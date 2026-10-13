@@ -1,6 +1,6 @@
 import type { Question } from "./types.ts";
 
-export function fitAnswer(q: Question, wanted: unknown): unknown {
+export function fitAnswer(q: Question, wanted: unknown, opts: { first?: boolean } = {}): unknown {
   const fits = (x: unknown) => !q.options.length || q.options.some((op) => String(op.value) === String(x) || op.label === String(x));
   const loose = (x: unknown) => q.options.find((op) => String(op.label).toLowerCase().includes(String(x).toLowerCase()) || String(x).toLowerCase().includes(String(op.label).toLowerCase()))?.value;
   if (wanted !== undefined && fits(wanted)) return wanted;
@@ -8,5 +8,5 @@ export function fitAnswer(q: Question, wanted: unknown): unknown {
     const v = loose(wanted);
     if (v !== undefined) return v;
   }
-  return [q.recommendation?.value, q.default, q.options[0]?.value].find((x) => x !== undefined && fits(x));
+  return [q.recommendation?.value, q.default, opts.first === false ? undefined : q.options[0]?.value].find((x) => x !== undefined && fits(x));
 }

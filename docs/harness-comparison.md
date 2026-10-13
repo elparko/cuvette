@@ -216,7 +216,7 @@ These causes are from the two records. A plain loop does not have them.
 | The data check after `inspect_table` checked the summary table of the tool and gave it the name of the data file. The model read the file again to make sure. | 1 call (run 1) | Fixed |
 | The version command of the adapter changed the system prompt after the first request. | 5,127 tokens written to the cache again (run 1) | Fixed |
 | The adapter hides the column table from a cloud model (`cloud_visibility: summaries`). The model reads the raw file with `read_file` to see the column names. | 1 call (run 2) | Not fixed |
-| Headless mode gave the first option (`paired: true`) because the question has no recommendation. The test failed, and the model asked to change the value. | 2 calls (run 1) | Not fixed |
+| Headless mode gave the first option (`paired: true`) because the question has no recommendation. The test failed, and the model asked to change the value. | 2 calls (run 1) | Fixed (see "Whole task again after the cache and effort changes") |
 | The answer check marks "80% power" as a number with no source, because it does not read the arguments of `run_script`. This starts a revision. | 1 call (run 1) | Not fixed |
 | The tool descriptions and the system prompt contain the folders of the session. Thus a new session cannot read the cache of the last session. | about 19,700 tokens written at each session start | Fixed (see "Prompt cache across sessions") |
 | The referee reads the answer. | 1 call | Not changed: part of the method |
@@ -246,7 +246,8 @@ Two tests in `tests/session.test.ts` cover the fixes. Each test fails on the old
   input file, the model does not need `read_file`. The `summaries` visibility permits column
   names. This change affects each data check, so the owner must decide.
 - The `paired` question has no recommendation. Headless mode then takes the first option.
-  This is a decision step, so it is not in this change.
+  This is a decision step, so it is not in this change. A later change fixes it. See "Whole
+  task again after the cache and effort changes".
 - The claim check does not read the arguments of free text tools. This rule is intentional.
 - A later change fixes the folders of the session and the effort for Haiku. See "Prompt cache
   across sessions and the effort for Haiku".
@@ -317,6 +318,109 @@ Limits:
   the effort. The cache read in the first request comes from the folder change.
 - The run before the change made 48 real model calls. The limit was 40. The session request
   count did not include the referee, the summary and the title calls.
+
+## Whole task again after the cache and effort changes
+
+This run repeats "Cost of a whole task with real Haiku" on main after the two changes above.
+The task, the data, the request and the prices are the same. These items are different:
+
+1. Cuvette uses effort `auto`, so it sends `medium` for Haiku. The system prompt has no
+   session path.
+2. Claude Code is version 2.1.296. It also sent effort `medium` for Haiku.
+3. The proxy limit is 30 model calls for all four runs. The proxy refused no request. The
+   four runs used 21 calls.
+4. The order is Cuvette run 1, Cuvette run 2, Claude Code run 1, Claude Code run 2.
+
+### Results
+
+| Metric | Cuvette run 1 | Cuvette run 2 | Claude Code run 1 | Claude Code run 2 |
+| --- | --- | --- | --- | --- |
+| Wall time | 22.3 s | 45.8 s | 10.5 s | 9.7 s |
+| Model time (sum of the requests) | 19.9 s | 42.4 s | 8.6 s | 8.2 s |
+| Harness time (wall time minus model time) | 2.3 s | 3.4 s | 1.9 s | 1.4 s |
+| Model calls | 6 (5 session, 1 referee) | 9 (7 session, 2 referee) | 3 | 3 |
+| Input tokens, not cached | 6,380 | 15,244 | 6 | 6 |
+| Cache write tokens | 22,068 | 6,399 | 27,559 | 6,847 |
+| Cache read tokens | 80,391 | 143,992 | 54,170 | 74,986 |
+| Output tokens | 3,191 | 6,485 | 1,371 | 1,541 |
+| Cost estimate | 0.0058 USD | 0.0070 USD | 0.0047 USD | 0.0024 USD |
+| Tool calls | 4 | 5 | 2 | 2 |
+| Answer says the groups differ, mean difference 0.9 | yes | yes | yes | yes |
+| Test result in the answer | Welch, p = 0.00066, 95% CI | Welch, p = 0.00066, 95% CI | Welch by hand, p about 0.001 | t-test by hand, p about 0.001 |
+
+Each Cuvette run gave the correct answer. Each run ran the Welch t-test in the `biostats`
+adapter. The answer gives the mean difference, the 95% CI, t, the degrees of freedom and
+Cohen d. Each Claude Code run computed the test by hand and said that the p value is
+approximate. The table rounds each time from the exact values, so a difference can be off by
+0.1 s.
+
+### Cache and effort
+
+- The first request of Cuvette run 2 read 18,182 tokens from the cache of run 1 and wrote
+  1,173 tokens. Run 1 wrote 19,355 tokens, because no earlier session had a cache entry.
+- The first request of Claude Code run 2 read 20,764 tokens from the cache of run 1. Run 1
+  wrote 26,920 tokens.
+- With a warm cache, a Cuvette session call costs about 0.0006 USD (run 2). A Claude Code
+  call costs about 0.0008 USD (run 2). The Cuvette prefix is smaller: 37 tools and about
+  19,500 tokens, against 21 tools and about 27,000 tokens.
+- The referee has no cache. Each referee call read 6,368 to 7,671 input tokens and wrote about
+  1,100 thinking tokens. A referee call costs 0.0012 to 0.0015 USD. The referee is 0.0012 USD
+  of Cuvette run 1 and 0.0028 USD of run 2.
+
+### Causes of the extra calls and tokens in Cuvette
+
+| Cause | Calls | Status |
+| --- | --- | --- |
+| The model reads the raw file with `read_file` to see the column names. The adapter shows only a summary to a cloud model. | 1 call in each run | Not fixed: owner decision (see the first "Not fixed" list) |
+| The referee reads the answer. | 1 call in each answer | Not changed: part of the method |
+| In run 2, the model added a power calculation with `run_script` at "80% power". The answer check marked 80 as a number with no source. This started a revision. | 1 call (revision) | Not fixed: the rule is intentional (see below) |
+| In run 2, the referee read the first answer, and then read the revised answer again. | 1 call | Not fixed (see below) |
+| Both harnesses list the project folder first. | 1 call in each run | Not changed: equal in the two harnesses |
+
+The `paired` question did not occur in these runs. In each run, the model gave `paired: false`
+in its call, so the question had a recommendation.
+
+### Fix
+
+This fix changes the headless default for a decision question with no recommendation. The
+old code took the first option of the list. For `paired`, that is `true`, and the unpaired test failed.
+
+- `src/core/session.ts`: a headless run can block on a decision with no recommendation and no
+  adapter default. Then the recommendation is the default of the linked tool argument. For `paired`
+  in `compare_two_groups`, this is `false`. The reason says that it is the tool default and
+  that no one can answer in a headless run.
+- `src/core/headless.ts`: a decision question can have no value in the answers file, no
+  recommendation and no default. Then the harness withdraws the question and writes a notice. It
+  does not take the first option. This also applies if the answers file gives a value that fits
+  no option. The answer note now gives the reason of the recommendation.
+  The old note said "answered from the answers file" also for a recommendation.
+
+The fix does not change the interactive mode. A scientist still sees no recommendation for
+`paired`. The benchmark of papers uses the same headless answers, so the fix applies there too.
+Two tests in `tests/session.test.ts` cover the fix. Each test fails on the old code.
+
+### Not fixed
+
+- The number check ignores the arguments of `run_script`. The test "numbers typed into a script
+  are not inputs" in `tests/claims.test.ts` makes this rule intentional. A number in script
+  code is not a source, because the model can type any number there. The script wrote 0.8 to
+  `power_check.csv`, but the check reads an output file only after `read_file` reads it. A
+  change to these rules is an owner decision.
+- The referee runs before the harness decides on a revision. If a rule finds an error, the
+  harness discards the referee warnings on the first answer. The referee then runs again on
+  the revised answer. The harness can skip the first referee call if a rule error already
+  starts a revision. Then the referee errors do not go into the revision. This changes the
+  review, so the owner must decide.
+- The column names for a cloud model. This is the same item as in the first "Not fixed" list.
+
+### Limits
+
+- Two runs of each harness. The Haiku replies change from run to run. Cuvette run 2 added a
+  power calculation that run 1 did not do.
+- The two harnesses do different work. Compare the cost for each call, not the total.
+- The cost is an estimate from the token counts. It is not the invoice.
+- `PATH` started with a Python that has `scipy`, for the two harnesses.
+- The proxy and the runner are not in the repository. They are about 150 lines in total.
 
 ## Method
 

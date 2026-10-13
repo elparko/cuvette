@@ -2398,12 +2398,14 @@ export class Session {
       const proposed = d?.links.map((l) => getArg(args, l.arg)).find((v) => v !== undefined && v !== null && v !== "");
       const hint = found ? await (await found.adapter.module()).suggest?.(key, args) : undefined;
       if (hint) evidence = [evidence, `Detected from the files: ${String(hint.value)}. ${hint.reason}`].filter(Boolean).join("\n");
+      const link = d?.links.find((l) => l.tool === (tool.remoteName ?? tool.name));
+      const toolDefault = this.settings.headless && link ? (tool.inputSchema.properties as Record<string, { default?: unknown }> | undefined)?.[link.arg]?.default : undefined;
       const q = await this.questions.ask({
         decisionKey: key,
         title: d?.label ?? key,
         text: `${d?.help || `The agent needs a value for "${d?.label ?? key}".`} The agent wants to run ${tool.remoteName ?? tool.name}.`,
         options: d?.kind === "bool" && !d.choices.length ? [{ value: true, label: "yes" }, { value: false, label: "no" }] : (d?.choices ?? []).map((c) => ({ value: c, label: String(c) })),
-        recommendation: hint ? { value: hint.value, reason: `The harness detected it from the files. ${hint.reason}` } : proposed !== undefined ? { value: proposed, reason: "The agent proposed this value in its tool call." } : d?.default !== undefined ? { value: d.default, reason: "This is the adapter default." } : undefined,
+        recommendation: hint ? { value: hint.value, reason: `The harness detected it from the files. ${hint.reason}` } : proposed !== undefined ? { value: proposed, reason: "The agent proposed this value in its tool call." } : d?.default !== undefined ? { value: d.default, reason: "This is the adapter default." } : toolDefault !== undefined ? { value: toolDefault, reason: `The tool uses this value if the call gives no ${link!.arg}. No one can answer in a headless run.` } : undefined,
         evidence,
         default: d?.default,
       });

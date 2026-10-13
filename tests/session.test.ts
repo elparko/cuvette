@@ -556,6 +556,40 @@ test("headless run: a refused answer from the catch-all falls back to the defaul
   expect(text).toMatch(/The answers file gave 'Use the values in the decision record\.' for min_size, which it refused: .* Used '5' instead\./);
 });
 
+test("headless run: a choice with no recommendation and no default is withdrawn, not answered with the first option", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: [{ value: true, label: "yes" }, { value: false, label: "no" }], evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("withdrawn"));
+  expect(session.decisions.isSet("method")).toBe(false);
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text)).join("\n")).toMatch(/no recommendation and no default/);
+});
+
+test("headless run: an answers-file value that fits no option, with no recommendation and no default, withdraws the question", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { method: "Huang" }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: [{ value: "Default", label: "Default" }, { value: "Otsu", label: "Otsu" }], evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("withdrawn"));
+  expect(session.decisions.isSet("method")).toBe(false);
+});
+
+test("headless run: a blocked decision with no recommendation uses the default of the tool argument and says so", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "Counted." }, { text: "Counted." }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: pickCwd(), settings: { headless: true, referee: "none" } });
+  attachHeadless(session, { answers: {}, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  const count = session.findTool("count")!;
+  (count.inputSchema.properties as Record<string, { default?: unknown }>).method.default = "Otsu";
+  await session.send("Count a.tif");
+  expect(session.decisions.value("method")).toBe("Otsu");
+  const q = session.record.entries(["question"]).find((e) => (e.data as { decisionKey?: string }).decisionKey === "method")!;
+  expect((q.data as { recommendation?: { value: unknown } }).recommendation?.value).toBe("Otsu");
+  const notes = session.record.entries(["answer"]).map((e) => String(e.data.note));
+  expect(notes.some((n) => /used the recommendation: The tool uses this value if the call gives no method/.test(n))).toBe(true);
+});
+
 test("blind mode adds a mid-session adapter folder to the allow list and hides it from the file tools", async () => {
   const cwd = pickCwd();
   setBlindPolicy({ allow: [cwd], deny: [] });
