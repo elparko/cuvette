@@ -33,10 +33,17 @@ interface ProgramRow {
   tags: { text: string; tone: string; title?: string }[];
   actions: Action[];
 }
+interface Job {
+  id: string;
+  name: string;
+  action: string;
+  started: number;
+}
 interface Programs {
   summary: string;
   checking: boolean;
   groups: { title: string; rows: ProgramRow[] }[];
+  jobs?: Job[];
 }
 interface Plan {
   action: string;
@@ -61,9 +68,17 @@ interface Run {
 
 const TONE: Record<string, "ok" | "bad" | "warn" | "default"> = { ok: "ok", bad: "bad", warn: "warn", none: "default" };
 const MAIN = new Set(["install", "update", "check"]);
+const LOG_LINES = 500;
 
-function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone }: { open: boolean; setOpen: (o: boolean) => void; run: Run | null; setRun: (r: Run | null) => void; plan: Plan | null; setPlan: (p: Plan | null) => void; mode: "" | "path" | "add"; onDone: () => void }) {
+function elapsed(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, job, onDone }: { open: boolean; setOpen: (o: boolean) => void; run: Run | null; setRun: (r: Run | null) => void; plan: Plan | null; setPlan: (p: Plan | null) => void; mode: "" | "path" | "add"; job: Job | null; onDone: () => void }) {
   const [input, setInput] = useState("");
+  const [running, setRunning] = useState<{ id: string; started: number; stopping?: boolean } | null>(null);
+  const [now, setNow] = useState(Date.now());
   const [result, setResult] = useState<{ text: string; ok?: boolean } | null>(null);
   const [log, setLog] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +86,7 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
   const [stage, setStage] = useState(mode);
   const logRef = useRef<HTMLPreElement>(null);
   const gen = useRef(0);
+  const source = useRef<EventSource | null>(null);
   const live = (g: number) => g === gen.current;
 
   useEffect(() => {
@@ -82,13 +98,29 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
     setBusy(false);
     setFinished(false);
     setStage(mode);
-  }, [open, mode]);
+    setRunning(null);
+    if (job) {
+      setBusy(true);
+      follow(job.id, job.started, gen.current);
+    }
+  }, [open, mode, job]);
+
+  const going = !!running && !finished;
+  useEffect(() => {
+    if (!going) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [going]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [log]);
 
   const close = (o: boolean) => {
+    if (!o && running && !finished) {
+      toast(`The ${plan?.action === "update" ? "update" : "install"} continues. The Programs page shows it.`);
+      onDone();
+    }
     if (!o && run?.install) call("api/adapters/drop", { install: run.install }).catch(() => {});
     if (!o) setRun(null);
     setOpen(o);
@@ -158,6 +190,40 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
     if (run) setRun({ ...run, install: "" });
   };
 
+  function follow(id: string, started: number, g: number) {
+    source.current?.close();
+    setRunning({ id, started });
+    setNow(Date.now());
+    setLog([]);
+    setResult({ text: "Working…" });
+    const src = new EventSource(withT("api/programs/progress?job=" + id));
+    source.current = src;
+    src.onopen = () => live(g) && setLog([]);
+    src.onerror = () => {
+      if (src.readyState !== EventSource.CLOSED) return;
+      finish({ ok: false, text: "The connection to the job stopped. The program list shows the result." }, g);
+    };
+    src.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.line !== undefined && live(g)) setLog((l) => [...(l ?? []), m.line].slice(-LOG_LINES));
+      if (m.done) {
+        src.close();
+        finish(m, g);
+      }
+    };
+  }
+
+  const stop = async () => {
+    if (!running) return;
+    setRunning({ ...running, stopping: true });
+    try {
+      await call("api/programs/stop", { job: running.id });
+    } catch (e) {
+      toast.error((e as Error).message);
+      setRunning((r) => r && { ...r, stopping: false });
+    }
+  };
+
   const confirm = async () => {
     if (!run) return;
     const g = gen.current;
@@ -173,24 +239,12 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
       return;
     }
     if (!r.job) return finish(r, g);
-    if (live(g)) setLog([]);
-    const src = new EventSource(withT("api/programs/progress?job=" + r.job));
-    src.onopen = () => live(g) && setLog([]);
-    src.onerror = () => {
-      if (src.readyState !== EventSource.CLOSED) return;
-      finish({ ok: false, text: "The connection to the job stopped. The program list shows the result." }, g);
-    };
-    src.onmessage = (ev) => {
-      const m = JSON.parse(ev.data);
-      if (m.line !== undefined && live(g)) setLog((l) => [...(l ?? []), m.line]);
-      if (m.done) {
-        src.close();
-        finish(m, g);
-      }
-    };
+    if (live(g)) follow(r.job, Date.now(), g);
   };
 
-  const can = !!plan && plan.runs && !plan.refused && !finished;
+  const retry = finished && result?.ok === false && !!plan?.runs && !plan.refused && (plan.action === "install" || plan.action === "update");
+  const can = !!plan && plan.runs && !plan.refused && !finished && !going;
+  const status = going && result && result.ok === undefined ? `${running!.stopping ? "Stopping…" : "Working…"} ${elapsed(now - running!.started)}` : result?.text;
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -257,7 +311,7 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
           {result && (
             <p role="status" className={cn("flex items-center gap-2 text-sm", result.ok === true && "text-ok", result.ok === false && "text-bad")}>
               {busy && <LoaderCircleIcon className="size-4 animate-spin" />}
-              {result.text}
+              {status}
             </p>
           )}
         </div>
@@ -265,9 +319,25 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
           <Button variant="ghost" onClick={() => close(false)}>
             {can ? "Cancel" : "Close"}
           </Button>
-          {plan?.review && !finished && (
+          {going && (
+            <Button variant="destructive" onClick={stop} disabled={running!.stopping}>
+              Stop the {plan?.action === "update" ? "update" : "install"}
+            </Button>
+          )}
+          {plan?.review && !finished && !going && (
             <Button variant="outline" onClick={review} disabled={busy}>
               {plan.review}
+            </Button>
+          )}
+          {retry && (
+            <Button
+              onClick={() => {
+                setRunning(null);
+                setFinished(false);
+                void confirm();
+              }}
+            >
+              Try again
             </Button>
           )}
           {can && (
@@ -289,6 +359,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
   const [run, setRun] = useState<Run | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [mode, setMode] = useState<"" | "path" | "add">("");
+  const [job, setJob] = useState<Job | null>(null);
   const [q, setQ] = useState("");
   const startRef = useRef(ctx.programStart);
 
@@ -323,8 +394,17 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
     }
   }, [data, ctx]);
 
+  const show = (r: ProgramRow, j: Job) => {
+    setRun({ name: r.name, action: j.action });
+    setPlan({ action: j.action, name: r.name, title: `${j.action === "update" ? "Update" : "Install"}: ${r.program} (${r.name})`, lines: [], runs: false });
+    setMode("");
+    setJob(j);
+    setOpen(true);
+  };
+
   const act = async (r: ProgramRow, action: string) => {
     setPlan(null);
+    setJob(null);
     if (action === "check") {
       setChecking(r.name);
       try {
@@ -369,6 +449,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
             variant="outline"
             onClick={() => {
               setRun({});
+              setJob(null);
               setPlan(null);
               setMode("add");
               setOpen(true);
@@ -401,6 +482,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
                 {g.rows.map((r) => {
                   const main = r.actions.filter((a) => MAIN.has(a.action));
                   const more = r.actions.filter((a) => !MAIN.has(a.action));
+                  const j = data.jobs?.find((x) => x.name === r.name);
                   return (
                     <div key={r.name} data-prog={r.name} className={cn("flex flex-col gap-1.5 px-5 py-4 sm:flex-row sm:items-start sm:gap-4", r.off && "opacity-70")}>
                       <div className="min-w-0 flex-1">
@@ -408,6 +490,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
                           <span className="font-medium">{r.program}</span>
                           <span className="text-xs text-muted-foreground">{r.name}</span>
                           <Badge tone={TONE[r.tone] ?? "default"}>{r.state}</Badge>
+                          {j && <Badge tone="warn">{j.action === "update" ? "updating" : "installing"}</Badge>}
                           {r.tags.map((t) => (
                             <Badge key={t.text} tone={t.tone === "warn" ? "warn" : "default"} title={t.title}>
                               {t.text}
@@ -432,12 +515,18 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5 pt-1 sm:pt-0">
-                        {main.map((a) => (
-                          <Button key={a.action} size="sm" variant={a.action === "install" ? "default" : a.action === "check" ? "ghost" : "outline"} disabled={checking === r.name} onClick={() => act(r, a.action)}>
-                            {a.label}
+                        {j ? (
+                          <Button size="sm" variant="outline" onClick={() => show(r, j)}>
+                            <LoaderCircleIcon className="animate-spin" /> Show the progress
                           </Button>
-                        ))}
-                        {more.length > 0 && (
+                        ) : (
+                          main.map((a) => (
+                            <Button key={a.action} size="sm" variant={a.action === "install" ? "default" : a.action === "check" ? "ghost" : "outline"} disabled={checking === r.name} onClick={() => act(r, a.action)}>
+                              {a.label}
+                            </Button>
+                          ))
+                        )}
+                        {more.length > 0 && !j && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button size="icon-sm" variant="ghost" aria-label={`More actions for ${r.program}`}>
@@ -464,7 +553,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
           {data.groups.length > 0 && !shown!.length && <p className="text-muted-foreground">No program matches the search.</p>}
         </>
       )}
-      <ProgramDialog open={open} setOpen={setOpen} run={run} setRun={setRun} plan={plan} setPlan={setPlan} mode={mode} onDone={() => load(true)} />
+      <ProgramDialog open={open} setOpen={setOpen} run={run} setRun={setRun} plan={plan} setPlan={setPlan} mode={mode} job={job} onDone={() => load(true)} />
     </div>
   );
 }

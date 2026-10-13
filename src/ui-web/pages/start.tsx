@@ -71,7 +71,7 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
               Show all sessions
             </Button>
           </div>
-          <SessionGrid list={recent} onOpen={(id) => sessions.open(id, ctx.opened)} />
+          <SessionGrid label="Recent sessions" list={recent} onOpen={(id) => sessions.open(id, ctx.opened)} />
         </section>
       )}
     </div>

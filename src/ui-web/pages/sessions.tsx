@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { AppCtx, Page } from "../App.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { call } from "../lib/api.ts";
+import { useRoving } from "../lib/rove.ts";
 import { cn } from "../lib/utils.ts";
 
 export interface SessionCard {
@@ -77,13 +78,16 @@ export type Sessions = ReturnType<typeof useSessions>;
 
 const STATUS_TONE: Record<string, "mag" | "info" | "ok" | "default"> = { "waiting for you": "mag", running: "info", answered: "ok" };
 
-export function SessionGrid({ list, onOpen, compact }: { list: SessionCard[]; onOpen: (id: string) => void; compact?: boolean }) {
+export function SessionGrid({ list, onOpen, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; compact?: boolean; label?: string }) {
+  const rove = useRoving(list.filter((s) => !s.moved).map((s) => s.id));
   return (
-    <ul className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
+    <ul aria-label={label} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
       {list.map((s) => (
         <li key={s.id}>
           <button
             type="button"
+            data-rove={s.id}
+            tabIndex={rove.tabIndex(s.id)}
             disabled={s.moved}
             onClick={() => onOpen(s.id)}
             className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-card transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-55"

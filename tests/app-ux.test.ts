@@ -244,7 +244,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await until(page, `${btnIn('[role="dialog"]', "Install")}`)).toBe(true);
     await page.eval(`${btnIn('[role="dialog"]', "Install")}.click()`);
     expect(await until(page, `window.__sources.length === 1`)).toBe(true);
-    await page.eval(`${btnIn('[role="dialog"]', "Cancel")}.click()`);
+    await page.eval(`${btnIn('[role="dialog"]', "Close")}.click()`);
     expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
     await page.eval(`${btnIn('[data-prog="bbb"]', "Install")}.click()`);
     expect(await until(page, `document.querySelector('[role="dialog"]')?.textContent.includes("Install bbb")`)).toBe(true);
@@ -255,8 +255,90 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`${btnIn('[role="dialog"]', "Install")}.click()`);
     expect(await until(page, `window.__calls.some((c) => c.url.includes("api/programs/run"))`)).toBe(true);
     expect(await page.eval(`JSON.parse(window.__calls.find((c) => c.url.includes("api/programs/run")).body).name`)).toBe("bbb");
-    await page.eval(`${btnIn('[role="dialog"]', "Cancel")}.click()`);
+    await page.eval(`${btnIn('[role="dialog"]', "Close")}.click()`);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/programs"))`);
+  });
+
+  test("program dialog: a running install shows the time and a Stop button, keeps running after Close, and the row opens it again", async () => {
+    await page.eval(`(() => {
+      window.__sources = [];
+      window.EventSource = class {
+        constructor(u) { this.url = u; this.readyState = 1; window.__sources.push(this); }
+        close() { this.readyState = 2; }
+      };
+      window.__jobs = [];
+      window.__mocks.push({ part: "api/programs.json", reply: () => ({ body: { summary: "One program.", checking: false, jobs: window.__jobs, groups: [{ title: "Imaging", rows: [{ name: "ccc", program: "Program ccc", state: "missing", tone: "bad", version: "", size: "", lastUse: "never", origin: "", detail: "Not installed.", warn: "", cite: "", off: false, path: "", tags: [], actions: [{ action: "install", label: "Install" }, { action: "remove", label: "Remove" }] }] }] } }) });
+      window.__mocks.push({ part: "api/programs/plan", reply: (_u, b) => ({ body: { plan: { action: "install", name: b.name, title: "Install " + b.name, lines: ["Line"], runs: true, confirm: "Install", command: "uv pip install ccc" } } }) });
+      window.__mocks.push({ part: "api/programs/run", reply: () => ({ body: { job: "job-ccc" } }) });
+      window.__mocks.push({ part: "api/programs/stop", reply: () => ({ body: { ok: true } }) });
+    })()`);
+    await goPage("Sessions");
+    await goPage("Programs");
+    expect(await until(page, `document.querySelector('[data-prog="ccc"]')`)).toBe(true);
+    const btnIn = (sel: string, label: string) => `[...document.querySelectorAll(${JSON.stringify(sel + " button")})].find((b) => b.textContent.trim() === ${JSON.stringify(label)})`;
+    const dlg = `document.querySelector('[role="dialog"]')`;
+    await page.eval(`${btnIn('[data-prog="ccc"]', "Install")}.click()`);
+    expect(await until(page, `${btnIn('[role="dialog"]', "Install")}`)).toBe(true);
+    await page.eval(`${btnIn('[role="dialog"]', "Install")}.click()`);
+    expect(await until(page, `window.__sources.length === 1 && ${btnIn('[role="dialog"]', "Stop the install")}`)).toBe(true);
+    expect(await page.eval(`!${btnIn('[role="dialog"]', "Install")} && !!${btnIn('[role="dialog"]', "Close")}`)).toBe(true);
+    expect(await until(page, `/Working… [0-9]+ s/.test(${dlg}.querySelector('[role="status"]').textContent)`)).toBe(true);
+    await page.eval(`window.__sources[0].onmessage({ data: JSON.stringify({ line: "Downloading torch" }) })`);
+    expect(await until(page, `${dlg}.querySelector("pre[aria-live]")?.textContent.includes("Downloading torch")`)).toBe(true);
+    await page.eval(`window.__calls = []; ${btnIn('[role="dialog"]', "Stop the install")}.click()`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/programs/stop") && JSON.parse(c.body).job === "job-ccc")`)).toBe(true);
+    expect(await until(page, `${dlg}.querySelector('[role="status"]').textContent.includes("Stopping…")`)).toBe(true);
+    await page.eval(`window.__sources[0].onmessage({ data: JSON.stringify({ done: true, ok: false, text: "You stopped the install." }) })`);
+    expect(await until(page, `${dlg}.textContent.includes("You stopped the install.") && !${btnIn('[role="dialog"]', "Stop the install")}`)).toBe(true);
+    await page.eval(`${btnIn('[role="dialog"]', "Try again")}.click()`);
+    expect(await until(page, `window.__sources.length === 2 && ${btnIn('[role="dialog"]', "Stop the install")} && !${btnIn('[role="dialog"]', "Try again")}`)).toBe(true);
+    await page.eval(`window.__jobs = [{ id: "job-ccc", name: "ccc", action: "install", started: Date.now() - 65000 }]; ${btnIn('[role="dialog"]', "Close")}.click()`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]') && document.body.textContent.includes("The install continues.")`)).toBe(true);
+    expect(await until(page, `!!${btnIn('[data-prog="ccc"]', "Show the progress")} && document.querySelector('[data-prog="ccc"]').textContent.includes("installing")`)).toBe(true);
+    expect(await page.eval(`!${btnIn('[data-prog="ccc"]', "Install")} && !document.querySelector('[data-prog="ccc"] [aria-label^="More actions"]')`)).toBe(true);
+    await page.eval(`${btnIn('[data-prog="ccc"]', "Show the progress")}.click()`);
+    expect(await until(page, `window.__sources.length === 3 && window.__sources[2].url.includes("job=job-ccc") && /Working… 1 min [0-9]+ s/.test(${dlg}.querySelector('[role="status"]').textContent)`)).toBe(true);
+    await page.eval(`window.__jobs = []; window.__sources[2].onmessage({ data: JSON.stringify({ done: true, ok: true, text: "Installed ccc." }) })`);
+    expect(await until(page, `${dlg}.textContent.includes("Installed ccc.")`)).toBe(true);
+    await page.eval(`${btnIn('[role="dialog"]', "Close")}.click()`);
+    expect(await until(page, `!!${btnIn('[data-prog="ccc"]', "Install")}`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/programs"))`);
+  });
+
+  test("a session list is one Tab stop; the arrow keys, Home and End move in it and skip a moved session", async () => {
+    await page.eval(`(() => {
+      const card = (i, moved) => ({ id: "s" + i, title: "Session " + i, text: "", folder: "/lab/f" + i, folderName: "f" + i, age: "1 h ago", status: "", moved, thumb: "" });
+      window.__mocks.push({ part: "api/sessions.json", reply: () => ({ body: [card(1, false), card(2, true), card(3, false), card(4, false), card(5, false)] }) });
+    })()`);
+    await page.size(1280, 900);
+    await goPage("Sessions");
+    await page.eval(`document.querySelector('main button[aria-pressed]')?.click()`);
+    expect(await until(page, `document.querySelectorAll('main ul[aria-label="Sessions"] button').length === 5`)).toBe(true);
+    const stops = `[...document.querySelectorAll('main ul[aria-label="Sessions"] button')].filter((b) => b.tabIndex === 0 && !b.disabled).map((b) => b.dataset.rove)`;
+    expect(await page.eval(stops)).toEqual(["s1"]);
+    const key = (k: string) => page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
+    const at = () => page.eval<string>(`document.activeElement.dataset.rove ?? ""`);
+    await page.eval(`document.querySelector('main [data-rove="s1"]').focus()`);
+    await key("ArrowRight");
+    expect(await at()).toBe("s3");
+    expect(await page.eval(stops)).toEqual(["s3"]);
+    await key("ArrowDown");
+    expect(await at()).toBe("s5");
+    await key("ArrowLeft");
+    expect(await at()).toBe("s4");
+    await key("ArrowUp");
+    expect(await at()).toBe("s1");
+    await key("End");
+    expect(await at()).toBe("s5");
+    await key("Home");
+    expect(await at()).toBe("s1");
+    const side = `[...document.querySelectorAll('aside [role="group"] button[data-rove]')]`;
+    expect(await until(page, `${side}.length === 4`)).toBe(true);
+    expect(await page.eval(`${side}.filter((b) => b.tabIndex === 0).length`)).toBe(1);
+    await page.eval(`${side}[0].focus()`);
+    await key("ArrowDown");
+    expect(await page.eval(`document.activeElement === ${side}[1]`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json")`);
   });
 
   test("the conversation shows its end after a reload, the sidebar names the request, and on a phone the message box fits under the header", async () => {
@@ -337,6 +419,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
     await page.eval(`window.dispatchEvent(new CustomEvent("cuvette-drag", { detail: "enter" }))`);
     expect(await until(page, `!!document.querySelector('[role="dialog"]')`)).toBe(true);
+    expect(await until(page, `document.querySelector('[role="dialog"]').textContent.includes("Drop a folder to open it")`)).toBe(true);
     await page.eval(`window.dispatchEvent(new CustomEvent("cuvette-drag", { detail: "leave" }))`);
     expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
   });

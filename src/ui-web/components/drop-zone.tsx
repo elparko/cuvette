@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { dropFolder, dropZones, hasFiles } from "../lib/drop.ts";
 
 export function DropZone({ choose, disabled, browserHint, children }: { choose: (folder: string) => void; disabled?: boolean; browserHint: string; children: ReactNode }) {
-  const [over, setOver] = useState(false);
+  const [over, setOver] = useState(() => dropZones.dragging);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {

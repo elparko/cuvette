@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
@@ -99,7 +100,8 @@ export interface RunOpts extends ProgramsOpts {
   confirmed?: boolean;
   via: Via;
   by?: string;
-  exec?: (command: string, onLine: (line: string) => void) => Promise<number | null>;
+  exec?: (command: string, onLine: (line: string) => void, signal?: AbortSignal) => Promise<number | null>;
+  signal?: AbortSignal;
   remove?: (path: string) => void;
   approve?: (root: string, by: string) => Promise<unknown>;
   onLine?: (line: string) => void;
@@ -498,14 +500,96 @@ export async function planAction(r: ProgramRow, action: Action, opts: { path?: s
   }
 }
 
-function defaultExec(command: string, onLine: (line: string) => void): Promise<number | null> {
+function defaultExec(command: string, onLine: (line: string) => void, signal?: AbortSignal): Promise<number | null> {
   const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
   return new Promise((done) => {
-    const child = spawn("/bin/sh", ["-c", command], { env: { ...process.env, PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+    if (signal?.aborted) return done(null);
+    const child = spawn("/bin/sh", ["-c", command], { env: { ...process.env, PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: !!signal });
     for (const s of [child.stdout, child.stderr]) createInterface({ input: s }).on("line", onLine);
+    const kill = (sig: NodeJS.Signals) => {
+      try {
+        process.kill(-child.pid!, sig);
+      } catch {}
+    };
+    let hard: NodeJS.Timeout | undefined;
+    const stop = () => {
+      kill("SIGTERM");
+      hard = setTimeout(() => kill("SIGKILL"), 5000);
+      hard.unref();
+    };
+    signal?.addEventListener("abort", stop, { once: true });
     child.on("error", (e) => (onLine(e.message), done(null)));
-    child.on("close", (code) => done(code));
+    child.on("close", (code) => {
+      signal?.removeEventListener("abort", stop);
+      clearTimeout(hard);
+      done(code);
+    });
   });
+}
+
+const NEEDS_PASSWORD = /a terminal is required to read the password|a password is required|no tty present|askpass|^\s*password:/im;
+
+// One install or update of a program at a time, also across processes: the app, the terminal and cuvette programs.
+function runFiles(home: string, plan: Plan): string[] {
+  // Homebrew allows one install at a time, so two Homebrew commands for two programs cannot run together.
+  const keys = [plan.name, ...(plan.command ? [createHash("sha256").update(plan.command).digest("hex").slice(0, 16)] : []), ...(/(^|[\s;&|])brew\s/.test(plan.command ?? "") ? ["homebrew"] : [])];
+  return keys.map((k) => join(home, "programs-running", k.replace(/[^\w.-]/g, "_") + ".json"));
+}
+
+export function runningText(home: string, plan: Plan): string | undefined {
+  for (const f of runFiles(home, plan)) {
+    let other: { pid?: number; action?: string; name?: string } = {};
+    try {
+      other = JSON.parse(readFileSync(f, "utf8"));
+    } catch {
+      continue;
+    }
+    if (other.pid && pidAlive(other.pid)) return `${other.name ?? plan.name}: an ${other.action === "update" ? "update" : "install"} runs now. Wait for it to end, or stop it. Nothing changed.`;
+  }
+  return undefined;
+}
+
+function claimRun(home: string, plan: Plan): { release: () => void } | { busy: string } {
+  const busy = runningText(home, plan);
+  if (busy) return { busy };
+  const keys = runFiles(home, plan);
+  mkdirSync(join(home, "programs-running"), { recursive: true });
+  const mine = JSON.stringify({ pid: process.pid, action: plan.action, name: plan.name, started: new Date().toISOString() });
+  const made: string[] = [];
+  for (const f of keys) {
+    try {
+      writeFileSync(f, mine, { flag: "wx" });
+    } catch {
+      const busy = runningText(home, plan);
+      if (!busy) rmSync(f, { force: true });
+      try {
+        if (busy) throw new Error(busy);
+        writeFileSync(f, mine, { flag: "wx" });
+      } catch {
+        for (const m of made) rmSync(m, { force: true });
+        return { busy: busy ?? `${plan.name}: an install runs now. Wait for it to end, or stop it. Nothing changed.` };
+      }
+    }
+    made.push(f);
+  }
+  return {
+    release: () => {
+      for (const f of keys) {
+        try {
+          if (JSON.parse(readFileSync(f, "utf8")).pid === process.pid) rmSync(f, { force: true });
+        } catch {}
+      }
+    },
+  };
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 export function logFile(home = cuvetteHome()): string {
@@ -547,11 +631,23 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
   switch (plan.action) {
     case "install":
     case "update": {
-      say(`$ ${plan.command}`);
-      const code = await (opts.exec ?? defaultExec)(plan.command!, say);
-      return done(code === 0, code === 0 ? `${plan.action === "install" ? "Installed" : "Updated"} ${plan.name}.` : `The command stopped with exit code ${code}. Nothing else changed.`, { command: plan.command, code });
+      const claim = claimRun(home, plan);
+      if ("busy" in claim) return { ok: false, text: claim.busy };
+      try {
+        say(`$ ${plan.command}`);
+        const tail: string[] = [];
+        const code = await (opts.exec ?? defaultExec)(plan.command!, (l) => (tail.push(l), tail.length > 200 && tail.shift(), say(l)), opts.signal);
+        const verb = plan.action === "install" ? "install" : "update";
+        if (opts.signal?.aborted && code !== 0) return done(false, `You stopped the ${verb}. Part of ${plan.name} can be on this computer. Choose ${plan.action === "install" ? "Install" : "Update"} again to finish it.`, { command: plan.command, code, stopped: true });
+        if (code !== 0 && NEEDS_PASSWORD.test(tail.join("\n"))) return done(false, `The command asks for your password, and Cuvette cannot type it. Run the command in Terminal, then choose Check again: ${plan.command}`, { command: plan.command, code, password: true });
+        return done(code === 0, code === 0 ? `${plan.action === "install" ? "Installed" : "Updated"} ${plan.name}.` : `The command stopped with exit code ${code}. Nothing else changed.`, { command: plan.command, code });
+      } finally {
+        claim.release();
+      }
     }
     case "remove": {
+      const busy = runningText(home, plan);
+      if (busy) return { ok: false, text: busy };
       const places = installPlaces(Object.values(manifests(opts)).map((x) => x.manifest), home);
       const lib = rLibrary(opts.env ?? process.env);
       for (const p of plan.paths ?? []) {

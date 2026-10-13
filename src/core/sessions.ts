@@ -110,22 +110,22 @@ interface Parsed {
   first: any;
   ask: any;
   title?: { title: string; description: string };
-  figure?: string;
+  figures: string[];
   answered: boolean;
   waiting: boolean;
   lastFinal: boolean;
 }
 
-const parsed = new Map<string, { mtime: number; size: number; p: Parsed }>();
+const parsed = new Map<string, { mtime: number; size: number; ino: number; p: Parsed }>();
 
 function parseLog(log: string): Parsed {
   const st = statSync(log);
   const hit = parsed.get(log);
-  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.p;
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino) return hit.p;
   let first: any;
   let ask: any;
   let title: { title: string; description: string } | undefined;
-  let figure: string | undefined;
+  const figures: string[] = [];
   let answered = false;
   const asked = new Set<string>();
   let planOpen = false;
@@ -149,15 +149,16 @@ function parseLog(log: string): Parsed {
     else if (e.kind === "answer") asked.delete(String(d.qid));
     else if (e.kind === "plan") planOpen = d.action === "proposed";
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
-    else if (!figure && e.kind === "node" && !d.sensitivityOf) figure = ((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).find((p) => IMAGE.test(p) && existsSync(p));
+    else if (figures.length < 20 && e.kind === "node" && !d.sensitivityOf) figures.push(...((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).filter((p) => IMAGE.test(p)));
   }
-  const p = { first, ask, title, figure, answered, waiting: asked.size > 0 || planOpen, lastFinal };
-  parsed.set(log, { mtime: st.mtimeMs, size: st.size, p });
+  const p = { first, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal };
+  parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, p });
   return p;
 }
 
 export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string } {
-  const { first, ask, title, figure, answered, waiting, lastFinal } = parseLog(log);
+  const { first, ask, title, figures, answered, waiting, lastFinal } = parseLog(log);
+  const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
   const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : "not started";
   return { first, ask, title, status, figure, owner: first?.session };
@@ -210,6 +211,7 @@ export function listSessions(home = cuvetteHome()): SessionInfo[] {
     s.cwd = String(scanLog(log).first?.data.cwd ?? "");
     out.push(s);
   }
+  for (const log of parsed.keys()) if (!existsSync(log)) parsed.delete(log);
   return out.filter((s) => !(s.moved && s.used === 0)).sort((a, b) => b.used - a.used || b.id.localeCompare(a.id));
 }
 

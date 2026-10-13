@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -111,6 +111,33 @@ test("the list reads a log again only after it changes, and the running status s
   expect(listSessions(h)[0]!.status).toBe("waiting for you");
   writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.pid }));
   expect(listSessions(h)[0]!.status).toBe("running");
+});
+
+test("a deleted log leaves no old data: a new log at the same path and a deleted figure show at once", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-gone-"));
+  const dir = join(h, "sessions", "20261012-110000-eeee");
+  const log = join(dir, "log.jsonl");
+  const fig = (n: string) => join(h, n);
+  writeFileSync(fig("a.png"), "x");
+  writeFileSync(fig("b.png"), "x");
+  const write = (ask: string) => {
+    mkdirSync(dir, { recursive: true });
+    const lines = [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "user", data: { text: ask } }, { id: 3, kind: "node", data: { outputs: [{ path: fig("a.png") }] } }, { id: 4, kind: "node", data: { outputs: [{ path: fig("b.png") }] } }];
+    writeFileSync(log, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    const t = new Date(Date.now() - 60000);
+    utimesSync(log, t, t);
+  };
+  write("Count the cells");
+  expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", figure: fig("a.png") });
+  rmSync(fig("a.png"));
+  expect(listSessions(h)[0]!.figure).toBe(fig("b.png"));
+  rmSync(dir, { recursive: true });
+  expect(listSessions(h)).toEqual([]);
+  write("Xxxxx xxx xxxxx");
+  expect(listSessions(h)[0]!.ask).toBe("Xxxxx xxx xxxxx");
+  rmSync(log);
+  write("Count the cells");
+  expect(listSessions(h)[0]!.ask).toBe("Count the cells");
 });
 
 test("a custom name wins over the automatic title, and a removed session leaves the list", () => {

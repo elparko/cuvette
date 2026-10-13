@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "./components/ui/input.tsx";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip.tsx";
 import { dropZones, hasFiles } from "./lib/drop.ts";
+import { useRoving } from "./lib/rove.ts";
 import { useStored } from "./lib/stored.ts";
 import { call, copyText, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
@@ -114,6 +115,7 @@ export function App() {
 
   const stream = useStream(boot, !!state?.session);
   const sessions = useSessions(page, boots, stream.status.state === "idle");
+  const rove = useRoving(sessions.list.filter((x) => !x.moved).slice(0, 6).map((x) => x.id));
 
   // A file or folder dragged over a page with no drop zone opens the folder dialog, which has one.
   // The browser must not open the dropped file in place of the app.
@@ -125,13 +127,17 @@ export function App() {
       setFolderOpen(true);
     };
     const desktopDrag = (e: Event) => {
-      if ((e as CustomEvent<string>).detail === "enter") show();
+      dropZones.dragging = (e as CustomEvent<string>).detail === "enter";
+      if (dropZones.dragging) show();
       else if (dragOpened.current) {
         dragOpened.current = false;
         setFolderOpen(false);
       }
     };
-    const desktopDrop = () => (dragOpened.current = false);
+    const desktopDrop = () => {
+      dragOpened.current = false;
+      dropZones.dragging = false;
+    };
     const enter = (e: DragEvent) => hasFiles(e) && show();
     const over = (e: DragEvent) => hasFiles(e) && e.preventDefault();
     const leave = (e: DragEvent) => {
@@ -227,13 +233,15 @@ export function App() {
             ))}
           </nav>
           {!rail && recent.length > 0 && (
-            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2">
-              <div className="px-2.5 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
+            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2" role="group" aria-labelledby="recent-head" onKeyDown={rove.onKeyDown} onFocus={rove.onFocus}>
+              <div id="recent-head" className="px-2.5 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
                 <ContextMenu key={s.id}>
                   <ContextMenuTrigger asChild>
                     <button
                       type="button"
+                      data-rove={s.id}
+                      tabIndex={rove.tabIndex(s.id)}
                       title={`${s.title}\n${s.folder}`}
                       onClick={() => sessions.open(s.id, opened)}
                       onContextMenu={(e) => e.stopPropagation()}

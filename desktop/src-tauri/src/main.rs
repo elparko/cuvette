@@ -184,7 +184,10 @@ fn open_folder(app: &AppHandle, path: PathBuf) {
 }
 
 fn drag_script(event: &DragDropEvent) -> Option<String> {
+    // A drag of text or of a link from another app has no paths. It must not open the folder dialog.
     let (name, detail) = match event {
+        DragDropEvent::Enter { paths, .. } if paths.is_empty() => return None,
+        DragDropEvent::Drop { paths, .. } if paths.is_empty() => return None,
         DragDropEvent::Enter { .. } => ("cuvette-drag", serde_json::json!("enter")),
         DragDropEvent::Leave => ("cuvette-drag", serde_json::json!("leave")),
         DragDropEvent::Drop { paths, .. } => {
