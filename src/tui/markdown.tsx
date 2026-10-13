@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { padTo, textWidth, wrapLine } from "./width.ts";
 
 const INLINE = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\s][^*\n]*\*|\[no source\])/g;
 
@@ -55,13 +56,14 @@ function wrapCell(text: string, width: number): string[] {
   const out: string[] = [];
   let cur = "";
   for (let word of text.split(/\s+/).filter(Boolean)) {
-    while (word.length > width) {
+    if (textWidth(word) > width) {
       if (cur) out.push(cur), (cur = "");
-      out.push(word.slice(0, width));
-      word = word.slice(width);
+      const parts = wrapLine(word, width);
+      word = parts.pop()!;
+      out.push(...parts);
     }
     if (!cur) cur = word;
-    else if (cur.length + 1 + word.length <= width) cur += " " + word;
+    else if (textWidth(cur) + 1 + textWidth(word) <= width) cur += " " + word;
     else out.push(cur), (cur = word);
   }
   if (cur || !out.length) out.push(cur);
@@ -70,7 +72,7 @@ function wrapCell(text: string, width: number): string[] {
 
 export function tableLines(rows: string[][], width: number): { text: string; head: boolean; rule: boolean }[] {
   const cols = Math.max(...rows.map((r) => r.length));
-  const widths = Array.from({ length: cols }, (_, c) => Math.max(3, ...rows.map((r) => (r[c] ?? "").length)));
+  const widths = Array.from({ length: cols }, (_, c) => Math.max(3, ...rows.map((r) => textWidth(r[c] ?? ""))));
   const gaps = 3 * (cols - 1);
   while (widths.reduce((a, b) => a + b, 0) + gaps > width && Math.max(...widths) > 3) {
     widths[widths.indexOf(Math.max(...widths))]!--;
@@ -80,7 +82,7 @@ export function tableLines(rows: string[][], width: number): { text: string; hea
     const wrapped = widths.map((w, c) => wrapCell(r[c] ?? "", w));
     const height = Math.max(...wrapped.map((w) => w.length));
     for (let k = 0; k < height; k++) {
-      const text = wrapped.map((w, c) => (w[k] ?? "").padEnd(widths[c]!)).join(" │ ").trimEnd();
+      const text = wrapped.map((w, c) => padTo(w[k] ?? "", widths[c]!)).join(" │ ").trimEnd();
       lines.push({ text, head: ri === 0, rule: false });
     }
     if (ri === 0) lines.push({ text: widths.map((w) => "─".repeat(w)).join("─┼─"), head: false, rule: true });

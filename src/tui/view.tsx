@@ -4,6 +4,7 @@ import type { Mode } from "../core/types.ts";
 import { fidelityLabel, type Item } from "../ui/items.ts";
 import { Markdown } from "./markdown.tsx";
 import type { SessionLike } from "./types.ts";
+import { fitStart, textWidth, untab, wrapLine } from "./width.ts";
 
 export type StaticItem = Item | { key: string; t: "header" };
 
@@ -78,18 +79,7 @@ export function ItemView({ item }: { item: StaticItem }) {
 
 // Wraps each line of the text in the room. The caller puts the indent before each next line.
 export function hangLines(text: string, room: number): string[] {
-  const out: string[] = [];
-  for (const line of text.split("\n")) {
-    let rest = line.trimEnd();
-    while (rest.length > room) {
-      const cut = rest.lastIndexOf(" ", room);
-      const at = cut > room / 3 ? cut : room;
-      out.push(rest.slice(0, at).trimEnd());
-      rest = rest.slice(at).trimStart();
-    }
-    out.push(rest);
-  }
-  return out;
+  return text.split("\n").flatMap((line) => wrapLine(line, Math.max(1, room)));
 }
 
 function useWidth(): number {
@@ -115,24 +105,14 @@ function HangText({ head, lead, text, color, dim, bold }: { head: React.ReactNod
 export function hangWrap(text: string, width: number): string {
   return text
     .split("\n")
-    .flatMap((line) => {
-      if (line.length <= width) return [line];
-      const gap = /^(.*\S) {2,}(?=\S)/.exec(line.slice(0, width));
-      if (gap && gap[0].length > width * 0.6) return [gap[1]!, ...hangLines(line.slice(gap[0].length), Math.max(1, width - 4)).map((l) => "    " + l)];
-      const indent = gap ? gap[0].length : 0;
-      const out: string[] = [];
-      let rest = indent ? line.slice(indent).trim() : line.trimEnd();
-      let first = line.slice(0, indent);
-      const room = width - indent;
-      while (rest.length > room) {
-        const cut = rest.lastIndexOf(" ", room);
-        const at = cut > room / 3 ? cut : room;
-        out.push(first + rest.slice(0, at).trimEnd());
-        rest = rest.slice(at).trimStart();
-        first = " ".repeat(indent);
-      }
-      out.push(first + rest);
-      return out;
+    .flatMap((raw) => {
+      const line = untab(raw);
+      if (textWidth(line) <= width) return [line];
+      const gap = /^(.*\S) {2,}(?=\S)/.exec(fitStart(line, width));
+      const indent = gap ? textWidth(gap[0]) : 0;
+      if (gap && indent > width * 0.6) return [gap[1]!, ...hangLines(line.slice(gap[0].length), Math.max(1, width - 4)).map((l) => "    " + l)];
+      const rest = gap ? line.slice(gap[0].length).trim() : line.trimEnd();
+      return wrapLine(rest, width - indent).map((l, i) => (i === 0 && gap ? gap[0] : " ".repeat(indent)) + l);
     })
     .join("\n");
 }
