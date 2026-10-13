@@ -100,7 +100,7 @@ describe("checker", () => {
   });
 
   test("pythonSignature reads names, defaults and **kwargs; scriptReads finds the params that a script reads and not those that it sets", () => {
-    const src = 'def other(a):\n    pass\n\ndef fit(path, cols=("a", "b"), *, alpha: float = 0.05, mode="x,y", # note, here\n        n: int, **extra):\n    pass\n';
+    const src = 'def other(a):\n    pass\n\ndef fit(path, cols=("a", "b"), *, alpha: float = 0.05, mode="x,#y", # don\'t (note), here\n        n: int, **extra):\n    pass\n';
     expect(pythonSignature(src, "fit")).toEqual({ names: ["path", "cols", "alpha", "mode", "n"], required: ["path", "n"], kwargs: true });
     expect(pythonSignature(src, "missing")).toBeUndefined();
     const r = 'p <- read_params()\nx <- pick(p, "alpha", 0.05)\nif (p$test == "a") p$input <- 1\ny <- p[["n"]]\nq <- t.test(1)$p.value';

@@ -46,14 +46,14 @@ export function methodFrom(record: AnalysisRecord, name: string, decisions: Reco
   for (const s of plan.steps) s.status = "todo";
   const asked = new Set(((record.live(["clarify"]).filter((e) => e.data.action === "asked" && e.id < a.entry).at(-1)?.data.questions as string[]) ?? []));
   const answered = record.live(["clarify"]).filter((e) => e.data.action === "answered" && e.id < a.entry).at(-1);
-  const notes = record.entries(["answer"]).map((e) => e.data.note).filter((n): n is string => typeof n === "string" && n !== "");
+  const noted = record.entries(["answer"]).filter((e) => typeof e.data.note === "string" && e.data.note !== "").map((e) => ({ value: String(e.data.value ?? ""), line: `${String(e.data.value ?? "")} (${String(e.data.note)})` }));
   const questions = ((answered?.data.answers as string[]) ?? [])
     .map((x) => {
       const question = [...asked].find((q) => x.startsWith(`${q} -> `));
       const i = question === undefined ? x.lastIndexOf(" -> ") : question.length;
       const answer = x.slice(i + 4);
-      const note = notes.find((n) => answer.endsWith(` (${n})`));
-      return { question: x.slice(0, i), answer: note ? answer.slice(0, -(note.length + 3)) : answer };
+      const hit = noted.find((n) => n.line === answer);
+      return { question: x.slice(0, i), answer: hit ? hit.value : answer };
     })
     .filter((q) => asked.has(q.question));
   const programs = new Map<string, Method["programs"][number]>();

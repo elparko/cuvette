@@ -230,30 +230,24 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
 export function pythonSignature(source: string, fn: string): { names: string[]; required: string[]; kwargs: boolean } | undefined {
   const start = new RegExp(`^def\\s+${fn}\\s*\\(`, "m").exec(source);
   if (!start) return undefined;
-  let depth = 1;
-  let i = start.index + start[0].length;
-  const begin = i;
-  let quote = "";
-  for (; i < source.length && depth > 0; i++) {
-    const ch = source[i];
-    if (quote) {
-      if (ch === "\\") i++;
-      else if (ch === quote) quote = "";
-    } else if (ch === '"' || ch === "'") quote = ch;
-    else if ("([{".includes(ch)) depth++;
-    else if (")]}".includes(ch)) depth--;
-  }
   const parts: string[] = [];
   let cur = "";
-  depth = 0;
-  quote = "";
-  for (const ch of source.slice(begin, i - 1).replace(/#[^\n]*/g, "")) {
+  let depth = 0;
+  let quote = "";
+  for (let i = start.index + start[0].length; i < source.length; i++) {
+    const ch = source[i];
     if (quote) {
-      if (ch === quote) quote = "";
+      if (ch === "\\") cur += source[i++];
+      else if (ch === quote) quote = "";
+    } else if (ch === "#") {
+      while (i + 1 < source.length && source[i + 1] !== "\n") i++;
+      continue;
     } else if (ch === '"' || ch === "'") quote = ch;
     else if ("([{".includes(ch)) depth++;
-    else if (")]}".includes(ch)) depth--;
-    else if (ch === "," && depth === 0) {
+    else if (")]}".includes(ch)) {
+      if (depth === 0) break;
+      depth--;
+    } else if (ch === "," && depth === 0) {
       parts.push(cur);
       cur = "";
       continue;

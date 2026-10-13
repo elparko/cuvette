@@ -149,6 +149,8 @@ test("the scan follows a link to a data file or a data folder", () => {
   symlinkSync(join(real, "s1.fcs"), join(d, "s1.fcs"));
   symlinkSync(real, join(d, "linked"));
   symlinkSync(join(real, "missing.fcs"), join(d, "broken.fcs"));
+  symlinkSync(d, join(d, "up"));
+  symlinkSync(join(d, "self.fcs"), join(d, "self.fcs"));
   const m = first(d);
   expect(m.adapter).toBe("flowkit");
   expect(m.count).toBe(3);

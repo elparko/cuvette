@@ -1,4 +1,4 @@
-import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { closeSync, openSync, readdirSync, readSync, realpathSync, statSync, type Stats } from "node:fs";
 import { extname, join } from "node:path";
 import { matches, type AdapterSummary } from "../adapters/catalog.ts";
 
@@ -41,9 +41,27 @@ function header(path: string): string {
   }
 }
 
+function linkTarget(path: string): Stats | undefined {
+  try {
+    return statSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
+function real(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
 function scan(folder: string): Seen[] {
   const out: Seen[] = [];
+  const seen = new Set<string>();
   const walk = (dir: string, depth: number) => {
+    seen.add(real(dir));
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -56,9 +74,9 @@ function scan(folder: string): Seen[] {
       if (out.length >= MAX_FILES) return;
       if (e.name.startsWith(".") || e.name === "node_modules") continue;
       const p = join(dir, e.name);
-      const target = e.isSymbolicLink() ? statSync(p, { throwIfNoEntry: false }) : e;
+      const target = e.isSymbolicLink() ? linkTarget(p) : e;
       if (target?.isFile()) out.push({ name: e.name.toLowerCase(), header: header(p) });
-      else if (target?.isDirectory() && depth < MAX_DEPTH) walk(p, depth + 1);
+      else if (target?.isDirectory() && depth < MAX_DEPTH && !seen.has(real(p))) walk(p, depth + 1);
     }
   };
   walk(folder, 0);
