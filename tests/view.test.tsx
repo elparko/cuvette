@@ -72,7 +72,8 @@ test("the live region leaves two rows of the terminal free", () => {
   for (const rows of [12, 20, 40, 60]) {
     const l = liveLayout({ rows, columns: 80, card: true, running: true, input: 0, queue: 0, suggestions: 0, text: true, pending: true });
     const box = l.inputBox ? 3 : 0;
-    expect(2 + 1 + box + l.live + l.pending + l.card).toBeLessThanOrEqual(Math.max(rows - 2, 2 + 1 + 4));
+    const chrome = l.chrome ? 2 + 1 : 0;
+    expect(chrome + box + l.live + l.pending + l.card).toBeLessThanOrEqual(Math.max(rows - 2, 4));
   }
 });
 

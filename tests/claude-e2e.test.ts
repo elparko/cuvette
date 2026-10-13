@@ -19,6 +19,7 @@ interface Reply {
   usage?: Record<string, number>;
   status?: number;
   hang?: boolean;
+  html?: boolean;
   error?: { type: string; message: string };
 }
 
@@ -88,6 +89,11 @@ beforeAll(async () => {
         return;
       }
       if (r.hang) return;
+      if (r.html) {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.end("<html><body>Sign in to the network</body></html>");
+        return;
+      }
       if (r.status && r.status !== 200) {
         res.writeHead(r.status, { "content-type": "application/json", "request-id": "req_mock", "x-should-retry": "false" });
         res.end(JSON.stringify({ type: "error", error: r.error ?? { type: "api_error", message: "error" } }));
@@ -334,6 +340,13 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(Date.now() - t0).toBeLessThan(5000);
     replies = [];
     expect(await checkClaudeKey("sk-ant-err")).toEqual({ ok: true, text: "Cannot check the key: the Claude API gave HTTP 500. The first request tests it." });
+  });
+
+  test("checkClaudeKey does not say that the key works if the server answers HTTP 200 with an HTML page", async () => {
+    replies = [{ html: true }];
+    const r = await checkClaudeKey("sk-ant-portal");
+    expect(r.text).not.toContain("The key works");
+    expect(r.text).toMatch(/^Cannot check the key: the server did not answer as the Claude API does/);
   });
 
   test("checkClaudeKey sends a low credit balance and a 403 to Billing", async () => {

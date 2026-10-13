@@ -432,7 +432,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
           </Box>
         </Last>
       ) : null}
-      {running ? (
+      {!fit.chrome ? null : running ? (
         <RunningLine
           key={`${status.state}${status.tool ?? ""}${status.since ?? ""}`}
           tool={status.tool ?? ""}
@@ -486,7 +486,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
           {c.args ? ` ${c.args}` : ""}  {c.help}
         </Text>
       ))}
-      <StatusLine
+      {fit.chrome ? <StatusLine
         mode={mode}
         model={session.model.model}
         busy={status.state !== "idle"}
@@ -502,7 +502,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         keys={footKeys}
         hints={hints}
         esc={keyStyle === "vim" && vimMode === "insert" ? "Esc twice stops this step. " : undefined}
-      />
+      /> : null}
         </Box>
       </Box>
     </Box>

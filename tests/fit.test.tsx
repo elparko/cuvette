@@ -292,3 +292,33 @@ describe("the proposed metrics card in a 40-row terminal", () => {
     expect(view).not.toContain("Unit of replication");
   });
 });
+
+describe("a short or narrow terminal", () => {
+  test("in a 10-row terminal an open card shows its question and every option", async () => {
+    const { h } = start(80, 10);
+    await until(() => h.all().includes("Type /plan"));
+    h.type("compare endo and epi");
+    await sleep(40);
+    h.type("\r");
+    await until(() => h.term.view().includes("Permission needed: run_script"));
+    await sleep(200);
+    expect(h.term.view()).toContain("y allow · n deny");
+    h.type("y");
+    await until(() => h.term.view().includes("Your decision: Which AUC cutoff"));
+    await sleep(200);
+    const view = h.term.view();
+    for (const part of ["The cutoff changes how many features pass.", "1 0.7 (14 features)", "2 0.8 (6 features)", "o other", "Enter accepts"]) expect(view).toContain(part);
+    expect(view).not.toContain("scroll · lines");
+  });
+
+  test("at 40 columns a long option and a long setup field continue under their text", async () => {
+    const { h, s } = start(40, 30);
+    await until(() => h.all().includes("Type /plan"));
+    s.askMany([{ qid: "qx", session: s.id, decisionKey: "k", title: "Which normalization?", text: "It changes the feature list.", options: [{ value: "tic", label: "TIC: divide each spectra by its total ion count" }, { value: "rms", label: "RMS: divide each spectra by its root mean square" }], status: "open", created: new Date().toISOString() } as never]);
+    await until(() => h.term.view().includes("Your decision: Which normalization?"));
+    await sleep(200);
+    const rows = h.term.view().split("\n");
+    const at = rows.findIndex((l) => l.includes("1 TIC: divide"));
+    expect(rows[at + 1]).toMatch(/^│ {5}\S/);
+  });
+});

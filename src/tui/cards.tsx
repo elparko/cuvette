@@ -37,6 +37,21 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
   );
 }
 
+const useCompact = () => useContext(CardRows) < 14;
+
+function Hang({ head, lead, children }: { head: React.ReactNode; lead: number; children: React.ReactNode }) {
+  return (
+    <Box>
+      <Box width={lead} flexShrink={0}>
+        <Text>{head}</Text>
+      </Box>
+      <Box flexGrow={1} flexShrink={1}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
   const [v, setV] = useState(props.initial ?? "");
   useInput((_, key) => {
@@ -73,6 +88,7 @@ export function PermissionCard(props: {
     { isActive: !asking },
   );
   const args = v.args;
+  const gap = useCompact() ? 0 : 1;
   const lines = showCode && code ? code.split("\n") : [];
   return (
     <Frame title={v.title} color="yellow">
@@ -91,7 +107,7 @@ export function PermissionCard(props: {
           ))}
         </Box>
       ) : null}
-      <Box marginTop={1}>
+      <Box marginTop={gap}>
         <Text>{v.touches}</Text>
       </Box>
       {asking ? (
@@ -160,6 +176,8 @@ export function QuestionCard(props: {
   const recIndex = recommendedIndex(q);
   const missing = questionNeed(q);
   const head = questionHead(q);
+  const compact = useCompact();
+  const gap = compact ? 0 : 1;
   useInput(
     (input, key) => {
       const n = Number(input);
@@ -180,19 +198,21 @@ export function QuestionCard(props: {
     <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta">
       {props.progress ? <Text dimColor>{props.progress}</Text> : null}
       {head.text ? <Text>{head.text}</Text> : null}
-      {q.evidence ? (
+      {q.evidence && !compact ? (
         <Box marginTop={1}>
           <Text>{q.evidence}</Text>
         </Box>
       ) : null}
       {props.note ? <Text color="yellow">{props.note}</Text> : null}
       <Box flexDirection="column">
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column" marginTop={gap}>
           {q.options.map((o, i) => (
-            <Text key={i} color={i === cursor && !other ? "magenta" : undefined}>
-              {i === cursor && !other ? "▸" : " "} <Text color="magenta">{i + 1}</Text> {o.label}
-              {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
-            </Text>
+            <Hang key={i} head={<Text color={i === cursor && !other ? "magenta" : undefined}>{i === cursor && !other ? "▸" : " "} <Text color="magenta">{i + 1}</Text> </Text>} lead={4}>
+              <Text color={i === cursor && !other ? "magenta" : undefined}>
+                {o.label}
+                {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
+              </Text>
+            </Hang>
           ))}
           {free ? null : (
             <Text>
@@ -201,7 +221,7 @@ export function QuestionCard(props: {
             </Text>
           )}
         </Box>
-        {q.recommendation?.reason ? (
+        {q.recommendation?.reason && !compact ? (
           <Box marginTop={1}>
             <Text dimColor>Recommended: {q.recommendation.reason}</Text>
           </Box>
@@ -223,7 +243,9 @@ export function QuestionCard(props: {
           />
         ) : (
           <Text dimColor>
-            ↑↓ choose · Enter accepts · a number answers at once{props.onBack ? " · ← back" : ""} · Esc {props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}
+            {compact
+              ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
+              : `↑↓ choose · Enter accepts · a number answers at once${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
           </Text>
         )}
       </Box>
@@ -429,13 +451,19 @@ export function SetupCard(props: {
           const f = r.f;
           return (
             <Box key={f.key} flexDirection="column">
+              <Hang head={<Text color={on ? "green" : undefined}>{mark} </Text>} lead={2}>
               <Text color={on ? "green" : undefined}>
-                {mark} {f.label}: <Text bold>{show(values[f.key])}</Text>
+                {f.label}: <Text bold>{show(values[f.key])}</Text>
                 {f.key in (props.card.proposed ?? {}) ? <Text color="cyan"> (from {props.card.proposedFrom ?? "eLabFTW"}, not saved yet)</Text> : null}
                 {f.owner === "fixed" ? <Text dimColor> (fixed)</Text> : null}
                 {f.owner === "agent" ? <Text dimColor> (agent decides)</Text> : null}
               </Text>
-              {on && f.help && !editing ? <Text dimColor>    {f.help}</Text> : null}
+              </Hang>
+              {on && f.help && !editing ? (
+                <Hang head="" lead={4}>
+                  <Text dimColor>{f.help}</Text>
+                </Hang>
+              ) : null}
               {editing === f.key && kind === "choice"
                 ? f.choices!.map((c, j) => (
                     <Text key={j} color={j === pick ? "green" : undefined}>
