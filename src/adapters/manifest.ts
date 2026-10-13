@@ -318,10 +318,26 @@ function manifestData(file: string): unknown {
   return parseYaml(readFileSync(file, "utf8"));
 }
 
+// The error names the file and each wrong field, so that the scientist knows which adapter to correct.
+function readManifest(file: string): Manifest {
+  let data: unknown;
+  try {
+    data = manifestData(file);
+  } catch (e) {
+    throw new Error(`${file} is not valid YAML: ${(e as Error).message.trim()}`, { cause: e });
+  }
+  const parsed = Manifest.safeParse(data);
+  if (parsed.success) return parsed.data;
+  const issues = parsed.error.issues;
+  const lines = issues.slice(0, 8).map((i) => `  ${i.path.length ? i.path.map(String).join(".") : "adapter.yaml"}: ${i.message}`);
+  if (issues.length > 8) lines.push(`  and ${issues.length - 8} more`);
+  throw new Error(`${file} has ${issues.length === 1 ? "an error" : `${issues.length} errors`}:\n${lines.join("\n")}`, { cause: parsed.error });
+}
+
 export function loadAdapter(path: string): LoadedAdapter {
   const file = statSync(path).isDirectory() ? join(path, "adapter.yaml") : path;
   const root = dirname(resolve(file));
-  const manifest = Manifest.parse(manifestData(file));
+  const manifest = readManifest(file);
   let mod: Promise<AdapterModule> | undefined;
   return {
     manifest,

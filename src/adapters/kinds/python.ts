@@ -104,6 +104,7 @@ export function startPython(c: KindContext): AdapterRuntime {
         } catch {
           return;
         }
+        if (!msg || typeof msg !== "object") return;
         if (msg.ready) {
           started = true;
           ok();
@@ -214,7 +215,8 @@ export function startPython(c: KindContext): AdapterRuntime {
     const outputs = new Map<string, OutputFile>(files.map((o) => [samePath(o.path), o]));
     for (const o of (reply.files ?? []).map((p) => outputFile(p))) outputs.set(samePath(o.path), o);
     for (const o of f.outputs ?? []) if (!outputs.has(samePath(o.path))) outputs.set(samePath(o.path), o);
-    const metrics = { ...(f.metrics ?? {}), ...(reply.metrics ?? {}) };
+    const metrics: Record<string, number> = { ...(f.metrics ?? {}) };
+    for (const [k, v] of Object.entries(reply.metrics ?? {})) if (typeof v === "number" && Number.isFinite(v)) metrics[k] = v;
     const entry = c.adapter.mapEntry(def.name, args);
     const out: ToolOutput = {
       ok: f.ok !== false,

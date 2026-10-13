@@ -48,7 +48,8 @@ const PLACEHOLDER: Record<PhiKind, string> = {
 const MONTH = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\.?";
 const DATE = `(?:\\d{1,2}[/.-]\\d{1,2}[/.-](?:\\d{4}|\\d{2})|\\d{4}-\\d{1,2}-\\d{1,2}|${MONTH}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}[\\s-]${MONTH}[\\s-]\\d{4})`;
 const DATE_RE = new RegExp(`(?<![\\d/.-])${DATE}(?![\\d/])`, "i");
-const NAME = "[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)?";
+// A name part has at most 40 letters. A longer word is not a name, and the scan of a long line in parts then gives the same result.
+const NAME = "[A-Z][a-z]{1,40}(?:[-'][A-Z]?[a-z]{1,40})?(?![a-z])";
 const FULL = `${NAME}(?:\\s+[A-Z]\\.?)?\\s+${NAME}`;
 const STATES = "AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY";
 const STREET = "Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Circle|Cir|Highway|Hwy|Parkway|Pkwy";
@@ -83,7 +84,8 @@ const TEXT_RULES: Rule[] = [
 const STAFF = /\b(contact|author|authors|investigator|maintainer|corresponding|reporting|copyright|institution|affiliation|study person|submitter|creator|owner|support|help|mailing list|send email|questions|bugs?|feedback|licen[cs]e|developer|curator|publisher|editor)\b/i;
 const PERSONAL = /\b(emergency|next of kin|guardian|caregiver|patient|pt)\b/i;
 const STAFF_KINDS = new Set<PhiKind>(["name", "email", "address", "phone"]);
-const QUICK = /\d{3}|@|[A-Z][a-z]+[\s,]+[A-Z]|\b(?:DOB|MRN|MR#|born|birth|record|zip|postal)\b/i;
+// Two letters, then a space and a letter: the same lines as "a word, a space, a word". A "+" after the letters makes a long run of letters slow.
+const QUICK = /\d{3}|@|[A-Za-z]{2}[\s,]+[A-Za-z]|\b(?:DOB|MRN|MR#|born|birth|record|zip|postal)\b/i;
 
 function staffLine(lines: string[], i: number): boolean {
   if (PERSONAL.test(lines[i]!)) return false;
@@ -94,28 +96,55 @@ function staffLine(lines: string[], i: number): boolean {
   return false;
 }
 
+// A long line is read in parts of 4000 characters. The parts overlap, and a match that starts in the overlap belongs to the next part.
+const PART = 4000;
+const STEP = 3800;
+const SPAN_RULES = TEXT_RULES.map((r) => ({ ...r, re: new RegExp(r.re.source, `${r.re.flags}d`) }));
+
+// Two hits that overlap, such as a street and a city with the same word, become one hit. Else the mask of one hit leaves a part of the other.
 export function scanText(text: string, where: string): PhiHit[] {
   const out: PhiHit[] = [];
   const lines = text.split("\n");
   lines.forEach((full, i) => {
-    const line = full.length > 4000 ? full.slice(0, 4000) : full;
-    if (!QUICK.test(line)) return;
     let staff: boolean | undefined;
-    for (const r of TEXT_RULES) {
-      r.re.lastIndex = 0;
-      for (const m of line.matchAll(r.re)) {
-        const value = (m[1] ?? m[0]).trim().replace(/[.,]$/, "");
-        if (r.check && !r.check(value, line)) continue;
-        if (STAFF_KINDS.has(r.kind) && (staff ??= staffLine(lines, i))) continue;
-        out.push({ kind: r.kind, value, where, line: i + 1 });
+    const spans: { kind: PhiKind; a: number; b: number }[] = [];
+    for (let at = 0; at === 0 || at + PART - STEP < full.length; at += STEP) {
+      const line = full.length > PART ? full.slice(at, at + PART) : full;
+      const last = at + PART >= full.length;
+      if (!QUICK.test(line)) continue;
+      for (const r of SPAN_RULES) {
+        r.re.lastIndex = 0;
+        for (const m of line.matchAll(r.re)) {
+          if (!last && (m.index >= STEP || m.index + m[0].length >= line.length)) continue;
+          let [a, b] = (m.indices![1] ?? m.indices![0])!;
+          while (a < b && /\s/.test(line[a]!)) a++;
+          while (b > a && /\s/.test(line[b - 1]!)) b--;
+          if (b > a && /[.,]/.test(line[b - 1]!)) b--;
+          if (r.check && !r.check(line.slice(a, b), line)) continue;
+          if (STAFF_KINDS.has(r.kind) && (staff ??= staffLine(lines, i))) continue;
+          spans.push({ kind: r.kind, a: at + a, b: at + b });
+        }
       }
+    }
+    spans.sort((x, y) => x.a - y.a || y.b - x.b);
+    let cur: (typeof spans)[number] | undefined;
+    for (const s of [...spans, undefined]) {
+      if (cur && s && s.a < cur.b) {
+        cur.b = Math.max(cur.b, s.b);
+        continue;
+      }
+      if (cur) out.push({ kind: cur.kind, value: full.slice(cur.a, cur.b), where, line: i + 1 });
+      cur = s && { ...s };
     }
   });
   return out;
 }
 
+// A placeholder of the Masker, such as [ADDRESS 1], does not make a column an address column.
+const PLACEHOLDERS = new RegExp(`\\[(?:${Object.values(PLACEHOLDER).join("|")}) \\d+\\]`, "g");
+
 function columnKind(name: string): PhiKind | undefined {
-  const n = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const n = name.replace(PLACEHOLDERS, " ").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (/\b(ssn|social security( number| no)?)\b/.test(n)) return "ssn";
   if (/\bmrn\b|^(medical record( number| no| num)?|mr (number|no)|med rec( no| number)?|chart (number|no)|hospital (number|no))$/.test(n)) return "mrn";
   if (/\b(dob|date of birth|birth ?date|birthday)\b/.test(n)) return "birth_date";
@@ -127,6 +156,7 @@ function columnKind(name: string): PhiKind | undefined {
   return undefined;
 }
 
+const MASKED = new RegExp(`^\\[(?:${Object.values(PLACEHOLDER).join("|")}) \\d+\\]$`);
 const PERSON = new RegExp(`^(?:${FULL}|${NAME},\\s*${NAME}(?:\\s+[A-Z]\\.?)?)$`);
 const WORD = new RegExp(`^${NAME}$`);
 
@@ -167,7 +197,7 @@ export function scanTable(columns: string[], rows: unknown[][], where: string, f
     if (!kind || (kind === "zip" && !hasDate)) return;
     const vals = rows.map((r, i) => ({ v: cell(r, j), i })).filter((x) => x.v);
     if (!vals.length) return;
-    const fit = vals.filter((x) => valueFits(kind, String(col), x.v));
+    const fit = vals.filter((x) => !MASKED.test(x.v) && valueFits(kind, String(col), x.v));
     if (fit.length * 2 < vals.length) return;
     const seen = new Set<string>();
     for (const x of fit) {
@@ -179,6 +209,7 @@ export function scanTable(columns: string[], rows: unknown[][], where: string, f
   return out;
 }
 
+// Each cell keeps its text as it is in the file, so that the Masker finds the value in the text. Only a pair of outer quotes goes.
 function splitRow(line: string, d: string): string[] {
   if (!line.includes('"')) return line.split(d);
   const out: string[] = [];
@@ -187,6 +218,7 @@ function splitRow(line: string, d: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const c = line[i]!;
     if (c === '"') {
+      cur += c;
       if (q && line[i + 1] === '"') {
         cur += '"';
         i++;
@@ -197,7 +229,7 @@ function splitRow(line: string, d: string): string[] {
     } else cur += c;
   }
   out.push(cur);
-  return out;
+  return out.map((c) => c.replace(/^(\s*)"([^]*)"(\s*)$/, "$1$2$3"));
 }
 
 function delimited(text: string): { columns: string[]; rows: string[][]; first: number } | undefined {
@@ -332,6 +364,14 @@ export function groupHits(hits: PhiHit[]): PhiShown[] {
   });
 }
 
+// A value does not match a part of a longer number or word. "400-70-5674x" still masks, because the scan also finds that SSN.
+const edge = (c: string | undefined) => (c && /\d/.test(c) ? "\\d" : c && /[A-Za-z]/.test(c) ? "A-Za-z" : "");
+function bounded(k: string): string {
+  const head = edge(k[0]);
+  const tail = edge(k.at(-1));
+  return `${head ? `(?<![${head}])` : ""}${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${tail ? `(?![${tail}])` : ""}`;
+}
+
 export class Masker {
   map = new Map<string, string>();
   private counts = new Map<PhiKind, number>();
@@ -354,7 +394,7 @@ export class Masker {
       if (!all.has(e)) all.set(e, v);
     }
     const keys = [...all.keys()].sort((a, b) => b.length - a.length);
-    const re = new RegExp(`(?<![A-Za-z0-9])(?:${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![A-Za-z0-9])`, "g");
+    const re = new RegExp(keys.map(bounded).join("|"), "g");
     return s.replace(re, (m) => all.get(m) ?? m);
   }
 

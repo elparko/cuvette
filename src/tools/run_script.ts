@@ -297,8 +297,8 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       let stderr = "";
       let timedOut = false;
       let aborted = false;
-      child.stdout!.on("data", (d: Buffer) => { if (stdout.length < 50_000) stdout += d.toString("utf8"); });
-      child.stderr!.on("data", (d: Buffer) => { if (stderr.length < 50_000) stderr += d.toString("utf8"); });
+      child.stdout!.setEncoding("utf8").on("data", (d: string) => { if (stdout.length < 50_000) stdout += d; });
+      child.stderr!.setEncoding("utf8").on("data", (d: string) => { if (stderr.length < 50_000) stderr += d; });
       const requests = child.stdio[3] as Readable;
       const replies = child.stdio[4] as Writable;
       replies.on("error", () => {});

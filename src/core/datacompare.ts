@@ -94,10 +94,23 @@ function renamed(a: ColumnSummary, b: ColumnSummary): boolean {
   return (b.groups ?? []).some(([g]) => names.has(same(g)));
 }
 
+// A second column with the same name gets its own key, so that no column hides another.
+function byKey(cols: ColumnSummary[]): Map<string, { c: ColumnSummary; i: number }> {
+  const out = new Map<string, { c: ColumnSummary; i: number }>();
+  const seen = new Map<string, number>();
+  cols.forEach((c, i) => {
+    const k = same(c.name);
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    out.set(n === 1 ? k : `${k} #${n}`, { c, i });
+  });
+  return out;
+}
+
 export function compareChecks(before: DataSummary, after: DataSummary): DataDifference[] {
   const out: DataDifference[] = [];
-  const old = new Map(before.columns.map((c, i) => [same(c.name), { c, i }]));
-  const now = new Map(after.columns.map((c, i) => [same(c.name), { c, i }]));
+  const old = byKey(before.columns);
+  const now = byKey(after.columns);
   const lost = [...old].filter(([k]) => !now.has(k));
   const gained = [...now].filter(([k]) => !old.has(k));
 

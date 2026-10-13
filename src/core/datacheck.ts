@@ -162,7 +162,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.to
 
 export function checkTable(t: Table, source: string): DataCheck {
   const items: CheckItem[] = [];
-  const cols = columnInfo(t);
+  const cols = columnInfo(t).map((c) => ({ ...c }));
   const n = t.rows.length;
   const id = idColumn(t);
   const group = groupColumn(t, cols, id);

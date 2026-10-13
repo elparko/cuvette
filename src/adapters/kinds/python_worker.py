@@ -93,9 +93,10 @@ def convert(value, out_dir, files, metrics, path):
             metrics[prefix + "size"] = int(value.size)
             metrics[prefix + "ndim"] = int(value.ndim)
             if value.size and value.dtype.kind in "biuf":
-                metrics[prefix + "min"] = float(value.min())
-                metrics[prefix + "max"] = float(value.max())
-                metrics[prefix + "mean"] = float(value.mean())
+                for key, stat in (("min", value.min), ("max", value.max), ("mean", value.mean)):
+                    number = float(stat())
+                    if math.isfinite(number):
+                        metrics[prefix + key] = number
             return {"handle": new_handle(value), "type": "ndarray", "shape": list(value.shape), "dtype": str(value.dtype), "path": target}
     return {"handle": new_handle(value), "type": type(value).__name__, "repr": short_repr(value)}
 
