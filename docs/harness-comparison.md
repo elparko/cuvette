@@ -724,6 +724,150 @@ final answer, with its notes, replaces the text when the review is complete.
 - The proxy, the runner and the replay script are not in the repository. They are about 200
   lines in total.
 
+## Whole task on main after the answer check and folder list changes
+
+This run repeats "Whole task on main after the script output rule" on main at commit edf6530.
+Main now has these changes. The answer check does not mark design values and known counts as
+numbers with no source. The first message gives the folder list. `show_thinking` is `on` by
+default. Measured on 13 October 2026.
+
+### Method of this run
+
+1. The task, the request, the arguments and the prices are the same as in "Cost of a whole task
+   with real Haiku".
+2. `data.csv` has new values with the same group means: control 4.2, treated 5.1. The Welch
+   t-test gives t = 5.32, 8.9 degrees of freedom and p = 0.0005.
+3. Each run has a new temporary `CUVETTE_HOME` or `CLAUDE_CONFIG_DIR`. The Cuvette home has a
+   link to the adapter environments. For the runs with `show_thinking` off, the home has a
+   `settings.json` with `"show_thinking": "off"`. The other settings are the defaults.
+4. Claude Code is version 2.1.296, with an empty `CLAUDE_CONFIG_DIR`.
+5. A proxy on localhost forwarded each request and recorded the time of the first byte, the first
+   text or tool input, and the end. It refused each request after 36 real model calls.
+6. The order was three Cuvette runs with `show_thinking` on, three Claude Code runs, and then
+   Cuvette runs with `show_thinking` off.
+
+The three Cuvette runs used 17 calls and the Claude Code runs used 10 calls. Thus 9 calls stayed
+for the runs with `show_thinking` off. This permitted one full run. A second run made three session
+calls, and then the proxy refused the fourth call. That run has no wall time.
+
+### Results
+
+| Metric | Cuvette, `show_thinking` on (median of 3) | Claude Code (median of 3) | Cuvette, `show_thinking` off (1 run) |
+| --- | --- | --- | --- |
+| Wall time | 22.7 s | 11.0 s | 24.4 s |
+| Model time (sum of the requests) | 20.3 s | 9.5 s | 22.0 s |
+| Harness time (wall time minus model time) | 2.4 s | 1.5 s | 2.4 s |
+| Model calls | 6 (5, 6 and 6) | 3 (3, 3 and 4) | 6 |
+| Revisions | 0 in 3 runs | none | 0 |
+| Referee calls and their time | 1 call in each run, 5.9 s | none | 1 call, 7.2 s |
+| Input tokens, not cached | 7,087 | 6 | 7,286 |
+| Cache write tokens | 5,456 | 7,765 | 4,356 |
+| Cache read tokens | 101,164 | 74,850 | 101,192 |
+| Output tokens | 3,443 | 1,638 | 3,640 |
+| Cost estimate | 0.0041 USD | 0.0028 USD | 0.0041 USD |
+| Answer says the groups differ, mean difference 0.9 | yes, 3 of 3 | yes, 3 of 3 | yes |
+| Test result in the answer | Welch, p = 0.0005, 95% CI 0.52 to 1.28, 3 of 3 | t by hand in 2 runs, a Python script in 1 run | Welch, p = 0.0005, 95% CI |
+
+The median of each row comes from the three values of that row. Thus a column can contain values
+from different runs. The first Cuvette run and the first Claude Code run had a cold cache. They
+wrote 22,058 and 27,595 tokens to the cache.
+
+No run had a revision. In the run before, the answer check marked "80" and "12" and started a
+revision in each run. This cost 13 to 17 s. Cuvette runs 2 and 3 again gave the power step with
+`run_script`, and the answer check accepted the answer. The referee made one call in each run.
+
+### Time of each call in the median Cuvette run
+
+Cuvette run 2 has the median wall time, 22.7 s. "Step before" is the harness time between the
+end of the last call and the start of this call. The first row gives the time from the start of
+the program.
+
+| Call | Reply | Output tokens | First byte | Total | Step before |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `inspect_table` | 183 | 0.93 s | 1.85 s | 0.17 s (program start) |
+| 2 | `read_file` of `data.csv` | 228 | 0.74 s | 1.69 s | 1.12 s (`inspect_table`, Python worker start) |
+| 3 | `compare_two_groups` | 462 | 0.73 s | 2.57 s | 0.02 s (`read_file`) |
+| 4 | `run_script`: power | 593 | 0.73 s | 3.45 s | 0.01 s (`compare_two_groups`) |
+| 5 | Answer | 903 | 0.75 s | 4.58 s | 0.86 s (`run_script`) |
+| 6 | Referee, no stream | 1,121 | 6.11 s | 6.11 s | 0.04 s (answer check) |
+| End | | | | | 0.18 s (record and results file) |
+| Sum | | 3,490 | | 20.3 s | 2.4 s |
+
+The median Claude Code run (run 2) made three calls: `Bash ls` 1.81 s, `Read` 1.16 s and the
+answer 6.57 s. The steps took 1.4 s in total.
+
+### What remains of the difference
+
+The difference in wall time is 11.7 s. These calls and steps make it, from the median runs:
+
+| Part | Cuvette | Claude Code | Difference |
+| --- | --- | --- | --- |
+| Referee | 6.1 s | none | 6.1 s |
+| Power step: `run_script` call and the script | 3.5 s and 0.9 s | none | 4.3 s |
+| Method step: `compare_two_groups` | 2.6 s | none, the model computes by hand | 2.6 s |
+| Table summary and file read | `inspect_table` 1.9 s and `read_file` 1.7 s | `Bash ls` 1.8 s and `Read` 1.2 s | 0.6 s |
+| Python worker start at the first adapter step | 1.1 s | none | 1.1 s |
+| Answer | 4.6 s | 6.6 s | -2.0 s |
+| Other harness time | 0.4 s | 1.4 s | -1.0 s |
+
+1. The referee is the largest part. A referee call does not stream. It writes 1,000 to 1,400
+   output tokens, most of them hidden thinking.
+2. The power step comes from the rule on small samples in the system prompt. It occurred in 2 of
+   3 runs with `show_thinking` on, and in the run with `show_thinking` off. The call took 3.5 s
+   and 6.2 s.
+3. The `compare_two_groups` step is the test in the adapter. Claude Code gives no tested
+   result in 2 of 3 runs, so this time is part of the different work.
+4. The model reads the raw file after `inspect_table` to see the column names. This is the item
+   "column names for a cloud model". It stays open.
+5. The first adapter step waits about 1.1 s for the Python worker in each run.
+
+### `show_thinking` on against off
+
+| Call (time to the first text or tool input) | On (runs 1 to 3) | Off (full run and partial run) |
+| --- | --- | --- |
+| `inspect_table` | 2.03 s, 1.72 s, 1.85 s | 1.89 s, 1.08 s |
+| `read_file` | 1.80 s, 1.69 s, 1.49 s | 0.92 s, 0.80 s |
+| `compare_two_groups` | 3.93 s, 2.56 s, 2.90 s | 1.55 s, 1.34 s |
+| `run_script` | 3.43 s, 6.15 s | 2.57 s |
+| Answer | 4.52 s, 4.16 s, 0.89 s | 2.21 s |
+
+| Call (total time) | On (runs 1 to 3) | Off (full run and partial run) |
+| --- | --- | --- |
+| `inspect_table` | 2.05 s, 1.85 s, 1.86 s | 2.54 s, 1.83 s |
+| `read_file` | 1.81 s, 1.69 s, 1.50 s | 1.65 s, 1.52 s |
+| `compare_two_groups` | 3.95 s, 2.57 s, 2.92 s | 2.65 s, 2.59 s |
+| `run_script` | 3.45 s, 6.17 s | 3.73 s |
+| Answer | 4.60 s, 4.58 s, 3.37 s | 4.31 s |
+
+With `show_thinking` off, the text or the tool input starts 0.4 to 2.3 s sooner in each call.
+The total time of a call does not change. The harness starts a tool only after the full reply.
+Thus the wall time of a task with `-p` does not get shorter. The full run with `off` took 24.4 s,
+against 19.9 to 23.6 s with `on`. Its referee call took 7.2 s, against 5.5 to 6.1 s. The
+earlier text helps only a person who reads the streamed text in the app.
+
+In the third run with `on`, the answer had no thinking. Thus its first text came at 0.89 s.
+
+### Not fixed
+
+- The referee. It is 6 s of each run. A lower effort for the referee or a stream does not change
+  the number of calls. A change to the referee is an owner decision.
+- The power step from the rule on small samples. It is in the system prompt, so this run does not
+  change it.
+- The column names for a cloud model.
+- The Python worker start at the first adapter step, about 1.1 s.
+
+### Limits
+
+- Three Cuvette runs with `show_thinking` on, three Claude Code runs and one full Cuvette run with
+  `show_thinking` off. The Haiku replies change from run to run.
+- The comparison of `show_thinking` uses one full run and three calls of a partial run.
+- In the partial run, Cuvette tried the refused request again for about 200 s. The proxy refused
+  16 requests, so no model call occurred.
+- The cost is an estimate from the token counts. It is not the invoice.
+- `PATH` started with the Python of the `biostats` environment, which has `scipy`, for the two
+  harnesses.
+- The proxy and the runner are not in the repository. They are about 150 lines in total.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
