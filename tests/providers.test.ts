@@ -279,7 +279,7 @@ describe("claude", () => {
     const p = new ClaudeProvider("claude-opus-5-5", { client });
     expect(await p.complete("S", "Q")).toBe("answer");
     expect(calls[0].params.tools).toBeUndefined();
-    expect(calls[0].params.thinking).toEqual({ type: "adaptive", display: "summarized" });
+    expect(calls[0].params.thinking).toEqual({ type: "adaptive", display: "omitted" });
     expect(await p.countTokens!({ system: "S", messages: [user("q")], tools })).toBe(42);
   });
 

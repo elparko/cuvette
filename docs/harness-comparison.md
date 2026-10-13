@@ -422,6 +422,96 @@ Two tests in `tests/session.test.ts` cover the fix. Each test fails on the old c
 - `PATH` started with a Python that has `scipy`, for the two harnesses.
 - The proxy and the runner are not in the repository. They are about 150 lines in total.
 
+## Where the output tokens and the calls go
+
+This section uses one new real run of the same task, with the code at commit 506c260. The
+limit was 12 real Haiku calls in total. The proxy recorded each request and each reply in full.
+It refused call 7 (the referee) and call 8 (the revision). Thus the table has the six session
+calls before the first answer. The visible tokens are the characters of the text and the tool
+input, divided by 4. The thinking tokens are the output tokens minus the visible tokens.
+
+| Call | Reply | Output tokens | Visible (estimate) | Thinking (estimate) | Time |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `list_dir` | 219 | 54 | 165 | 3.6 s |
+| 2 | `inspect_table` | 105 | 25 | 80 | 0.9 s |
+| 3 | `read_file` of `data.csv` | 185 | 58 | 127 | 1.7 s |
+| 4 | `compare_two_groups` | 400 | 104 | 296 | 2.7 s |
+| 5 | `run_script`: smallest effect at 80% power | 637 | 192 | 445 | 3.9 s |
+| 6 | Answer | 796 | 288 | 508 | 4.2 s |
+| Sum | | 2,342 | 721 | 1,621 | 17.0 s |
+
+The answer check marked the 80 of "80% power" as a number with no source. Thus a full run has
+three more calls: the referee, the revision and the referee on the revised answer. This agrees
+with Cuvette run 2 of "Whole task again after the cache and effort changes": 9 calls and 6,485
+output tokens. Each referee call writes about 1,100 thinking tokens.
+
+### Calls that a plain loop does not make
+
+| Call | Cost | Cause | Status |
+| --- | --- | --- | --- |
+| `read_file` after `inspect_table` | 1 call, 185 tokens, 1.7 s | The adapter shows no column table to a cloud model | Not changed: owner decision |
+| `run_script` for the power | 1 call, 637 tokens, 3.9 s | The system prompt asks for the effect size at 80% power for a small sample | Not changed: method and system prompt |
+| Revision | 1 call, about 800 tokens | The answer check marks 80 as a number with no source. The 80 comes from the system prompt. | Not changed: owner decision |
+| Referee on the first answer and on the revised answer | 2 calls, about 1,100 thinking tokens each | Part of the review | Not changed: owner decision |
+| `list_dir` | 1 call, 219 tokens | The request names no file | Not changed: Claude Code also does it |
+
+The revision and the second referee call are the largest avoidable cost: 2 calls and about
+2,000 output tokens. They come only from the number 80 in the system prompt.
+
+### Thinking
+
+Thinking is 69% of the output tokens of the session calls. The three calls that read files use
+80 to 165 thinking tokens each, 372 in total. The other 1,249 tokens are in the calls that
+choose the test, add the power step and write the answer. A lower effort for the routine calls
+can save 372 tokens at most. A change of `output_config.effort` between two steps also makes
+the cached messages invalid. Thus this change is not in the code. A per-message effort beta
+keeps the cache, but a bench run must show that the results do not change.
+
+The `display` value changes only what the reply shows. The API bills the same thinking tokens.
+A replay of the request of call 6 gave these values:
+
+| Display | Total time | First text | Output tokens |
+| --- | --- | --- | --- |
+| `omitted` | 4.45 s | 2.43 s | 872 |
+| `summarized` | 10.92 s | 10.89 s | 1,058 |
+
+The original call 6, with `summarized`, took 4.2 s. One pair of replays is not enough to
+measure the effect. In the `summarized` replay, the thinking and the text came at the end.
+The two replays are two different model replies, so the output tokens are different. The
+difference is not an effect of `display` on the bill.
+
+### Parallel calls
+
+Each reply had one tool call. Each call needed the result of the call before it. The one
+exception is the power step, which did not need the t-test result. A test added a sentence to
+the descriptions of `run_script`, `read_file` and `list_dir`: send independent calls in the
+same reply. A real run with this change and a limit of 4 calls gave the same first four calls.
+Haiku sent `compare_two_groups` alone. Thus the change is not in the code.
+
+### Repeated state in tool results
+
+The result of `compare_two_groups` has the session folder path three times. The `table.path`
+value is the same as the path in `outputs`. A second copy costs about 35 input tokens for each
+adapter result. These tokens go to the cache. The code keeps the copy, because the gain is small.
+
+### Fix
+
+- `src/providers/claude.ts`: `complete()` sends `display: "omitted"`. The referee, the
+  summary after compaction and the title use `complete()`. `complete()` returns only the text,
+  so no caller read the thinking summary. The session steps keep `summarized`, because the trail
+  and the case pages of the bench show the thinking.
+
+The tests in `tests/providers.test.ts` and `tests/claude-e2e.test.ts` check the new value.
+
+### Not fixed
+
+- The answer check rule on typed numbers, the referee before a revision and the column names.
+  These are owner decisions.
+- The power step. The system prompt asks for it.
+- A lower effort for routine steps. It needs a bench run.
+- The `fallbacks` field for Haiku. The API documentation says that Haiku 5.5 has no server-side
+  fallback. No run measured the effect of the field on Haiku.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
