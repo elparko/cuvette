@@ -5,6 +5,7 @@ export interface TaskDeps {
   tools: () => Tool[];
   run: (tool: Tool, args: Record<string, unknown>, callId: string, signal: AbortSignal) => Promise<{ text: string; isError: boolean }>;
   maxSteps?: number;
+  guard?: (m: Message, history: Message[]) => Message | string;
 }
 
 const SYSTEM = `You are a helper agent inside a Cuvette session. You have read-only tools. Do the task you get, then answer with a short report: what you looked at, what you found, with the numbers from tool results. Do not guess values.`;
@@ -35,7 +36,9 @@ export function taskTool(d: TaskDeps): Tool {
           const r = t ? await d.run(t, (c.args ?? {}) as Record<string, unknown>, `${ctx.callId}.t${i}`, ctx.signal) : { text: `ERROR: no read-only tool ${c.name}`, isError: true };
           results.push({ type: "tool_result", callId: c.id, name: c.name, text: r.text, isError: r.isError });
         }
-        history.push({ role: "user", parts: results });
+        const next = d.guard ? d.guard({ role: "user", parts: results }, history) : { role: "user" as const, parts: results };
+        if (typeof next === "string") return { ok: false, error: next };
+        history.push(next);
       }
       return { ok: false, error: "the helper agent did not finish in time" };
     },

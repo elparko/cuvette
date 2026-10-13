@@ -743,7 +743,12 @@ async function main() {
         console.log(deck.deckLine(await s.exportImages(opts)));
         return s.close();
       }
-      console.log(await s.exportAs(fmt as never));
+      try {
+        console.log(await s.exportAs(fmt as never));
+      } catch (e) {
+        console.error((e as Error).message);
+        process.exitCode = 1;
+      }
       return s.close();
     }
     case "databook": {

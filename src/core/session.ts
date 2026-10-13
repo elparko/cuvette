@@ -15,11 +15,11 @@ import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
 import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
-import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
+import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
-import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
+import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
@@ -478,12 +478,11 @@ export class Session {
         log: (kind, data) => this.record.append(kind, data),
         plan: (a) => this.planTool(a),
         fullPlan: () => this.planFirst || this.planning || this.approvedEntry > 0,
-        partialPlan: () => !!this.pilotPlan || (this.approvedEntry > 0 && !!this.plan),
       }),
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
     if (this.pick) extra.push(...this.adapterTools());
-    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
+    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.runTool(t, a, id, sig), guard: (m, all) => this.phiForHelper(m, all) }));
     if (this.pilotOn()) extra.push(...this.pilotTools());
     if (this.planFirst || this.interactive) extra.push(this.clarifyTool());
     extra.push(this.inspectTool());
@@ -1187,6 +1186,7 @@ export class Session {
     } finally {
       if (this.planning) this.endPlanning();
       this.waitedQids.clear();
+      this.laterQids.clear();
       this.draft = undefined;
       this.stopTurn = false;
       this.endTurn = undefined;
@@ -1304,6 +1304,7 @@ export class Session {
 
   private async retitle(turnStart: number): Promise<void> {
     if (!this.interactive || this.settings.headless || this.provider.info.provider === "fake" || this.phiChoice === "mask") return;
+    if (isCloud(this.provider.info) && (this.phiHeld() || (!this.phiOff() && this.phiChoice !== "send" && scanContent(titleInput(this.record), "title").length))) return;
     const all = this.record.entries();
     const had = lastTitle(all);
     if (!changedAnalysis(all.slice(turnStart)) && (had || !all.some((e) => e.kind === "assistant" && e.data.final))) return;
@@ -1568,6 +1569,27 @@ export class Session {
     return true;
   }
 
+  // The record keeps each possible patient identifier that the check found. Only the "send" choice lets a cloud model read the record.
+  private phiHeld(): boolean {
+    return !this.phiOff() && this.phiChoice !== "send" && this.record.entries(["phi"]).length > 0;
+  }
+
+  private refereeBlocked(): boolean {
+    return !!this.refereeProvider && isCloud(this.refereeProvider.info) && this.phiHeld();
+  }
+
+  // The helper agent of the task tool sends tool results to the same model, so they go through the same check.
+  private phiForHelper(m: Message, all: Message[]): Message | string {
+    if (this.phiOff() || !isCloud(this.provider.info)) return m;
+    const hits = scanMessages([m], [...all, m]);
+    if (hits.length && this.phiChoice !== "send" && this.phiChoice !== "mask") {
+      this.record.append("phi", { action: "stop", by: "harness: the helper agent cannot show the card", model: this.provider.info.model, count: hits.length, hits: groupHits(hits).slice(0, 20) as unknown as Record<string, unknown>[] });
+      return "The helper agent stopped: a tool result has possible patient identifiers. Nothing went to the model. Do this job yourself, so that the scientist sees the patient data card.";
+    }
+    if (hits.length && this.phiChoice === "mask") this.masker.add(hits);
+    return this.masker.map.size ? this.masker.message(m) : m;
+  }
+
   private async askPhi(hits: PhiShown[], signal: AbortSignal, local: string | undefined): Promise<{ rid: string; action: PhiAction }> {
     const rid = `phi${++this.phiCount}`;
     const p = new Promise<PhiAction>((resolve) => this.phiWaits.set(rid, { resolve }));
@@ -1655,13 +1677,13 @@ export class Session {
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
-    if (this.refereeProvider && this.phiChoice === "mask" && isCloud(this.refereeProvider.info) && !this.refereeOffNoted) {
+    if (this.refereeBlocked() && !this.refereeOffNoted) {
       this.refereeOffNoted = true;
-      this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds the values that the patient data card masked." });
+      this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds possible patient identifiers that did not go to a cloud model." });
     }
     const turnStart = this.lastRequest()?.id ?? 0;
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
-    if (this.refereeProvider && !signal.aborted && !nothingToCheck && !(this.phiChoice === "mask" && isCloud(this.refereeProvider.info))) {
+    if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
       try {
         for (const f of await referee(this.refereeProvider, ctx)) found.push({ f, source: "referee" });
       } catch (e) {
@@ -1810,26 +1832,30 @@ export class Session {
     const base = signal ?? (calls.length ? AbortSignal.any(calls) : this.abort?.signal);
     const later = new AbortController();
     if (this.laterQids.has(qid)) later.abort();
-    this.laterWaits.set(qid, later);
+    const waits = this.laterWaits.get(qid) ?? new Set<AbortController>();
+    waits.add(later);
+    this.laterWaits.set(qid, waits);
     this.waitedQids.add(qid);
     try {
       return await abortable(this.questions.wait(qid), base ? AbortSignal.any([base, later.signal]) : later.signal);
     } catch (e) {
-      this.waitedQids.delete(qid);
+      if (waits.size === 1) this.waitedQids.delete(qid);
       throw e;
     } finally {
-      if (this.laterWaits.get(qid) === later) this.laterWaits.delete(qid);
+      waits.delete(later);
+      if (!waits.size && this.laterWaits.get(qid) === waits) this.laterWaits.delete(qid);
     }
   }
 
   private laterQids = new Set<string>();
-  private laterWaits = new Map<string, AbortController>();
+  private laterWaits = new Map<string, Set<AbortController>>();
 
   answerLater(qids: string[]): void {
+    if (!this.busy) return;
     for (const qid of qids) {
       if (this.questions.get(qid)?.status !== "open") continue;
       this.laterQids.add(qid);
-      this.laterWaits.get(qid)?.abort();
+      for (const w of this.laterWaits.get(qid) ?? []) w.abort();
     }
   }
 
@@ -1893,13 +1919,22 @@ export class Session {
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     this.useTools([tool.name]);
-    const args = coerceArgs(dropNulls((call.args && typeof call.args === "object" && !Array.isArray(call.args) ? call.args : {}) as Args, tool.inputSchema), tool.inputSchema);
-    if (!ownPurpose(tool)) delete args.purpose;
-    const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
+    const r = await this.pipeline(tool, this.callArgs(tool, call.args), call.id, signal);
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     const earlier = tool.readOnly && !r.isError && !r.images?.length && r.text.length > 400 ? this.sameEarlierResult(call, r.text) : undefined;
     if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: `[The output is the same as the output of the earlier call ${earlier} with the same input. It is still above in this conversation.]` };
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
+  }
+
+  private callArgs(tool: Tool, raw: unknown): Args {
+    const args = coerceArgs(dropNulls((raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Args, tool.inputSchema), tool.inputSchema);
+    if (!ownPurpose(tool)) delete args.purpose;
+    return absolutePaths(args, this.cwd) as Args;
+  }
+
+  // A call from the MCP server or the helper agent gets the same argument checks as a call from the model: relative paths become absolute before the blind check.
+  runTool(tool: Tool, raw: unknown, callId: string, signal: AbortSignal) {
+    return this.pipeline(tool, this.callArgs(tool, raw), callId, signal);
   }
 
   // A read-only call that repeats an earlier call with the same output does not put the output in the context a second time.
@@ -2157,7 +2192,7 @@ export class Session {
 
   private render(tool: Tool, o: ToolOutput): { text: string; images?: string[] } {
     const adapter = this.adapterOf(tool);
-    const cloud = this.provider.info.provider === "claude";
+    const cloud = isCloud(this.provider.info);
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
@@ -2303,7 +2338,7 @@ export class Session {
       for (const qid of qids) await this.waitFor(qid, signal);
       return keys.every((k) => this.decisions.isSet(k));
     } catch {
-      for (const qid of qids) this.waitedQids.delete(qid);
+      for (const qid of qids) if (!this.laterWaits.has(qid)) this.waitedQids.delete(qid);
       return false;
     }
   }
@@ -2385,6 +2420,12 @@ export class Session {
     if (!target) return { ok: false, error: `The tool ${last.tool} is not available.` };
     const values = (spec.values.length ? spec.values : d.sensitivity?.options.length ? d.sensitivity.options : d.choices).slice(0, 5);
     if (!values.length) return { ok: false, error: `Give the values to compare for ${d.label}.` };
+    if ((this.mode === "plan" || this.mode === "teach") && !target.readOnly) return { ok: false, error: this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Comparison runs also wait." : `${this.mode === "plan" ? "Plan" : "Teach"} mode: the agent runs only read-only tools, so no comparison runs of ${last.tool}.` };
+    const probe = { ...last.args, [link.arg]: values };
+    const blind = blindCheck(target, probe);
+    if (blind) return { ok: false, error: blind.message };
+    const held = this.heldBack(probe);
+    if (held) return { ok: false, error: `${basename(held)} is held back for the blind test. Do not read it.` };
     const signal = this.abort?.signal ?? new AbortController().signal;
     const perm = this.permitted(target, last.args);
     if (perm === "deny") return { ok: false, error: "the permission rules deny this tool" };
@@ -2830,7 +2871,8 @@ export class Session {
     const after = (e: Entry) => e.id > asked.id;
     if (this.record.live(["plan_approved"]).some(after) || plans.some((e) => after(e) && ["cancelled", "proposed", "update_proposed"].includes(String(e.data.action)))) return;
     if (this.record.live(["mode"]).some((e) => after(e) && e.data.reason === "plan first")) return;
-    const last = plans.filter((e) => e.data.plan && ["proposed", "update_proposed", "setting_changed", "pilot_changed"].includes(String(e.data.action))).at(-1);
+    const withPlan = [...plans.filter((e) => ["proposed", "update_proposed", "setting_changed", "pilot_changed", "updated", "status"].includes(String(e.data.action))), ...this.record.live(["plan_approved"])];
+    const last = withPlan.filter((e) => e.data.plan).sort((x, y) => x.id - y.id).at(-1);
     if (!last) return;
     const version = Number(last.data.version) || Number(asked.data.version) || this.planVersion;
     const target = (asked.data.target as Mode | undefined) ?? (this.mode === "plan" ? "watch" : this.mode);
@@ -3385,6 +3427,7 @@ export class Session {
     }
     if (!this.planUpdate && !this.clarified) return { ok: false, error: "Phase 1 first: call clarify with what you found in the data and your clarifying questions about meaning (or none). Then call plan with the proposed analysis." };
     if (this.planUpdate && reason) this.replanReason = reason;
+    if (!(this.planUpdate && this.plan) && a.steps === undefined) return { ok: false, error: "missing required arguments: steps" };
     const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
     if (this.method && !this.planUpdate) fillFromMethod(plan, this.method);
     if (plan.restatement) {
@@ -4045,7 +4088,7 @@ export class Session {
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
-    if (this.refereeProvider) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+    if (this.refereeProvider && !this.refereeBlocked()) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
     return out;
   }
 
@@ -4054,6 +4097,7 @@ export class Session {
     this.busy = true;
     const ctl = this.sideAbort();
     try {
+      if (!(await this.phiGate(ctl.signal))) return false;
       return await this.maybeCompact(ctl.signal, true);
     } finally {
       this.sideAborts.delete(ctl);
@@ -4098,6 +4142,8 @@ export class Session {
         const eln = await import("../eln/export.ts");
         return eln.exportEln(this, join(out, `${this.id}.eln`));
       }
+      default:
+        throw new Error(`No export format ${String(fmt)}. Use html, md, jsonl, pdf, protocol, script, notebook, flow, eln or xlsx.`);
     }
   }
 

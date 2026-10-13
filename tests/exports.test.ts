@@ -174,3 +174,24 @@ test("protocol puts the approved plan at the top", () => {
   const text = readFileSync(exportProtocol(r, [adapter], join(dir, "plan-protocol.md")), "utf8");
   expect(text).toMatch(/^# Protocol\n\nSession .*\n\n## Proposed analysis \(version 1, confirmed .*\)\n\n### Proposed metrics\n\nQuestion: Does drug 2 help\?\n/);
 });
+
+test("the protocol and the replay exports leave out the steps and the decisions that a rewind set aside", () => {
+  const r = new AnalysisRecord(join(dir, "rw"), "20260101-000000-rwnd");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.addNode(nodeIn({ tool: "open", args: { path: a } }));
+  const upTo = r.entries().at(-1)!.id;
+  r.append("decision", { key: "sigma", old: null, new: 5, by: "human" });
+  r.addNode(nodeIn({ tool: "blur", args: { path: "/w/a_out.tif", sigma: 5 } }));
+  r.append("rewind", { upTo });
+  r.append("decision", { key: "sigma", old: 5, new: null, by: "human", reason: "rewind", rewind: true, unset: true });
+  const md = readFileSync(exportProtocol(r, [adapter], join(dir, "rw.md")), "utf8");
+  expect(md).not.toContain("Gaussian Blur");
+  expect(md).toContain("No setup values were recorded.");
+  const ts = readFileSync(exportScript(r, [adapter], join(dir, "rw.ts")), "utf8");
+  expect(ts).not.toContain('"blur"');
+  const flow = JSON.parse(readFileSync(exportFlow(r, [adapter], join(dir, "rw.json")), "utf8"));
+  expect(flow.steps.map((s: { tool: string }) => s.tool)).toEqual(["open"]);
+  expect(flow.decisions).toEqual({});
+  const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "rw.ipynb")), "utf8"));
+  expect(nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code")).toHaveLength(1);
+});

@@ -308,6 +308,95 @@ test("the card in both views: masked values, where, and the four actions", async
   await Promise.race([done, sleep(500)]);
 });
 
+function cloudFake(script: ConstructorParameters<typeof FakeProvider>[0] = []): FakeProvider {
+  const p = new FakeProvider(script);
+  p.info.local = false;
+  return p;
+}
+
+test("a cloud referee does not read the record after patient identifiers went to the local model", async () => {
+  const { session } = await clinicSession({ local: true });
+  await session.send("Summarize visits.csv");
+  const ref = cloudFake();
+  const spy = vi.spyOn(ref, "complete");
+  (session as any).refereeProvider = ref;
+  await session.review();
+  expect(spy).not.toHaveBeenCalled();
+  await session.close();
+});
+
+test("a cloud referee reads the record after the scientist chose to send", async () => {
+  const { session } = await clinicSession({ action: "send" });
+  await session.send("Summarize visits.csv");
+  const ref = cloudFake();
+  const spy = vi.spyOn(ref, "complete");
+  (session as any).refereeProvider = ref;
+  await session.review();
+  expect(spy).toHaveBeenCalled();
+  await session.close();
+});
+
+test("the helper agent of the task tool does not send patient identifiers to a cloud model", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-phi-proj-"));
+  const file = join(cwd, "visits.csv");
+  writeFileSync(file, CLINIC_CSV);
+  const provider = cloudFake([{ calls: [{ name: "task", args: { job: "Read visits.csv" } }] }, { calls: [{ name: "read_file", args: { path: file } }] }, { text: "Done." }, { text: "Done." }]);
+  const session = await Session.create({ adapters: [], provider, cwd });
+  session.decisions.applySetup({});
+  const cards: PhiEvent[] = [];
+  session.bus.on((e) => {
+    if (e.type === "phi") cards.push(e);
+  });
+  await session.send("Summarize visits.csv");
+  expect(JSON.stringify(provider.requests.map((r) => r.messages))).not.toContain("John Doe");
+  expect(session.record.entries(["phi"])[0]!.data).toMatchObject({ action: "stop" });
+  const task = session.record.entries(["tool_result"]).find((e) => e.data.tool === "task")!;
+  expect(String(task.data.error)).toMatch(/^The helper agent stopped: a tool result has possible patient identifiers\./);
+  expect(cards).toHaveLength(0);
+  await session.close();
+});
+
+test("/compact checks the history for patient identifiers before the summary goes to a cloud model", async () => {
+  const { session, provider, cards } = await clinicSession({ action: "stop" });
+  (session as any).history.push({ role: "user", parts: [{ type: "text", text: CLINIC_CSV }] });
+  const spy = vi.spyOn(provider, "complete");
+  expect(await session.compact()).toBe(false);
+  expect(cards).toHaveLength(1);
+  expect(spy).not.toHaveBeenCalled();
+  expect(session.record.entries(["phi"])[0]!.data.action).toBe("stop");
+  await session.close();
+});
+
+test("no new title from a cloud model after the scientist stopped patient identifiers", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-phi-proj-"));
+  const file = join(cwd, "visits.csv");
+  writeFileSync(file, CLINIC_CSV);
+  const provider = cloudFake([{ text: "Not read." }]);
+  provider.info.provider = "openai";
+  const session = await Session.create({ adapters: [], provider, cwd, interactive: true, settings: { planFirst: false, guidance: false } as never });
+  session.bus.on((e) => {
+    if (e.type === "phi") setTimeout(() => session.respondPhi(e.rid, "stop"), 0);
+  });
+  const spy = vi.spyOn(provider, "complete");
+  await session.send(`Summarize visits.csv for John Doe, MRN 00123456`);
+  await session.send("Go on without the file.");
+  await session.titling;
+  expect(session.record.entries(["phi"])[0]!.data.action).toBe("stop");
+  expect(session.record.entries(["assistant"]).some((e) => e.data.final)).toBe(true);
+  expect(spy).not.toHaveBeenCalled();
+  await session.close();
+});
+
+test("cloud_visibility applies to every cloud model, not only Claude", async () => {
+  const provider = cloudFake();
+  provider.info.provider = "openai";
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")) });
+  (session as any).adapterOf = () => ({ manifest: { data_rules: { cloud_visibility: "none" } } });
+  const r = (session as any).render({ name: "count", source: "adapter" }, { ok: true, metrics: { cells: 41 }, text: "41 cells" });
+  expect(r.text).not.toContain("41");
+  await session.close();
+});
+
 const DATA = "/Volumes/T7/guided-analysis/data";
 const BINARY = new Set([".gz", ".zip", ".bz2", ".xz", ".tif", ".tiff", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".pdf", ".h5", ".h5ad", ".hdf5", ".bam", ".bai", ".cram", ".ibd", ".fif", ".xlsx", ".xls", ".npz", ".npy", ".rds", ".rda", ".mgz", ".nii", ".czi", ".nd2", ".lif", ".raw", ".fcs", ".sqlite", ".db", ".parquet", ".pkl", ".mat"]);
 const MAX = 1_000_000;
