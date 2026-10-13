@@ -531,15 +531,15 @@ tests:
 
   - id: rarefy_dune_site_1
     description: >
-      Dune data rarefied to 10 individuals. Site 1 has 18 individuals and 5 species, and the
-      expected richness at 10 is 4.3265. This is a stability value from vegan 2.7.6, not a
-      published value.
+      Dune data rarefied to 10 individuals. Site 1 has 18 individuals and 5 species (counts 1, 4, 7, 4 and 2).
+      The Hurlbert formula, the sum over species of 1 - C(18 - x, 10) / C(18, 10), gives 4.326546 by hand
+      (Python math.comb). vegan 2.7.6 gives the same value.
     data: [data/dune.csv]
     calls:
       - tool: rarefy_richness
         args: { community: "{adapter_dir}/data/dune.csv", sample_size: 10 }
     expect:
-      - { path: metrics.first_site_rarefied, approx: 4.3265, abs: 0.001 }
+      - { path: metrics.first_site_rarefied, approx: 4.326546, abs: 0.000001 }
       - { path: metrics.n_sites_dropped, equals: 0 }
       - { path: metrics.min_total, equals: 15 }
 
