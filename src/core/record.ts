@@ -8,6 +8,8 @@ import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
+// A table or text file that a script wrote holds its results. A code file holds typed numbers, not results.
+const SCRIPT_RESULT_FILE = /\.(csv|tsv|tab|txt|json|md)$/i;
 
 export interface RecordPlaces {
   workDir?: string;
@@ -361,7 +363,15 @@ export class AnalysisRecord {
       walk(n.result, "");
       const texts: [string, string][] = [];
       if (n.tool === "run_script") texts.push(["stdout", String(this.entry(n.entry)?.data.text ?? "")]);
-      const hits = n.outputs.filter((o, i) => n.outputs.findIndex((x) => x.path === o.path) === i).flatMap((o) => (reads.get(o.path) ?? []).map((e) => ({ e, out: o, read: o.path }))).sort((x, y) => x.e.id - y.e.id);
+      const own = n.outputs.filter((o, i) => n.outputs.findIndex((x) => x.path === o.path) === i);
+      const written = n.tool === "run_script" ? own.filter((o) => o.sha && SCRIPT_RESULT_FILE.test(o.path) && !reads.has(o.path)) : [];
+      for (const o of written) {
+        const blob = this.blobPath(o.sha!);
+        try {
+          if (blob && statSync(blob).size <= MAX_FILE_BYTES) texts.push([`file:${o.path}`, readFileSync(blob, "utf8")]);
+        } catch {}
+      }
+      const hits = own.flatMap((o) => (reads.get(o.path) ?? []).map((e) => ({ e, out: o, read: o.path }))).sort((x, y) => x.e.id - y.e.id);
       for (const { e, out, read } of hits) {
         const blob = out.sha ? this.blobPath(out.sha) : undefined;
         let text = String(e.data.text ?? "");
