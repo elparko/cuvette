@@ -204,3 +204,34 @@ test("an empty summary does not replace the older messages", async () => {
   expect(session.record.entries(["compaction"])).toHaveLength(0);
   await session.close();
 });
+
+test("at each cut point, every kept tool result has its call before it in the kept messages", async () => {
+  const h: Message[] = [request("Measure.")];
+  for (let i = 1; i <= 12; i++) {
+    h.push({ role: "assistant", parts: [{ type: "text", text: `step ${i}` }, { type: "tool_call", id: `a${i}`, name: "read_file", args: {} }, { type: "tool_call", id: `b${i}`, name: "read_file", args: {} }] });
+    h.push({ role: "user", parts: [{ type: "tool_result", callId: `a${i}`, name: "read_file", text: "x".repeat(i * 300) }, { type: "tool_result", callId: `b${i}`, name: "read_file", text: "y" }] });
+    if (i % 4 === 0) h.push({ role: "user", parts: [{ type: "text", text: "a note" }] });
+  }
+  const provider = new FakeProvider({ steps: [], complete: "sum" });
+  for (const win of [10, 500, 1000, 2000, 4000, 8000]) {
+    const res = await summarizeOld(h, provider, win, undefined, h[0]);
+    if (!res) continue;
+    expect(res.kept[0]!.role).toBe("assistant");
+    const calls = new Set<string>();
+    for (const m of res.kept)
+      for (const p of m.parts) {
+        if (p.type === "tool_call") calls.add(p.id);
+        if (p.type === "tool_result") expect(calls.has(p.callId)).toBe(true);
+      }
+  }
+});
+
+test("a second summary does not carry the old plan statuses into the new summary input", async () => {
+  const h = [summaryMessage("## Question\nOld question.\n## Current plan\n1. [todo] Segment"), ...oneLongTurn(6)];
+  let input = "";
+  const provider = new FakeProvider({ steps: [], complete: "new" });
+  (provider as { complete: (s: string, t: string) => Promise<string> }).complete = async (_s, text) => ((input = text), "new");
+  await summarizeOld(h, provider, 10, undefined, h[1]);
+  expect(input).toContain("Old question.");
+  expect(input).not.toContain("[todo] Segment");
+});

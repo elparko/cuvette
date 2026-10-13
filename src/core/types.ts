@@ -121,6 +121,7 @@ export interface StepRequest {
   system: string;
   messages: Message[];
   tools: ToolSchema[];
+  knownTools?: string[];
   noToolCalls?: boolean;
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;

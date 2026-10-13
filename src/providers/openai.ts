@@ -287,7 +287,7 @@ export class OpenAIProvider implements Provider {
   }
 
   async step(input: StepRequest): Promise<StepResult> {
-    const req = input.noToolCalls ? { ...input, tools: [] } : input;
+    const req = input.noToolCalls ? { ...input, tools: [], knownTools: [] } : input;
     const native = this.toNative(req.system, req.messages);
     let streamed = "";
     const reply = await this.exchange(() => this.body(native, req.tools), req.signal, req.onRetry, (d) => {
@@ -312,7 +312,7 @@ export class OpenAIProvider implements Provider {
     });
     let said = (reply.text ?? "").trim();
     if (!calls.length && said) {
-      const hit = extractTextToolCall(said, req.tools.map((t) => t.name));
+      const hit = extractTextToolCall(said, [...req.tools.map((t) => t.name), ...(req.knownTools ?? [])]);
       if (hit) {
         calls.push({ type: "tool_call", id: freshId(""), name: hit.name, args: hit.args });
         said = hit.rest;

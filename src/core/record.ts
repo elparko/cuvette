@@ -46,6 +46,7 @@ export class AnalysisRecord {
   private nodeEntry = new Map<string, number>();
   private asideRanges: [number, number][] = [];
   private nextNode = 1;
+  private cutTail = false;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
@@ -79,11 +80,13 @@ export class AnalysisRecord {
         closeSync(fd);
       }
       if (last[0] !== 0x0a) appendFileSync(this.logPath, "\n");
+      this.cutTail = false;
     } catch {}
   }
 
   private load(): void {
     const buf = readFileSync(this.logPath);
+    this.cutTail = buf.length > 0 && buf[buf.length - 1] !== 10;
     for (let at = 0, end = 0; at < buf.length; at = end + 1) {
       end = buf.indexOf(10, at);
       if (end < 0) end = buf.length;
@@ -95,6 +98,7 @@ export class AnalysisRecord {
       } catch {
         continue;
       }
+      if (!e || typeof e !== "object") continue;
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.index(e);
@@ -165,7 +169,7 @@ export class AnalysisRecord {
 
   append(kind: EntryKind, data: Record<string, unknown>, opts: { refs?: number[]; node?: string } = {}): Entry {
     const e: Entry = {
-      id: this.log.length + 1,
+      id: Math.max(this.log.length, Number(this.log.at(-1)?.id) || 0) + 1,
       ts: new Date().toISOString(),
       session: this.sessionId,
       kind,
@@ -173,7 +177,8 @@ export class AnalysisRecord {
       ...(opts.node ? { node: opts.node } : {}),
       data,
     };
-    appendFileSync(this.logPath, JSON.stringify(portable(e, this.project)) + "\n");
+    appendFileSync(this.logPath, (this.cutTail ? "\n" : "") + JSON.stringify(portable(e, this.project)) + "\n");
+    this.cutTail = false;
     this.log.push(e);
     this.index(e);
     this.onAppend?.(e);
@@ -185,7 +190,8 @@ export class AnalysisRecord {
   }
 
   entry(id: number): Entry | undefined {
-    return this.log[id - 1];
+    const e = this.log[id - 1];
+    return e?.id === id ? e : this.log.find((x) => x.id === id);
   }
 
   correct(id: number, data: Record<string, unknown>): Entry {
@@ -328,6 +334,11 @@ export class AnalysisRecord {
   numbers(): { node: string; path: string; value: number }[] {
     const out: { node: string; path: string; value: number }[] = [];
     const rewound = this.rewound();
+    const reads = new Map<string, Entry[]>();
+    for (const e of this.log) {
+      const path = e.kind === "tool_result" && e.data.tool === "read_file" && e.data.ok ? (e.data.effectiveArgs as { path?: string } | undefined)?.path : undefined;
+      if (path) reads.get(path)?.push(e) ?? reads.set(path, [e]);
+    }
     for (const n of this.nodeList) {
       if (rewound.has(n.id)) continue;
       let count = 0;
@@ -349,12 +360,9 @@ export class AnalysisRecord {
       };
       walk(n.result, "");
       const texts: [string, string][] = [];
-      if (n.tool === "run_script") texts.push(["stdout", String(this.log.find((e) => e.id === n.entry)?.data.text ?? "")]);
-      for (const e of this.log) {
-        if (e.kind !== "tool_result" || e.data.tool !== "read_file" || !e.data.ok) continue;
-        const read = (e.data.effectiveArgs as { path?: string } | undefined)?.path;
-        const out = read ? n.outputs.find((o) => o.path === read) : undefined;
-        if (!out) continue;
+      if (n.tool === "run_script") texts.push(["stdout", String(this.entry(n.entry)?.data.text ?? "")]);
+      const hits = n.outputs.filter((o, i) => n.outputs.findIndex((x) => x.path === o.path) === i).flatMap((o) => (reads.get(o.path) ?? []).map((e) => ({ e, out: o, read: o.path }))).sort((x, y) => x.e.id - y.e.id);
+      for (const { e, out, read } of hits) {
         const blob = out.sha ? this.blobPath(out.sha) : undefined;
         let text = String(e.data.text ?? "");
         try {
@@ -373,13 +381,20 @@ export class AnalysisRecord {
     return out;
   }
 
+  // One pass: a rewind takes the history as it was at its point, from a saved copy. A message body is read from disk only once.
   messages(upTo = Infinity): Message[] {
+    const points = [...new Set(this.log.filter((e) => e.kind === "rewind").map((e) => Number(e.data.upTo)))].sort((a, b) => a - b);
+    const at = new Map<number, { list: Message[]; length: number }>();
+    let next = 0;
     let out: Message[] = [];
     for (const e of this.log) {
       if (e.id > upTo) break;
+      for (; next < points.length && points[next]! < e.id; next++) at.set(points[next]!, { list: out, length: out.length });
       if (e.kind === "compaction") out = [{ role: "user", parts: [{ type: "text", text: String(e.data.summary ?? "") }] }, ...((e.data.kept as Message[] | undefined) ?? [])];
-      else if (e.kind === "rewind") out = this.messages(Number(e.data.upTo));
-      else if (e.kind === "message") out.push(e.data.message as Message);
+      else if (e.kind === "rewind") {
+        const back = at.get(Number(e.data.upTo));
+        if (back) out = back.list.slice(0, back.length);
+      } else if (e.kind === "message") out.push(e.data.message as Message);
     }
     return out;
   }

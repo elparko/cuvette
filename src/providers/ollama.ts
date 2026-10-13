@@ -239,7 +239,7 @@ export class OllamaProvider implements Provider {
   }
 
   async step(input: StepRequest): Promise<StepResult> {
-    const req = input.noToolCalls ? { ...input, tools: [] } : input;
+    const req = input.noToolCalls ? { ...input, tools: [], knownTools: [] } : input;
     const system = this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system;
     if (this.info.vision) await prepareImages(req.messages, req.signal);
     const body: Record<string, unknown> = {
@@ -337,7 +337,7 @@ export class OllamaProvider implements Provider {
     let note: string | undefined;
     const calls: { name: string; args: unknown; parseError?: string }[] = nativeCalls.map((c) => ({ ...c }));
     if (!calls.length && text) {
-      const hit = extractTextToolCall(text, req.tools.map((t) => t.name));
+      const hit = extractTextToolCall(text, [...req.tools.map((t) => t.name), ...(req.knownTools ?? [])]);
       if (hit) {
         calls.push({ name: hit.name, args: hit.args });
         text = hit.rest;

@@ -14,7 +14,7 @@ export type PreResult = PreToolUseResult & { errors?: string[] };
 const STOPPING = new Set(["deny", "block", "ask", "instruct"]);
 const TIMEOUT_MS = 30_000;
 
-type Runner = (input: any) => Promise<{ result?: any; error?: string }>;
+type Runner = (input: any, signal?: AbortSignal) => Promise<{ result?: any; error?: string }>;
 
 function matches(matcher: string | undefined, name: unknown): boolean {
   if (!matcher || matcher === "*" || typeof name !== "string") return true;
@@ -45,8 +45,9 @@ function normalize(raw: any): any {
 
 function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
   const label = hook.command.join(" ");
-  return (input) =>
+  return (input, signal) =>
     new Promise((resolve) => {
+      if (signal?.aborted) return resolve({});
       const payload = {
         ...input,
         hook_event_name: event,
@@ -61,13 +62,19 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         resolve(v);
+      };
+      const onAbort = () => {
+        child.kill("SIGKILL");
+        finish({});
       };
       const child = spawn(hook.command[0], hook.command.slice(1), { cwd, stdio: ["pipe", "pipe", "pipe"] });
       const timer = setTimeout(() => {
         child.kill("SIGKILL");
         finish({ error: `Command hook "${label}" timed out after 30 s.` });
       }, TIMEOUT_MS);
+      signal?.addEventListener("abort", onAbort, { once: true });
       child.stdout.on("data", (d) => (stdout += d));
       child.stderr.on("data", (d) => (stderr += d));
       child.on("error", (err) => finish({ error: `Command hook "${label}" failed to start: ${err.message}` }));
@@ -83,7 +90,7 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
         try {
           finish({ result: normalize(JSON.parse(text)) });
         } catch {
-          finish({});
+          finish({ error: `Command hook "${label}" gave output that is not JSON: ${text.slice(0, 200)}` });
         }
       });
       child.stdin.end(JSON.stringify(payload));
@@ -99,11 +106,19 @@ export class HookRunner {
     private cwd: string = process.cwd(),
   ) {}
 
+  onError?: (message: string) => void;
+
+  private async call(run: Runner, input: any, signal?: AbortSignal): Promise<any> {
+    const { result, error } = await run(input, signal);
+    if (error) this.onError?.(error);
+    return result;
+  }
+
   setCommands(commands: Partial<Record<HookEvent, CommandHook[]>>): void {
     this.commandHooks = commands;
   }
 
-    add(hooks: Hook[]): void {
+  add(hooks: Hook[]): void {
     this.hooks.push(...hooks);
   }
 
@@ -117,13 +132,21 @@ export class HookRunner {
     return [...builtin, ...commands];
   }
 
-  async pre(input: PreToolUseInput): Promise<PreResult> {
+  async pre(input: PreToolUseInput, signal?: AbortSignal): Promise<PreResult> {
     const merged: PreResult = {};
     const errors: string[] = [];
     let current = input;
     for (const run of this.runners("PreToolUse", input.tool)) {
-      const { result: r, error } = await run(current);
-      if (error) errors.push(error);
+      const { result: r, error } = await run(current, signal);
+      if (error) {
+        errors.push(error);
+        this.onError?.(error);
+      }
+      if (signal?.aborted) {
+        merged.decision = "deny";
+        merged.reason = "The scientist stopped the turn before the hooks ended.";
+        break;
+      }
       if (!r) continue;
       if (r.updatedArgs) {
         current = { ...current, args: r.updatedArgs };
@@ -151,7 +174,7 @@ export class HookRunner {
   async post(input: PostToolUseInput): Promise<PostToolUseResult> {
     const merged: PostToolUseResult = {};
     for (const run of this.runners("PostToolUse", input.tool)) {
-      const { result: r } = await run(input);
+      const r = await this.call(run, input);
       if (!r) continue;
       merged.additionalContext = join(merged.additionalContext, r.additionalContext);
       if (r.findings?.length) merged.findings = [...(merged.findings ?? []), ...r.findings];
@@ -163,7 +186,7 @@ export class HookRunner {
     const merged: PreAnswerResult = {};
     let current = input;
     for (const run of this.runners("PreAnswer", undefined)) {
-      const { result: r } = await run(current);
+      const r = await this.call(run, current);
       if (!r) continue;
       if (typeof r.answer === "string") {
         current = { ...current, answer: r.answer };
@@ -176,9 +199,10 @@ export class HookRunner {
   }
 
   // Like Claude Code: a Stop hook that gives decision "block" keeps the agent working, with the reason as the next note.
-  async stop(input: Record<string, unknown>): Promise<string | undefined> {
+  async stop(input: Record<string, unknown>, signal?: AbortSignal): Promise<string | undefined> {
     for (const run of this.runners("Stop", undefined)) {
-      const { result: r } = await run({ ...input, event: "Stop" });
+      if (signal?.aborted) return undefined;
+      const r = await this.call(run, { ...input, event: "Stop" }, signal);
       if (r?.decision === "block") return String(r.reason || "A Stop hook asks the agent to continue.");
     }
     return undefined;
@@ -187,7 +211,7 @@ export class HookRunner {
   async event(name: HookEvent, input: Record<string, unknown>): Promise<void> {
     for (const run of this.runners(name, input.tool)) {
       try {
-        await run({ ...input, event: name });
+        await this.call(run, { ...input, event: name });
       } catch {}
     }
   }

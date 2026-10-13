@@ -941,3 +941,24 @@ describe("agent loop fixes, round seven", () => {
     expect(r.message.parts).toEqual([{ type: "tool_call", id: "call_1", name: "add", args: { a: 1, b: 2 } }]);
   });
 });
+
+describe("agent loop fixes, round eight", () => {
+  test("a tool call written as text for a tool that left the list still becomes a call", async () => {
+    stubOllama(() => ndjson([{ message: { content: '<tool_call>{"name": "old_tool", "arguments": {"x": 1}}</tool_call>' } }, { done: true }]), showBody(["completion"]));
+    const p = await makeProvider("ollama:x");
+    const r = await p.step(req([user("q")], { knownTools: ["old_tool"] }));
+    expect(r.message.parts).toEqual([{ type: "tool_call", id: "call_1", name: "old_tool", args: { x: 1 } }]);
+    expect(r.stopReason).toBe("tool_use");
+    stubOllama(() => ndjson([{ message: { content: '{"name": "old_tool", "arguments": {"x": 1}}' } }, { done: true }]), showBody(["completion"]));
+    const off = await (await makeProvider("ollama:x")).step(req([user("q")], { knownTools: ["old_tool"], noToolCalls: true }));
+    expect(off.message.parts.some((x) => x.type === "tool_call")).toBe(false);
+  });
+
+  test("openai: a text call for a known tool outside the list becomes a call", async () => {
+    vi.stubGlobal("fetch", async () => json({ choices: [{ message: { content: '{"name": "old_tool", "arguments": {"x": 2}}' }, finish_reason: "stop" }] }));
+    const p: any = await makeProvider("openai:http://localhost:1234/v1|m");
+    p.stream = false;
+    const r = await p.step(req([user("q")], { knownTools: ["old_tool"] }));
+    expect(r.message.parts.find((x: any) => x.type === "tool_call")).toMatchObject({ name: "old_tool", args: { x: 2 } });
+  });
+});
