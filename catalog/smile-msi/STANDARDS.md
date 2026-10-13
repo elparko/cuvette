@@ -51,7 +51,7 @@ For a segmentation without a mask, check `background_clusters` in the result. Ba
 ## Settings and the decision record
 
 - The decision record sets the tolerance, the normalization, the reducer and the TIC amplification cap. The wrapper applies them to the open slide.
-- After the scientist changes one of these values, call `apply_settings` with the new values. Then run the step again.
+- To change one of these values, call propose_change. After the scientist agrees, call `apply_settings`: the harness fills the new values. Then run the step again.
 - Do not set a different value without a reason. The harness logs each difference as a deviation.
 - The `find_peaks` tool sets Min rel. intensity to 0, and the dialog uses 0.002. The `annotate` tool uses a match tolerance of 5 ppm, and the dialog uses 10. Tell the scientist about each difference.
 

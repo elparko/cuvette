@@ -14,5 +14,5 @@ description: Steps to fit an ELISA standard curve, back-calculate the samples an
 6. Look at the plot. Check that the samples lie on the curve and inside the range.
 7. Read the samples table. For each sample, report conc (times the dilution factor), the CV and the flag.
 8. For each flagged sample, tell the scientist the cause: below LLOQ, above ULOQ, beyond an asymptote, or a high CV.
-9. If the scientist asks whether 5PL is better than 4PL, run compare_models with both models on the same standards.
+9. If the scientist asks whether 5PL is better than 4PL, run compare_models with both models on the same plate file. Give type_col, so that the tool uses the standard wells only.
 10. Report the model, the weighting, the blank, the limits with their rules, the excluded wells and the drc version.

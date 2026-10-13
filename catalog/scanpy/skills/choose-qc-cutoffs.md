@@ -11,6 +11,6 @@ The cutoffs belong to the scientist. Help the scientist to see the data.
 2. Minimum genes per cell: look for the low tail. Cells in the tail are empty droplets or debris.
 3. Maximum genes per cell: look for the high tail. Cells in the tail may be doublets.
 4. Maximum percent mitochondrial counts: look for a group of cells with a high share. Dying cells have a high share. Some tissues, such as heart, have a high normal share.
-5. Give the scientist the number of cells that each cutoff would remove. Use filter_cells on a copy of the handle to find it. The tool never changes the input handle.
-6. Call filter_cells. The harness asks for the three cutoffs and records them. Do not change them to get a round cell count.
+5. Call filter_cells. The harness asks for the three cutoffs and records them. Do not change them to get a round cell count.
+6. If the scientist wants to see other cutoffs, call compare_options with the key of the cutoff and the values that the scientist names. It shows the number of cells that each value keeps. Do not suggest values.
 7. Mouse data use the prefix mt- in calculate_qc and filter_cells. Human data use MT-.

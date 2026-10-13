@@ -9,4 +9,4 @@ description: Steps to root a tree with an outgroup that the scientist names.
 2. Look in the FASTA file for the exact sequence names.
 3. If the decision outgroup does not hold these names, call propose_change with the key outgroup and the names. Use commas between several names. Then run infer_tree.
 4. Report the outgroup. If the outgroup is not a single group on the tree, IQ-TREE says so in the report. Tell the scientist.
-5. If the scientist has no outgroup, the decision outgroup stays empty. Say that the tree is unrooted.
+5. If the scientist has no outgroup, the decision outgroup stays empty. Say that the tree has no root.

@@ -63,7 +63,7 @@ run_tool(function() {
   dropped <- sum(!ok)
   d <- d[ok, ]
   groups <- unique(d$g)
-  rows <- list(); metrics <- list(); fits <- list(); comp <- NULL
+  rows <- list(); metrics <- list(); fits <- list(); comps <- list()
   for (gr in groups) {
     dg <- d[d$g == gr, ]
     where <- if (length(groups) > 1) paste("group", gr) else p$data
@@ -83,6 +83,7 @@ run_tool(function() {
         data.frame(group = gr, model = m, n_par = a$k, rss = a$rss, aicc = aicc_of(a$rss, nrow(dg), a$k), error = "", stringsAsFactors = FALSE)
       }))
       comp$delta_aicc <- comp$aicc - min(comp$aicc, na.rm = TRUE)
+      comps[[gr]] <- comp
       res <- all[[model]]
       if (!is.null(res$error)) fail(sprintf("the %s model did not converge on %s: %s", model, where, res$error))
       for (i in seq_len(nrow(comp))) metrics[[paste0(if (length(groups) > 1) paste0(clean_name(gr), "_") else "", "aicc_", comp$model[i])]] <- comp$aicc[i]
@@ -139,7 +140,8 @@ run_tool(function() {
     t <- tab[tab$group == gr, ]
     paste0(if (length(groups) > 1) paste0(gr, ": ") else "", paste(sprintf("%s %s (%g%% CI %s to %s)", t$parameter, fmt(t$estimate), 100 * (1 - alpha), fmt(t$ci_low), fmt(t$ci_high)), collapse = ", "))
   }), collapse = "; ")
-  best <- if (!is.null(comp)) comp$model[which.min(comp$aicc)] else NULL
+  comp <- if (length(comps)) do.call(rbind, comps) else NULL
+  best <- if (length(comps)) paste(vapply(names(comps), function(gr) paste0(if (length(comps) > 1) paste0(gr, " ") else "", comps[[gr]]$model[which.min(comps[[gr]]$aicc)]), ""), collapse = ", ") else NULL
   emit(list(
     ok = TRUE,
     summary = sprintf("%s fit by nonlinear least squares on %d rows. %s%s%s", model, nrow(d), per, if (!is.null(best)) sprintf(". Lowest AICc among the inhibition models: %s", best) else "",

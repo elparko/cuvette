@@ -167,6 +167,8 @@ run_tool(function() {
     lines <- c(lines, txt)
     rows[[length(rows) + 1]] <- data.frame(measure = "non-inferiority limit", estimate = est, ci_low = ci[1], ci_high = ci[2], note = txt)
   }
+  endpoint <- pick(p, "endpoint", NULL)
+  if (!is.null(endpoint) && nzchar(endpoint)) lines <- c(sprintf("Endpoint: %s.", endpoint), lines)
   pop <- pick(p, "population", NULL)
   if (!is.null(pop)) lines <- c(lines, sprintf("Analysis population: %s (%d patients analyzed).", pop, d$n_rows))
   tab <- do.call(rbind, rows)

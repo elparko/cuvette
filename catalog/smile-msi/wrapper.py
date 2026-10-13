@@ -147,7 +147,8 @@ def make_regions(rim_fraction: float = 0.3, clusters: int = 4) -> dict:
     rim = tissue & (depth <= rim_fraction * top)
     core = tissue & (depth > 0.5 * top)
     lesion = None
-    if not api.get_features():
+    auto_peaks = not api.get_features()
+    if auto_peaks:
         api.find_peaks(snr=3, max_peaks=300)
     labels = np.asarray(api.segment(n_clusters=int(clusters), mask=tissue).labels)
     sizes = {c: int((labels == c).sum()) for c in np.unique(labels[labels >= 0])}
@@ -164,7 +165,9 @@ def make_regions(rim_fraction: float = 0.3, clusters: int = 4) -> dict:
         api.add_region(name, mask)
     return {"regions": [{"name": k, "n_pixels": int(v.sum())} for k, v in made.items()],
             "lesion_found": lesion is not None,
-            "note": "Regions are staged. Use the names in run_analysis. Call send_regions to give them to the app."}
+            "note": "Regions are staged. Use the names in run_analysis. Call send_regions to give them to the app."
+            + (" The working feature set was empty, so this tool ran find_peaks with snr 3 and max_peaks 300 for the segmentation."
+               " These peaks are now the working set. Run find_peaks with the settings of the decision record before an analysis." if auto_peaks else "")}
 
 
 def state() -> dict:

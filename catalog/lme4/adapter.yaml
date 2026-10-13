@@ -158,7 +158,7 @@ decisions:
     sensitivity:
       options: [satterthwaite, kenward-roger]
       tool: fit_mixed_model
-      compare: [metrics.estimate_Days, metrics.p_Days]
+      compare: []
       max_runs: 2
 
   - key: reduced_formula
@@ -314,7 +314,7 @@ tests:
     description: >
       Sleepstudy data (18 subjects, 180 observations). The model Reaction ~ Days + (Days | Subject)
       fitted by REML. Fixed effects 251.405 and 10.467, REML criterion 1743.6, random-effect
-      standard deviations 24.74 and 5.92, residual 25.59 and correlation 0.07. These are the
+      standard deviations 24.74 and 5.92, residual 25.59 and correlation 0.07. The Days slope has the standard error 1.546 and t 6.771. These are the
       values in Bates et al. 2015 (Journal of Statistical Software 67(1)) and the lme4 vignette.
     data: [data/sleepstudy.csv]
     calls:
@@ -329,6 +329,8 @@ tests:
       - { path: metrics.sd_Subject_Intercept, label: "the subject intercept standard deviation", approx: 24.74, abs: 0.01 }
       - { path: metrics.sd_Subject_Days, label: "the subject slope standard deviation", approx: 5.92, abs: 0.01 }
       - { path: metrics.sd_residual, label: "the residual standard deviation", approx: 25.59, abs: 0.01 }
+      - { path: "table.rows[1][2]", label: "the standard error of the Days slope (vignette 1.546)", approx: 1.546, abs: 0.001 }
+      - { path: "table.rows[1][4]", label: "the t value of the Days slope (vignette 6.771)", approx: 6.771, abs: 0.001 }
       - { path: metrics.corr_Subject, approx: 0.066, abs: 0.005 }
       - { path: metrics.n_groups_Subject, equals: 18 }
       - { path: metrics.singular, equals: 0 }

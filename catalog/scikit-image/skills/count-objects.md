@@ -6,8 +6,8 @@ description: Step-by-step workflow to count nuclei or blobs in one image or a fo
 # Count objects in an image or a folder
 
 1. Run inspect_image on the folder to see the file patterns. Then run it on one image. Read the channels, the value range and the warnings.
-2. Decide the channel. A gray image uses gray. An H&E image usually uses hematoxylin.
-3. Decide if the objects are bright or dark in that channel. Hematoxylin and a fluorescence image give bright objects.
+2. The channel is a decision of the scientist (stain_channel). Tell the scientist what you see: a gray image uses gray, and an H&E image usually uses hematoxylin.
+3. Bright or dark objects is also a decision (object_polarity). Tell the scientist that hematoxylin and a fluorescence image give bright objects.
 4. Run count_objects on one image with the threshold method that the scientist chose. Look at the outline PNG.
 5. Run the sensitivity check for the threshold method and the smallest object size. Say which counts change.
 6. Run count_objects on the folder with the same settings. Give a pattern such as "*/tissue images/*.png".

@@ -203,6 +203,8 @@ def filter_genes_by_spots(adata, min_counts=3, min_spot_fraction=0.005, exclude_
     keep = n_spots_with >= need
     low = int((~keep).sum())
     dropped_prefix = 0
+    if str(exclude_prefix or "").strip().lower() in ("", "none"):
+        exclude_prefix = None
     if exclude_prefix:
         pre = a.var_names.str.startswith(exclude_prefix)
         dropped_prefix = int((keep & pre).sum())

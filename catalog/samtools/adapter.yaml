@@ -267,11 +267,9 @@ checks:
   - id: no_header_without_reference
     description: A SAM file without a header was converted with no reference file.
     severity: error
-    rule:
-      tool: convert_to_bam
-      arg: reference
-      op: missing
-      message: Give the reference FASTA file. A SAM file without a header needs it.
+    text: >
+      A SAM file without a header (no @SQ lines) needs the reference FASTA file. Flag the answer if convert_to_bam ran on such a
+      file without reference. A SAM file with a header and a BAM file need no reference.
   - id: mapq_not_stated
     description: A count of reads does not say which mapping quality cutoff and which flag filters it used.
     severity: warning

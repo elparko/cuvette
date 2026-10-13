@@ -4,7 +4,7 @@ Report each enrichment result so that another lab can repeat it.
 - For over-representation, give the rule that made the gene list: the cutoffs and the direction.
 - Also give the number of genes on the list, the background and its size.
 - Give the gene set size limits and the correction (Benjamini-Hochberg).
-- The background must be the measured genes. A background of all genes in the gene sets gives p values that are too small.
+- The background is a decision of the scientist. The measured genes are the usual choice. A background of all genes in the gene sets gives p values that are too small. Report the background of the analysis.
 - For each pathway, give the overlap: the genes on the list in the set, out of the set size.
 - Also give the p value and the adjusted p value for each pathway.
 - For preranked GSEA, give the ranking metric and the number of ranked genes.

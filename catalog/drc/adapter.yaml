@@ -113,6 +113,7 @@ decisions:
     stage: when_needed
     links:
       - { tool: fit_standard_curve, arg: blank }
+      - { tool: compare_models, arg: blank }
 
   - key: average_replicates
     label: Average the replicate wells before the fit

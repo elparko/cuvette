@@ -236,7 +236,8 @@ decisions:
     help: >
       A higher s keeps fewer ions for each segment and gives fewer segments. At a high s a small
       real region can vanish. The package workflow fits s of 2 to 64 and reports s of 32. Look at
-      the segment maps of several models before you choose.
+      the segment maps of several models before you choose. The value must be one of the s values that segment_image fitted
+      (by default 2, 4, 8, 16, 32 and 64).
     essential: true
     owner: human
     stage: when_needed

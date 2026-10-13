@@ -33,6 +33,8 @@ run_tool(function() {
   ids <- sprintf("%s:%d-%d", pk$Chr, pk$Start, pk$End)
   counts <- data.frame(peak_id = ids, chr = pk$Chr, start = pk$Start, end = pk$End, reads, check.names = FALSE, stringsAsFactors = FALSE)
   samples <- data.frame(sample = info$ID, info[, intersect(c("Tissue", "Factor", "Condition", "Treatment", "Replicate"), names(info)), drop = FALSE], library_size = as.numeric(info$Reads), frip = as.numeric(info$FRiP), peak_reads = colSums(reads), check.names = FALSE, stringsAsFactors = FALSE)
+  extra <- setdiff(names(raw), c("SampleID", "Tissue", "Factor", "Condition", "Treatment", "Replicate", "bamReads", "bamControl", "ControlID", "Peaks", "PeakCaller", "PeakFormat", "ScoreCol", "LowerBetter", "Spikein"))
+  if (length(extra)) samples <- cbind(samples, raw[match(samples$sample, raw$SampleID), extra, drop = FALSE])
   names(samples) <- tolower(names(samples))
   if (nzchar(out_path("counts"))) write.csv(counts, out_path("counts"), row.names = FALSE)
   if (nzchar(out_path("samples"))) write.csv(samples, out_path("samples"), row.names = FALSE)

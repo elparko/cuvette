@@ -116,7 +116,7 @@ decisions:
     hi: 10
     group: Integration
     help: >
-      A higher value mixes the batches more strongly. The value 0 removes no batch effect. The
+      A higher value mixes the batches more strongly. The value 0 turns off the diversity penalty: Harmony still corrects, but it mixes the batches least. The
       Harmony default is 2.
     essential: true
     owner: human
@@ -144,6 +144,7 @@ decisions:
     links:
       - { tool: integrate_harmony, arg: n_pcs }
       - { tool: compute_lisi, arg: n_pcs }
+      - { tool: plot_integration, arg: n_pcs }
 
   - key: random_seed
     label: Random seed
@@ -186,7 +187,7 @@ tools:
     params:
       adata: { type: [object, string], description: "A handle or an .h5ad path. The object must hold obsm X_pca." }
       batch_key: { type: string, description: The column of the cell table that holds the batch. }
-      theta: { type: number, minimum: 0, maximum: 10, description: "Diversity penalty, unitless. A higher value mixes the batches more. 0 removes no batch effect." }
+      theta: { type: number, minimum: 0, maximum: 10, description: "Diversity penalty, unitless. A higher value mixes the batches more. 0 turns off the diversity penalty." }
       n_pcs: { type: integer, minimum: 2, description: "Number of principal components to correct, counted from the first." }
       random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
       basis: { type: string, default: X_pca, description: The obsm key of the components to correct. }

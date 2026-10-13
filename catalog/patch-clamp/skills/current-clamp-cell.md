@@ -5,7 +5,7 @@ description: How to measure spikes, rheobase, the F-I curve, input resistance, t
 
 1. Run `inspect_recording` on the file. Check that the mode is current clamp and note the step window and the step currents.
 2. Ask the scientist for the sweeps to include, the baseline window and the junction potential correction.
-3. Run `measure_passive` on the hyperpolarizing sweeps. Set `current_range_pa` to the negative steps, such as -100,0.
+3. Run `measure_passive` on the hyperpolarizing sweeps. Set `current_range_pa` to the negative steps. The tool keeps steps above the first value and below the second, so -101,0 keeps a -100 pA step and leaves out 0.
 4. Read the input resistance, the R squared of the line and the number of tau fits. A tau fit can fail on a small step.
 5. Run `measure_spikes` on all sweeps. The scientist chooses the threshold definition, the dV/dt cutoff and the lowest peak.
 6. Read the rheobase and its step size. If a sweep with no step current has spikes, the cell fires by itself.

@@ -56,10 +56,11 @@ function search() {
   if (num("max_variable_mods") !== undefined) database.max_variable_mods = num("max_variable_mods");
   const tol = (v, unit) => ({ [unit]: [-v, v] });
   if (num("precursor_tol_ppm") === undefined || num("fragment_tol") === undefined) fail("precursor_tol_ppm and fragment_tol are required");
+  if (!["ppm", "da"].includes(flags.fragment_tol_unit)) fail("fragment_tol_unit is required: ppm for high-resolution fragments, da for ion-trap fragments");
   const config = {
     database,
     precursor_tol: tol(num("precursor_tol_ppm"), "ppm"),
-    fragment_tol: tol(num("fragment_tol"), flags.fragment_tol_unit ?? "ppm"),
+    fragment_tol: tol(num("fragment_tol"), flags.fragment_tol_unit),
     mzml_paths: files,
   };
   if (num("isotope_min") !== undefined || num("isotope_max") !== undefined) config.isotope_errors = [num("isotope_min") ?? 0, num("isotope_max") ?? 0];
