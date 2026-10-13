@@ -6,7 +6,12 @@ import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import type { Mode } from "./core/types.ts";
 
 readOldEnv();
-if (process.env.NO_COLOR && process.env.FORCE_COLOR === undefined) process.env.FORCE_COLOR = "0";
+// Chalk reads FORCE_COLOR once, when Ink loads. Child processes must not get it: Python Rich takes FORCE_COLOR=0 as "force color".
+if (process.env.NO_COLOR && process.env.FORCE_COLOR === undefined) {
+  process.env.FORCE_COLOR = "0";
+  await import("ink");
+  delete process.env.FORCE_COLOR;
+}
 if (!process.env.CUVETTE_HOME) {
   const moved = moveOldHome();
   if (moved) console.error(moved);
@@ -333,11 +338,16 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   return { cwd: s.folder, message: s.request };
 }
 
+function needTerminal() {
+  if (!process.stdin.isTTY) fail('The terminal app needs a terminal for the input. For a request from a pipe or a script, use cuvette -p "<request>". For the browser app, use cuvette app.');
+  if (process.env.TERM === "dumb") fail('The terminal app cannot draw its screen in this terminal (TERM=dumb). For the browser app, use cuvette app. For no screen, use cuvette -p "<request>".');
+}
+
 async function interactive(resumeId?: string, folder?: string) {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
-  if (!process.stdin.isTTY) fail('The terminal app needs a terminal for the input. For a request from a pipe or a script, use cuvette -p "<request>". For the browser app, use cuvette app.');
+  needTerminal();
   if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
   let sample: { cwd: string; message: string } | undefined;
   if (!resumeId && !str(o.model) && process.stdin.isTTY && (await import("./core/firststart.ts")).needsFirstStart()) sample = await firstStart();
@@ -427,6 +437,7 @@ async function main() {
     case undefined:
       return interactive();
     case "resume":
+      needTerminal();
       return interactive(a1 || (await chooseSession(true)));
     case "help":
       return console.log(HELP);
@@ -481,6 +492,7 @@ async function main() {
     }
     case "onboard": {
       if (!a1) return fail("usage: cuvette onboard <program> --model <model> [--docs <url>] [--kind cli]");
+      needTerminal();
       const { onboardCommand } = await import("./onboarding/agent.ts");
       const { Session } = await import("./core/session.ts");
       const { runTui } = await import("./tui/app.tsx");

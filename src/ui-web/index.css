@@ -38,7 +38,8 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
+/* Paper is white: the dark colors apply only on the screen. */
+@media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --background: #131315;
     --sidebar: #19191c;
@@ -75,39 +76,41 @@
   }
 }
 
-:root[data-theme="dark"] {
-  --background: #131315;
-  --sidebar: #19191c;
-  --card: #1c1c20;
-  --popover: #222227;
-  --foreground: #ececef;
-  --muted: #26262b;
-  --muted-foreground: #b4b4be;
-  --border: #2e2e34;
-  --field: #17171a;
-  --primary: #ececef;
-  --primary-foreground: #141416;
-  --secondary: #29292e;
-  --secondary-foreground: #ececef;
-  --accent-brand: #f06a8e;
-  --ring: #f06a8e;
-  --destructive: #e5534b;
-  --switch-off: #77777f;
-  --on-accent: #141416;
-  --ok: #5fd28a;
-  --ok-bg: #15301f;
-  --bad: #ff8a7d;
-  --bad-bg: #3a1e1b;
-  --warn: #f0b24e;
-  --warn-bg: #392b10;
-  --info: #85aaff;
-  --info-bg: #1e2a44;
-  --mag: #e59be9;
-  --mag-bg: #381f3a;
-  --code: #16161a;
-  --user: #2a2a30;
-  --shadow-card: none;
-  color-scheme: dark;
+@media screen {
+  :root[data-theme="dark"] {
+    --background: #131315;
+    --sidebar: #19191c;
+    --card: #1c1c20;
+    --popover: #222227;
+    --foreground: #ececef;
+    --muted: #26262b;
+    --muted-foreground: #b4b4be;
+    --border: #2e2e34;
+    --field: #17171a;
+    --primary: #ececef;
+    --primary-foreground: #141416;
+    --secondary: #29292e;
+    --secondary-foreground: #ececef;
+    --accent-brand: #f06a8e;
+    --ring: #f06a8e;
+    --destructive: #e5534b;
+    --switch-off: #77777f;
+    --on-accent: #141416;
+    --ok: #5fd28a;
+    --ok-bg: #15301f;
+    --bad: #ff8a7d;
+    --bad-bg: #3a1e1b;
+    --warn: #f0b24e;
+    --warn-bg: #392b10;
+    --info: #85aaff;
+    --info-bg: #1e2a44;
+    --mag: #e59be9;
+    --mag-bg: #381f3a;
+    --code: #16161a;
+    --user: #2a2a30;
+    --shadow-card: none;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -1279,4 +1282,34 @@
 }
 .srv.hide-notes .line:not(.red):not(.yellow):not(:has([data-change])) {
   display: none;
+}
+
+/* Print and Save as PDF: the whole conversation on paper, without the sidebar, the side panel and the message box. */
+@media print {
+  html,
+  body,
+  #root,
+  #root * {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  aside,
+  main > header,
+  section[aria-label="Conversation"] form,
+  section[aria-label="Conversation"] [role="status"],
+  section[aria-label^="Your decision"],
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+  main > div {
+    display: block !important;
+  }
+  .srv .item,
+  .srv .step,
+  .srv table,
+  .srv img {
+    break-inside: avoid;
+  }
 }

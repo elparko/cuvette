@@ -455,6 +455,7 @@ export class WebView {
         const act = card.act;
         const v = act ? undefined : seqView(this.seq, seqPending(this.slots.map((x) => x.card)));
         const q = v?.q ?? card.q;
+        if (body.qid && body.qid !== q.qid) return this.keep(slot, "The question changed in another window. Choose your answer again.");
         if (a === "later") {
           if (v?.changing) {
             this.seq = SEQ_START;

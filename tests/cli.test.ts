@@ -218,6 +218,17 @@ test("the terminal app with piped input stops with a clear message and makes no 
   expect(spawnSync("ls", [join(h, "proj")], { encoding: "utf8" }).stdout).not.toContain("cuvette");
 }, 40_000);
 
+test.skipIf(!hasPython)("the terminal app with TERM=dumb stops with a clear message and prints no cursor codes", async () => {
+  const h = ptyHome();
+  const r = await drive([], cleanEnv(h, { ANTHROPIC_API_KEY: "sk-ant-test", TERM: "dumb" }), join(h, "proj"));
+  expect(r.code).toBe(1);
+  expect(r.out).toContain("TERM=dumb");
+  expect(r.out).toContain("cuvette app");
+  expect(r.out).toContain("cuvette -p");
+  expect(r.out).not.toContain("\x1b[");
+  expect(spawnSync("ls", [join(h, "proj")], { encoding: "utf8" }).stdout).not.toContain("cuvette");
+}, 40_000);
+
 test("cuvette app with a file in place of a folder stops with a clear message", () => {
   const h = ptyHome();
   const file = join(h, "data.csv");
@@ -267,3 +278,11 @@ describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-termin
     expect(r.out).not.toMatch(/\x1b\[(3|4|9|10)\dm/);
   }, 40_000);
 });
+
+test("NO_COLOR does not give FORCE_COLOR to child processes", () => {
+  const h = ptyHome();
+  const show = 'data:text/javascript,process.on("exit",()=>console.error("FORCE_COLOR="+process.env.FORCE_COLOR))';
+  const r = spawnSync(process.execPath, ["--import", show, CUVETTE, "--version"], { env: cleanEnv(h, { NO_COLOR: "1" }), encoding: "utf8", timeout: 30_000 });
+  expect(r.status).toBe(0);
+  expect(r.stderr).toContain("FORCE_COLOR=undefined");
+}, 40_000);

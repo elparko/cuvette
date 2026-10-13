@@ -327,7 +327,7 @@ describe("question sequence and /change in the app", () => {
     expect(html).toContain("Question 1 of 3");
     expect(html).toContain("Your decision: First");
     expect(html).not.toContain("Your decision: Second");
-    expect(html).toMatch(/btn primary" data-act="answer" data-value="1">two \(recommended\)/);
+    expect(html).toMatch(/btn primary" data-act="answer" data-value="1" data-qid="q1">two \(recommended\)/);
     expect(html).not.toContain('data-act="back"');
     await view.act(first(view), { act: "recommend", fields: {} });
     html = view.cardsHtml();
@@ -350,7 +350,7 @@ describe("question sequence and /change in the app", () => {
     await view.act(first(view), { act: "back", fields: {} });
     html = view.cardsHtml();
     expect(html).toContain("Question 1 of 3");
-    expect(html).toMatch(/btn primary" data-act="answer" data-value="0">one/);
+    expect(html).toMatch(/btn primary" data-act="answer" data-value="0" data-qid="q1">one/);
     expect(html).not.toContain('data-act="back"');
     await view.act(first(view), { act: "next", fields: {} });
     expect(view.cardsHtml()).toContain("Your decision: Second");
@@ -361,6 +361,27 @@ describe("question sequence and /change in the app", () => {
     await view.act(first(view), { act: "next", fields: {} });
     expect(view.cardsHtml()).toContain("Question 3 of 3");
     expect(view.cardsHtml()).toContain("Your decision: Third");
+    view.close();
+  });
+
+  test("two windows: an answer for a question that the other window left with Back does not change the earlier answer", async () => {
+    const { s, view } = setup();
+    await view.act(first(view), { act: "answer", value: "0", qid: "q1", fields: {} });
+    expect(view.cardsHtml()).toContain('data-qid="q2"');
+    await view.act(first(view), { act: "back", fields: {} });
+    await view.act(first(view), { act: "answer", value: "2", qid: "q2", fields: {} });
+    expect(s.record.entries(["answer"]).map((e) => e.data.qid)).toEqual(["q1"]);
+    expect(view.cardsHtml()).toContain("The question changed in another window.");
+    expect(view.cardsHtml()).toContain("Your decision: First");
+    view.close();
+  });
+
+  test("two windows: the second answer to the same card does not answer the next question", async () => {
+    const { s, view } = setup();
+    const id = first(view);
+    expect(await view.act(id, { act: "answer", value: "0", qid: "q1", fields: {} })).toEqual({ ok: true });
+    expect(await view.act(id, { act: "answer", value: "0", qid: "q1", fields: {} })).toEqual({ ok: false, error: "This card is no longer open." });
+    expect(s.record.entries(["answer"]).map((e) => e.data.qid)).toEqual(["q1"]);
     view.close();
   });
 
@@ -632,7 +653,7 @@ test("a failed script step shows the last line of the traceback, and the full er
   const html = itemHtml(ctx, { key: "s", t: "step", ok: false, tool: "run_script", purpose: "Compute the test", summary: "Runs the test.", error, outputs: [{ n: 1, path: "/r/blobs/" + "a".repeat(64) + ".png", kind: "image" }] } as never);
   expect(html).toContain('<span class="summary">the script exited with code 1: ValueError: bad column name</span>');
   expect(html).toContain('<details class="errmore"><summary>Error details</summary><pre>  File &quot;/x/script.py&quot;');
-  expect(html).toContain('alt="PNG file"');
+  expect(html).toContain('alt="Figure from Compute the test: the script exited with code 1: ValueError: bad column name"');
   expect(html).not.toContain('alt="aaaa');
   const ok = itemHtml(ctx, { key: "o", t: "step", ok: true, tool: "run_script", summary: "Wrote 2 files.", outputs: [] } as never);
   expect(ok).toContain('<span class="summary">Wrote 2 files.</span>');
@@ -699,7 +720,7 @@ describe("agent message markdown", () => {
   test("an agent message shows headings, lists, links and a table", () => {
     const text = "## Result\n\n**Counts:**\n- one *n* is a Set\n  - nested\n\n1. first\n2. second\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSee [the paper](https://example.com).";
     const html = itemHtml(ctx, { t: "assistant", text } as Item);
-    for (const part of ["<h4>Result</h4>", "<strong>Counts:</strong>", "<em>n</em>", "<ul><li>nested</li></ul>", "<ol><li>first</li><li>second</li></ol>", "<th>A</th>", '<a href="https://example.com"']) expect(html).toContain(part);
+    for (const part of ["<h4>Result</h4>", "<strong>Counts:</strong>", "<em>n</em>", "<ul><li>nested</li></ul>", "<ol><li>first</li><li>second</li></ol>", "<th role=\"columnheader\">A</th>", '<a href="https://example.com"']) expect(html).toContain(part);
   });
 });
 

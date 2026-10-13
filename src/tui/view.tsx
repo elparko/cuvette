@@ -15,9 +15,14 @@ export function animationsOn(stdout: { isTTY?: boolean } | undefined, env: Recor
   return Boolean(stdout?.isTTY) && env.TERM !== "dumb" && setting !== "off" && setting !== false;
 }
 
+export const CARD_MIN = 12;
+
 export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; inputRows?: number; keys?: boolean; status?: number; queue: number; suggestions: number; text: boolean; pending: boolean }) {
   const budget = o.rows - 2;
-  const footer = 1 + (o.status ?? 2) + (o.keys ? 1 : 0) + o.queue + o.suggestions;
+  let footer = 1 + (o.status ?? 2) + (o.keys ? 1 : 0) + o.queue + o.suggestions;
+  // In a short terminal an open card also takes the rows of the activity line and the status line.
+  const chrome = !o.card || budget - footer >= CARD_MIN;
+  if (!chrome) footer = o.queue;
   const box = 2 + (o.inputRows ?? Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4))));
   // A card gets the rows first. The empty message box, the streamed text and the open steps take only the rows that are left.
   const inputBox = !o.card || budget - footer - box >= 22;
@@ -25,10 +30,10 @@ export function liveLayout(o: { rows: number; columns: number; card: boolean; ru
   if (o.card) {
     const live = o.text ? Math.min(3, Math.max(0, avail - 18)) : 0;
     const pending = o.pending ? Math.min(2, Math.max(0, avail - live - 18)) : 0;
-    return { inputBox, live, pending, card: Math.max(4, avail - live - pending) };
+    return { inputBox, chrome, live, pending, card: Math.max(4, avail - live - pending) };
   }
   const pending = o.pending ? Math.floor(avail / (o.text ? 3 : 1)) : 0;
-  return { inputBox, live: avail - pending, pending, card: avail };
+  return { inputBox, chrome, live: avail - pending, pending, card: avail };
 }
 
 export function Header({ session }: { session: SessionLike }) {

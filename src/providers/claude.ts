@@ -283,7 +283,8 @@ export class ClaudeProvider implements Provider {
 
 export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL, timeoutMs = 15_000): Promise<{ ok: boolean; text: string }> {
   try {
-    await makeClient(key).models.retrieve(model, {}, { timeout: timeoutMs });
+    const m: unknown = await makeClient(key).models.retrieve(model, {}, { timeout: timeoutMs });
+    if (typeof (m as { id?: unknown } | null)?.id !== "string") return { ok: true, text: "Cannot check the key: the server did not answer as the Claude API does. Make sure that ANTHROPIC_BASE_URL or the proxy is correct. The first request tests it." };
     return { ok: true, text: `The key works. It can use ${model}.` };
   } catch (e) {
     if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return { ok: false, text: keyApiProblem(e.status, e.message) };

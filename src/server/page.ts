@@ -108,6 +108,7 @@ section.has-node #detail { flex: 0 0 42%; max-height: none; }
 .badge.info { border: 1px solid var(--accent); color: var(--accent); border-radius: 10px; }
 .badge.changed { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.mdtable { overflow-x: auto; margin: 6px 0; }
 th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 th { color: var(--dim); font-weight: 600; font-size: 12px; }
 tr.changed td:first-child { border-left: 4px solid var(--warn); }
@@ -208,7 +209,7 @@ aside .tabs .n.alert { background: var(--warn-bg); border-color: var(--warn); co
       <span><i class="sw compare"></i> comparison run</span>
       <span><i class="sw waiting"></i> waiting for a decision</span>
     </div>
-    <div id="graphwrap" tabindex="0" aria-label="Graph of steps"><div id="canvas"></div></div>
+    <div id="graphwrap" tabindex="0" role="group" aria-label="Graph of steps. The arrow keys move between the steps."><div id="canvas"></div></div>
     <div id="detail" aria-live="polite"></div>
   </section>
   <aside aria-label="Side panel">
@@ -220,6 +221,27 @@ aside .tabs .n.alert { background: var(--warn-bg); border-color: var(--warn); co
 const TOKEN = __TOKEN__;
 __LAYOUT__
 const BOX_W = 224, BOX_H = 84;
+// The arrow keys move the focus to the nearest step in that direction.
+document.getElementById("graphwrap").addEventListener("keydown", (e) => {
+  const d = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[e.key];
+  if (!d || e.altKey || e.ctrlKey || e.metaKey) return;
+  const cards = [...document.querySelectorAll("#canvas button.card")];
+  if (!cards.length) return;
+  e.preventDefault();
+  const at = cards.indexOf(document.activeElement);
+  if (at < 0) return cards[0].focus();
+  const p = (b) => [parseFloat(b.style.left) || 0, parseFloat(b.style.top) || 0];
+  const [x0, y0] = p(cards[at]);
+  let best = null, score = Infinity;
+  for (const b of cards) {
+    const [x, y] = p(b);
+    const along = (x - x0) * d[0] + (y - y0) * d[1];
+    if (b === cards[at] || along <= 0) continue;
+    const sc = along + 3 * (Math.abs((x - x0) * d[1]) + Math.abs((y - y0) * d[0]));
+    if (sc < score) { score = sc; best = b; }
+  }
+  if (best) { best.focus(); best.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+});
 const HARNESS = new Set(["plan", "note", "calculate", "task", "load_skill", "find_tools", "ask_scientist", "propose_lab_rule", "propose_change", "compare_options"]);
 const TABS = [["plan", "Analysis"], ["trail", "Trail"], ["decisions", "Decisions"], ["questions", "Questions"], ["findings", "Findings"]];
 const IMG_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -314,6 +336,17 @@ function markdown(src) {
     }
     const head = /^#{1,6}\s+(.*)$/.exec(line);
     if (head) { box.append(h("h4", {}, inlineMd(head[1]))); i++; continue; }
+    const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    if (line.trim().startsWith("|") && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1] || "")) {
+      const table = h("table", {});
+      table.append(h("thead", {}, h("tr", {}, ...cells(line).map((c) => h("th", {}, inlineMd(c))))));
+      const body = h("tbody", {});
+      i += 2;
+      while (i < lines.length && lines[i].trim().startsWith("|")) body.append(h("tr", {}, ...cells(lines[i++]).map((c) => h("td", {}, inlineMd(c)))));
+      table.append(body);
+      box.append(h("div", { class: "mdtable" }, table));
+      continue;
+    }
     const li = /^\s*([-*]|\d+\.)\s+/;
     if (li.test(line)) {
       const ordered = /\d/.test(li.exec(line)[1]);

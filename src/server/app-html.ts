@@ -97,12 +97,12 @@ function preText(text: string): string {
 
 // ---------------------------------------------------------------- conversation
 
-function outputsHtml(c: Ctx, outs: { path: string; kind: string; name?: string }[]): string {
+function outputsHtml(c: Ctx, outs: { path: string; kind: string; name?: string }[], from?: string): string {
   if (!outs.length) return "";
   const imgs = outs.filter((o) => o.kind === "image" || IMG.test(o.path));
   const files = outs.filter((o) => !imgs.includes(o));
   return (
-    (imgs.length ? `<div class="images">${imgs.map((o) => imageHtml(c, o.path, o.name)).join("")}</div>` : "") +
+    (imgs.length ? `<div class="images">${imgs.map((o) => imageHtml(c, o.path, o.name, from)).join("")}</div>` : "") +
     (files.length ? `<ul class="files">${files.map((o) => `<li>${fileLink(c, o.path, o.name)}</li>`).join("")}</ul>` : "")
   );
 }
@@ -113,9 +113,10 @@ const shownName = (path: string, name?: string) => {
   return /^[0-9a-f]{40,}\./.test(base) ? `${extname(base).slice(1).toUpperCase() || "Output"} file` : base;
 };
 
-export function imageHtml(c: Ctx, path: string, name?: string): string {
+// A figure without a file name gets the step that made it as its name, for a screen reader and for the tooltip.
+export function imageHtml(c: Ctx, path: string, name?: string, from?: string): string {
   const u = fileUrl(c, path);
-  const label = shownName(path, name);
+  const label = !name && from && /^[0-9a-f]{40,}\./.test(basename(path)) ? `Figure from ${from}` : shownName(path, name);
   const full = /\.tiff?$/i.test(path) ? `${u}&w=2400` : u;
   return `<button type="button" class="thumb" data-full="${esc(full)}" title="${esc(label)}"><img src="${esc(u)}&amp;w=640" alt="${esc(label)}" loading="lazy" decoding="async"></button>`;
 }
@@ -209,7 +210,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
       return `<div class="step ${it.ok ? "ok" : "bad"}${it.n ? "" : " minor"}">
 <div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${shortPaths(esc(head!))}</span></div>${more ? `<details class="errmore"><summary>Error details</summary><pre>${esc(more)}</pre></details>` : ""}
 ${it.why ? `<div class="dim">Purpose: ${esc(it.why)}</div>` : ""}${detail ? `<details class="callinfo"><summary>Settings</summary><div class="dim small">${esc(detail)}</div></details>` : ""}${fid ? `<div class="warn small">${esc(fid)}</div>` : ""}
-${outputsHtml(c, it.outputs)}${opts.code && it.code ? `<details><summary>Code</summary><pre>${esc(it.code)}</pre></details>` : ""}</div>`;
+${outputsHtml(c, it.outputs, `${label}: ${head}`.slice(0, 160))}${opts.code && it.code ? `<details><summary>Code</summary><pre>${esc(it.code)}</pre></details>` : ""}</div>`;
     }
   }
 }
@@ -293,7 +294,8 @@ function questionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "question" }
   const sq = slot.seq;
   const nav = sq && (sq.back || sq.next) ? `<div class="row">${sq.back ? btn("Back", act("back"), "quiet") : ""}${sq.next ? btn("Next", act("next"), "quiet") : ""}</div>` : "";
   const progress = sq?.progress ? `<p class="dim small progress">${esc(sq.progress)}</p>` : "";
-  return frame(slot, `Your decision: ${questionHead(card.q).title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current, titled: true }) + nav);
+  const qid = ` data-qid="${esc(card.q.qid)}"`;
+  return frame(slot, `Your decision: ${questionHead(card.q).title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i) + qid, act("other") + qid, act("later"), act("recommend") + qid, { current: sq?.current, titled: true }) + nav);
 }
 
 function instructionCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "instruction" }>): string {
@@ -554,7 +556,7 @@ export function stepsHtml(c: Ctx): string {
       const tag = rewound.has(n.id) ? ` <span class="tag">rewound</span>` : newer ? ` <span class="tag">replaced by step ${newer}</span>` : st && !st.current ? ` <span class="tag warn">out of date</span>` : "";
       const why = st && !st.current ? `<div class="small warn">${esc(st.reasons.map((x) => x.text).join(" "))}</div>` : "";
       const change = changes.get(n.id);
-      return `<li class="${rewound.has(n.id) ? "rewound" : newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path)}</div>` : ""}</li>`;
+      return `<li class="${rewound.has(n.id) ? "rewound" : newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path, undefined, `Step ${steps.get(n.id)}: ${n.summary || n.tool.replace(/_/g, " ")}`.slice(0, 160))}</div>` : ""}</li>`;
     })
     .join("")}</ol>`;
 }
