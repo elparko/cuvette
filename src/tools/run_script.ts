@@ -7,7 +7,7 @@ import type { Readable, Writable } from "node:stream";
 import { addOldEnv } from "../core/old-names.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
+import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
 import { cap, EXIT_GRACE_MS, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
@@ -165,11 +165,12 @@ export function describeLimits(network: boolean, state: SandboxState = sandbox, 
   return `The script runs as your user account. The operating system does not limit it on Windows. ${open}`;
 }
 
-export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string }): string[] {
+export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string; held?: string[] }): string[] {
   const hide = existsSync(o.cred) ? [...new Set([o.cred, realpathSync(o.cred)])] : [];
   if (state === "bwrap") {
     const binds = [...new Set(o.writable.filter((p) => existsSync(p)))].flatMap((p) => ["--bind", p, p]);
-    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
+    const held = [...new Set((o.held ?? []).filter((p) => existsSync(p)).flatMap((p) => [p, realpathSync(p)]))].flatMap((p) => (statSync(p).isDirectory() ? ["--tmpfs", p] : ["--ro-bind", "/dev/null", p]));
+    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
   }
   if (state === "unshare") {
     const flags = o.network ? "-rm" : "-rmn";
@@ -184,8 +185,14 @@ function sbString(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-function wrap(argv: string[], workDir: string, network: boolean, project?: string): string[] {
-  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
+// A reference that is held back for a blind test is not readable in the sandbox, also when no blind benchmark policy is active.
+export function heldReadRules(held: string[]): string {
+  const paths = [...new Set(held.flatMap((p) => [p, canonical(p)]))];
+  return paths.length ? `(deny file-read-data ${paths.map((p) => `(subpath ${sbString(p)})`).join("")})` : "";
+}
+
+function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = []): string[] {
+  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), held, writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
@@ -195,7 +202,7 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
     const cred = credentialsPath();
     const credPaths = [cred, ...(existsSync(cred) ? [realpathSync(cred)] : [])];
     const secrets = `(deny file-read* file-write* ${credPaths.map((p) => `(literal ${sbString(p)})`).join("")})`;
-    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
+    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
   return argv;
@@ -265,7 +272,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(join(scriptDir, "cuvette.mplstyle"), STYLE_FILE);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
-      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir);
+      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? []);
 
       const child = spawn(argv[0], argv.slice(1), {
         cwd: existsSync(project) ? project : dirs.workDir,

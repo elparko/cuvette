@@ -13,8 +13,8 @@ import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
 const root = mkdtempSync(join(tmpdir(), "cuvette-script-"));
 let n = 0;
 
-function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = async () => ({ ok: true }), network = false) {
-  const dirs = { workDir: join(root, `work${++n}`), sessionDir: join(root, `session${n}`) };
+function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = async () => ({ ok: true }), network = false, heldBack?: () => string[]) {
+  const dirs = { workDir: join(root, `work${++n}`), sessionDir: join(root, `session${n}`), heldBack };
   mkdirSync(dirs.workDir, { recursive: true });
   const tool = runScriptTool(dirs, { network });
   const run = (code: string, extra: Args = {}, signal: AbortSignal = new AbortController().signal) => {
@@ -137,7 +137,31 @@ test("rejects an empty code argument", async () => {
   expect((await run("")).ok).toBe(false);
 });
 
+test("Linux wrap: bubblewrap covers a reference that is held back for a blind test", () => {
+  const ref = join(root, "hand-counts.csv");
+  writeFileSync(ref, "sample,count\nA,41\n");
+  const b = linuxWrap("bwrap", ["python3"], { network: false, writable: [], cred: join(root, "none.json"), held: [ref, join(root, "gone.csv")] });
+  expect(b.join(" ")).toContain(`--ro-bind /dev/null ${ref}`);
+  expect(b.join(" ")).not.toContain("gone.csv");
+});
+
 const sandboxed = process.platform === "darwin";
+
+test.skipIf(!sandboxed)("macOS sandbox: a reference that is held back for a blind test is not readable, also with no blind policy", async () => {
+  setBlindPolicy(undefined);
+  const ref = join(root, "held-counts.csv");
+  writeFileSync(ref, "sample,count\nA,41\n");
+  let held = [ref];
+  const { run } = setup(undefined, false, () => held);
+  const r = await run(`import glob\nfor p in glob.glob(${JSON.stringify(join(root, "held-*.csv"))}):\n    print(open(p).read())`);
+  expect(r.ok).toBe(false);
+  expect(r.text).not.toContain("A,41");
+  expect(r.error).toMatch(/PermissionError|Operation not permitted/);
+  held = [];
+  const after = await run(`print(open(${JSON.stringify(ref)}).read())`);
+  expect(after.ok).toBe(true);
+  expect(after.text).toContain("A,41");
+});
 
 test.skipIf(!sandboxed)("macOS sandbox: blocks a write outside the work folder", async () => {
   const { run } = setup();

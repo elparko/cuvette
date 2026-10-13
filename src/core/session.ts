@@ -19,7 +19,7 @@ import { changedAnalysis, describeSession, lastTitle, titleInput } from "./title
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
-import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
+import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
@@ -55,7 +55,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { Findings, referee, runChecks } from "./review.ts";
+import { Findings, logText, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -341,7 +341,7 @@ export class Session {
   }
 
   dirs(): Dirs {
-    this.sharedDirs ??= { workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd } as Dirs;
+    this.sharedDirs ??= { workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd, heldBack: () => this.hidden } as Dirs;
     return Object.assign(this.sharedDirs, { outputDir: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) });
   }
 
@@ -449,7 +449,9 @@ export class Session {
     if (this.settings.notify.ntfy) {
       try {
         const { ntfyNotifier } = await import("../server/notify.ts");
-        notify = ntfyNotifier(this.settings.notify.ntfy);
+        const send = ntfyNotifier(this.settings.notify.ntfy);
+        const outside = !localUrl(this.settings.notify.ntfy);
+        notify = (q) => send(outside && !this.phiOff() && scanContent(`${q.title}\n${q.text}`, "question").length ? { ...q, title: "A question waits for you", text: "The question can contain patient identifiers, so the notice does not show it. Open Cuvette to read it." } : q);
       } catch {}
     }
     this.questions = new QuestionQueue(this.record, { notify });
@@ -1574,8 +1576,20 @@ export class Session {
     return !this.phiOff() && this.phiChoice !== "send" && this.record.entries(["phi"]).length > 0;
   }
 
+  // The record also keeps results that never went to the model, for example the tool calls inside a script, so a cloud referee also needs a scan of the log.
   private refereeBlocked(): boolean {
-    return !!this.refereeProvider && isCloud(this.refereeProvider.info) && this.phiHeld();
+    if (!this.refereeProvider || !isCloud(this.refereeProvider.info)) return false;
+    return this.phiHeld() || (!this.phiOff() && this.phiChoice !== "send" && scanContent(logText(this.record.liveView()), "log").length > 0);
+  }
+
+  // The MCP client cannot show the patient data card, so the harness masks possible patient identifiers, as in a headless run.
+  phiForClient(text: string, where: string): string {
+    if (this.phiOff() || this.phiChoice === "send") return text;
+    const hits = scanContent(text, where);
+    if (!hits.length) return this.masker.text(text);
+    this.masker.add(hits);
+    this.record.append("phi", { action: "mask", by: "harness: the MCP client cannot show the card", model: "MCP client", count: hits.length, hits: groupHits(hits).slice(0, 20) as unknown as Record<string, unknown>[] });
+    return `${this.masker.text(text)}\n\n[Cuvette masked ${hits.length === 1 ? "a possible patient identifier" : `${hits.length} possible patient identifiers`} in this result before it went to the MCP client. To send the values, the scientist sets phi_check to off or marks the folder as a folder with no patient data.]`;
   }
 
   // The helper agent of the task tool sends tool results to the same model, so they go through the same check.
@@ -4162,6 +4176,8 @@ export class Session {
     const { elabftw } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const plan = sync.planPush(this, cfg.url);
+    const phi = this.record.entries(["phi"]).length;
+    if (phi) plan.display.patient_identifiers = `The patient identifier check found possible identifiers ${phi === 1 ? "one time" : `${phi} times`} in this session. The session log and the trail can hold them.`;
     const tool: Tool = { name: "eln_push", title: "Send to eLabFTW", description: "Send this session to the eLabFTW notebook.", inputSchema: {}, source: "harness", execute: async () => ({ ok: true }) };
     const ctl = this.sideAbort();
     const res = await this.requestPermission(tool, plan.display, ctl.signal, `Sends the listed data to ${plan.server}. It leaves this computer.`).finally(() => this.sideAborts.delete(ctl));

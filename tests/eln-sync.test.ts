@@ -59,6 +59,15 @@ test("the permission card lists the server, the action and the files", async () 
   expect(card.touches).toContain(mock.url);
 });
 
+test("the permission card says when the session holds possible patient identifiers", async () => {
+  const seen = approve(false);
+  await expect(s.elnPush()).rejects.toThrow(/did not approve/);
+  expect(seen[0]!.args!.patient_identifiers).toBeUndefined();
+  s.record.append("phi", { action: "mask", by: "scientist", count: 2, hits: [] });
+  await expect(s.elnPush()).rejects.toThrow(/did not approve/);
+  expect(String(seen[1]!.args!.patient_identifiers)).toMatch(/found possible identifiers one time in this session\. The session log and the trail can hold them\./);
+});
+
 test("a push creates an experiment, tags it, uploads the files and records the push", async () => {
   approve(true);
   const r = await s.elnPush();

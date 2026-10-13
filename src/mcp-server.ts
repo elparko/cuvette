@@ -114,9 +114,9 @@ export async function runMcpServer(opts: { adapters: string[]; trustFolder?: boo
     if (!def) return { content: [{ type: "text", text: `no tool ${req.params.name}` }], isError: true };
     try {
       const r = await def.run((req.params.arguments ?? {}) as Args);
-      return { content: [{ type: "text", text: r.text }], isError: !!r.isError };
+      return { content: [{ type: "text", text: session.phiForClient(r.text, def.name) }], isError: !!r.isError };
     } catch (e) {
-      return { content: [{ type: "text", text: (e as Error).message }], isError: true };
+      return { content: [{ type: "text", text: session.phiForClient((e as Error).message, def.name) }], isError: true };
     }
   });
   if (session.trustNotice) process.stderr.write(`Note: ${session.trustNotice}\n`);
