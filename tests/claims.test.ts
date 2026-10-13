@@ -1,5 +1,9 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { annotate, checkAnswer } from "../src/core/claims.ts";
+import { AnalysisRecord } from "../src/core/record.ts";
 import type { Entry, EntryKind } from "../src/core/types.ts";
 
 function fake(numbers: { node: string; path: string; value: number }[], user: string[] = [], setup: Record<string, unknown> = {}) {
@@ -250,6 +254,35 @@ describe("checkAnswer inputs and small counts", () => {
     const { record, entries } = fake([]);
     entries.push({ id: 60, ts: "", session: "s", kind: "tool_call", data: { tool: "run_script", args: { code: "x = 2.718" } } });
     expect(checkAnswer("The value is 2.718.", record).map((c) => c.label)).toEqual(["unsourced"]);
+  });
+
+  function scriptRun(code: string, files: Record<string, string>) {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-claims-"));
+    const r = new AnalysisRecord(dir, "s1");
+    r.append("tool_call", { tool: "run_script", args: { code } });
+    const e = r.append("tool_result", { tool: "run_script", ok: true, text: "done" });
+    const outputs = Object.entries(files).map(([name, text]) => {
+      const path = join(dir, name);
+      writeFileSync(path, text);
+      return { path, kind: "file" as const, sha: r.putBlob(path) };
+    });
+    r.addNode({ entry: e.id, adapter: "", adapterVersion: "", programVersion: "", tool: "run_script", args: { code }, decisions: {}, codeHash: "", inputHashes: [], outputs, result: { ok: true, metrics: {} }, parents: [], summary: "", model: "m", manualRoute: "", fidelity: "none" });
+    return r;
+  }
+
+  test("a number that a script wrote to its output file is sourced with no read_file", () => {
+    const r = scriptRun("import csv\npower = 0.8\nopen('power.csv','w').write(f'power,min_effect\\n{power},1.62\\n')", { "power.csv": "power,min_effect\n0.8,1.62\n" });
+    expect(checkAnswer("At 80% power, the test can find an effect of 1.62 hours.", r).map((c) => c.label)).toEqual(["measured", "measured"]);
+  });
+
+  test("a number only in the script source, or in a code file that the script wrote, is not sourced", () => {
+    const r = scriptRun("power = 0.8\nprint('done')", { "copy.py": "power = 0.8\n", "out.csv": "min_effect\n1.62\n" });
+    expect(checkAnswer("At 80% power, the test can find an effect of 1.62 hours.", r).map((c) => c.label)).toEqual(["unsourced", "measured"]);
+  });
+
+  test("a wrong number that no step wrote is still flagged", () => {
+    const r = scriptRun("x = 1", { "power.csv": "power,min_effect\n0.8,1.62\n" });
+    expect(checkAnswer("At 90% power, the test can find an effect of 2.4 hours.", r).map((c) => c.label)).toEqual(["unsourced", "unsourced"]);
   });
 
   test("a very small number must match its logged value, not any small value", () => {
