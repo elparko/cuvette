@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { addedSteps, approvedPlan, currentPlan, definitionFindings, matchStep, mergePlan, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
+import { addedSteps, approvedPlan, currentPlan, definitionFindings, matchStep, mergePlan, toolWords, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 
 export const SLEEP_PLAN = {
@@ -168,4 +168,10 @@ test("an exclusion or a check with no full stop gets one before its effect", () 
   const text = planText({ steps: [{ step: "Compare" }], exclusions: [{ what: "No sample is left out", effect: "all 6 samples stay" }], checks: [{ check: "normality", if_fails: "use Mann-Whitney U" }] } as AnalysisPlan);
   expect(text).toContain("- No sample is left out. Effect: all 6 samples stay");
   expect(text).toContain("- normality. If it fails: use Mann-Whitney U");
+});
+
+test("a tool name with a slash stays whole and also gives its parts", () => {
+  expect(toolWords("fiji/run_macro, stats (t_test)")).toEqual(["fiji/run_macro", "fiji", "run_macro", "stats", "t_test"]);
+  const plan = { steps: [{ step: "Segment", tool: "fiji/run_macro", status: "todo" }] } as unknown as AnalysisPlan;
+  expect(matchStep(plan, "fiji/run_macro")).toBe(0);
 });

@@ -74,3 +74,29 @@ test("a Stop command hook blocks with exit code 2 or with decision block, and ge
   const ok = script("stopok.mjs", `process.stdin.resume();process.stdin.on("end",()=>process.exit(0))`);
   expect(await new HookRunner([], { Stop: [{ command: ok }] }, dir).stop({ session: "s" })).toBeUndefined();
 });
+
+test("a command hook with output that is not JSON gives an error, and the runner reports it", async () => {
+  const bad = script("notjson.js", "console.log('deny please')");
+  const seen: string[] = [];
+  const h = new HookRunner([], { PreToolUse: [{ command: bad }], Stop: [{ command: bad }] });
+  h.onError = (m) => seen.push(m);
+  const r = await h.pre(input);
+  expect(r.decision).toBeUndefined();
+  expect(r.errors?.[0]).toMatch(/not JSON: deny please/);
+  expect(await h.stop({ session: "s" })).toBeUndefined();
+  expect(seen).toHaveLength(2);
+});
+
+test("a hook that hangs stops at once when the turn stops, and the call does not run", async () => {
+  const hang = script("hang.js", "setInterval(() => {}, 1000)");
+  const h = new HookRunner([], { PreToolUse: [{ command: hang }], Stop: [{ command: hang }] });
+  const ctl = new AbortController();
+  const t0 = Date.now();
+  setTimeout(() => ctl.abort(), 200);
+  const r = await h.pre(input, ctl.signal);
+  expect(r.decision).toBe("deny");
+  const ctl2 = new AbortController();
+  setTimeout(() => ctl2.abort(), 200);
+  expect(await h.stop({ session: "s" }, ctl2.signal)).toBeUndefined();
+  expect(Date.now() - t0).toBeLessThan(5000);
+});

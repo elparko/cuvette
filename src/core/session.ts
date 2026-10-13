@@ -42,7 +42,7 @@ import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
-import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
+import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
@@ -499,6 +499,7 @@ export class Session {
       this.settings.hooks,
       this.cwd,
     );
+    this.hooks.onError = (message) => this.record.append("notice", { text: message, warn: true });
 
     this.system = this.buildSystem();
     if (resumed) {
@@ -627,7 +628,9 @@ export class Session {
   // The version command and the package list of an adapter run after the first request goes out.
   private async afterStart(rt: AdapterRuntime) {
     const name = rt.adapter.name;
+    const had = rt.startPath;
     const f = await rt.checked?.catch(() => undefined);
+    if (f && had && !f.path) this.record.append("notice", { text: `The version check of the adapter ${name} did not find ${rt.adapter.manifest.program.name} at ${had}: ${f.how}. The tools of ${name} can fail. To look for the program again, run "cuvette programs check ${name}".`, warn: true });
     if (f) {
       const info = this.adapterInfo.find((x) => x.name === name);
       const before = info?.programVersion;
@@ -982,7 +985,7 @@ export class Session {
     if (!turnStart) return;
     const hits = request ? searchTools(adapterTools.filter((t) => !this.baseTools.has(t.name)), request, 4) : [];
     this.useTools(hits.map((t) => t.name));
-    const planned = new Set((this.plan?.steps ?? []).filter((s) => s.status === "todo" || s.status === "doing").flatMap((s) => (s.tool ?? "").toLowerCase().split(/[\s,;/()]+/)));
+    const planned = new Set((this.plan?.steps ?? []).filter((s) => s.status === "todo" || s.status === "doing").flatMap((s) => toolWords(s.tool ?? "")));
     this.useTools(adapterTools.filter((t) => !this.baseTools.has(t.name) && planned.has((t.remoteName ?? t.name).toLowerCase())).map((t) => t.name));
     const extras = [...this.active].filter((n) => this.tools.get(n)?.source === "adapter" && !this.baseTools.has(n));
     for (const n of extras) if (this.turnNo - (this.toolTurn.get(n) ?? 0) > TOOL_IDLE_TURNS) this.active.delete(n);
@@ -1131,7 +1134,7 @@ export class Session {
           }
         }
         if (!calls.length) {
-          const block = stopBlocks < MAX_STOP_BLOCKS ? await this.hooks.stop({ session: this.id, answer: said, stop_hook_active: stopBlocks > 0 }).catch(() => undefined) : undefined;
+          const block = stopBlocks < MAX_STOP_BLOCKS ? await this.hooks.stop({ session: this.id, answer: said, stop_hook_active: stopBlocks > 0 }, signal).catch(() => undefined) : undefined;
           if (block && !signal.aborted) {
             stopBlocks++;
             if (said) this.record.append("assistant", { text: said, final: false });
@@ -1263,6 +1266,7 @@ export class Session {
           system: this.system,
           messages: this.history,
           tools: this.activeSchemas(),
+          knownTools: [...this.tools.keys()],
           noToolCalls: noTools,
           signal,
           onDelta: (d) => {
@@ -2036,13 +2040,13 @@ export class Session {
       return error(gate);
     }
     if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && tool.name !== "clarify" && ++this.planLooks === 4) this.notes.push(this.clarified ? "You have looked at the data enough. Call plan now." : "You have looked at the data enough. Call clarify now.");
-    if (this.planning && this.planUpdate && this.mode === "plan" && !tool.readOnly && depth === 0 && this.plan && this.plan.steps.some((x) => x.status !== "skipped" && !!x.tool && x.tool.toLowerCase().split(/[\s,;/()]+/).includes((tool.remoteName ?? tool.name).toLowerCase()))) {
+    if (this.planning && this.planUpdate && this.mode === "plan" && !tool.readOnly && depth === 0 && this.plan && this.plan.steps.some((x) => x.status !== "skipped" && !!x.tool && toolWords(x.tool).includes((tool.remoteName ?? tool.name).toLowerCase()))) {
       this.endPlanning();
       this.record.append("notice", { text: `${tool.remoteName ?? tool.name} is a step of the confirmed plan, so it runs with no plan update.` });
     }
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Call plan now." : this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
-    const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never);
+    const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never, signal);
     let eff = (pre.updatedArgs ?? args) as Args;
     if (pre.deviations?.length) this.record.append("deviation", { callId, tool: tool.name, deviations: pre.deviations });
     if (pre.decision === "deny") return error(pre.reason ?? "a hook denied this call");
@@ -3498,7 +3502,7 @@ export class Session {
     }
     const known = this.knownDecisions(plan);
     const m = matchSettings(plan, known);
-    const stepTools = new Set(plan.steps.flatMap((x) => (x.tool ?? "").toLowerCase().split(/[\s,;/()]+/)).filter(Boolean));
+    const stepTools = new Set(plan.steps.flatMap((x) => toolWords(x.tool ?? "")));
     const keyed = new Set(settingsOf(plan).map((x) => x.setting.key).filter(Boolean));
     const loose = known.filter((k) => k.asks && !keyed.has(k.key) && !k.tools.some((t) => stepTools.has(t)));
     if (!this.planUpdate && !this.toolsHinted && loose.length && plannedAdapters(plan).length) {

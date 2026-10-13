@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -141,3 +141,62 @@ test("a compaction entry holds the messages that it keeps, so a crash after it l
   r.append("message", { message: msg("three") });
   expect(r.messages().map((m) => (m.parts[0] as { text: string }).text)).toEqual(["short", "two", "three"]);
 });
+
+const said = (r: AnalysisRecord) => r.messages().map((m) => (m.parts[0] as { text: string }).text);
+const textMsg = (t: string) => ({ message: { role: "user", parts: [{ type: "text", text: t }] } });
+
+test("a cut last line does not swallow the next entry, also with no repair before the append", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(dir, "s1");
+  r.append("message", textMsg("one"));
+  appendFileSync(join(dir, "log.jsonl"), '{"id":2,"kind":"mess');
+  const again = new AnalysisRecord(dir, "s1");
+  expect(again.append("message", textMsg("two")).id).toBe(2);
+  const third = new AnalysisRecord(dir, "s1");
+  expect(said(third)).toEqual(["one", "two"]);
+  expect(third.append("note", {}).id).toBe(3);
+});
+
+test("a bad line in the middle does not give two entries the same id", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(dir, "s1");
+  for (const t of ["a", "b", "c"]) r.append("message", textMsg(t));
+  const lines = readFileSync(join(dir, "log.jsonl"), "utf8").split("\n");
+  lines.splice(1, 1, "{not json", "null");
+  writeFileSync(join(dir, "log.jsonl"), lines.join("\n"));
+  const again = new AnalysisRecord(dir, "s1");
+  expect(again.entry(3)?.data.message).toMatchObject({ parts: [{ text: "c" }] });
+  expect(again.append("note", {}).id).toBe(4);
+});
+
+test("messages after several rewinds are the same as the history at each rewind point", () => {
+  const r = new AnalysisRecord(tmp(), "s1");
+  for (const t of ["a", "b", "c"]) r.append("message", textMsg(t));
+  r.append("rewind", { upTo: 2 });
+  r.append("message", textMsg("d"));
+  r.append("rewind", { upTo: 5 });
+  r.append("message", textMsg("e"));
+  r.append("rewind", { upTo: 0 });
+  r.append("message", textMsg("f"));
+  expect(said(r)).toEqual(["f"]);
+  expect(r.messages(7).map((m) => (m.parts[0] as { text: string }).text)).toEqual(["a", "b", "d", "e"]);
+  expect(r.messages(4).map((m) => (m.parts[0] as { text: string }).text)).toEqual(["a", "b"]);
+});
+
+test("a log with 100,000 entries loads, rebuilds the history and finds numbers in time", () => {
+  const dir = tmp();
+  const lines: string[] = [];
+  const ts = new Date().toISOString();
+  for (let i = 1; i <= 100_000; i++) {
+    const kind = i % 500 === 0 ? "rewind" : i % 3 === 0 ? "node" : "message";
+    const data = kind === "rewind" ? { upTo: i - 10 } : kind === "node" ? { ...nodeIn({ entry: i - 1, result: { v: i } }), id: `n${i}` } : { message: { role: "user", parts: [{ type: "text", text: `m${i}` }] } };
+    lines.push(JSON.stringify({ id: i, ts, session: "s1", kind, data }));
+    if (i % 7 === 0) lines.push(JSON.stringify({ id: ++i, ts, session: "s1", kind: "tool_result", data: { tool: "read_file", ok: true, text: "1 2", effectiveArgs: { path: "/x" } } }));
+  }
+  writeFileSync(join(dir, "log.jsonl"), lines.join("\n") + "\n");
+  const t0 = Date.now();
+  const r = new AnalysisRecord(dir, "s1");
+  expect(r.messages().length).toBeGreaterThan(0);
+  expect(r.numbers().length).toBeGreaterThan(1000);
+  expect(Date.now() - t0).toBeLessThan(15_000);
+}, 30_000);

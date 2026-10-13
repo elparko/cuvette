@@ -286,8 +286,9 @@ export function openDecisions(p: AnalysisPlan): { step: number; decision: PlanDe
   return p.steps.flatMap((s, i) => (s.decisions ?? []).filter((d) => !has(d.value)).map((decision) => ({ step: i + 1, decision })));
 }
 
-function toolWords(tool: string): string[] {
-  return tool.toLowerCase().split(/[\s,;/()]+/).filter(Boolean);
+// A tool name can hold "/" (an MCP tool such as "fiji/run_macro"), so each word stays whole and also gives its parts.
+export function toolWords(tool: string): string[] {
+  return [...new Set(tool.toLowerCase().split(/[\s,;()]+/).filter(Boolean).flatMap((w) => [w, ...w.split("/")]).filter(Boolean))];
 }
 
 export function matchStep(p: AnalysisPlan, tool: string, adapter?: string): number {

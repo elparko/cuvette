@@ -18,6 +18,7 @@ export interface AdapterRuntime {
   instructions: string;
   running: boolean;
   checked?: Promise<Located>;
+  startPath?: string;
   tools(): Promise<Tool[]>;
   cancel(): Promise<void>;
   close(): Promise<void>;
@@ -46,6 +47,7 @@ export async function startAdapter(adapter: LoadedAdapter, dirs: { workDir: stri
       if (f.path && f.measured) saveVersion(m, f.path, f.version);
     });
     const rt = startPython(c);
+    rt.startPath = found.path;
     rt.checked = c.ready.then(async () => {
       const f = await checked;
       Object.assign(rt, { programPath: f.path, programVersion: f.version, interpreter: m.connection.interpreter.map((a) => expand(a, c.ph)) });

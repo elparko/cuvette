@@ -2726,3 +2726,40 @@ test("rewind withdraws the open questions of the part that it removes, so a late
   expect(session.questions.get(open[0]!.qid)!.status).toBe("withdrawn");
   expect(session.questions.open()).toHaveLength(0);
 });
+
+test("with deferred tools, a plan step that names a tool with a slash keeps that tool in the list", async () => {
+  const provider = new FakeProvider([{ text: "One." }, { text: "Two." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none", toolExposure: "search" } });
+  const s = session;
+  const tools = s["tools"] as Map<string, any>;
+  for (let i = 0; i < 20; i++) tools.set(`fiji_t${i}`, { name: `fiji_t${i}`, remoteName: `fiji/t${i}`, description: `Tool ${i}.`, inputSchema: { type: "object", properties: {} }, source: "adapter", adapter: "lab", readOnly: true, deferred: true, permission: "allow", execute: async () => ({ ok: true, summary: "Ran." }) });
+  s.plan = { steps: [{ step: "Run the macro", tool: "fiji/t7", status: "todo" }] } as any;
+  await s.send("Start");
+  const names = provider.requests[0]!.tools.map((t) => t.name);
+  expect(names).toContain("fiji_t7");
+  expect(names).not.toContain("fiji_t6");
+});
+
+test("the provider gets the names of all tools, so a text call to a tool outside the list still runs", async () => {
+  const provider = new FakeProvider([{ text: "Done." }]);
+  let known: string[] | undefined;
+  const step = provider.step.bind(provider);
+  provider.step = async (req) => ((known = req.knownTools), step(req));
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none" } });
+  await session.send("Start");
+  expect(known).toEqual([...(session["tools"] as Map<string, unknown>).keys()]);
+});
+
+test("a notice tells the scientist when the version check no longer finds the program", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none" } });
+  const rt = {
+    adapter: { name: "fiji", manifest: { program: { name: "Fiji", version: "2.14" }, connection: { kind: "python" } } },
+    programPath: undefined,
+    startPath: "/Applications/Fiji.app",
+    programVersion: "2.14",
+    checked: Promise.resolve({ path: undefined, version: "2.14", how: "not found" }),
+  };
+  await (session as any).afterStart(rt);
+  const text = session.record.entries(["notice"]).map((e) => String(e.data.text)).join("\n");
+  expect(text).toContain("did not find Fiji at /Applications/Fiji.app: not found");
+});
