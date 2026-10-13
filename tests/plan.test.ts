@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { addedSteps, approvedPlan, currentPlan, definitionFindings, matchStep, mergePlan, toolWords, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
+import { addedSteps, approvedPlan, coerceSetting, currentPlan, definitionFindings, matchStep, mergePlan, toolWords, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 
 export const SLEEP_PLAN = {
@@ -174,4 +174,12 @@ test("a tool name with a slash stays whole and also gives its parts", () => {
   expect(toolWords("fiji/run_macro, stats (t_test)")).toEqual(["fiji/run_macro", "fiji", "run_macro", "stats", "t_test"]);
   const plan = { steps: [{ step: "Segment", tool: "fiji/run_macro", status: "todo" }] } as unknown as AnalysisPlan;
   expect(matchStep(plan, "fiji/run_macro")).toBe(0);
+});
+
+test("a number setting reads the exponent, a leading point and a thousands comma", () => {
+  const d = { key: "alpha", label: "Alpha", kind: "float", tools: [] };
+  expect(coerceSetting(d, "1e-5")).toEqual({ ok: true, value: 1e-5 });
+  expect(coerceSetting(d, ".5")).toEqual({ ok: true, value: 0.5 });
+  expect(coerceSetting(d, "1,000 cells")).toEqual({ ok: true, value: 1000 });
+  expect(coerceSetting(d, "-2.5")).toEqual({ ok: true, value: -2.5 });
 });

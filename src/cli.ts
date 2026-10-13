@@ -251,7 +251,7 @@ async function headless(prompt: string) {
   });
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
-  if (s.endedBy === "error") process.exitCode = 1;
+  if (s.endedBy !== "answer") process.exitCode = 1;
   if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list() }, null, 1));
   else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nFolder: ${s.workDir}\nRecord: ${join(s.dir, "log.jsonl")}`);
   await s.close();
@@ -789,11 +789,12 @@ async function main() {
     case "replay": {
       if (!a1) return fail("usage: cuvette replay <flow.json> [--input name=path ...] [--session <id>]");
       const { replayFlow } = await import("./core/replay.ts");
-      const inputs = Object.fromEntries(((o.input as string[]) ?? []).map((kv) => kv.split("=", 2)));
+      const inputs = Object.fromEntries(((o.input as string[]) ?? []).map((kv) => (kv.includes("=") ? [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)] : [kv, ""])));
       const { findPlace } = await import("./core/places.ts");
       const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`No session ${str(o.session)}. See cuvette sessions.`)) : undefined;
       const r = await replayFlow(a1, inputs, { sessionDir });
       for (const st of r.steps) console.log(`${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : "same"}`);
+      if (r.steps.some((st) => !st.ok || st.diffs.length)) process.exitCode = 1;
       return;
     }
     case "run-step": {
@@ -806,9 +807,14 @@ async function main() {
       }
       const { ToolRunner } = await import("./core/replay.ts");
       const run = await ToolRunner.start([a1]);
-      const r = await run.call(a1, a2, args);
-      console.log(JSON.stringify(r, null, 1));
-      return run.close();
+      try {
+        const r = await run.call(a1, a2, args);
+        console.log(JSON.stringify(r, null, 1));
+        if (!r.ok) process.exitCode = 1;
+      } finally {
+        await run.close();
+      }
+      return;
     }
     case "status": {
       const { AnalysisRecord } = await import("./core/record.ts");

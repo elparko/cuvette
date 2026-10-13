@@ -1414,6 +1414,9 @@ test("the four stages in order: Questions (meaning only), Proposed metrics (pre-
   expect(cards[0]!.text).toContain("1. Count the cells in each field: [2] Threshold method: Otsu (agent) · [3] Smallest particle: 5 (default)");
   expect(cards[1]!.text).toContain("Legend: yellow = counted as positive");
   expect(cards[2]!.text).toContain("- positive cell: 39");
+  const pilotImages = session.record.entries(["pilot_run"]).map((e) => (e.data.images as string[])[0]!);
+  expect(new Set(pilotImages).size).toBe(2);
+  expect(pilotImages.every((p) => existsSync(p))).toBe(true);
   const phases = session.record
     .entries(["clarify", "plan", "pilot_run", "plan_approved"])
     .map((e) => e.data.phase)

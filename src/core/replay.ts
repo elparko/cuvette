@@ -22,20 +22,26 @@ export class ToolRunner implements Runner {
     const workDir = opts.workDir ?? mkdtempSync(join(tmpdir(), "cuvette-run-"));
     const tools: Tool[] = [];
     const closers: (() => Promise<void>)[] = [];
-    for (const name of adapters) {
-      const a = findAdapter(name);
-      const rt = await startAdapter(a, { workDir, sessionDir: workDir });
-      closers.push(() => rt.close());
-      for (const t of await rt.tools()) tools.push({ ...t, adapter: t.adapter ?? a.name, meta: { ...(t as { meta?: object }).meta, alias: name } } as Tool);
+    const runner = new ToolRunner(tools, closers, workDir);
+    try {
+      for (const name of adapters.filter(Boolean)) {
+        const a = findAdapter(name);
+        const rt = await startAdapter(a, { workDir, sessionDir: workDir });
+        closers.push(() => rt.close());
+        for (const t of await rt.tools()) tools.push({ ...t, adapter: t.adapter ?? a.name, meta: { ...(t as { meta?: object }).meta, alias: name } } as Tool);
+      }
+    } catch (e) {
+      await runner.close();
+      throw e;
     }
-    return new ToolRunner(tools, closers, workDir);
+    return runner;
   }
 
   async call(adapter: string, tool: string, args: Args): Promise<ToolOutput> {
     const t = this.tools.find(
       (x) => (x.adapter === adapter || (x as { meta?: { alias?: string } }).meta?.alias === adapter) && (x.name === tool || x.remoteName === tool || x.name === `${adapter}_${tool}`),
     );
-    if (!t) return { ok: false, error: `no tool "${tool}" in adapter "${adapter}"` };
+    if (!t) return { ok: false, error: adapter ? `no tool "${tool}" in adapter "${adapter}"` : `"${tool}" is a step of the harness, not of an adapter. Replay runs adapter steps only.` };
     const callId = `run-${Date.now()}`;
     return t.execute(args, {
       session: "run",
@@ -49,7 +55,8 @@ export class ToolRunner implements Runner {
   }
 
   async close(): Promise<void> {
-    for (const c of this.closers) await c();
+    const failed = (await Promise.allSettled(this.closers.map((c) => c()))).find((r) => r.status === "rejected");
+    if (failed) throw failed.reason;
   }
 }
 
@@ -96,6 +103,8 @@ function compare(before: Record<string, number>, now: Record<string, number>): s
     const b = now[k];
     if (a === undefined) diffs.push(`${k}: new metric ${b}`);
     else if (b === undefined) diffs.push(`${k}: missing, was ${a}`);
+    else if (Object.is(a, b)) continue;
+    else if (typeof a !== "number" || typeof b !== "number" || !Number.isFinite(a) || !Number.isFinite(b)) diffs.push(`${k}: was ${a}, now ${b}`);
     else {
       const scale = Math.max(Math.abs(a), Math.abs(b));
       if (scale > 0 && Math.abs(a - b) / scale > REL_TOL) diffs.push(`${k}: was ${a}, now ${b}`);
@@ -121,9 +130,9 @@ export async function replayFlow(
     if (v === undefined) throw new Error(`no input given for ${k} (original: ${flow.inputs[k]})`);
     values.set(k, v);
   }
-  const original = opts.sessionDir
-    ? new AnalysisRecord(opts.sessionDir, basename(opts.sessionDir)).nodes().filter((n) => !n.sensitivityOf)
-    : [];
+  const record = opts.sessionDir ? new AnalysisRecord(opts.sessionDir, basename(opts.sessionDir)) : undefined;
+  const rewound = record?.rewound() ?? new Set<string>();
+  const original = record ? record.nodes().filter((n) => !n.sensitivityOf && !rewound.has(n.id)) : [];
   const runner = await (opts.runtimeFactory ?? ((a) => ToolRunner.start(a, { workDir: opts.workDir })))(flow.adapters);
   const steps: ReplayStep[] = [];
   try {

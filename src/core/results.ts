@@ -227,6 +227,11 @@ export function parseCsv(text: string, sep = ","): string[][] {
   return rows;
 }
 
+// An integer with more than 15 digits, such as a barcode, changes in a double. It stays text.
+function exact(v: string): boolean {
+  return /[.eE]/.test(v) || v.replace(/\D/g, "").length <= 15;
+}
+
 export function typed(rows: unknown[][], width: number): Cell[][] {
   const kinds = Array.from({ length: width }, (_, j) => {
     let numeric = true;
@@ -236,7 +241,7 @@ export function typed(rows: unknown[][], width: number): Cell[][] {
       const v = r[j];
       if (v === null || v === undefined || (typeof v === "string" && MISSING.has(v.trim()))) continue;
       any = true;
-      if (!(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim())))) numeric = false;
+      if (!(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim()) && exact(v)))) numeric = false;
       if (!(typeof v === "boolean" || (typeof v === "string" && /^(true|false)$/i.test(v.trim())))) bool = false;
     }
     return !any ? "text" : numeric ? "number" : bool ? "bool" : "text";
@@ -259,7 +264,7 @@ export function readTable(path: string): { columns: string[]; rows: Cell[][]; to
   const all = parseCsv(text, delimiterOf(text, path)).filter((r) => r.some((c) => c.trim() !== ""));
   if (!all.length) return undefined;
   const [head, ...body] = all;
-  const width = Math.max(head!.length, ...body.slice(0, 1000).map((r) => r.length));
+  const width = body.reduce((w, r) => Math.max(w, r.length), head!.length);
   const columns = Array.from({ length: width }, (_, j) => head![j] || `column ${j + 1}`);
   return { columns, rows: typed(body.slice(0, MAX_ROWS), width), total: body.length };
 }

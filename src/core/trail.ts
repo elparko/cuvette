@@ -729,7 +729,7 @@ export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], sty
   });
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${TRAIL_CSP}">
+<meta http-equiv="Content-Security-Policy" content="${img.linkFrom ? TRAIL_CSP.replace("img-src data:", "img-src data: 'self' file:") : TRAIL_CSP}">
 <title>Analysis trail ${esc(m.id)}</title><style>${CSS}</style></head>
 <body><main>
 <h1>Analysis trail</h1>
@@ -777,7 +777,7 @@ function mdDetails(record: AnalysisRecord, d: Record<string, unknown>): string[]
   }
   for (const sha of (d.images as string[] | undefined) ?? []) {
     const p = record.blobPath(sha);
-    if (p) out.push("", `   ![Result image](${p})`, "");
+    if (p) out.push("", `   ![Result image](<${p}>)`, "");
   }
   const rest = Object.entries(d).filter(([k, v]) => !["values", "manualRoute", "fidelity", "settings", "decisions", "outputs", "metrics", "error", "table", "images"].includes(k) && v !== undefined && v !== null && v !== "");
   for (const [k, v] of rest) add(k, typeof v === "object" ? "`" + JSON.stringify(v) + "`" : show(v));

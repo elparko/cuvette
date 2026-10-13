@@ -164,7 +164,7 @@ export function coerceSetting(d: KnownDecision, value: unknown): { ok: true; val
   }
   if (/int|float|num|real/.test(d.kind)) {
     if (typeof value === "number") return { ok: true, value };
-    const m = /-?\d+(\.\d+)?/.exec(text);
+    const m = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?/.exec(text.replace(/(\d),(?=\d{3}\b)/g, "$1"));
     return m ? { ok: true, value: Number(m[0]) } : { ok: false };
   }
   return { ok: true, value: typeof value === "string" ? value : JSON.stringify(value) };

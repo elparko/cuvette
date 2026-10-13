@@ -1763,9 +1763,9 @@ export class Session {
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
       try {
-        for (const f of await referee(this.refereeProvider, ctx)) found.push({ f, source: "referee" });
+        for (const f of await referee(this.refereeProvider, ctx, signal)) found.push({ f, source: "referee" });
       } catch (e) {
-        this.record.append("notice", { text: `The referee did not run: ${(e as Error).message}` });
+        this.record.append("notice", { text: `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
       }
     }
     let errors = found.filter((x) => x.f.severity === "error");
@@ -3137,9 +3137,13 @@ export class Session {
     const plan = this.pilotPlan?.plan ?? this.plan;
     const definitions = plan?.definitions ?? [];
     const figs = this.figuresDir();
-    const images = (Array.isArray(a.images) ? a.images.map(String) : []).filter((p) => existsSync(p)).map((p) => {
-      const to = join(figs, `pilot-${norm(sample) || "sample"}-${basename(p)}`);
-      if (resolve(p) !== to) copyFileSync(p, to);
+    const images = (Array.isArray(a.images) ? a.images.map((p) => resolve(this.cwd, String(p))) : []).filter((p) => existsSync(p)).map((p) => {
+      const name = `pilot-${norm(sample) || "sample"}-${basename(p)}`;
+      let to = join(figs, name);
+      if (resolve(p) === to) return to;
+      const dot = name.lastIndexOf(".");
+      for (let i = 2; existsSync(to); i++) to = join(figs, dot > 0 ? `${name.slice(0, dot)}-${i}${name.slice(dot)}` : `${name}-${i}`);
+      copyFileSync(p, to);
       return to;
     });
     const comparison: string[] = [];

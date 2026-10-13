@@ -67,6 +67,13 @@ function makeClient(key?: string): any {
   return key ? new Anthropic({ apiKey: key, maxRetries: 0, ...headers }) : new Anthropic({ maxRetries: 0, ...headers });
 }
 
+function usageOf(u: any): Usage {
+  const usage: Usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
+  if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
+  if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
+  return usage;
+}
+
 function toolResultContent(text: string, images: { media: string; data: string }[], note: string): unknown {
   const body = (text || "(no output)") + (note ? `\n[${note}]` : "");
   if (!images.length) return body;
@@ -176,11 +183,13 @@ export class ClaudeProvider implements Provider {
     await prepareImages(req.messages, req.signal);
     const base = this.params(req.system, req.messages, req.tools);
     if (req.noToolCalls && req.tools.length) base.tool_choice = { type: "none" };
+    let live: any;
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;
       const body = useFallback ? { ...base, betas: [FALLBACK_BETA], fallbacks: "default" } : base;
       const api = useFallback ? this.client.beta.messages : this.client.messages;
       const stream = api.stream(body, req.signal ? { signal: req.signal } : undefined);
+      live = stream;
       stream.on("text", (d: string) => req.onDelta?.({ type: "text", text: d }));
       stream.on("thinking", (d: string) => req.onDelta?.({ type: "thinking", text: d }));
       return stream.finalMessage();
@@ -196,6 +205,9 @@ export class ClaudeProvider implements Provider {
         } else throw e;
       }
     } catch (e) {
+      // A stopped stream still costs the input tokens. The budget must count them.
+      const started = req.signal?.aborted ? live?.currentMessage?.usage : undefined;
+      if (started && !this.fixedClient) recordSpend(this.model, usageOf(started));
       throw mapError(e, this.model);
     }
     const out = this.fromNative(msg);
@@ -208,6 +220,7 @@ export class ClaudeProvider implements Provider {
     const stop: string = msg.stop_reason ?? "end_turn";
     let content: any[] = msg.content ?? [];
     if (stop === "refusal" || stop === "max_tokens") content = content.filter((b) => b.type !== "tool_use");
+    content = content.filter((b) => !(b.type === "text" && !b.text)).map((b) => (b.type === "tool_use" && (b.input === undefined || b.input === null) ? { ...b, input: {} } : b));
     const parts: Part[] = [];
     for (const b of content) {
       if (b.type === "text" && b.text) parts.push({ type: "text", text: b.text });
@@ -221,10 +234,7 @@ export class ClaudeProvider implements Provider {
       note = `The model declined this request${cat ? ` (category: ${cat})` : ""}.`;
       parts.push({ type: "text", text: note });
     } else if (stop === "max_tokens") note = "The reply hit the output limit and was cut short.";
-    const u = msg.usage ?? {};
-    const usage: Usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
-    if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
-    if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
+    const usage = usageOf(msg.usage ?? {});
     const stopReason: StepResult["stopReason"] =
       stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" ? "max_tokens" : "end";
     const result: StepResult = {
