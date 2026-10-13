@@ -243,7 +243,7 @@ export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], 
       return;
     }
     const route = stepRoute(adapters, n)?.route ?? n.manualRoute;
-    if (route) lines.push(`// Step ${k + 1}: ${route.split("\n")[0]}`);
+    if (route) lines.push(`// Step ${k + 1}: ${route.split(/[\r\n\u2028\u2029]/)[0]}`);
     const refs = new Map(seen);
     lines.push(`const s${k + 1} = await step(${k + 1}, ${JSON.stringify(n.adapter)}, ${JSON.stringify(n.tool)}, ${toCode(n.args, refs)});`);
     n.outputs.forEach((o, i) => { if (!seen.has(o.path)) seen.set(o.path, `s${k + 1}.outputs[${i}].path`); });
@@ -256,6 +256,11 @@ export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], 
 
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+// IPython reads {x} and $x in a ! line before the shell gets it.
+function shellWord(s: string): string {
+  return (/^[\w.-]+$/.test(s) ? s : shellQuote(s)).replace(/\{/g, "{{").replace(/\}/g, "}}").replace(/\$/g, "$$$$");
 }
 
 function cellSource(text: string): string[] {
@@ -276,13 +281,12 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
     if (!n.adapter) md.push("", "This is a step of the harness, not of an adapter. cuvette run-step cannot run it.");
     cells.push({ cell_type: "markdown", metadata: {}, source: cellSource(md.join("\n")) });
     if (!n.adapter) return;
-    const json = JSON.stringify(n.args).replace(/\{/g, "{{").replace(/\}/g, "}}").replace(/\$/g, "$$$$");
     cells.push({
       cell_type: "code",
       execution_count: null,
       metadata: {},
       outputs: [],
-      source: cellSource(`!cuvette run-step ${n.adapter} ${n.tool} ${shellQuote(json)}`),
+      source: cellSource(`!cuvette run-step ${shellWord(n.adapter)} ${shellWord(n.tool)} ${shellWord(JSON.stringify(n.args))}`),
     });
   });
   const nb = {

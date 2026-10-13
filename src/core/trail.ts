@@ -428,7 +428,7 @@ const ICONS: Record<TrailIcon, { sym: string; path: string; label: string }> = {
 };
 
 export function esc(s: unknown): string {
-  return show(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return show(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function iconSvg(icon: TrailIcon): string {

@@ -466,7 +466,9 @@ export function readFields(obj: unknown, opts: { inferMetrics?: boolean; scanPat
   if (found.size) f.outputs = [...found.values()];
   const t = o.table as { columns?: unknown; rows?: unknown; n_rows?: unknown; path?: unknown } | undefined;
   if (t && Array.isArray(t.columns) && Array.isArray(t.rows)) {
-    f.table = { columns: t.columns.map(String), rows: t.rows as unknown[][], n_rows: typeof t.n_rows === "number" ? t.n_rows : t.rows.length, path: typeof t.path === "string" ? t.path : undefined };
+    const columns = t.columns.map((c) => (typeof c === "string" ? c : c && typeof c === "object" ? JSON.stringify(c) : String(c)));
+    const rows = t.rows.map((r) => (Array.isArray(r) ? r : [r]));
+    f.table = { columns, rows, n_rows: typeof t.n_rows === "number" ? t.n_rows : t.rows.length, path: typeof t.path === "string" ? t.path : undefined };
   }
   const route = o.manualRoute ?? o.manual_route;
   if (typeof route === "string") f.manualRoute = route;
@@ -671,11 +673,11 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
     };
     if (o.signal?.aborted) onAbort();
     else o.signal?.addEventListener("abort", onAbort, { once: true });
-    child.stdout?.on("data", (d: Buffer) => {
-      if (stdout.length < max) stdout += d.toString("utf8");
+    child.stdout?.setEncoding("utf8").on("data", (d: string) => {
+      if (stdout.length < max) stdout += d;
     });
-    child.stderr?.on("data", (d: Buffer) => {
-      if (stderr.length < max) stderr += d.toString("utf8");
+    child.stderr?.setEncoding("utf8").on("data", (d: string) => {
+      if (stderr.length < max) stderr += d;
     });
     if (o.stdin !== undefined) {
       child.stdin?.on("error", () => {});
