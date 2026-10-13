@@ -219,14 +219,6 @@ function fail(msg: string): never {
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const planSetting = () => (o.plan ? { planFirst: true } : o["no-plan"] ? { planFirst: false } : {});
-const readJson = (p?: string) => {
-  if (!p) return undefined;
-  try {
-    return JSON.parse(readFileSync(p, "utf8"));
-  } catch (e) {
-    fail(`Cannot read the JSON file ${p}: ${(e as Error).message}`);
-  }
-};
 const FORMATS = new Set(["text", "json", "stream-json"]);
 const outputFolder = () => {
   const v = str(o.output);
@@ -237,7 +229,15 @@ const bypass = () => ({ ...(o["bypass-permissions"] ? { permissionMode: "bypass"
 
 async function headless(prompt: string) {
   const { Session } = await import("./core/session.ts");
-  const { applyHeadlessSetup, attachHeadless } = await import("./core/headless.ts");
+  const { applyHeadlessSetup, attachHeadless, readJsonObject } = await import("./core/headless.ts");
+  const readJson = (p?: string) => {
+    if (!p) return undefined;
+    try {
+      return readJsonObject(p);
+    } catch (e) {
+      fail(`Cannot read the JSON file ${p}: ${(e as Error).message}`);
+    }
+  };
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -186,6 +187,10 @@ test("the install commands are exact", () => {
   expect(rInstallCommand("/Users/a/R-library", { bioc: ["DESeq2"] })).toBe(
     `mkdir -p /Users/a/R-library && Rscript -e '.libPaths(c("/Users/a/R-library", .libPaths())); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = "/Users/a/R-library", repos = "https://cloud.r-project.org"); BiocManager::install(c("DESeq2"), lib = "/Users/a/R-library", ask = FALSE, update = FALSE)'`,
   );
+  const odd = `/Users/o'brien/R "lib"; $(touch x)`;
+  const shown = execFileSync("/bin/sh", ["-c", rInstallCommand(odd, { cran: ["lme4"] }).replace("mkdir -p", "printf '%s\\n'").replace("Rscript -e", "printf '%s\\n'")], { encoding: "utf8" }).split("\n");
+  expect(shown[0]).toBe(odd);
+  expect(shown[1]).toBe(`.libPaths(c(${JSON.stringify(odd)}, .libPaths())); install.packages(c("lme4"), lib = ${JSON.stringify(odd)}, repos = "https://cloud.r-project.org")`);
 });
 
 test("version comparison uses major and minor", () => {

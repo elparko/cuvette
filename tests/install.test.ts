@@ -108,6 +108,19 @@ describe("adapter add", () => {
     expect(readInstalled().obtest!.kind).toBe("zip");
   });
 
+  test("a zip file with a symbolic link, a path outside it, or too many bytes is refused before unzip", async () => {
+    const src = fixture(join(work, "lsrc"));
+    symlinkSync("/etc", join(src, "etc"));
+    execFileSync("zip", ["-q", "-r", "-y", join(work, "link.zip"), "."], { cwd: src });
+    await expect(prepareAdd(join(work, "link.zip"))).rejects.toThrow(/symbolic link: etc/);
+    const py = (file: string, code: string) => execFileSync("python3", ["-I", "-c", `import zipfile,sys\nz=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED)\n${code}\nz.close()`, join(work, file)]);
+    py("slip.zip", "z.writestr('adapter.yaml','x')\nz.writestr('../evil.txt','x')");
+    await expect(prepareAdd(join(work, "slip.zip"))).rejects.toThrow(/goes outside its folder: \.\.\/evil\.txt/);
+    expect(existsSync(join(work, "staging", "evil.txt"))).toBe(false);
+    py("bomb.zip", "z.writestr('adapter.yaml','x')\nz.writestr('big.bin', b'0' * 61_000_000)");
+    await expect(prepareAdd(join(work, "bomb.zip"))).rejects.toThrow(/too large when it opens/);
+  });
+
   test("a repository installs pinned to a commit, and a later commit does not change it", async () => {
     const r = join(work, "repo");
     fixture(r);

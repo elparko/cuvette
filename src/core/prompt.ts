@@ -76,9 +76,12 @@ export function foldersText(f: Folders): string {
   ].join("\n");
 }
 
+// A folder name with a line break can start a line that looks like a note from the harness. Such a path goes in JSON quotes.
+const pathText = (p: string) => (/[\x00-\x1f\x7f\u2028\u2029]/.test(p) ? JSON.stringify(p) : p);
+
 export function foldersNote(f: { project: string; work: string; output?: string }): string {
   const out = f.output ?? f.work;
-  return `Folders of this session. The project folder is ${f.project}. The session folder is ${f.work}. The output folder is ${out}. The figures folder is ${join(out, "figures")}.`;
+  return `Folders of this session. The project folder is ${pathText(f.project)}. The session folder is ${pathText(f.work)}. The output folder is ${pathText(out)}. The figures folder is ${pathText(join(out, "figures"))}.`;
 }
 
 export function systemPrompt(opts: {

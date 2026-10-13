@@ -135,10 +135,11 @@ export function rLibrary(env: Record<string, string | undefined>, home = homedir
 export function rInstallCommand(lib: string, p: { cran?: string[]; bioc?: string[] }): string {
   const vec = (xs: string[]) => `c(${xs.map((x) => `"${x}"`).join(", ")})`;
   const repos = `repos = "https://cloud.r-project.org"`;
+  const l = JSON.stringify(lib);
   const body = p.bioc?.length
-    ? `.libPaths(c("${lib}", .libPaths())); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = "${lib}", ${repos}); BiocManager::install(${vec(p.bioc)}, lib = "${lib}", ask = FALSE, update = FALSE)`
-    : `.libPaths(c("${lib}", .libPaths())); install.packages(${vec(p.cran ?? [])}, lib = "${lib}", ${repos})`;
-  return `mkdir -p ${q(lib)} && Rscript -e '${body}'`;
+    ? `.libPaths(c(${l}, .libPaths())); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = ${l}, ${repos}); BiocManager::install(${vec(p.bioc)}, lib = ${l}, ask = FALSE, update = FALSE)`
+    : `.libPaths(c(${l}, .libPaths())); install.packages(${vec(p.cran ?? [])}, lib = ${l}, ${repos})`;
+  return `mkdir -p ${q(lib)} && Rscript -e ${q(body)}`;
 }
 
 async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {

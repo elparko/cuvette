@@ -177,6 +177,25 @@ function copyClean(from: string, to: string): void {
   walk(from, "");
 }
 
+// unzip writes symbolic links and fills the disk before copyClean can refuse them. Read the list of the zip first.
+export async function checkZip(abs: string): Promise<void> {
+  const list = await exec("unzip", ["-Z", "--", abs], { timeout: 60_000, maxBuffer: 50_000_000 }).catch((e: Error) => {
+    throw new Error(`The zip file did not open: ${e.message.split("\n")[0]}`);
+  });
+  let files = 0;
+  let bytes = 0;
+  for (const line of list.stdout.split("\n")) {
+    const m = /^(\S)\S*\s+\d+\.\d+\s+\S+\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s(.*)$/.exec(line);
+    if (!m) continue;
+    const [, type, size, name] = m as unknown as [string, string, string, string];
+    if (type === "l") throw new Error(`The zip file holds a symbolic link: ${name}. Cuvette does not install symbolic links.`);
+    if (name.startsWith("/") || name.split(/[\\/]/).includes("..")) throw new Error(`The zip file holds a path that goes outside its folder: ${name}. Cuvette does not install it.`);
+    if (type !== "d") files++;
+    bytes += Number(size);
+  }
+  if (files > MAX_FILES || bytes > MAX_BYTES) throw new Error(`The zip file is too large when it opens: more than ${MAX_FILES} files or ${MAX_BYTES / 1e6} MB.`);
+}
+
 interface Staged {
   work: string;
   dir: string;
@@ -211,6 +230,7 @@ async function stage(source: string, opts: PrepareOpts): Promise<Staged> {
     if (kind === "zip") {
       const abs = resolve(source);
       if (!existsSync(abs)) throw new Error(`No file ${abs}.`);
+      await checkZip(abs);
       const out = join(work, "unzipped");
       mkdirSync(out);
       await exec("unzip", ["-q", "-o", "--", abs, "-d", out], { timeout: 120_000 }).catch((e: Error) => {

@@ -537,7 +537,7 @@ function imageFigures(record: AnalysisRecord, shas: string[], img: HtmlImages): 
   const figs = shown.slice(0, 6).map((sha) => {
     const p = img.linkFrom ? record.blobPath(sha) : undefined;
     const uri = p && MIME[extname(p).toLowerCase()] ? linkTo(img.linkFrom!, p) : dataUri(record, sha);
-    return uri ? `<img src="${uri}" alt="Result image ${esc(sha.slice(0, 8))}">` : `<p class="muted">Image ${esc(sha.slice(0, 12))} is not embedded.</p>`;
+    return uri ? `<img src="${esc(uri)}" alt="Result image ${esc(sha.slice(0, 8))}">` : `<p class="muted">Image ${esc(sha.slice(0, 12))} is not embedded.</p>`;
   });
   return figs.length ? `<figure>${figs.join("")}</figure>` : "";
 }
