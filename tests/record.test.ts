@@ -1,8 +1,9 @@
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
+import { extractNumbers } from "../src/core/claims.ts";
 import type { NodeIn } from "../src/core/types.ts";
 
 function tmp(): string {
@@ -200,3 +201,49 @@ test("a log with 100,000 entries loads, rebuilds the history and finds numbers i
   expect(r.numbers().length).toBeGreaterThan(1000);
   expect(Date.now() - t0).toBeLessThan(15_000);
 }, 30_000);
+
+function scriptNode(files: Record<string, string | Buffer>) {
+  const dir = tmp();
+  const r = new AnalysisRecord(dir, "s1");
+  const e = r.append("tool_result", { tool: "run_script", ok: true, text: "done" });
+  const outputs = Object.entries(files).map(([name, body]) => {
+    const path = join(dir, name);
+    writeFileSync(path, body);
+    return { path, kind: "file" as const, sha: r.putBlob(path) };
+  });
+  r.addNode(nodeIn({ entry: e.id, tool: "run_script", outputs }));
+  return { r, dir };
+}
+
+test("numbers from a script output file: a binary file with a .csv name gives none", () => {
+  const { r, dir } = scriptNode({ "fake.csv": Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0x31, 0x32, 0x2e, 0x35, 0x20, 0x34, 0x37]), "ok.csv": "x\n12.5\n" });
+  expect(r.numbers().map((n) => [n.path.split("/").pop(), n.value])).toEqual([["ok.csv", 12.5]]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("numbers from a script output file come from the copy at the step, not from a later change", () => {
+  const { r, dir } = scriptNode({ "out.csv": "x\n12.5\n" });
+  writeFileSync(join(dir, "out.csv"), "x\n99.9\n");
+  expect(r.numbers().map((n) => n.value)).toEqual([12.5]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("numbers from script output files: a huge file gives none and many files stay fast", () => {
+  const rows = Array.from({ length: 9000 }, (_, i) => `${i},${(i * 0.37).toFixed(3)},s${i % 5}`).join("\n");
+  const files: Record<string, string> = { "huge.csv": "a,b\n" + "1.5,2.5\n".repeat(200_000) };
+  for (let i = 0; i < 40; i++) files[`part${i}.csv`] = rows;
+  const { r, dir } = scriptNode(files);
+  const t = Date.now();
+  const nums = r.numbers();
+  expect(Date.now() - t).toBeLessThan(3000);
+  expect(nums.length).toBe(2000);
+  expect(nums.some((n) => n.path.endsWith("huge.csv"))).toBe(false);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a long table in a file is read in linear time", () => {
+  const rows = Array.from({ length: 20_000 }, (_, i) => `| ${i} | ${i % 7} | ${(i * 0.37).toFixed(3)} |`).join("\n");
+  const t = Date.now();
+  expect(extractNumbers(rows).length).toBeGreaterThan(40_000);
+  expect(Date.now() - t).toBeLessThan(2000);
+});

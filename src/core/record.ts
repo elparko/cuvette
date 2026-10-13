@@ -333,6 +333,18 @@ export class AnalysisRecord {
     return at;
   }
 
+  // A blob over the size limit, or one with a NUL byte (binary content with a text name), gives no text.
+  private blobText(sha: string): string | undefined {
+    try {
+      const blob = this.blobPath(sha);
+      if (!blob || statSync(blob).size > MAX_FILE_BYTES) return undefined;
+      const buf = readFileSync(blob);
+      return buf.subarray(0, 8192).includes(0) ? undefined : buf.toString("utf8");
+    } catch {
+      return undefined;
+    }
+  }
+
   numbers(): { node: string; path: string; value: number }[] {
     const out: { node: string; path: string; value: number }[] = [];
     const rewound = this.rewound();
@@ -361,27 +373,17 @@ export class AnalysisRecord {
         }
       };
       walk(n.result, "");
-      const texts: [string, string][] = [];
-      if (n.tool === "run_script") texts.push(["stdout", String(this.entry(n.entry)?.data.text ?? "")]);
-      const own = n.outputs.filter((o, i) => n.outputs.findIndex((x) => x.path === o.path) === i);
+      const texts: [string, () => string | undefined][] = [];
+      if (n.tool === "run_script") texts.push(["stdout", () => String(this.entry(n.entry)?.data.text ?? "")]);
+      const seen = new Set<string>();
+      const own = n.outputs.filter((o) => !seen.has(o.path) && seen.add(o.path));
       const written = n.tool === "run_script" ? own.filter((o) => o.sha && SCRIPT_RESULT_FILE.test(o.path) && !reads.has(o.path)) : [];
-      for (const o of written) {
-        const blob = this.blobPath(o.sha!);
-        try {
-          if (blob && statSync(blob).size <= MAX_FILE_BYTES) texts.push([`file:${o.path}`, readFileSync(blob, "utf8")]);
-        } catch {}
-      }
+      for (const o of written) texts.push([`file:${o.path}`, () => this.blobText(o.sha!)]);
       const hits = own.flatMap((o) => (reads.get(o.path) ?? []).map((e) => ({ e, out: o, read: o.path }))).sort((x, y) => x.e.id - y.e.id);
-      for (const { e, out, read } of hits) {
-        const blob = out.sha ? this.blobPath(out.sha) : undefined;
-        let text = String(e.data.text ?? "");
-        try {
-          if (blob && statSync(blob).size <= MAX_FILE_BYTES) text = readFileSync(blob, "utf8");
-        } catch {}
-        texts.push([`file:${read}`, text]);
-      }
-      for (const [path, text] of texts) {
-        for (const f of extractNumbers(text)) {
+      for (const { e, out, read } of hits) texts.push([`file:${read}`, () => (out.sha ? this.blobText(out.sha) : undefined) ?? String(e.data.text ?? "")]);
+      for (const [path, read] of texts) {
+        if (count >= MAX_NUMBERS_PER_NODE) break;
+        for (const f of extractNumbers(read() ?? "")) {
           if (count >= MAX_NUMBERS_PER_NODE) break;
           out.push({ node: n.id, path, value: f.value });
           count++;

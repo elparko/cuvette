@@ -804,7 +804,10 @@ async function main() {
       const inputs = Object.fromEntries(((o.input as string[]) ?? []).map((kv) => (kv.includes("=") ? [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)] : [kv, ""])));
       const { findPlace } = await import("./core/places.ts");
       const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`No session ${str(o.session)}. See cuvette sessions.`)) : undefined;
-      const r = await replayFlow(a1, inputs, { sessionDir });
+      const { mkdtempSync, rmSync } = await import("node:fs");
+      const { tmpdir } = await import("node:os");
+      const workDir = mkdtempSync(join(tmpdir(), "cuvette-run-"));
+      const r = await replayFlow(a1, inputs, { sessionDir, workDir }).finally(() => rmSync(workDir, { recursive: true, force: true }));
       for (const st of r.steps) console.log(st.skipped ? `- ${st.tool} skipped: ${st.skipped}` : `${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : st.before ? "same" : `ran, no original to compare: ${JSON.stringify(st.metrics)}`}`);
       if (r.steps.some((st) => !st.ok || st.diffs.length)) process.exitCode = 1;
       if (r.steps.every((st) => st.skipped)) {

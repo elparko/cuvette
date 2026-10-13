@@ -412,7 +412,8 @@ function userFile(): string {
 
 function readUser(): Record<string, unknown> {
   try {
-    return JSON.parse(readFileSync(userFile(), "utf8"));
+    const v = JSON.parse(readFileSync(userFile(), "utf8"));
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   } catch {
     return {};
   }

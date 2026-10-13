@@ -80,17 +80,37 @@ export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {
 function readJson(path: string): Partial<Settings> {
   if (!existsSync(path)) return {};
   let s: Partial<Settings> & { permissions?: unknown };
+  const text = readFileSync(path, "utf8");
+  if (!text.trim()) return {};
   try {
-    s = JSON.parse(readFileSync(path, "utf8"));
+    s = JSON.parse(text);
   } catch (e) {
     throw new Error(`settings file ${path} is not valid JSON: ${(e as Error).message}`);
   }
+  if (!s || typeof s !== "object" || Array.isArray(s)) throw new Error(`settings file ${path} must hold one JSON object, in braces { }`);
   if (typeof s.permissions === "string") {
     if (s.permissions !== "bypass" && s.permissions !== "ask") throw new Error(`settings file ${path}: "permissions" must be "bypass", "ask" or an object of rules`);
     const { permissions, ...rest } = s;
-    return { ...rest, permissionMode: permissions };
+    return wellTyped({ ...rest, permissionMode: permissions });
   }
-  return s as Partial<Settings>;
+  return wellTyped(s as Partial<Settings>);
+}
+
+// The loader ignores a value of the wrong type (a number for a folder name, a list for the rules) and uses the default.
+function wellTyped(s: Partial<Settings>): Partial<Settings> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(s)) {
+    const d = (DEFAULTS as unknown as Record<string, unknown>)[k];
+    const either = k === "export_xlsx" || k === "phi_check";
+    const ok =
+      d === undefined || v === undefined ? true
+      : either ? typeof v === "string" || typeof v === "boolean"
+      : Array.isArray(d) ? Array.isArray(v) && v.every((x) => typeof x === "string")
+      : typeof d === "object" ? !!v && typeof v === "object" && !Array.isArray(v)
+      : typeof v === typeof d;
+    if (ok) out[k] = v;
+  }
+  return out as Partial<Settings>;
 }
 
 function merge(a: Settings, b: Partial<Settings>): Settings {
@@ -106,7 +126,7 @@ function merge(a: Settings, b: Partial<Settings>): Settings {
 export function loadSettings(cwd: string, overrides: Partial<Settings> = {}): Settings {
   let s = merge(DEFAULTS, readJson(join(cuvetteHome(), "settings.json")));
   const trusted = folderTrusted(cwd);
-  for (const layer of projectSettings(cwd)) s = merge(s, (trusted ? layer : safeOnly(layer)) as Partial<Settings>);
+  for (const layer of projectSettings(cwd)) s = merge(s, wellTyped((trusted ? layer : safeOnly(layer)) as Partial<Settings>));
   s = { ...s, phi_check: readJson(join(cuvetteHome(), "settings.json")).phi_check ?? DEFAULTS.phi_check };
   return merge(s, Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)));
 }

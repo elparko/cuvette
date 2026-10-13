@@ -10,7 +10,8 @@ function indexPath(): string {
 
 function readIndex(): Question[] {
   try {
-    return JSON.parse(readFileSync(indexPath(), "utf8"));
+    const v = JSON.parse(readFileSync(indexPath(), "utf8"));
+    return Array.isArray(v) ? v.filter((q) => q && typeof q === "object" && typeof q.qid === "string" && typeof q.created === "string") : [];
   } catch {
     return [];
   }

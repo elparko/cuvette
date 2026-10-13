@@ -36,6 +36,21 @@ async function analysed(cwd: string, request = "Count the red cells in LDL") {
   return session;
 }
 
+test("a session with a damaged meta.json is left out of the search, and the other sessions stay", async () => {
+  const cwd = project();
+  const s = await analysed(cwd);
+  const good = s.id;
+  await s.close();
+  session = undefined;
+  const bad = join(cwd, "cuvette", "broken", ".record");
+  mkdirSync(bad, { recursive: true });
+  for (const body of ["", "null", "{bad", '{"id": 5}']) {
+    writeFileSync(join(bad, "meta.json"), body);
+    expect(findPlace(good, { cwd })?.id).toBe(good);
+    expect(findPlace("20990101-000000-none", { cwd })).toBeUndefined();
+  }
+});
+
 test("slug keeps the words that name the request", () => {
   expect(slug("Can we use ImageJ to count these things?")).toBe("use-imagej-count-things");
   expect(slug("Count the red-positive cells in the images we have stored.")).toBe("count-red-positive-cells-images-have");

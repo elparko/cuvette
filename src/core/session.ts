@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -15,7 +15,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { COPY_LIMIT_BYTES, findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -1395,8 +1395,9 @@ export class Session {
     try {
       let old: Record<string, unknown> = {};
       try {
-        old = JSON.parse(readFileSync(this.lockPath(), "utf8"));
+        old = JSON.parse(readFileSync(this.lockPath(), "utf8")) ?? {};
       } catch {}
+      if (typeof old !== "object") old = {};
       if (old.pid !== process.pid && lockAlive(old as unknown as OpenLock)) return;
       const mine = old.pid === process.pid;
       const tmp = `${this.lockPath()}.${process.pid}.tmp`;
@@ -3142,14 +3143,30 @@ export class Session {
     const plan = this.pilotPlan?.plan ?? this.plan;
     const definitions = plan?.definitions ?? [];
     const figs = this.figuresDir();
-    const images = (Array.isArray(a.images) ? a.images.map((p) => resolve(this.cwd, String(p))) : []).filter((p) => /\.(png|jpe?g|gif|webp|svg|tiff?)$/i.test(p) && !isCredentialsFile(p) && existsSync(p) && statSync(p).isFile()).map((p) => {
-      const name = `pilot-${norm(sample) || "sample"}-${basename(p)}`;
+    const image = /\.(png|jpe?g|gif|webp|svg|tiff?)$/i;
+    const paths = [...new Set(Array.isArray(a.images) ? a.images.map((p) => resolve(this.cwd, String(p))) : [])];
+    const realImage = (p: string) => {
+      try {
+        return image.test(realpathSync(p)) && statSync(p).isFile();
+      } catch {
+        return false;
+      }
+    };
+    const images = paths.filter((p) => image.test(p) && realImage(p) && !isCredentialsFile(p)).map((p) => {
+      if (statSync(p).size > COPY_LIMIT_BYTES) return p;
+      const base = basename(p);
+      const dot = base.lastIndexOf(".");
+      const name = `pilot-${norm(sample).slice(0, 40) || "sample"}-${dot > 80 ? base.slice(0, 80) + base.slice(dot) : base}`;
       let to = join(figs, name);
       if (resolve(p) === to) return to;
-      const dot = name.lastIndexOf(".");
-      for (let i = 2; existsSync(to); i++) to = join(figs, dot > 0 ? `${name.slice(0, dot)}-${i}${name.slice(dot)}` : `${name}-${i}`);
-      copyFileSync(p, to);
-      return to;
+      const at = name.lastIndexOf(".");
+      for (let i = 2; existsSync(to); i++) to = join(figs, `${name.slice(0, at)}-${i}${name.slice(at)}`);
+      try {
+        copyFileSync(p, to);
+        return to;
+      } catch {
+        return p;
+      }
     });
     const comparison: string[] = [];
     let refValues: Record<string, number> | undefined;

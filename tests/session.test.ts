@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless, readJsonObject } from "../src/core/headless.ts";
@@ -2122,6 +2122,28 @@ test("pilot: a definition change on the pilot card goes into the plan that the p
   const approved = s.record.entries(["plan_approved"]).at(-1)!;
   expect((approved.data.plan as any).definitions).toEqual([{ measure: "positive cell", definition: "A cell with at least 5 red pixels inside its outline." }]);
   expect(s.record.entries(["plan"]).some((e) => e.data.action === "pilot_changed")).toBe(true);
+});
+
+test("pilot: the QC image copy skips a link to a file that is not an image, keeps a huge file in place and gives a clash a new name", async () => {
+  const { root, proj, images, qc } = pilotProject();
+  mkdirSync(join(root, "b"));
+  const qc2 = join(root, "b", "qc.png");
+  writeFileSync(qc2, Buffer.from("89504e470d0a1a0b", "hex"));
+  writeFileSync(join(root, "secret.txt"), "token");
+  symlinkSync(join(root, "secret.txt"), join(root, "link.png"));
+  const huge = join(root, "huge.tif");
+  writeFileSync(huge, Buffer.alloc(21 * 1024 * 1024));
+  const call = { name: "pilot_result", args: { sample: "Set 1 " + "x".repeat(300), values: { "positive cell": 41 }, images: [qc, qc, qc2, join(root, "link.png"), huge], check: "" } };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [call] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  answerCards(session, (e) => (e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }));
+  await session.send(`Count the red-positive cells in ${images}`);
+  const got = session.record.entries(["pilot_run"])[0]!.data.images as string[];
+  const figs = join(session.workDir, "figures");
+  expect(got.map((p) => (p.startsWith(figs) ? basename(p).replace(/x+/, "x") : p))).toEqual(["pilot-set1x-qc.png", "pilot-set1x-qc-2.png", huge]);
+  expect(readFileSync(got[1]!).equals(readFileSync(qc2))).toBe(true);
+  rmSync(huge);
 });
 
 test("pilot: a plan call during the pilot changes the pending plan, not the earlier one", async () => {

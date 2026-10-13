@@ -546,6 +546,7 @@ export function runningText(home: string, plan: Plan): string | undefined {
     } catch {
       continue;
     }
+    if (!other || typeof other !== "object") continue;
     // After a restart of the computer, a new process can have the process ID of a lock file from before the restart.
     const beforeBoot = Date.parse(other.started ?? "") < Date.now() - uptime() * 1000 - 60_000;
     if (other.pid && !beforeBoot && pidAlive(other.pid)) return `${other.name ?? plan.name}: an ${other.action === "update" ? "update" : "install"} runs now. Wait for it to end, or stop it. Nothing changed.`;
@@ -580,7 +581,7 @@ function claimRun(home: string, plan: Plan): { release: () => void } | { busy: s
     release: () => {
       for (const f of keys) {
         try {
-          if (JSON.parse(readFileSync(f, "utf8")).pid === process.pid) rmSync(f, { force: true });
+          if (JSON.parse(readFileSync(f, "utf8"))?.pid === process.pid) rmSync(f, { force: true });
         } catch {}
       }
     },
@@ -604,7 +605,8 @@ export function readLog(home = cuvetteHome()): Record<string, unknown>[] {
   if (!existsSync(logFile(home))) return [];
   return readFileSync(logFile(home), "utf8").split("\n").filter(Boolean).map((l) => {
     try {
-      return JSON.parse(l);
+      const v = JSON.parse(l);
+      return v && typeof v === "object" && !Array.isArray(v) ? v : {};
     } catch {
       return {};
     }

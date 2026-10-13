@@ -61,7 +61,8 @@ export function hideKeys(text: string, env: Record<string, string | undefined> =
 
 function readFile(): Record<string, string> {
   try {
-    return JSON.parse(readFileSync(credentialsPath(), "utf8"));
+    const v = JSON.parse(readFileSync(credentialsPath(), "utf8"));
+    return v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => typeof x === "string")) as Record<string, string> : {};
   } catch {
     return {};
   }

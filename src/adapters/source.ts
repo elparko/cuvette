@@ -50,7 +50,9 @@ function readIndex(): IndexFile {
   if (!existsSync(indexFile())) return { adapters: {}, confirmed: {} };
   try {
     const j = JSON.parse(readFileSync(indexFile(), "utf8"));
-    return { adapters: j.adapters ?? {}, confirmed: j.confirmed ?? {} };
+    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+    const adapters = Object.fromEntries(Object.entries(obj(j?.adapters)).filter(([, e]) => e && typeof e === "object" && typeof (e as { name?: unknown }).name === "string"));
+    return { adapters, confirmed: obj(j?.confirmed) } as IndexFile;
   } catch {
     return { adapters: {}, confirmed: {} };
   }

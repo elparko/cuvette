@@ -220,10 +220,16 @@ export function titlePlace(p: Place, request: string, keepOldName: boolean): Pla
 export function placeAt(recordDir: string): Place | undefined {
   const metaPath = join(recordDir, "meta.json");
   if (!existsSync(metaPath)) return undefined;
-  const m = JSON.parse(readFileSync(metaPath, "utf8")) as Meta;
+  let m: Meta;
+  try {
+    m = JSON.parse(readFileSync(metaPath, "utf8"));
+  } catch {
+    return undefined;
+  }
+  if (!m || typeof m !== "object" || typeof m.id !== "string") return undefined;
   const outDir = dirname(recordDir);
-  const project = m.project ?? (m.fromProject ? resolve(outDir, ...m.fromProject.split("/").map(() => "..")) : dirname(dirname(outDir)));
-  return { id: m.id, recordDir, outDir, project, title: m.title, created: m.created, legacy: false, fallback: !!m.fallback };
+  const project = typeof m.project === "string" ? m.project : (typeof m.fromProject === "string" && m.fromProject ? resolve(outDir, ...m.fromProject.split("/").map(() => "..")) : dirname(dirname(outDir)));
+  return { id: m.id, recordDir, outDir, project, title: typeof m.title === "string" ? m.title : "", created: typeof m.created === "string" ? m.created : "", legacy: false, fallback: !!m.fallback };
 }
 
 function sessionsIn(folder: string): Place[] {
