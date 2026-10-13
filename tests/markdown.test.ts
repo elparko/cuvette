@@ -38,7 +38,7 @@ describe("md", () => {
 
   test("a table with a separator row", () => {
     const html = md("| A | B |\n|---|:-:|\n| 1 | **2** |");
-    expect(html).toContain("<th>A</th><th>B</th>");
+    expect(html).toContain('<th role="columnheader">A</th><th role="columnheader">B</th>');
     expect(html).toContain("<strong>2</strong>");
     expect(html).not.toContain("---");
   });

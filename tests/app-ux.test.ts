@@ -402,6 +402,17 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(head).toBeLessThanOrEqual(100);
     await page.size(1280, 900);
   });
+  test("print: the whole conversation on white paper, without the sidebar, the side panel and the message box", async () => {
+    await goPage("Analysis");
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
+    await page.eval(`document.documentElement.dataset.theme = "dark"`);
+    await page.media([], "print");
+    const r = await page.eval<{ bg: string; aside: boolean; form: boolean; scroll: string }>(`({ bg: getComputedStyle(document.body).backgroundColor, aside: [...document.querySelectorAll("aside")].some((a) => a.getClientRects().length), form: !!document.querySelector("#msg").closest("form").getClientRects().length, scroll: getComputedStyle(document.querySelector('[role="log"]').parentElement).overflowY })`);
+    await page.media([]);
+    await page.eval(`delete document.documentElement.dataset.theme`);
+    expect(r).toEqual({ bg: "rgb(246, 246, 244)", aside: false, form: false, scroll: "visible" });
+  });
+
   test("settings on a phone: a long model name in the model list wraps in its row", async () => {
     await page.size(390, 844);
     await goPage("Settings");

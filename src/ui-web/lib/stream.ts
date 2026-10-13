@@ -15,14 +15,15 @@ export interface StreamState {
 
 type Msg = { t: string; [k: string]: unknown };
 
-const START: StreamState = { items: [], pending: "", live: "", think: "", cards: "", status: { state: "idle" }, changed: 0, resets: 0 };
+export const START: StreamState = { items: [], pending: "", live: "", think: "", cards: "", status: { state: "idle" }, changed: 0, resets: 0 };
 
-function reduce(s: StreamState, m: Msg): StreamState {
+export function reduce(s: StreamState, m: Msg): StreamState {
   switch (m.t) {
     case "clear":
       return START;
+    // A reset after the first one is a new connection, after a sleep of the computer or a restart. The side panel loads again.
     case "reset":
-      return { ...s, items: [String(m.items ?? "")], pending: String(m.pending ?? ""), live: String(m.live ?? ""), think: String(m.think ?? ""), cards: String(m.cards ?? ""), status: (m.status as Status) ?? s.status, resets: s.resets + 1 };
+      return { ...s, items: [String(m.items ?? "")], pending: String(m.pending ?? ""), live: String(m.live ?? ""), think: String(m.think ?? ""), cards: String(m.cards ?? ""), status: (m.status as Status) ?? s.status, resets: s.resets + 1, changed: s.resets ? s.changed + 1 : s.changed };
     case "append":
       return { ...s, items: [...s.items, String(m.html ?? "")] };
     case "pending":

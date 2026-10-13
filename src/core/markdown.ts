@@ -1,9 +1,10 @@
 const ENT: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ENT[c]!);
 
+// A narrow screen shows each row as a block (CSS display: block). The roles keep the table for a screen reader.
 export function tableHtml(columns: string[], rows: string[][], cls = ""): string {
-  return `<table class="stack ${cls}"><thead><tr>${columns.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows
-    .map((r) => `<tr>${columns.map((h, i) => `<td data-label="${esc(h.replace(/<[^>]+>/g, ""))}">${r[i] ?? ""}</td>`).join("")}</tr>`)
+  return `<table class="stack ${cls}" role="table"><thead role="rowgroup"><tr role="row">${columns.map((h) => `<th role="columnheader">${h}</th>`).join("")}</tr></thead><tbody role="rowgroup">${rows
+    .map((r) => `<tr role="row">${columns.map((h, i) => `<td role="cell" data-label="${esc(h.replace(/<[^>]+>/g, ""))}">${r[i] ?? ""}</td>`).join("")}</tr>`)
     .join("")}</tbody></table>`;
 }
 
