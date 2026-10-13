@@ -13,6 +13,7 @@ export interface ProviderOpts {
   effort?: string;
   numCtx?: number;
   think?: boolean;
+  showThinking?: boolean;
   apiKey?: string;
   client?: any;
   cache?: "off" | "5m" | "1h";

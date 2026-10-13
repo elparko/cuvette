@@ -31,6 +31,7 @@ export interface Settings {
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
   export_xlsx: "on" | "off" | boolean;
+  show_thinking: "on" | "off" | boolean;
   animations?: "on" | "off";
   footer_hints?: "full" | "short" | "off";
   figure_formats: string;
@@ -65,6 +66,7 @@ export const DEFAULTS: Settings = {
   hooks: {},
   notify: {},
   export_xlsx: "on",
+  show_thinking: "on",
   figure_formats: "png,svg",
   output_folder: "cuvette",
   defaultAdapters: ["tables"],
@@ -75,6 +77,10 @@ export const DEFAULTS: Settings = {
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {
   return s.export_xlsx !== false && s.export_xlsx !== "off";
+}
+
+export function thinkingShown(s: Pick<Settings, "show_thinking">): boolean {
+  return s.show_thinking !== false && s.show_thinking !== "off";
 }
 
 function readJson(path: string): Partial<Settings> {

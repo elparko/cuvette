@@ -736,6 +736,16 @@ test("applySetting changes the model, the referee and the mode of a running sess
   expect(session.mode).toBe("plan");
 });
 
+test("show_thinking off makes a Claude provider that sends display omitted; the referee follows with same", async () => {
+  session = await Session.create({ adapters: [], model: "claude:claude-haiku-5-5", cwd: mkdtempSync(join(tmpdir(), "cuvette-cwd-")) });
+  expect((session.provider as any).display).toBe("summarized");
+  await session.applySetting("show_thinking", "off");
+  expect((session.provider as any).display).toBe("omitted");
+  expect(session.refereeProvider).toBe(session.provider);
+  await session.applySetting("show_thinking", "on");
+  expect((session.provider as any).display).toBe("summarized");
+});
+
 const LAB = join(__dirname, "fixtures/lab");
 const LOOK = { name: "inspect_data", args: { path: join(__dirname, "fixtures/lab") } };
 const CLARIFY = { calls: [LOOK, { name: "clarify", args: { found: "I see one image." } }] };

@@ -63,6 +63,15 @@ const claudeMsg = (content: any[], stop = "end_turn", extra: any = {}) => ({
 });
 
 describe("claude", () => {
+  test("show_thinking off sends display omitted in each step; the default sends summarized", async () => {
+    for (const [opts, display] of [[{}, "summarized"], [{ showThinking: true }, "summarized"], [{ showThinking: false }, "omitted"]] as const) {
+      const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "hi" }])]);
+      await new ClaudeProvider("claude-haiku-5-5", { client, ...opts }).step(req([user("hello")]));
+      expect(calls[0].params.thinking).toEqual({ type: "adaptive", display });
+    }
+    expect(DEFAULTS.show_thinking).toBe("on");
+  });
+
   test("request shape: adaptive thinking, effort, cache control, no tool_choice", async () => {
     const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "hi" }])]);
     const p = new ClaudeProvider("claude-opus-5-5", { client });

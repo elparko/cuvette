@@ -563,6 +563,167 @@ Limits:
 - One run of each paper, and three of the six papers. The Haiku replies change from run to run.
 - The two changes are in the same "after" run.
 
+## Whole task on main after the script output rule
+
+This run repeats "Cost of a whole task with real Haiku" on main at commit 0cc70e8. Main has the
+answer check for script output files, the data rule in the prompt, effort `auto` and
+`display: "omitted"` for the helper calls. Measured on 13 October 2026.
+
+### Method of this run
+
+1. The task, the request and the prices are the same as in "Cost of a whole task with real Haiku".
+2. `data.csv` has new values with the same group means: control 4.2, treated 5.1. The Welch
+   t-test gives t = 4.89 and p = 0.00063.
+3. Cuvette runs the bundle with the same arguments. The settings are the defaults: effort `auto`
+   (`medium` for Haiku), referee `same`.
+4. Claude Code is version 2.1.296, with an empty `CLAUDE_CONFIG_DIR`. It sent effort `medium`
+   and `display: "omitted"` in each call.
+5. A proxy on localhost forwarded each request. For each reply, it recorded the time of the
+   first byte, the first thinking event, the first text and the end. It refused each request
+   after 36 real model calls.
+6. The order was Cuvette run 1, Claude Code run 1, Cuvette run 2 and four replays. Then Claude
+   Code runs 2 and 3 ran, and one Cuvette run with the folder list.
+
+The limit of 36 calls did not permit a third Cuvette run. Cuvette run 1 used 11 calls and run 2
+used 8. Thus each Cuvette value is the median of two runs, which is the mean of the two runs.
+
+### Results
+
+| Metric | Cuvette (median of 2) | Claude Code (median of 3) |
+| --- | --- | --- |
+| Wall time | 41.0 s | 10.6 s |
+| Model time (sum of the requests) | 38.2 s | 9.3 s |
+| Harness time (wall time minus model time) | 2.8 s | 1.3 s |
+| Model calls | 9.5 (8 and 11) | 3 |
+| Referee calls and their time | 2 calls, 15.4 s | none |
+| Input tokens, not cached | 13,598 | 6 |
+| Cache write tokens | 14,963 | 7,557 |
+| Cache read tokens | 147,897 | 74,967 |
+| Output tokens | 6,316 | 1,507 |
+| Cost estimate | 0.0079 USD | 0.0027 USD |
+| Answer says the groups differ, mean difference 0.9 | yes, 2 of 2 | yes, 3 of 3 |
+| Test result in the answer | Welch, p = 0.00063, 95% CI, 2 of 2 | t by hand in 2 runs, a Python script in 1 run |
+
+### What makes the difference in wall time
+
+The difference is 30.4 s. Almost all of it is model time.
+
+| Part | Cuvette run 1 | Cuvette run 2 | Claude Code (median) |
+| --- | --- | --- | --- |
+| Session calls before the first answer | 7 calls, 20.1 s | 4 calls, 10.5 s | 3 calls, 9.3 s |
+| First referee call | 9.3 s | 6.2 s | none |
+| Revision (session calls after the first answer) | 2 calls, 8.6 s | 2 calls, 6.4 s | none |
+| Second referee call | 8.6 s | 6.7 s | none |
+| Harness time | 3.7 s | 2.0 s | 1.3 s |
+
+1. The review of the answer is the largest part: 26.4 s in run 1 and 19.3 s in run 2. This is
+   the referee, the revision and the second referee.
+2. The answer check started each revision, not the referee. In run 1 the answer gave "80"
+   (80% power). In run 2 it gave "12" and "80". No tool result had these numbers. The 80 comes
+   from the rule on small samples in the system prompt.
+3. A referee call does not stream. It writes 1,111 to 1,790 output tokens, most of them hidden
+   thinking. Thus each referee call takes 6 to 9 s.
+4. The other extra session calls are a table summary before the read of the file, the power
+   step and a `calculate` step. Claude Code also lists the folder first.
+5. The harness time is 1.5 s more than Claude Code. The Python steps of the adapter take 0.5 to
+   1.3 s each. The other gaps between two calls are less than 40 ms. The gap between the answer and the referee
+   is 20 to 35 ms.
+
+### Time of each reply
+
+The time for each output token is about equal in the two harnesses. Thus Cuvette has more model
+time because it makes more calls and writes more tokens. The request size is not the cause:
+a Cuvette request has 52 to 74 kB and 19,500 to 24,700 input tokens. A Claude Code request has
+75 to 81 kB and about 27,000 input tokens.
+
+| Reply | Harness and display | Output tokens | Time to first byte | Total |
+| --- | --- | --- | --- | --- |
+| `list_dir` / `Bash ls` | Cuvette, `summarized` | 243 | 0.85 s | 1.86 s |
+| `list_dir` / `Bash ls` | Claude Code, `omitted` | 245 | 0.88 s | 1.74 s |
+| Tool call, no thinking | Cuvette, `summarized` | 130 | 0.74 s | 1.19 s |
+| Tool call, no thinking | Claude Code, `omitted` | 130 | 0.67 to 0.81 s | 0.98 to 1.12 s |
+| Answer | Cuvette, `summarized` | 736 | 0.77 s | 3.90 s |
+| Tool call | Claude Code, `omitted` | 708 | 1.14 s | 3.63 s |
+
+### Display `omitted` against `summarized` for session steps
+
+The replay script sent four session requests of Cuvette run 2 again with `display: "omitted"`. The
+`summarized` values are the original calls with the same request. The replays read the full
+prefix from the cache, so their first byte can be a little earlier.
+
+| Value (median of 4) | `summarized` | `omitted` |
+| --- | --- | --- |
+| Time to the first text or tool call | 3.49 s | 1.54 s |
+| Total time | 3.61 s | 2.82 s |
+| Output tokens | 608 | 483 |
+| Time for each output token after the first byte | 4.3 ms | 3.9 ms |
+
+With `summarized`, the text and the tool call of a step come at the end of the reply, after
+the thinking summary. With `omitted`, the text starts about 2 s sooner. The total time changes
+less, because the replies have different lengths. Four pairs are a small sample.
+
+In a run with `-p`, the record keeps the thinking summary, but the report of the session does
+not show it. The web app shows the summary while the model works, and the case pages of the
+bench show short summaries. Thus a new setting `show_thinking` keeps `on` as the default.
+
+### Changes
+
+- `show_thinking` (`src/core/config.ts`, `src/core/settings.ts`, `src/providers/claude.ts`):
+  `on` (the default) sends `display: "summarized"` in each session step, as before. `off` sends
+  `display: "omitted"`. The bill is the same. With `off`, the record has no `thinking` entries.
+  The setting is in the "Model" group of `/settings`. A change during a session makes a new
+  provider, and a referee with `same` uses it.
+- Folder list in the first message (`src/core/session.ts`, `src/core/prompt.ts`). The first
+  message of a new session gives the list of the project folder, in the format of `list_dir`.
+  It is a note from the harness, after the folders note. The list has 50 entries or fewer. A
+  name with a line break goes in JSON quotes. The system prompt and the tools do not change, so
+  the prompt cache across sessions does not change. A later turn and a resumed session do not
+  send the list again. The check for patient identifiers reads the first message, as it reads a
+  `list_dir` result. The list adds about 170 bytes for two entries. The scan took 0.03 ms for a
+  folder with two entries and 0.18 ms for a folder with 5,000 files.
+
+Tests: `tests/providers.test.ts`, `tests/session.test.ts`, `tests/prompt.test.ts` and
+`tests/prompt-cache.test.ts`.
+
+| Folder list | Before (Cuvette runs 1 and 2) | After (one run, 3 calls) |
+| --- | --- | --- |
+| First model call | `list_dir`, 243 and 250 output tokens, 1.86 s and 3.27 s | `inspect_table` of `data.csv` |
+| Calls before the first table read | 2 | 1 |
+
+The run after the change stopped at the proxy limit after three calls. Thus it has no total.
+After `inspect_table`, the model called `inspect_table` again and then `read_file`, to see
+the column names. This is the item "column names for a cloud model". It stays open.
+
+### Referee in parallel with the answer
+
+The referee cannot start before the answer is complete, because it reads the full answer. An
+error of the referee starts a revision before the scientist sees the answer. If the harness
+recorded the answer before the referee, the record would change. Thus this change is not in
+the code. The terminal app already shows the streamed answer text while the referee runs. The
+final answer, with its notes, replaces the text when the review is complete.
+
+### Not fixed
+
+- The answer check marks "80" from the rule on small samples as a number with no source. This
+  started the revision in the two runs. It costs two session calls and a second referee call:
+  13 to 17 s. A change to the rule or to the answer check is an owner decision.
+- The referee runs on the first answer also when a rule error already starts a revision. This
+  is the same owner decision as in "Whole task again after the cache and effort changes".
+- The referee uses the session effort. At `medium`, Haiku writes 1,100 to 1,800 hidden
+  thinking tokens in each referee call. A lower effort for the referee changes the review, so
+  the owner must decide.
+- The column names for a cloud model.
+
+### Limits
+
+- Two Cuvette runs and three Claude Code runs. The Haiku replies change from run to run.
+- The display measurement uses four requests from one run.
+- The cost is an estimate from the token counts. It is not the invoice.
+- `PATH` started with the Python of the `biostats` environment, which has `scipy`, for the two
+  harnesses.
+- The proxy, the runner and the replay script are not in the repository. They are about 200
+  lines in total.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
