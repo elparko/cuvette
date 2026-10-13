@@ -2,7 +2,7 @@ import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, maskShown, Masker, scanContent, scanMessages, scanTable, scanText, setFolderNoPatientData, shownHits, type PhiAction } from "../src/core/phi.ts";
+import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, maskShown, Masker, NOT_SENT, scanContent, scanMessages, scanTable, scanText, setFolderNoPatientData, shownHits, withheld, type PhiAction } from "../src/core/phi.ts";
 import { Session } from "../src/core/session.ts";
 import type { Message, PhiEvent } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -118,6 +118,33 @@ test("scanMessages names the file from the tool call", () => {
   const hits = scanMessages(msgs.slice(1), msgs);
   expect(hits[0]!.where).toBe("/data/visits.csv");
   expect(scanMessages([{ role: "user", parts: [{ type: "text", text: "Patient: John Doe, DOB 1/2/1950" }] }], [])[0]!.where).toBe("your message");
+});
+
+test("an image file name with an identifier triggers, and the masker keeps that image from the model", () => {
+  const img = "/data/scans/John_Smith_DOB_03-14-1956.png";
+  const plain = "/data/scans/field_01.png";
+  const msg: Message = { role: "user", parts: [{ type: "tool_result", callId: "c1", name: "inspect_data", text: "Two previews.", images: [img, plain] }, { type: "image", path: img }] };
+  const hits = scanMessages([msg], [msg]);
+  expect(hits.map((h) => [h.kind, h.value])).toContainEqual(["birth_date", "03-14-1956"]);
+  expect(hits[0]!.where).toBe("image file name John_Smith_DOB_03-14-1956.png");
+  const m = new Masker();
+  m.add(hits);
+  const out = m.message(msg);
+  const result = out.parts[0] as Extract<Message["parts"][number], { type: "tool_result" }>;
+  expect(result.images).toEqual([plain]);
+  expect(result.text).toMatch(/One image not sent to the model: the file name has a possible patient identifier/);
+  expect(out.parts[1]).toMatchObject({ type: "text" });
+  expect(JSON.stringify(out)).not.toContain("1956.png");
+  expect(m.message({ role: "user", parts: [{ type: "tool_result", callId: "c2", name: "x", text: "ok", images: [plain] }] }).parts[0]).toMatchObject({ images: [plain] });
+  const named = new Masker();
+  named.add(scanText("Patient: John Smith", "x"));
+  const shown = named.message({ role: "user", parts: [{ type: "tool_result", callId: "c3", name: "x", text: "ok", images: ["/data/John_Smith_chart.png", "/data/Johnson/field_01.png", "/data/John Smithers.png"] }] });
+  expect(shown.parts[0]).toMatchObject({ images: ["/data/Johnson/field_01.png", "/data/John Smithers.png"] });
+});
+
+test("stop: an attached image does not stay in the history", () => {
+  const out = withheld({ role: "user", parts: [{ type: "text", text: "Patient: John Doe" }, { type: "image", path: "/data/chart.png" }] });
+  expect(out.parts).toEqual([{ type: "text", text: NOT_SENT }, { type: "text", text: NOT_SENT }]);
 });
 
 test("cloud and local models", () => {
@@ -384,6 +411,53 @@ test("no new title from a cloud model after the scientist stopped patient identi
   expect(session.record.entries(["phi"])[0]!.data.action).toBe("stop");
   expect(session.record.entries(["assistant"]).some((e) => e.data.final)).toBe(true);
   expect(spy).not.toHaveBeenCalled();
+  await session.close();
+});
+
+test("a cloud referee does not read a log with identifiers that never went to the model", async () => {
+  const provider = cloudFake([{ text: "Done." }]);
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")) });
+  session.decisions.applySetup({});
+  await session.send("Summarize the run.");
+  session.record.append("tool_result", { callId: "s1.1", tool: "read_file", ok: true, summary: "Patient: John Doe, MRN 00123456" });
+  const ref = cloudFake();
+  const spy = vi.spyOn(ref, "complete");
+  (session as any).refereeProvider = ref;
+  await session.review();
+  expect(spy).not.toHaveBeenCalled();
+  expect(session.record.entries(["phi"])).toHaveLength(0);
+  await session.close();
+});
+
+test("the MCP client gets masked values, a notice and a logged choice; phi_check off sends the values", async () => {
+  const session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")) });
+  const out = session.phiForClient(CLINIC_CSV, "read_file");
+  expect(out).not.toContain("John Doe");
+  expect(out).toContain("[NAME 1],[MRN 1],[DATE OF BIRTH 1]");
+  expect(out).toMatch(/Cuvette masked \d+ possible patient identifiers in this result before it went to the MCP client/);
+  expect(session.record.entries(["phi"])[0]!.data).toMatchObject({ action: "mask", by: "harness: the MCP client cannot show the card" });
+  expect(session.phiForClient("Again: John Doe", "read_file")).toBe("Again: [NAME 1]");
+  expect(session.phiForClient("Counts: 41 cells", "count")).toBe("Counts: 41 cells");
+  await session.close();
+  const off = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")), settings: { phi_check: false } as never });
+  expect(off.phiForClient(CLINIC_CSV, "read_file")).toBe(CLINIC_CSV);
+  await off.close();
+});
+
+test("a phone notice to an outside server does not carry patient identifiers", async () => {
+  const bodies: string[] = [];
+  vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+    bodies.push(init.body);
+    return new Response("{}");
+  });
+  const session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")), settings: { notify: { ntfy: "https://ntfy.example.org/topic" } } as never });
+  session.questions.ask({ decisionKey: "", title: "Which visit?", text: "Use the visit of Patient: John Doe, MRN 00123456?", options: [], recommendation: { value: "", reason: "" }, evidence: "" } as never);
+  session.questions.ask({ decisionKey: "", title: "Which threshold?", text: "Otsu or Li?", options: [], recommendation: { value: "", reason: "" }, evidence: "" } as never);
+  for (let i = 0; i < 50 && bodies.length < 2; i++) await sleep(10);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).not.toContain("John Doe");
+  expect(bodies[0]).toMatch(/Open Cuvette to read it/);
+  expect(bodies[1]).toContain("Otsu or Li?");
   await session.close();
 });
 

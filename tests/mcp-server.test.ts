@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -87,6 +87,17 @@ test("with no adapter, the client lists the adapters, use_adapter loads the agen
   expect(after).toEqual(expect.arrayContaining(["count", "blur"]));
   await vi.waitFor(() => expect(changed.length).toBeGreaterThan(0));
   expect(transportErrors).toEqual([]);
+});
+
+test("a tool result with patient identifiers goes to the client masked, with a notice", async () => {
+  writeFileSync(join(home, "visits.csv"), "patient_name,mrn,troponin_ng_l\nJohn Doe,00123456,54\nMary Smith,00123457,12\n");
+  await connect(lab);
+  const r = await call("read_file", { path: join(home, "visits.csv") });
+  expect(r.text).not.toContain("John Doe");
+  expect(r.text).toContain("[NAME 1],[MRN 1],54");
+  expect(r.text).toMatch(/Cuvette masked 4 possible patient identifiers in this result before it went to the MCP client/);
+  const trail = await call("cuvette_trail", { level: 3 });
+  expect(trail.text).not.toContain("John Doe");
 });
 
 test("setup, a blocked call, an answer, a good call, the trail and the export", async () => {

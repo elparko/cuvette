@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
@@ -279,10 +279,19 @@ export function scanMessages(fresh: Message[], all: Message[]): PhiHit[] {
     if (m.role !== "user") continue;
     for (const p of m.parts) {
       if (p.type === "text") hits.push(...scanContent(p.text, "your message"));
-      else if (p.type === "tool_result") hits.push(...scanContent(p.text, paths.get(p.callId) ?? p.name));
+      else if (p.type === "tool_result") {
+        hits.push(...scanContent(p.text, paths.get(p.callId) ?? p.name));
+        for (const img of p.images ?? []) hits.push(...scanImagePath(img));
+      } else if (p.type === "image") hits.push(...scanImagePath(p.path));
     }
   }
   return dedupe(hits);
+}
+
+const imageName = (path: string) => basename(path, extname(path)).replace(/_+/g, " ");
+
+function scanImagePath(path: string): PhiHit[] {
+  return scanText(imageName(path), `image file name ${basename(path)}`);
 }
 
 export function maskShown(v: string): string {
@@ -338,18 +347,33 @@ export class Masker {
     return s.replace(re, (m) => this.map.get(m) ?? m);
   }
 
+  private marked(path: string): boolean {
+    const name = imageName(path);
+    return this.text(name) !== name;
+  }
+
   message(m: Message): Message {
     if (!this.map.size || m.role !== "user") return m;
-    const parts = m.parts.map((p): Part => (p.type === "text" ? { ...p, text: this.text(p.text) } : p.type === "tool_result" ? { ...p, text: this.text(p.text) } : p));
+    const parts = m.parts.map((p): Part => {
+      if (p.type === "text") return { ...p, text: this.text(p.text) };
+      if (p.type === "image") return this.marked(p.path) ? { type: "text", text: imagesNotSent(1) } : p;
+      if (p.type !== "tool_result") return p;
+      const kept = p.images?.filter((i) => !this.marked(i));
+      const left = (p.images?.length ?? 0) - (kept?.length ?? 0);
+      const text = this.text(p.text) + (left ? `\n${imagesNotSent(left)}` : "");
+      return { ...p, text, images: kept?.length ? kept : undefined };
+    });
     return { ...m, parts };
   }
 }
+
+export const imagesNotSent = (n: number) => `[${n === 1 ? "One image" : `${n} images`} not sent to the model: the file name has a possible patient identifier, and the harness cannot mask an image.]`;
 
 export const NOT_SENT = "[Not sent to the model: the scientist stopped it, because it can contain patient identifiers.]";
 
 export function withheld(m: Message): Message {
   if (m.role !== "user") return m;
-  return { ...m, parts: m.parts.map((p): Part => (p.type === "text" ? { ...p, text: NOT_SENT } : p.type === "tool_result" ? { ...p, text: NOT_SENT, images: undefined } : p)) };
+  return { ...m, parts: m.parts.map((p): Part => (p.type === "text" || p.type === "image" ? { type: "text", text: NOT_SENT } : p.type === "tool_result" ? { ...p, text: NOT_SENT, images: undefined } : p)) };
 }
 
 export function isLocal(info: Pick<ModelInfo, "provider"> & { local?: boolean }): boolean {

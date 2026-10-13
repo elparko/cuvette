@@ -16,6 +16,7 @@ export interface Dirs {
   outputDir?: string;
   figureFormats?: string;
   xlsx?: boolean;
+  heldBack?: () => string[];
 }
 
 export interface KindContext {
