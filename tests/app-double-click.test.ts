@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -44,6 +44,16 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
   const api = (path: string, body?: unknown) =>
     page.eval<any>(`fetch(${JSON.stringify(path + (path.includes("?") ? "&" : "?") + "t=" + token())}, ${JSON.stringify(body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-token": token() }, body: JSON.stringify(body) })}).then((r) => r.json())`);
   const sessions = async () => (await api("api/sessions.json")).length as number;
+
+  test("the start page fits a phone when the folder list has a long folder name", async () => {
+    mkdirSync(join(tmpdir(), "cuvette-long-folder-name-" + "x".repeat(70)), { recursive: true });
+    await page.size(390, 844);
+    await page.go(url + "&page=start");
+    await until(page, `document.querySelector('input[aria-label="Folder"]') && document.body.textContent.includes("Up one folder")`);
+    const wide = await page.eval<string[]>(`[...document.querySelectorAll("#root *")].filter((e) => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.tagName + "." + e.className).slice(0, 5)`);
+    expect(wide).toEqual([]);
+    await page.size(1280, 900);
+  });
 
   test("a second click on the sample button after the first request ends does not open a second session", async () => {
     await page.go(url + "&page=start");

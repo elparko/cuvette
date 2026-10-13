@@ -106,7 +106,22 @@ export function claimLock(recordDir: string, extra: Record<string, unknown> = {}
 
 const alive = (dir: string) => !!openLock(dir);
 
-export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string } {
+interface Parsed {
+  first: any;
+  ask: any;
+  title?: { title: string; description: string };
+  figure?: string;
+  answered: boolean;
+  waiting: boolean;
+  lastFinal: boolean;
+}
+
+const parsed = new Map<string, { mtime: number; size: number; p: Parsed }>();
+
+function parseLog(log: string): Parsed {
+  const st = statSync(log);
+  const hit = parsed.get(log);
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.p;
   let first: any;
   let ask: any;
   let title: { title: string; description: string } | undefined;
@@ -136,8 +151,14 @@ export function scanLog(log: string): { first: any; ask: any; title?: { title: s
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
     else if (!figure && e.kind === "node" && !d.sensitivityOf) figure = ((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).find((p) => IMAGE.test(p) && existsSync(p));
   }
+  const p = { first, ask, title, figure, answered, waiting: asked.size > 0 || planOpen, lastFinal };
+  parsed.set(log, { mtime: st.mtimeMs, size: st.size, p });
+  return p;
+}
+
+export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string } {
+  const { first, ask, title, figure, answered, waiting, lastFinal } = parseLog(log);
   const live = alive(dirname(log));
-  const waiting = asked.size > 0 || planOpen;
   const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : "not started";
   return { first, ask, title, status, figure, owner: first?.session };
 }
@@ -181,9 +202,10 @@ function indexed(home: string): SessionInfo[] {
 export function listSessions(home = cuvetteHome()): SessionInfo[] {
   const dir = join(home, "sessions");
   const out: SessionInfo[] = indexed(home);
+  const seen = new Set(out.map((s) => s.id));
   for (const id of existsSync(dir) ? readdirSync(dir) : []) {
     const log = join(dir, id, "log.jsonl");
-    if (!existsSync(log) || out.some((s) => s.id === id)) continue;
+    if (seen.has(id) || !existsSync(log)) continue;
     const s = info(id, log, { cwd: "" });
     s.cwd = String(scanLog(log).first?.data.cwd ?? "");
     out.push(s);

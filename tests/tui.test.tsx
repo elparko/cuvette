@@ -7,7 +7,7 @@ import { liveTail, tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/ui/commands.ts";
 import React from "react";
-import { render } from "ink";
+import { Static, render } from "ink";
 import { ItemView, activityText, busyHint, runningText } from "../src/tui/view.tsx";
 
 let live: { h: Harness; s: FakeSession; done: Promise<void> } | undefined;
@@ -580,6 +580,21 @@ describe("quiet view", () => {
     expect(texts(mainView(log, true).settled)).toEqual(["· Listed folders with a script; Looked at 1 folder (LDL)"]);
   });
 
+  test("a reply that the scientist stopped shows at once, after the failed step that waits", () => {
+    const c = new Collapser();
+    const { log } = feed((s) => {
+      s.record.append("tool_result", { callId: "a", tool: "run_script", ok: false, summary: "The script failed.", error: "The script failed." });
+      s.record.append("assistant", { text: "The script failed, so I", final: false });
+      s.record.append("assistant", { text: "I try again with", final: false, stopped: true });
+    });
+    expect(c.add(log[0]!)).toEqual([]);
+    expect(c.add(log[1]!)).toEqual([]);
+    const out = c.add(log[2]!);
+    expect(out.map((i) => i.t)).toEqual(["step", "assistant", "assistant"]);
+    expect(out.at(-1)).toMatchObject({ t: "assistant", text: expect.stringContaining("I try again with") });
+    expect(c.preview()).toEqual([]);
+  });
+
   test("held lines show in the live area until the next main line", () => {
     const c = new Collapser();
     const { log } = feed((s) => {
@@ -688,6 +703,26 @@ describe("pieces", () => {
     expect(lines[0]!.startsWith("> compare")).toBe(true);
     expect(lines[1]!.startsWith("  ")).toBe(true);
     expect(Math.max(...lines.map((l) => l.length))).toBeLessThanOrEqual(80);
+  });
+
+  test("a status line and a step line that wrap continue under their text, not at column 0", async () => {
+    const text = "The referee found a problem with the normalization step and holds the result until you answer the question";
+    for (const item of [
+      { key: "l1", t: "line", sym: "⚠", color: "yellow", text },
+      { key: "l2", t: "line", sym: "✓", color: "green", text },
+      { key: "l3", t: "line", sym: "▸", dim: true, text: `${text}\n   and a demonstration before any step runs.` },
+      { key: "u1", t: "user", text },
+      { key: "s2", t: "step", n: 3, ok: false, tool: "normalize", summary: "Failed", error: text, outputs: [] },
+    ] as Item[]) {
+      const h = makeHarness(50, 20);
+      const app = render(<Static items={[item]}>{(it) => <ItemView key={it.key} item={it} />}</Static>, { stdout: h.stdout as never, patchConsole: false });
+      await sleep(30);
+      app.unmount();
+      const lines = h.term.lines().filter(Boolean);
+      expect(lines.length).toBeGreaterThan(2);
+      expect(lines.slice(1).every((l) => l.startsWith("  "))).toBe(true);
+      expect(h.term.wraps).toBe(0);
+    }
   });
 
   test("a step detail that wraps keeps its indent", async () => {

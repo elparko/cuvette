@@ -351,4 +351,28 @@ describe("the browser app", () => {
     const refused = await post("api/programs/run", { name: "epsilon", action: "remove", confirmed: true });
     expect(refused.text).toMatch(/Installed outside Cuvette/);
   });
+
+  test("a second install of the same program while the first runs gets the first job", async () => {
+    let release = () => {};
+    const exec = vi.fn(async (_c: string, line: (l: string) => void) => {
+      line("started");
+      await new Promise<void>((r) => (release = r));
+      return 0;
+    });
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const first = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    await vi.waitFor(() => expect(exec).toHaveBeenCalledTimes(1));
+    const second = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    expect(second.job).toBe(first.job);
+    expect(exec).toHaveBeenCalledTimes(1);
+    release();
+    const stream = await fetch(`${base}api/programs/progress?job=${first.job}&t=${app.token}`).then((r) => r.text());
+    expect(stream).toContain('"line":"started"');
+    expect(stream).toContain('"done":true');
+    const third = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    expect(third.job).not.toBe(first.job);
+    release();
+  });
 });

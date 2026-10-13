@@ -53,7 +53,7 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
                   <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
                     <ClockIcon className="size-4 text-muted-foreground" />
                     <span className="min-w-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
-                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{midText(r, 40)}</span>
+                    <span className="ml-auto min-w-0 shrink-[3] truncate text-xs text-muted-foreground">{midText(r, 40)}</span>
                   </button>
                 </li>
               ))}
@@ -93,7 +93,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
       <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={target} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
         <span className="text-muted-foreground">{icon}</span>
         <span className="min-w-0 truncate">{label}</span>
-        {sub && <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{midText(sub, 40)}</span>}
+        {sub && <span className="ml-auto min-w-0 shrink-[3] truncate text-xs text-muted-foreground">{midText(sub, 40)}</span>}
       </button>
     </li>
   );
@@ -113,7 +113,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
           }}
           aria-label="Folder"
           placeholder="Folder, for example ~/Data/experiment-12"
-          className="flex-1 font-mono text-[13px]"
+          className="min-w-[12rem] flex-1 font-mono text-[13px]"
           spellCheck={false}
         />
         <Button onClick={() => pick.choose(path)} disabled={pick.busy}>Analyze this folder</Button>

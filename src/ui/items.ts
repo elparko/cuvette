@@ -366,7 +366,7 @@ export class Collapser {
     }
     const r = role(e);
     if (r === "housekeeping" && !l.items.length && e.kind !== "tool_result") return [];
-    const waitText = e.kind === "assistant" && !e.data.final && this.held.some((h) => h.e && role(h.e) === "failed");
+    const waitText = e.kind === "assistant" && !e.data.final && !e.data.stopped && this.held.some((h) => h.e && role(h.e) === "failed");
     if (r === "housekeeping" || r === "failed" || HELD.has(e.kind) || waitText) {
       this.held.push(l);
       return [];

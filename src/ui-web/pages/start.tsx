@@ -27,7 +27,7 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
         <p className="mt-2 max-w-2xl text-base text-foreground/80">Choose the folder that holds your data. Cuvette does not change your files. It writes the results to a new folder inside it.</p>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card>
           <CardContent className="flex flex-col gap-4">
             <div className="flex items-center gap-2 text-[15px] font-semibold">
