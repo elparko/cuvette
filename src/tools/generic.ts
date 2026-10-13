@@ -68,7 +68,7 @@ export function genericTools(dirs: Dirs): Tool[] {
     make({
       name: "run_command",
       title: "Run a command",
-      description: `Run a program with an argument list. There is no shell. The scientist must approve each call. The program runs in the project folder ${project} unless you give cwd; a relative cwd starts there. Give purpose and does in plain language: the scientist sees them, not the command.`,
+      description: `Run a program with an argument list. There is no shell. The scientist must approve each call. The program runs in the project folder unless you give cwd; a relative cwd starts there. Give purpose and does in plain language: the scientist sees them, not the command.`,
       permission: "ask",
       inputSchema: {
         type: "object",
@@ -95,7 +95,7 @@ export function genericTools(dirs: Dirs): Tool[] {
     make({
       name: "read_file",
       title: "Read a file",
-      description: `Read the start of a text file. A relative path starts in the project folder ${project}.`,
+      description: "Read the start of a text file. A relative path starts in the project folder.",
       readOnly: true,
       inputSchema: {
         type: "object",
@@ -122,7 +122,7 @@ export function genericTools(dirs: Dirs): Tool[] {
     make({
       name: "list_dir",
       title: "List a folder",
-      description: `List the files and folders in a folder. A relative path starts in the project folder ${project}.`,
+      description: "List the files and folders in a folder. A relative path starts in the project folder.",
       readOnly: true,
       inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
       run(a) {
@@ -135,7 +135,7 @@ export function genericTools(dirs: Dirs): Tool[] {
     make({
       name: "write_file",
       title: "Write a file",
-      description: `Write a text file. A relative name goes to the session folder ${dirs.workDir}. An absolute path in the project folder ${project} is also allowed, for a place that the scientist names. Other paths are refused.`,
+      description: "Write a text file. A relative name goes to the session folder. An absolute path in the project folder is also allowed, for a place that the scientist names. Other paths are refused.",
       inputSchema: {
         type: "object",
         properties: { name: { type: "string", minLength: 1 }, text: { type: "string" } },

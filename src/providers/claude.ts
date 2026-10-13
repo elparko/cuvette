@@ -89,7 +89,7 @@ export class ClaudeProvider implements Provider {
 
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
     this.info = { provider: "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
-    this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
+    this.effort = opts.effort && opts.effort !== "auto" ? opts.effort : model === "claude-haiku-5-5" ? "medium" : "high";
     this.fixedClient = opts.client;
     this.apiKey = opts.apiKey;
     this.sleep = opts.sleep;

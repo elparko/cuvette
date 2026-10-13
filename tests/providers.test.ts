@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
+import { DEFAULTS } from "../src/core/config.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
@@ -97,6 +98,18 @@ describe("claude", () => {
     const b = fakeClient([claudeMsg([{ type: "text", text: "x" }])]);
     await new ClaudeProvider("claude-opus-5-5", { client: b.client, effort: "max" }).step(req([user("q")]));
     expect(b.calls[0].params.output_config.effort).toBe("max");
+  });
+
+  test("effort auto, the settings default, gives medium for Haiku and high for the other models", async () => {
+    const sent = async (model: string) => {
+      const f = fakeClient([claudeMsg([{ type: "text", text: "x" }])]);
+      await new ClaudeProvider(model, { client: f.client, effort: DEFAULTS.effort }).step(req([user("q")]));
+      return f.calls[0].params.output_config.effort;
+    };
+    expect(DEFAULTS.effort).toBe("auto");
+    expect(await sent("claude-haiku-5-5")).toBe("medium");
+    expect(await sent("claude-sonnet-5-5")).toBe("high");
+    expect(await sent("claude-opus-5-5")).toBe("high");
   });
 
   test("echoes raw content when provider and model match, drops thinking otherwise", async () => {

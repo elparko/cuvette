@@ -211,7 +211,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(nodes[0].decisions.method).toBe("Triangle");
   });
 
-  test("Haiku: one streamed request before the first token, effort high from the default settings, one connection for each step", async () => {
+  test("Haiku: one streamed request before the first token, effort medium from the default settings, one connection for each step", async () => {
     replies = [
       { blocks: [{ type: "text", text: "Counting now." }, { type: "tool_use", id: "toolu_01", name: "count", input: { input: "/data/a.tif", method: "Otsu", min_size: 10 } }], stop: "tool_use" },
       { blocks: [{ type: "text", text: "There are 66 particles." }], stop: "end_turn" },
@@ -226,7 +226,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(captured[0].url).toBe("/v1/messages?beta=true");
     expect(captured[0].body.stream).toBe(true);
     expect(captured[0].body.model).toBe("claude-haiku-5-5");
-    expect(captured[0].body.output_config.effort).toBe("high");
+    expect(captured[0].body.output_config.effort).toBe("medium");
     const steps = captured.filter((c) => c.url.startsWith("/v1/messages"));
     expect(steps.length).toBeGreaterThanOrEqual(2);
     expect(steps[1].headers.connection).toBe("keep-alive");

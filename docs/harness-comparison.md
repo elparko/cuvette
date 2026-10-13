@@ -69,9 +69,8 @@ sentence, so Haiku thinks very little at the two efforts.
 
 This result does not cover a task with tools. In the first real run with tools, the first
 Cuvette reply at effort high had 534 output tokens. The Claude Code reply at medium had 175.
-More output tokens before the text make the first token later. The owner must decide the
-default effort for Haiku. `src/core/config.ts:53` sets `effort: "high"` for all models, and
-this value replaces the Haiku default (`medium`) of `ClaudeProvider`.
+More output tokens before the text make the first token later. The settings default is now
+`auto`: `medium` for Haiku and `high` for the other Claude models.
 
 ### Request comparison
 
@@ -219,7 +218,7 @@ These causes are from the two records. A plain loop does not have them.
 | The adapter hides the column table from a cloud model (`cloud_visibility: summaries`). The model reads the raw file with `read_file` to see the column names. | 1 call (run 2) | Not fixed |
 | Headless mode gave the first option (`paired: true`) because the question has no recommendation. The test failed, and the model asked to change the value. | 2 calls (run 1) | Not fixed |
 | The answer check marks "80% power" as a number with no source, because it does not read the arguments of `run_script`. This starts a revision. | 1 call (run 1) | Not fixed |
-| The tool descriptions and the system prompt contain the folders of the session. Thus a new session cannot read the cache of the last session. | about 19,700 tokens written at each session start | Not fixed |
+| The tool descriptions and the system prompt contain the folders of the session. Thus a new session cannot read the cache of the last session. | about 19,700 tokens written at each session start | Fixed (see "Prompt cache across sessions") |
 | The referee reads the answer. | 1 call | Not changed: part of the method |
 | The model added a power calculation, a rank test and a Holm correction. | 1 to 3 calls | Not changed: model behavior |
 
@@ -249,9 +248,8 @@ Two tests in `tests/session.test.ts` cover the fixes. Each test fails on the old
 - The `paired` question has no recommendation. Headless mode then takes the first option.
   This is a decision step, so it is not in this change.
 - The claim check does not read the arguments of free text tools. This rule is intentional.
-- The folders of the session in the tool descriptions and the system prompt. To move them to
-  the first user message is a change to the prompt text.
-- Effort `high` for Haiku, as in the sections above.
+- A later change fixes the folders of the session and the effort for Haiku. See "Prompt cache
+  across sessions and the effort for Haiku".
 
 ### Limits
 
@@ -265,6 +263,60 @@ Two tests in `tests/session.test.ts` cover the fixes. Each test fails on the old
 - The cost is an estimate from the token counts. It is not the invoice.
 - The scripts are not in the repository. They are a proxy, a runner and a mock server of
   about 200 lines in total.
+
+## Prompt cache across sessions and the effort for Haiku
+
+The owner decided two changes:
+
+- Effort: the settings default is now `auto` (`src/core/config.ts`). `ClaudeProvider` sends
+  `medium` for Haiku and `high` for Opus, Sonnet and the other Claude models. A person can
+  still set `low`, `medium`, `high`, `xhigh` or `max`.
+- Folders: the system prompt and the tool descriptions contain no session path. The first user
+  message gives the project folder, the session folder, the output folder and the figures
+  folder. A summary after compaction gives them again. A resumed session gives them again in
+  its next message.
+
+`tests/prompt-cache.test.ts` makes two sessions in different folders. It compares the tools and
+the system prompt of the first request. These are the part of the request before the cache
+breakpoint on the system prompt. The two are byte-identical.
+
+### Benchmark subset
+
+The bench harness ran six papers, one run each, with `claude:claude-haiku-5-5` in blind mode:
+`sriphoosanaphan2021-sample-size`, `student1908-sleep`, `belenky2003-sleepstudy`,
+`aledo2022-renz-onpg`, `quinlan2010-bedtools` and `schindelin2012-fiji-blobs`. The T7 drive had
+no connection, so `fetch.sh` loaded the public data of five papers into a temporary folder.
+"Before" is commit 57a5f1a. "After" includes the two changes.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Computed items | 22 of 22 | 22 of 22 |
+| Reported items | 14 of 14 | 14 of 14 |
+| Session requests (sum of the six runs) | 33 | 31 |
+| All real model calls, with referee and titles (spend log) | 48 | 37 |
+| Output tokens | 31,477 | 19,199 |
+| Cache write tokens | 115,661 | 89,810 |
+| Cache read tokens | 422,324 | 396,248 |
+| Cache read share of input tokens | 78.5% | 81.5% |
+| Cache write tokens in the first request (sum of six sessions) | 79,856 | 60,602 |
+| Cost of the session requests (token estimate) | 0.034 USD | 0.025 USD |
+| Cost of all calls (spend log) | 0.061 USD | 0.038 USD |
+
+Each run has a new `CUVETTE_HOME` and a new project folder. Only `student1908-sleep` and
+`belenky2003-sleepstudy` use the same adapter (`biostats`), and they run one after the other.
+In the run after the change, the first request of `belenky2003-sleepstudy` read 15,262 tokens
+from the cache of the earlier session and wrote 1,358 tokens. Before the change, it read 0 and
+wrote 17,336. The other sessions have a different adapter, so a different system prompt and
+other tools. Thus they still write their prefix to the cache.
+
+Limits:
+
+- One run of each paper. The Haiku replies change from run to run, so the token counts and
+  the cost are not only the effect of the changes.
+- The two changes are in the same "after" run. The lower output token count comes mostly from
+  the effort. The cache read in the first request comes from the folder change.
+- The run before the change made 48 real model calls. The limit was 40. The session request
+  count did not include the referee, the summary and the title calls.
 
 ## Method
 
@@ -383,12 +435,12 @@ If the session has an adapter and no program step ran in the turn, Cuvette tells
 run a step. In the real run, this added one model call after the answer. In the mock runs,
 it added three calls. This is a rule of the method, not overhead, so it did not change.
 
-### Effort for Haiku (not fixed, behavior)
+### Effort for Haiku (fixed)
 
-`ClaudeProvider` selects effort `medium` for Haiku, but the settings default `effort: high`
-replaces it. Thus Cuvette sends `high` and Claude Code sends `medium`. This makes the first
-Cuvette reply longer (534 output tokens against 175). A change has an effect on the model
-output and the benchmark scores, so it is not in this change.
+Before the fix, the settings default `effort: high` replaced the Haiku default `medium` of
+`ClaudeProvider`. This made the first Cuvette reply longer (534 output tokens against 175).
+The owner decided to use `medium` for Haiku. See "Prompt cache across sessions and the effort
+for Haiku".
 
 ## Limits
 

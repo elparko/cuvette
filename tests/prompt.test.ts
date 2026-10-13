@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { systemPrompt } from "../src/core/prompt.ts";
+import { foldersNote, systemPrompt } from "../src/core/prompt.ts";
 
 const base = { adapters: [], mode: "watch" as const, lab: "", guidance: true };
 
@@ -20,8 +20,13 @@ test("with no adapter at the start, the prompt tells the agent to list and load 
   expect(systemPrompt({ ...base, model, guidance: false, pick: true })).toMatch(/list_adapters/);
 });
 
-test("the prompt gives the absolute project folder and forbids a disk search", () => {
-  const text = systemPrompt({ ...base, model: { provider: "claude", model: "m", contextWindow: 1, vision: true, small: false }, folders: { project: "/data/exp1", work: "/data/exp1/out" } });
-  expect(text).toContain("The project folder is /data/exp1.");
+test("the prompt names the folders with no path and forbids a disk search; the folder note gives the paths", () => {
+  const text = systemPrompt({ ...base, model: { provider: "claude", model: "m", contextWindow: 1, vision: true, small: false }, folders: { figureFormats: "png,svg", xlsx: true } });
+  expect(text).toContain("A note from the harness gives the paths of the project folder, the session folder and the output folder.");
+  expect(text).toContain("Save every figure in the figures folder of the output folder as PNG (300 dpi) and SVG");
+  expect(text).toContain("Write each result table as a CSV file in the output folder.");
+  expect(text).not.toMatch(/\/[a-z]+\//);
   expect(text).toContain("Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.");
+  const note = foldersNote({ project: "/data/exp1", work: "/data/exp1/out", output: "/data/exp1/results" });
+  expect(note).toBe("Folders of this session. The project folder is /data/exp1. The session folder is /data/exp1/out. The output folder is /data/exp1/results. The figures folder is /data/exp1/results/figures.");
 });
