@@ -341,6 +341,39 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json")`);
   });
 
+  test("after a remove of the focused session, the focus goes to the session in its place", async () => {
+    await page.eval(`(() => {
+      const card = (i, moved) => ({ id: "s" + i, title: "Session " + i, text: "", folder: "/lab/f" + i, folderName: "f" + i, age: "1 h ago", status: "", moved, thumb: "" });
+      window.__gone = [];
+      window.__mocks.push({ part: "api/sessions.json", reply: () => ({ body: [1, 2, 3, 4].filter((i) => !window.__gone.includes("s" + i)).map((i) => card(i, false)) }) });
+      window.__mocks.push({ part: "api/session-remove", reply: (_u, b) => (window.__gone.push(b.id), { body: { ok: true } }) });
+    })()`);
+    await page.size(1280, 900);
+    await goPage("Programs");
+    await goPage("Sessions");
+    const side = `[...document.querySelectorAll('aside [role="group"] button[data-rove]')]`;
+    expect(await until(page, `${side}.map((b) => b.dataset.rove).join() === "s1,s2,s3,s4"`)).toBe(true);
+    await page.eval(`${side}[1].focus()`);
+    await page.eval(`${side}[1].dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 50, clientY: 300 }))`);
+    const item = (label: string) => `[...document.querySelectorAll('[role="menuitem"], [role="dialog"] button')].find((b) => b.textContent.trim() === ${JSON.stringify(label)})`;
+    expect(await until(page, `!!${item("Remove from the list")}`)).toBe(true);
+    await page.eval(`${item("Remove from the list")}.click()`);
+    expect(await until(page, `!!${item("Remove")}`)).toBe(true);
+    await page.eval(`${item("Remove")}.click()`);
+    expect(await until(page, `${side}.length === 3 && !document.querySelector('[role="dialog"]')`)).toBe(true);
+    expect(await until(page, `document.activeElement?.dataset.rove === "s3"`)).toBe(true);
+    expect(await page.eval(`${side}.filter((b) => b.tabIndex === 0).map((b) => b.dataset.rove)`)).toEqual(["s3"]);
+    await page.eval(`document.activeElement.blur(); window.__gone.push("s3")`);
+    await goPage("Programs");
+    await goPage("Sessions");
+    expect(await until(page, `${side}.map((b) => b.dataset.rove).join() === "s1,s4"`)).toBe(true);
+    await wait(200);
+    expect(await page.eval(`document.activeElement === document.body`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json" && m.part !== "api/session-remove")`);
+    await goPage("Programs");
+    expect(await until(page, `!${side}.some((b) => b.dataset.rove === "s1")`)).toBe(true);
+  });
+
   test("the conversation shows its end after a reload, the sidebar names the request, and on a phone the message box fits under the header", async () => {
     await goPage("Analysis");
     expect(await until(page, `document.querySelector("#msg")`)).toBe(true);

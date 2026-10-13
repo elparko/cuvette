@@ -120,6 +120,14 @@ test("the trust card shows the folder, the keys, each hook in full, the adapters
   expect(trustStatus(cwd).state).toBe("new");
 });
 
+test("a SessionStart hook of a folder that the scientist trusts in the session shows its error as a notice", async () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "echo not json"] }] } });
+  session = await start(true);
+  const q = session.questions.open().find((x) => x.title === TRUST_TITLE)!;
+  await session.answer(q.qid, "once");
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContainEqual(expect.stringMatching(/gave output that is not JSON: not json/));
+});
+
 test("do not trust: the session keeps user settings only", async () => {
   project(".ga", { ...hook("ran"), permissions: "bypass" });
   session = await start(true);

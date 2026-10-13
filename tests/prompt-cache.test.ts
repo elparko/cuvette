@@ -1,9 +1,10 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
+import { FakeProvider } from "../src/providers/fake.ts";
 
 let sessions: Session[] = [];
 afterEach(async () => {
@@ -70,4 +71,78 @@ test("the folders stay in the first message only; a second turn does not repeat 
   expect(prefix(last)).toBe(prefix(calls[0]));
   const texts = last.messages.filter((m: any) => m.role === "user").map((m: any) => JSON.stringify(m.content));
   expect(texts.filter((t: string) => t.includes("The project folder is")).length).toBe(1);
+});
+
+type Msgs = { role: string; parts: { type: string; text?: string }[] }[];
+const userTexts = (msgs: Msgs) => msgs.filter((m) => m.role === "user").flatMap((m) => m.parts.flatMap((p) => (p.type === "text" ? [p.text ?? ""] : [])));
+const noteCount = (msgs: Msgs) => userTexts(msgs).filter((t) => t.includes("Folders of this session.")).length;
+
+async function fakeSession(provider: FakeProvider, cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"))) {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-note-home-"));
+  const s = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none", defaultAdapters: [] } });
+  sessions.push(s);
+  return s;
+}
+
+test("a folder name with spaces, Unicode and a long path goes into the note unchanged", async () => {
+  const deep = join(mkdtempSync(join(tmpdir(), "cuvette-note-proj-")), "My Data ρ ü 日本", ...Array.from({ length: 12 }, (_, i) => `level ${i} of a long path`));
+  mkdirSync(deep, { recursive: true });
+  const p = new FakeProvider([{ text: "ok" }]);
+  const s = await fakeSession(p, deep);
+  await s.send("Hello");
+  const first = userTexts(p.requests[0]!.messages)[0]!;
+  expect(first).toContain(`The project folder is ${deep}.`);
+  expect(first).toContain(`The session folder is ${s.dirs().workDir}.`);
+  expect(p.requests[0]!.system).not.toContain(deep);
+});
+
+test("a send that fails keeps the note in the history: the next send does not add a second note", async () => {
+  const p = new FakeProvider([{ text: "ok" }]);
+  const real = p.step.bind(p);
+  let fail = true;
+  p.step = async (req) => {
+    if (fail) {
+      fail = false;
+      throw new Error("network down");
+    }
+    return real(req);
+  };
+  const s = await fakeSession(p);
+  expect(await s.send("First")).toBe("");
+  expect(s.endedBy).toBe("error");
+  await s.send("Second");
+  expect(noteCount(p.requests.at(-1)!.messages)).toBe(1);
+});
+
+test("a rewind to before the first message sends the note again; a rewind to a later point does not", async () => {
+  const p = new FakeProvider([{ text: "one" }, { text: "two" }, { text: "three" }, { text: "four" }]);
+  const s = await fakeSession(p);
+  await s.send("First");
+  await s.send("Second");
+  s.rewind(2);
+  await s.send("Second again");
+  expect(noteCount(p.requests.at(-1)!.messages)).toBe(1);
+  s.rewind(1);
+  expect(s.history).toEqual([]);
+  await s.send("First again");
+  expect(noteCount(p.requests.at(-1)!.messages)).toBe(1);
+  expect(userTexts(p.requests.at(-1)!.messages)[0]).toContain(`The project folder is ${s.cwd}.`);
+});
+
+test("a resumed session sends the note again once, in its first new message", async () => {
+  const p = new FakeProvider([{ text: "one" }]);
+  const s = await fakeSession(p);
+  await s.send("First");
+  const folder = s.place.outDir;
+  await s.close();
+  sessions = sessions.filter((x) => x !== s);
+  const q = new FakeProvider([{ text: "two" }, { text: "three" }]);
+  const r = await Session.resume(folder, { provider: q });
+  sessions.push(r);
+  await r.send("Second");
+  await r.send("Third");
+  const texts = userTexts(q.requests.at(-1)!.messages);
+  expect(noteCount(q.requests.at(-1)!.messages)).toBe(2);
+  expect(texts.find((t) => t.endsWith("Second"))).toContain("Folders of this session.");
+  expect(texts.find((t) => t.endsWith("Third"))).not.toContain("Folders of this session.");
 });

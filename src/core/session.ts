@@ -2719,7 +2719,11 @@ export class Session {
     this.index = undefined;
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
     const start = (project.hooks as Settings["hooks"] | undefined)?.SessionStart;
-    if (start?.length) await new HookRunner([], { SessionStart: start }, this.cwd).event("SessionStart", { session: this.id });
+    if (start?.length) {
+      const runner = new HookRunner([], { SessionStart: start }, this.cwd);
+      runner.onError = this.hooks.onError;
+      await runner.event("SessionStart", { session: this.id });
+    }
     const later = ["model", "referee", "mode", "effort", "promptCache", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
     const shadowed = this.adapters.filter((a) => { try { return findAdapter(a.name, this.cwd).root !== a.root; } catch { return false; } }).map((a) => a.name);
     const parts = [choice === "trust" ? "This folder is trusted. Its settings, hooks and adapters apply now." : "This folder is trusted for this session. Its settings, hooks and adapters apply now."];

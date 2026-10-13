@@ -1,9 +1,44 @@
-import { useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent } from "react";
 
 // One Tab stop for a list of items. The arrow keys, Home and End move the focus in the list.
 export function useRoving(ids: string[]) {
   const [active, setActive] = useState("");
   const current = ids.includes(active) ? active : ids[0];
+  const box = useRef<HTMLElement | null>(null);
+  const before = useRef(ids);
+  const key = ids.join("\n");
+
+  // After a delete or a move of the focused item, the focus goes to the item in its place, not to the page.
+  // A menu or a dialog of the item can have the focus between. A focus that the scientist moves to another place cancels this.
+  const pending = useRef("");
+  useEffect(() => {
+    const away = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && !box.current?.contains(t) && !t.closest?.('[role="menu"], [role="dialog"], [role="alertdialog"]')) pending.current = "";
+    };
+    const out = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && box.current?.contains(t) && !e.relatedTarget && t.isConnected) pending.current = "";
+    };
+    document.addEventListener("focusin", away);
+    document.addEventListener("focusout", out);
+    return () => {
+      document.removeEventListener("focusin", away);
+      document.removeEventListener("focusout", out);
+    };
+  }, []);
+
+  useEffect(() => {
+    const was = before.current;
+    before.current = ids;
+    const gone = pending.current;
+    if (!gone || ids.includes(gone) || !was.includes(gone) || !ids.length) return;
+    pending.current = "";
+    const f = document.activeElement;
+    if (f && f !== document.body) return;
+    const id = ids[Math.min(was.indexOf(gone), ids.length - 1)]!;
+    box.current?.querySelector<HTMLElement>(`[data-rove="${CSS.escape(id)}"]`)?.focus();
+  }, [key]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-rove]:not(:disabled)")];
@@ -29,10 +64,16 @@ export function useRoving(ids: string[]) {
     next.scrollIntoView?.({ block: "nearest" });
   };
 
-  const onFocus = (e: FocusEvent<HTMLElement>) => {
+  const onFocus = (e: ReactFocusEvent<HTMLElement>) => {
     const id = (e.target as HTMLElement).closest("[data-rove]")?.getAttribute("data-rove");
-    if (id) setActive(id);
+    if (!id) return;
+    setActive(id);
+    pending.current = id;
   };
 
-  return { tabIndex: (id: string) => (id === current ? 0 : -1), onKeyDown, onFocus };
+  const ref = (el: HTMLElement | null) => {
+    box.current = el;
+  };
+
+  return { tabIndex: (id: string) => (id === current ? 0 : -1), onKeyDown, onFocus, ref };
 }

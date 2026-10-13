@@ -99,6 +99,9 @@ export const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z
 const listings = new Map<string, { mtime: number; files: string[]; dirs: string[] }>();
 const tables = new Map<string, { mtime: number; size: number; sheets: { name: string; columns: string[]; hay: string[] }[] }>();
 
+// Some disks (FAT, exFAT, network shares) keep the modification time in steps of up to 2 s. A change in the same step keeps the same time, so a recent time is not cached.
+const settled = (mtime: number) => Date.now() - mtime > 2500;
+
 function listing(dir: string): { files: string[]; dirs: string[] } {
   let mtime: number;
   try {
@@ -130,7 +133,7 @@ function listing(dir: string): { files: string[]; dirs: string[] } {
     else if (st.isFile() && /\.(xlsx|csv|tsv)$/i.test(n) && st.size < 20_000_000) files.push(p);
   }
   const out = { mtime, files, dirs };
-  listings.set(dir, out);
+  if (settled(mtime)) listings.set(dir, out);
   return out;
 }
 
@@ -144,7 +147,7 @@ function tableHay(f: string): { name: string; columns: string[]; hay: string[] }
   const hit = tables.get(f);
   if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.sheets;
   const sheets = readTable(f).map((s) => ({ name: s.name, columns: s.columns, hay: [s.name, basename(f), ...s.columns, ...s.rows.map((r) => r[0])].map(norm).filter(Boolean) }));
-  tables.set(f, { mtime: st.mtimeMs, size: st.size, sheets });
+  if (settled(st.mtimeMs)) tables.set(f, { mtime: st.mtimeMs, size: st.size, sheets });
   return sheets;
 }
 

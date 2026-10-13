@@ -233,7 +233,7 @@ export function App() {
             ))}
           </nav>
           {!rail && recent.length > 0 && (
-            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2" role="group" aria-labelledby="recent-head" onKeyDown={rove.onKeyDown} onFocus={rove.onFocus}>
+            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2" role="group" aria-labelledby="recent-head" ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus}>
               <div id="recent-head" className="px-2.5 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
                 <ContextMenu key={s.id}>
