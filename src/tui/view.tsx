@@ -113,7 +113,8 @@ export function hangWrap(text: string, width: number): string {
     .flatMap((line) => {
       if (line.length <= width) return [line];
       const gap = /^(.*\S) {2,}(?=\S)/.exec(line.slice(0, width));
-      const indent = gap && gap[0].length <= width * 0.6 ? gap[0].length : 0;
+      if (gap && gap[0].length > width * 0.6) return [gap[1]!, ...hangLines(line.slice(gap[0].length), Math.max(1, width - 4)).map((l) => "    " + l)];
+      const indent = gap ? gap[0].length : 0;
       const out: string[] = [];
       let rest = indent ? line.slice(indent).trim() : line.trimEnd();
       let first = line.slice(0, indent);

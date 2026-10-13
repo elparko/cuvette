@@ -278,9 +278,9 @@ export class ClaudeProvider implements Provider {
   }
 }
 
-export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL): Promise<{ ok: boolean; text: string }> {
+export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL, timeoutMs = 15_000): Promise<{ ok: boolean; text: string }> {
   try {
-    await makeClient(key).models.retrieve(model);
+    await makeClient(key).models.retrieve(model, {}, { timeout: timeoutMs });
     return { ok: true, text: `The key works. It can use ${model}.` };
   } catch (e) {
     if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return { ok: false, text: keyApiProblem(e.status, e.message) };
@@ -288,6 +288,7 @@ export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL):
     if (e instanceof Anthropic.NotFoundError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
     if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return { ok: false, text: WORKSPACE_HELP };
     if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: "Cannot reach the Claude API to check the key. The first request tests it." };
+    if (e instanceof Anthropic.APIError && e.status) return { ok: true, text: `Cannot check the key: the Claude API gave HTTP ${e.status}. The first request tests it.` };
     return { ok: true, text: `Cannot check the key: ${(e as Error).message}. The first request tests it.` };
   }
 }

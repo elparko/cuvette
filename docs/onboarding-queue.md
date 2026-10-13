@@ -54,10 +54,16 @@ Order: easiest and most useful first. "Verified" means the tool ran one command 
 | 29 | QGIS 4.2.3 (`qgis_process`) | cli | Adapter `catalog/qgis`. 5 tests pass. No model run. | `/Volumes/T7/guided-analysis/tools/qgis/` | reuses `rouault-gdal-autotest` | Run one emulation. |
 | 30 | Sage 0.14.6 | cli | Adapter `catalog/sage`. 4 tests pass. qwen3:8b 1 pass, 1 partial. | `/Volumes/T7/guided-analysis/tools/sage/` | `lazear2023-sage` | Add a tool that lists peptides. |
 
-Kinds covered by the queue: mcp (SMILE MSI), cli (samtools, FastQC, bftools, CellProfiler, MZmine,
-Open Babel, MAFFT, IQ-TREE, bcftools, bedtools, GDAL, QGIS, Sage, OpenMS), python (scikit-image, scanpy, pyimzML, pyOpenMS, RDKit, Cellpose), script (Cardinal,
-DESeq2), http (METASPACE), macro (Fiji, QuPath), files (PSPP exports, any table), screen (jamovi
-or the ImageJ GUI, as a fallback test).
+The queue covers these kinds:
+- mcp (SMILE MSI).
+- cli (samtools, FastQC, bftools, CellProfiler, MZmine,
+Open Babel, MAFFT, IQ-TREE, bcftools, bedtools, GDAL, QGIS, Sage, OpenMS).
+- python (scikit-image, scanpy, pyimzML, pyOpenMS, RDKit, Cellpose).
+- script (Cardinal, DESeq2).
+- http (METASPACE).
+- macro (Fiji, QuPath).
+- files (PSPP exports, any table).
+- screen (jamovi or the ImageJ GUI, as a fallback test).
 
 ## Verified commands
 
@@ -94,7 +100,7 @@ Notes on the commands:
 
 ## Blockers
 
-- R is not installed (`which Rscript` finds nothing). `brew install r` gives R 4.6.1. Cardinal and
+- R is missing (`which Rscript` finds nothing). `brew install r` gives R 4.6.1. Cardinal and
   DESeq2 wait for it. The data and prompts are ready.
 - OpenMS TOPP tools have no Homebrew formula. pyOpenMS covers the same algorithms from python.
 - PSPP has no macOS binary. Build from source or use jamovi.
@@ -296,9 +302,9 @@ says which. Open items are in the notes of each file.
 
 ## Open number checks
 
-- NuInsSeg: the label masks hold 35,138 nuclei. The paper (Table 2) says 30,698. The cause is not found.
+- NuInsSeg: the label masks hold 35,138 nuclei. The paper (Table 2) says 30,698. We did not find the cause.
 - BBBC039: the masks hold 23,615 nuclei. The paper says 23,165.
 - Palmer 2017: the paper says 73 formulas. The table gives 66 (sections 1 to 3) or 76 (sections 1 to 5).
 - The CellProfiler F1 scores for BBBC039 are not yet reproduced. QuPath has no reference numbers.
 - The Fiji blob counts (64 and 46) come from an ImageJ 1.53 run, not from the paper.
-- The license of `blobs.gif` is not found.
+- We did not find the license of `blobs.gif`.

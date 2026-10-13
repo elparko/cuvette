@@ -70,7 +70,11 @@ describe("the app server", () => {
     const c = client(app);
     expect(app.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/\?t=/);
     expect((await fetch(`${c.base}/`)).status).toBe(401);
-    expect((await fetch(`${c.base}/?t=wrong`)).status).toBe(401);
+    const wrong = await fetch(`${c.base}/?t=wrong`);
+    expect(wrong.status).toBe(401);
+    expect(wrong.headers.get("content-type")).toContain("text/html");
+    expect(await wrong.text()).toContain("Use the link that <code>cuvette app</code> shows in the terminal.");
+    expect(await (await fetch(`${c.base}/api/state?t=wrong`)).json()).toEqual({ error: "missing or wrong token" });
     const page = await c.get("");
     expect(page.status).toBe(200);
     expect(page.headers.get("access-control-allow-origin")).toBeNull();

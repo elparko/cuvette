@@ -124,6 +124,11 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
+export const WRONG_LINK = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cuvette</title>
+<body style="font: 16px/1.5 system-ui, sans-serif; max-width: 40em; margin: 3em auto; padding: 0 16px"><h1>This link does not open the app</h1>
+<p>The link is old or not complete. Cuvette makes a new link each time the app starts.</p>
+<p>Use the link that <code>cuvette app</code> shows in the terminal. If the app does not run, start it again with <code>cuvette app</code>.</p></body></html>`;
+
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
   res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
@@ -577,7 +582,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const url = new URL(req.url ?? "/", `http://${host}`);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
     if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
-    if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return send(res, 401, { error: "missing or wrong token" });
+    if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return req.method === "GET" && url.pathname === "/" ? send(res, 401, WRONG_LINK, "text/html; charset=utf-8") : send(res, 401, { error: "missing or wrong token" });
     try {
       await route(req, res, url);
     } catch (e) {

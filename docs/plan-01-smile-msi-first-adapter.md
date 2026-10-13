@@ -4,8 +4,8 @@ Status: not started (2026-10-07).
 
 ## Goal
 
-Run the SMILE MSI demo-slide analysis through this harness, with the same tool calls and the
-same numbers as the stage 1 chat in `smile_msi/agent/`. The harness must contain no MSI logic.
+Run the SMILE MSI demo-slide analysis through this harness.
+Use the same tool calls and the same numbers as the stage 1 chat in `smile_msi/agent/`. The harness must contain no MSI logic.
 
 ## Starting point
 
@@ -41,10 +41,11 @@ MCP. Three things change because of this:
 1. **Harness core.** Port the loop, the providers, the log and the result rendering. Add an MCP
    client that starts an adapter process, lists its tools and calls them. Test it with a small
    fake adapter in `tests/`.
-2. **Adapter manifest, version 0.** A TOML file plus a Python package. Fields: program name and
-   version, launch command, standards text, decision schema (fields, defaults, owner, links to
-   tool arguments), review checks (Python entry points), and the tool-to-UI map. Validate it
-   with Pydantic.
+2. **Adapter manifest, version 0.** A TOML file plus a Python package. It has these fields:
+   program name and version, launch command, standards text.
+   Decision schema (fields, defaults, owner, links to tool arguments).
+   Review checks (Python entry points). The tool-to-UI map.
+   Validate it with Pydantic.
 3. **SMILE MSI adapter.** Build the manifest from the stage 1 parts:
     - standards text from `core.SYSTEM_PROMPT`;
     - decision schema from `setup.STUDY_FIELDS`, `setup.TOOL_ARGS` and the Analysis Profiles;

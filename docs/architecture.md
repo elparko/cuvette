@@ -16,21 +16,22 @@ A terminal agent, built like Claude Code and OpenCode, for science programs inst
   on the source if a source file is newer than the bundle. `CUVETTE_TSX=1` always uses `tsx`.
   Adapter modules in TypeScript load at run time through `tsx`.
 - **Terminal UI:** Ink (React for the terminal), like Claude Code.
-- **Core is a library with an event bus**, like OpenCode's server: the terminal UI, the headless
+- **Core is a library with an event bus**, like OpenCode's server. The terminal UI, the headless
   mode, the MCP server mode and the later graph window are all clients of one `Session`.
 - **One append-only JSON Lines log per session** is the analysis record and the conversation,
   like Claude Code's transcripts. The node graph is rebuilt from the log.
-- **An adapter is a plugin folder**, like a Claude Code plugin: `adapter.yaml` (tools,
-  decisions, tool-to-UI map, checks, known-answer tests), `STANDARDS.md` (always loaded, like
-  CLAUDE.md), `skills/*.md` (procedures loaded on demand), an optional `adapter.ts` module (hooks,
-  checks, extra tools), and optional server code.
+- **An adapter is a plugin folder**, like a Claude Code plugin. It holds these files:
+  `adapter.yaml` (tools, decisions, tool-to-UI map, checks, known-answer tests),
+  `STANDARDS.md` (always loaded, like CLAUDE.md) and `skills/*.md` (procedures loaded on demand).
+  It can also hold an `adapter.ts` module (hooks, checks, extra tools) and server code.
 - **Enforcement is a PreToolUse hook**, like Claude Code hooks and OpenCode's
   `tool.execute.before`. Built-in hooks: permissions, mode, decisions, data rules. Labs can add
   command hooks with the Claude Code JSON protocol.
-- **Modes are like Claude Code permission modes** (Shift+Tab cycles them): `watch` (the agent
-  runs the steps), `follow` (the scientist runs each step; the agent instructs and checks),
-  `teach` (the scientist works; the agent compares with the decision record), `plan` (the agent
-  plans, and runs only read-only tools).
+- **Modes are like Claude Code permission modes.** Shift+Tab cycles them.
+  In `watch`, the agent runs the steps.
+  In `follow`, the scientist runs each step, and the agent instructs and checks.
+  In `teach`, the scientist works, and the agent compares with the decision record.
+  In `plan`, the agent plans, and runs only read-only tools.
 - **Small local models:** deferred tools with a `find_tools` tool, and compaction near the
   context limit.
 
@@ -209,7 +210,7 @@ function listModels(): Promise<{ spec: string; label: string; local: boolean; to
 ```
 
 Providers are stateless: the session holds the `Message[]` history and passes it to each
-`step()`. A provider may store its native content in `Message.raw` and must echo it unchanged
+`step()`. A provider can store its native content in `Message.raw`. It must echo that content unchanged
 when the next request goes to the same provider and model.
 
 ## Adapter runtime (`src/adapters/runtime.ts`)
@@ -231,9 +232,9 @@ Placeholders in `connection.command`, `env`, `cwd`, `interpreter` and tool templ
 `{node}` (process.execPath), `{tsx}` (path to the tsx cli), `{adapter_dir}`, `{work_dir}`,
 `{session_dir}`, `{program_path}` (from `locate.ts`), `{env:NAME}`. The child gets
 `CUVETTE_WORK_DIR`, `CUVETTE_SESSION_DIR`, `CUVETTE_ADAPTER_DIR`, `CUVETTE_PROGRAM_PATH`. Adapter tools return the
-`ToolOutput` shape. An MCP tool result is read as: `structuredContent`, else JSON text, else
-plain text; `ok`, `summary`, `metrics`, `outputs`, `table`, `manualRoute`, `fidelity` are read
-from the JSON when present; image content is saved in `workDir`.
+`ToolOutput` shape. Cuvette reads an MCP tool result as `structuredContent`, else JSON text, else
+plain text. It reads `ok`, `summary`, `metrics`, `outputs`, `table`, `manualRoute` and `fidelity`
+from the JSON when present. It saves image content in `workDir`.
 
 ## Decisions, questions, sensitivity, permissions, hooks (`src/core/`, owner D)
 
@@ -286,7 +287,7 @@ Decision rules: a `setup` stage decision gets a value in `applySetup` (the defau
 scientist gives none; the setup entry lists `defaultsAccepted`). A `when_needed` decision owned
 by `human` has no value until the scientist answers; `enforce` lists it in `waiting` for each
 call that it links to. Owner `fixed`: a different value is overwritten (`overwritten: true`).
-Owner `agent`: the agent's first value is recorded as a `decision` by `agent`. A link `arg` can
+Owner `agent`: the harness records the agent's first value as a `decision` by `agent`. A link `arg` can
 be a dotted path into nested objects (`params.tol_ppm`). The harness adds one built-in
 decision: `question` (text, human, setup, "What question are you asking?").
 
@@ -307,12 +308,17 @@ function checkoutModelOptions(checkout: string): Record<string, unknown>   // th
 Rules:
 
 - The project files are `settings.json`, `settings.local.json` and `adapters/` in `.ga/` and `.cuvette/` of the project folder. The harness does not read them in a parent folder.
-- `loadSettings` (`config.ts`), `layers` (`settings.ts`) and `adapterDirs` (`manifest.ts`) use the project files only if `folderTrusted` is true. Without trust, only `SAFE_KEYS` apply: display settings with no effect on code.
+- `loadSettings` (`config.ts`), `layers` (`settings.ts`) and `adapterDirs` (`manifest.ts`) use the project files only if `folderTrusted` is true. Without trust, only `SAFE_KEYS` apply. These are settings for how the UI looks, with no effect on code.
 - `findAdapter` does not load a path in a project adapter folder without trust. It loads the adapter with the same name from the user or catalog folder.
-- A folder is trusted if its entry in `trusted_folders` has the same hash as the files now. A new or changed file, key, hook or adapter sets the state to `changed`.
+- The harness trusts a folder if its entry in `trusted_folders` has the same hash as the files now. A new or changed file, key, hook or adapter sets the state to `changed`.
 - A folder with only `SAFE_KEYS` has the state `none`. It needs no card.
 - `Session.init` checks the trust before the `SessionStart` hooks. An interactive session asks a question with the title `Trust this folder?` and no decision key. Other sessions write one `notice` entry, and `session.trustNotice` holds the text.
-- `Session.answer` sends an answer to that question to `setTrust`. `setTrust` writes a `trust` entry. On trust, `applyProjectFiles` loads the settings again, sets the permission rules and command hooks, turns on bypass if a file sets it, and runs the `SessionStart` hooks of the folder. Model, mode and default adapter settings apply in the next session.
+- `Session.answer` sends an answer to that question to `setTrust`. `setTrust` writes a `trust` entry.
+  On trust, `applyProjectFiles` loads the settings again.
+  It sets the permission rules and command hooks.
+  It turns on bypass if a file sets it.
+  Then it runs the `SessionStart` hooks of the folder.
+  Model, mode and default adapter settings apply in the next session.
 - `SessionOptions.trustFolder` (`--trust-folder`) trusts the folder once for that session.
 - `runPapers` trusts its own checkout once and passes `checkoutModelOptions` of the checkout to each run as session settings. The session folder of a blind run is a work folder with no project files.
 
@@ -376,11 +382,13 @@ class Session {
    two model replies, up to 30% of the window. After the step: append `message` and
    `usage`, and stream deltas to the bus.
 3. Each tool call, in order: schema check; `PreToolUse` (permissions, mode, decisions, data
-   rules, adapter hooks, command hooks); `ask` waits on `respondPermission`; `block` runs the
-   sensitivity check, asks the question, logs `blocked`, and returns an error result that tells
-   the model to continue with work that does not depend on the answer; `instruct` (Follow mode)
-   shows the manual route and waits for `followDone`; then `execute`; hash outputs; add the
-   node; `PostToolUse`; append `tool_result`.
+   rules, adapter hooks, command hooks). Then the result of `PreToolUse` decides the next step.
+   `ask` waits on `respondPermission`.
+   `block` runs the sensitivity check, asks the question and logs `blocked`.
+   `block` then returns an error result. The result tells the model to continue with work that
+   does not depend on the answer.
+   `instruct` (Follow mode) shows the manual route and waits for `followDone`.
+   After that: `execute`; hash outputs; add the node; `PostToolUse`; append `tool_result`.
 4. No tool calls: `Stop` hooks. As in Claude Code, a `Stop` hook can return
    `{"decision": "block", "reason": "..."}` or exit with code 2. Then the agent continues, and the
    reason is its next note. The input has `stop_hook_active`. After eight blocks in one turn, the
@@ -423,7 +431,7 @@ take the first option of a list.
 
 ## Changes made during the build (2026-10-08)
 
-- **Permission order.** Rules are checked deny, then ask, then allow; the first match decides
+- **Permission order.** The harness checks the rules in this order: deny, ask, allow. The first match decides
   (Claude Code's order). A hook decision `defer` means `block`.
 - **Bypass permissions.** `--bypass-permissions`, `/permissions bypass` or
   `"permissions": "bypass"` in a settings file. In bypass, `requestPermission` allows the call
@@ -432,18 +440,18 @@ take the first option of a list.
   push gives an outward text to `requestPermission`, so it still asks.
 - **Hook order.** The decision hook runs before the mode hook, so Follow mode shows filled
   values. Plan and teach mode deny a non-read-only tool before any hook runs.
-- **After an answer.** A call that was blocked runs again with the linked arguments set from the
+- **After an answer.** A call that the harness blocked runs again with the linked arguments set from the
   decision record, not with the value that the model proposed.
-- **Small models.** Up to 16 adapter tools are visible, chosen by relevance to the request, when
-  an adapter has more than 24 tools. Skills are listed as procedures, not tools. Null optional
-  arguments are removed. A bare handle string such as `"h1"` is read as `{"handle": "h1"}`. An
-  empty reply gets up to two retries; when the model produced tokens, the retry says that the
+- **Small models.** If an adapter has more than 24 tools, the model sees up to 16 adapter tools.
+  The harness chooses them by relevance to the request. The harness lists skills as procedures, not tools.
+  It removes null optional arguments. It reads a bare handle string such as `"h1"` as `{"handle": "h1"}`.
+  An empty reply gets up to two retries. When the model produced tokens, the retry says that the
   call named a tool that does not exist (Ollama drops such calls without an error).
 - **Paths.** Relative path arguments that exist under the session's working directory become
   absolute before the hooks run, so the record holds absolute paths.
 - **Review.** New domain-free checks: `decision_misreported` (the answer names a choice that is
-  not the recorded value), `number_from_comparison` (a number from a sensitivity run of another
-  option), and `unsourced_numbers` is now an error. Error findings send the answer back to the
+  not the recorded value). `number_from_comparison` (a number from a sensitivity run of another
+  option). `unsourced_numbers` is now an error. Error findings send the answer back to the
   agent once before the scientist sees it.
 - **Trail.** The runs of a sensitivity check are one line ("Compared 3 options for ...").
 - **Provider options.** `makeProvider(spec, {effort, numCtx, think, apiKey, client})`.
@@ -452,18 +460,18 @@ take the first option of a list.
   `expireQuestions()` runs every 30 s; the `task` tool runs a read-only helper agent.
 - **Answers.** `src/core/answers.ts` `fitAnswer(question, wanted)` turns an answer that is not
   one of the options into a valid one (headless mode and the benchmark).
-- **Scientist-owned values win.** When the model gives a value that differs from a decision
-  owned by the scientist (or fixed), the harness uses the recorded value, logs the deviation
-  with `overwritten: true`, and tells the model to ask the scientist if it needs a change. An
-  agent-owned decision changes when the agent gives a new value (logged as a `decision` by the
+- **Scientist-owned values win.** The model can give a value that differs from a decision
+  owned by the scientist (or fixed). Then the harness uses the recorded value and logs the deviation
+  with `overwritten: true`. It tells the model to ask the scientist if it needs a change.
+  An agent-owned decision changes when the agent gives a new value (logged as a `decision` by the
   agent). In headless mode `ask_scientist` always waits, because the answer comes at once.
 
 ## Browser app (`src/server/app.ts`, 2026-10-08)
 
-`cuvette app [folder] [--resume <id|folder>] [--no-open]` starts `startApp(opts)`: an HTTP server on
+`cuvette app [folder] [--resume <id|folder>] [--no-open]` starts `startApp(opts)`. This is an HTTP server on
 127.0.0.1 with a random port and a random token. Every request needs the token (`?t=` or the
-`x-token` header), the Host header must be 127.0.0.1 or localhost with the port, a POST with an
-Origin header must come from the same origin, and the server sends no CORS headers. The page
+`x-token` header). The Host header must be 127.0.0.1 or localhost with the port.
+A POST with an Origin header must come from the same origin. The server sends no CORS headers. The page
 uses relative URLs only. `startApp` returns `{ url, port, token, close() }`, so a desktop wrapper
 can start and stop it without the command line.
 
@@ -472,20 +480,20 @@ can start and stop it without the command line.
   editor. `WebView` (`app-view.ts`) maps the bus events with the same `Mapper` and `Collapser`
   as the terminal and runs every slash command through the same `commands` list.
   `tests/parity.test.ts` checks that both views have every command and every card type.
-- **Cards are rendered on the server** (`app-html.ts`, `WEB_CARDS`, one renderer for each card
+- **The server renders the cards** (`app-html.ts`, `WEB_CARDS`, one renderer for each card
   type). The page posts `{id, act, value, fields}` to `/api/act`.
 - **Desktop bridge.** The page calls `window.cuvetteDesktop` when a wrapper provides it:
   `chooseFolder(start)`, `reveal(path)`, `notify(title, body)`, `saveFile(url, name)`. In a
   browser the fallbacks are the in-page folder field, `/api/reveal`, the Notification API and a
   download link.
 - **One session, two views.** In the terminal, `/app` starts the app on the running session.
-  `cuvette app --resume <id>` on a session that a terminal holds sends SIGUSR2 to that process,
-  which starts the app on its session and writes the URL to `.record/open.json`. A session that
-  the app holds refuses `cuvette --resume` and prints the app URL. `open.json` (pid, app URL, mode
-  0600) is removed when the session closes.
+  `cuvette app --resume <id>` on a session that a terminal holds sends SIGUSR2 to that process.
+  That process starts the app on its session and writes the URL to `.record/open.json`.
+  A session that the app holds refuses `cuvette --resume` and prints the app URL.
+  The session removes `open.json` (pid, app URL, mode 0600) when it closes.
 - **Session titles.** After a turn that changes the analysis, the session makes one short
-  model call (Claude Haiku for Claude models, the session model otherwise) for a title and a
-  one-sentence description. The record gets a `title` entry and the home index gets `name` and
+  model call for a title and a one-sentence description. The call uses Claude Haiku for Claude
+  models and the session model otherwise. The record gets a `title` entry and the home index gets `name` and
   `description`. `cuvette sessions`, the terminal picker and the app's Sessions page show them.
 - **Tests and windows.** `openWithOs`, the reveal action and the pilot image viewer do nothing
   under vitest or with `CUVETTE_NO_OPEN=1` (`--no-open` sets it).

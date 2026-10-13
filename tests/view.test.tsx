@@ -178,3 +178,11 @@ test("a wide table row wraps its last column under the start of that column", ()
   expect(hangWrap("short line", 79)).toBe("short line");
   expect(hangWrap("x".repeat(100), 40).split("\n").every((l) => l.length <= 40)).toBe(true);
 });
+
+test("in a narrow terminal, a table row puts the description under the key", () => {
+  const row = "Esc                             Stop the agent. If the agent is idle, Esc clears the input.";
+  const out = hangWrap(row, 39).split("\n");
+  expect(out[0]).toBe("Esc");
+  expect(out.slice(1).every((l) => l.startsWith("    ") && l.length <= 39)).toBe(true);
+  expect(out.slice(1).join(" ").replace(/\s+/g, " ").trim()).toBe("Stop the agent. If the agent is idle, Esc clears the input.");
+});

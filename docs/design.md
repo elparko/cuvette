@@ -97,7 +97,7 @@ the work, and the scientist approves each part. An adapter contains six parts:
 - **Tool-to-UI map**: the manual route for each tool (see the next section).
 - **Decision schema**: the choices that can change a result, with their defaults and their links
   to tool arguments.
-- **Domain standards**: the text that tells the model how results in this field must be reported.
+- **Domain standards**: the text that tells the model how the scientist must report results in this field.
 - **Review checks**: the rules that find errors common in this field, such as pseudoreplication.
 - **Known-answer tests**: small datasets with expected outputs.
 
@@ -115,14 +115,13 @@ The steps:
    two.
 6. **Get approval.** The scientist reads each part. The tool code, the decision defaults and the
    fidelity levels need explicit approval.
-7. **Lock the version.** The adapter records the program version that it was tested on. A new
+7. **Lock the version.** The adapter records the program version that the tests used. A new
    version starts the tests again.
 
 A program with no adapter still works: the agent uses the generic tools (run a command, read a
-file, take a screenshot). Every step then has the label "no manual route" until onboarding is
-done.
+file, take a screenshot). Every step then has the label "no manual route" until onboarding ends.
 
-Adapters can be shared. A lab can publish an approved adapter, and another lab can use it after
+A lab can share adapters. A lab can publish an approved adapter, and another lab can use it after
 its own tests pass.
 
 **Two ways to get adapters.** Both use the same published adapter spec.
@@ -130,7 +129,7 @@ its own tests pass.
 - **The catalog.** A hosted repo of adapters that we build, test and maintain. SMILE MSI is the
   first one. Each entry is also a worked example of the spec.
 - **Build your own.** The spec, an onboarding guide that a model can follow step by step, and a
-  checker that validates a new adapter (schema, map, known-answer tests) before its first use.
+  checker. The checker validates a new adapter (schema, map, known-answer tests) before its first use.
   The user picks the model that builds it.
 
 ## The tool-to-UI map
@@ -147,12 +146,12 @@ Each map entry holds:
 - **Manual route**: the menu path, the dialog, the order of the fields, and the button that runs
   it. For a library or a command-line program, the route is the code line or the command.
 - **Parameter map**: each tool argument, linked to the label of its UI field and to the UI
-  default. If the tool default is different from the UI default, the step shows a warning,
-  because a person who keeps the UI default gets a different result.
+  default. If the tool default is different from the UI default, the step shows a warning.
+  A person who keeps the UI default gets a different result.
 - **Fidelity level**: one of three values.
     - *Exact*: the manual route gives the same numbers. A test shows this.
     - *Close*: the same method with a known difference, such as a different random seed. The
-      difference is written in the entry.
+      The entry describes the difference.
     - *Code only*: there is no manual route. Each step that uses this tool has a label.
 - **Evidence**: where the entry came from (step definitions, macro recorder, demonstration or
   docs) and the test that checked it.
@@ -167,7 +166,7 @@ Sources for the map, from the most reliable to the least reliable:
 
 The agent uses mapped tools by default. It uses free code only when no mapped tool fits, and only
 with approval. A loop becomes a repeated step: "Repeat step 3 for samples 1 to 12." A hand-drawn
-shape, such as a region of interest, is saved in the record, so a repeat by hand can load the
+shape, such as a region of interest, goes into the record, so a repeat by hand can load the
 same shape.
 
 ## Decisions the human owns
@@ -223,17 +222,17 @@ harness logs each change of owner.
 
 The record is a graph, not a transcript. The chat is one view of the graph.
 
-- **Nodes.** Each result is a node. A node stores the tool, the adapter version, the program
-  version, the arguments, the decisions that applied, the code hash, the hashes of the input
-  data, and the output files.
+- **Nodes.** Each result is a node. A node stores the tool, the adapter version and the program version.
+  It also stores the arguments and the decisions that applied.
+  It also stores the code hash, the hashes of the input data, and the output files.
 - **Edges.** An edge links a result to the results it used. If a decision changes, the harness
   marks every node downstream of it as out of date.
 - **Append-only log.** The harness never edits or deletes an entry. A correction is a new entry
   that points to the old one.
 
-**The audit trail.** The trail is the readable view of the record. It is not a second record:
+**The audit trail.** The trail is the readable view of the record. It is not a second record.
 SMILE MSI has four records that overlap (`provenance.py`, `runs.py`, `gui/audit.py` and the
-agent log), and that made its trail complicated. Here there is one record and one trail view.
+agent log). That made its trail complicated. Here there is one record and one trail view.
 
 - **One line for each step, in plain language.** For example: "3. Found 14 features that are
   different between endo and epi." A non-technical reader can read the trail from top to bottom.
@@ -245,7 +244,7 @@ agent log), and that made its trail complicated. Here there is one record and on
        or figure;
     3. the technical record: the tool call, the arguments, the hashes, the versions.
 - **Saveable.** The trail saves with the session. It exports as one HTML file that keeps the
-  expand and collapse, as a PDF of levels 1 and 2, and as JSON Lines for programs.
+  expand and collapse. It also exports as a PDF of levels 1 and 2, and as JSON Lines for programs.
 
 **Claims linked to results.** Each number and each finding in the agent's answer links to a node.
 Each claim has a label: *measured* (a tool output), *inferred* (the agent's reasoning from
@@ -276,8 +275,8 @@ Rules for the checks:
 
 - The adapter lists the options to compare for each decision, and a cost limit. The agent does
   not run every combination.
-- The check result is a node in the record, so a reviewer can see that the choice was made with
-  the evidence.
+- The check result is a node in the record, so a reviewer can see that the evidence supports
+  the choice.
 - The final answer states which conclusions hold for every option and which conclusions depend
   on one choice.
 
@@ -302,10 +301,12 @@ evidence, and it continues with the parts that do not depend on the answer.
 **Review.** Two reviewers read each analysis before the final answer, and again when the
 scientist asks.
 
-- **Rule checks** come from the adapter. Examples: p-values from pixels presented as biological
-  replication, a failed tool result that the agent ignored, an identification stated with more
-  certainty than the evidence allows, a p-value with no effect size, a deviation from the
-  decision record.
+- **Rule checks** come from the adapter. They find these errors:
+  p-values from pixels presented as biological replication.
+  A failed tool result that the agent ignored.
+  An identification stated with more certainty than the evidence allows.
+  A p-value with no effect size.
+  A deviation from the decision record.
 - **An independent referee** is a second model. It reads only the log and the claims, not the
   agent's reasoning, and writes a report with citations to log entries. It can be a different
   model from the agent.
@@ -337,7 +338,7 @@ Approval is a review step. It is not a sandbox. The harness needs both.
 - **Interrupts.** The Stop button stops the current tool. A runaway script stops at its next
   instruction, and a long numerical call stops when it returns.
 - **Local by default.** The web interface accepts requests only from the same computer, with a
-  token for each launch. API keys stay in memory and are never written to the log.
+  token for each launch. API keys stay in memory. Cuvette never writes them to the log.
 - **Data rules.** With a local model, no data leaves the computer. With a cloud model, the setup
   states which data the model can see (for example, summary tables but not raw spectra). This
   matters for patient data.

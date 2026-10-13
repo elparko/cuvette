@@ -18,6 +18,7 @@ interface Reply {
   stopDetails?: unknown;
   usage?: Record<string, number>;
   status?: number;
+  hang?: boolean;
   error?: { type: string; message: string };
 }
 
@@ -86,6 +87,7 @@ beforeAll(async () => {
         res.end(JSON.stringify({ type: "error", error: { type: "api_error", message: "mock has no reply queued" } }));
         return;
       }
+      if (r.hang) return;
       if (r.status && r.status !== 200) {
         res.writeHead(r.status, { "content-type": "application/json", "request-id": "req_mock", "x-should-retry": "false" });
         res.end(JSON.stringify({ type: "error", error: r.error ?? { type: "api_error", message: "error" } }));
@@ -106,7 +108,7 @@ beforeAll(async () => {
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
-afterAll(() => new Promise<void>((ok) => server.close(() => ok())));
+afterAll(() => new Promise<void>((ok) => (server.close(() => ok()), server.closeAllConnections())));
 
 const saved = { key: process.env.ANTHROPIC_API_KEY, url: process.env.ANTHROPIC_BASE_URL, token: process.env.ANTHROPIC_AUTH_TOKEN };
 let session: Session | undefined;
@@ -323,6 +325,15 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(captured[0]!.headers["x-api-key"]).toBe("sk-ant-good");
     replies = [{ status: 401, error: { type: "authentication_error", message: "invalid x-api-key" } }];
     expect(await checkClaudeKey("sk-ant-bad")).toMatchObject({ ok: false, text: expect.stringMatching(/HTTP 401.*settings\/keys/) });
+  });
+
+  test("checkClaudeKey stops after the timeout, and a server error shows only the HTTP status", async () => {
+    replies = [{ hang: true }];
+    const t0 = Date.now();
+    expect(await checkClaudeKey("sk-ant-slow", "claude-opus-5-5", 300)).toMatchObject({ ok: true, text: expect.stringMatching(/^Cannot reach the Claude API/) });
+    expect(Date.now() - t0).toBeLessThan(5000);
+    replies = [];
+    expect(await checkClaudeKey("sk-ant-err")).toEqual({ ok: true, text: "Cannot check the key: the Claude API gave HTTP 500. The first request tests it." });
   });
 
   test("checkClaudeKey sends a low credit balance and a 403 to Billing", async () => {
