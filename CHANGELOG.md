@@ -3,6 +3,22 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 13 October 2026
+
+### Retry limits
+
+- The total wait for retries of one model request is now 60 s or less. This includes the wait of a headless run before it tries again.
+- A rate limit (HTTP 429) follows the `retry-after` header. If the next wait goes past the 60 s limit, Cuvette stops at once. The error gives the wait that the API asks for.
+- An HTTP 4xx status other than 408, 409 and 429 never gets a retry, also with the header `x-should-retry: true`.
+- A headless run now waits 20 s and tries again one time, not three times after 60 s. Before this change, a request that the server always refused went out 16 times in about 200 s. Now it goes out 8 times in about 30 s.
+- The error tells the number of tries, the time and what to do next.
+
+### Python worker start
+
+- At the first request, the Python worker of a named adapter starts in the background and imports the modules of the adapter. The first adapter step does not wait for this start.
+- A default adapter, such as `tables`, gets this early start only if the request names a file that the adapter reads. The import of `tables` uses about 100 MB and 0.5 s of CPU.
+- A failed early start shows as the error of the first adapter step. The next step tries to start the worker again.
+
 ## 11 October 2026
 
 ### Network failures

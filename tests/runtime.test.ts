@@ -286,3 +286,114 @@ test("quick start: a stop while the version command runs ends the call at once, 
     process.env.CUVETTE_HOME = home;
   }
 }, 30000);
+
+function warmPythonAdapter(importS: number, interpreter = 'exec python3 "$@"'): string {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-warmpy-"));
+  const exe = join(dir, "python");
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) echo "openpyxl 9.9";; *) ${interpreter};; esac\n`);
+  chmodSync(exe, 0o755);
+  writeFileSync(
+    join(dir, "warmmod.py"),
+    `import os, time\nwith open(${JSON.stringify(join(dir, "imported"))}, "w") as f:\n    f.write(str(os.getpid()))\ntime.sleep(${importS})\n\ndef pid():\n    return {'pid': os.getpid()}\n`,
+  );
+  writeFileSync(
+    join(dir, "adapter.yaml"),
+    [
+      "adapter: { name: warmpy }",
+      'program: { name: openpyxl, version: "from the manifest" }',
+      'connection: { kind: python, interpreter: ["{program_path}"], startup_timeout_s: 10 }',
+      "locate:",
+      `  paths: [${JSON.stringify(exe)}]`,
+      '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
+      "  version_pattern: 'openpyxl (\\S+)'",
+      "  identity: 'openpyxl \\d'",
+      "tools:",
+      "  - name: pid",
+      "    description: Give the process ID.",
+      '    function: "warmmod:pid"',
+    ].join("\n"),
+  );
+  return dir;
+}
+
+async function until(check: () => boolean, ms = 10_000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error("time limit");
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+async function quickStart(dir: string) {
+  const home = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  const d = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
+  const rt = await startAdapter(loadAdapter(dir), d, { quick: true });
+  await rt.checked;
+  if (home === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = home;
+  const tool = (await rt.tools()).find((t) => t.name === "pid")!;
+  return { rt, call: () => tool.execute({}, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir }) };
+}
+
+test("warm: the worker starts and imports the adapter modules before the first call, and the call uses that worker", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(0.8);
+  const { rt, call } = await quickStart(dir);
+  const t0 = Date.now();
+  rt.warm!(true);
+  expect(Date.now() - t0).toBeLessThan(50);
+  await until(() => existsSync(join(dir, "imported")));
+  await new Promise((r) => setTimeout(r, 1200));
+  const t1 = Date.now();
+  const out = await call();
+  expect(Date.now() - t1).toBeLessThan(500);
+  expect(out.ok).toBe(true);
+  expect((out.data as { pid: number }).pid).toBe(Number(readFileSync(join(dir, "imported"), "utf8")));
+  await rt.close();
+}, 20000);
+
+test("warm: a failed start shows at the first call, and the next call tries again", async () => {
+  if (process.platform === "win32") return;
+  const { rt, call } = await quickStart(warmPythonAdapter(0, "echo broken interpreter >&2; exit 3"));
+  rt.warm!(true);
+  await new Promise((r) => setTimeout(r, 500));
+  const first = await call();
+  expect(first.ok).toBe(false);
+  expect(first.error).toMatch(/exit code 3/);
+  const second = await call();
+  expect(second.ok).toBe(false);
+  await rt.close();
+}, 20000);
+
+test("warm: a close while the worker imports the modules stops the worker", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(5);
+  const { rt } = await quickStart(dir);
+  rt.warm!(true);
+  await until(() => existsSync(join(dir, "imported")));
+  const pid = Number(readFileSync(join(dir, "imported"), "utf8"));
+  const t0 = Date.now();
+  await rt.close();
+  expect(Date.now() - t0).toBeLessThan(1000);
+  await until(() => !alive(pid), 3000);
+}, 20000);
+
+test("warm: a close before the worker starts starts no worker", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(0);
+  const { rt } = await quickStart(dir);
+  await rt.close();
+  rt.warm!(true);
+  await new Promise((r) => setTimeout(r, 500));
+  expect(existsSync(join(dir, "imported"))).toBe(false);
+}, 20000);

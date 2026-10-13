@@ -51,6 +51,9 @@ export function startPython(c: KindContext): AdapterRuntime {
   let queue: Promise<unknown> = Promise.resolve();
   const waiting = new Map<number, (r: Reply) => void>();
   let ready: Promise<void> | undefined;
+  let spawnedWith = "";
+  let closed = false;
+  let warming: { error?: unknown } | undefined;
 
   const interpreter = (): string[] => {
     const given = conn.interpreter.map((a) => expand(a, c.ph));
@@ -67,6 +70,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   const spawnWorker = (): Promise<void> => {
     log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
     stderrTail = "";
+    spawnedWith = JSON.stringify(interpreter());
     const argv = blindArgv([...interpreter(), "-u", WORKER, c.adapter.root]);
     const p = spawn(argv[0], argv.slice(1), {
       cwd: c.dirs.workDir,
@@ -117,13 +121,51 @@ export function startPython(c: KindContext): AdapterRuntime {
     });
   };
 
-  const ensure = async () => {
-    await c.ready;
+  const spawnOnce = () => {
+    if (closed) throw new Error("the adapter is closed");
     if (!child) {
       ready = spawnWorker();
       ready.catch(() => {});
     }
-    await ready;
+    return ready!;
+  };
+
+  // A worker that started before the version command ends starts again if the command found another interpreter.
+  const ensure = async () => {
+    const w = warming;
+    warming = undefined;
+    await c.ready;
+    if (w?.error && !child && spawnedWith === JSON.stringify(interpreter())) throw w.error;
+    if (child && spawnedWith !== JSON.stringify(interpreter())) {
+      const old = child;
+      stopped("the version command found another interpreter");
+      killTree(old.pid);
+    }
+    await spawnOnce();
+  };
+
+  const modules = [...new Set(c.adapter.manifest.tools.filter((d) => d.function.includes(":")).map((d) => d.function.split(":")[0]!.replace(/\.py$/, "")))];
+
+  // The first call finds a started worker with the modules of the adapter imported. A failed start shows at the first call.
+  const warm = (load: boolean) => {
+    if (closed || child || warming) return;
+    const w: { error?: unknown } = {};
+    warming = w;
+    const started = (async () => {
+      if (!c.programPath) await c.ready;
+      await spawnOnce();
+      if (load && modules.length) await send({ preload: modules });
+    })();
+    started.catch((e) => {
+      if (!closed) w.error = e;
+    });
+  };
+
+  const send = (msg: Record<string, unknown>): Promise<Reply> => {
+    const id = nextId++;
+    const reply = new Promise<Reply>((done) => waiting.set(id, done));
+    child!.stdin!.write(`${JSON.stringify({ id, ...msg })}\n`);
+    return reply;
   };
 
   const request = (fn: string, args: Args, outDir: string, signal: AbortSignal): Promise<Reply> => {
@@ -135,8 +177,8 @@ export function startPython(c: KindContext): AdapterRuntime {
       started.catch(() => {});
       await Promise.race([started, stopped]);
       if (signal.aborted) return cut;
-      const id = nextId++;
-      const reply = new Promise<Reply>((done) => waiting.set(id, done));
+      const id = nextId;
+      const reply = send({ function: fn, args, out_dir: outDir });
       const timeout = setTimeout(() => {
         waiting.get(id)?.({ id, ok: false, error: `the call timed out after ${conn.call_timeout_s} s` });
         killTree(child?.pid);
@@ -149,7 +191,6 @@ export function startPython(c: KindContext): AdapterRuntime {
         }, 3000).unref();
       };
       signal.addEventListener("abort", abort, { once: true });
-      child!.stdin!.write(`${JSON.stringify({ id, function: fn, args, out_dir: outDir })}\n`);
       try {
         return await reply;
       } finally {
@@ -206,8 +247,12 @@ export function startPython(c: KindContext): AdapterRuntime {
     tools: () => tools,
     running: () => true,
     cancel: () => live.cancel(),
+    warm,
     close: async () => {
+      closed = true;
       live.cancel();
+      for (const [id, fn] of waiting) fn({ id, ok: false, error: "the adapter closed" });
+      waiting.clear();
       if (child) {
         try {
           child.stdin?.end();

@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { expect, test } from "vitest";
 import type { Message, StepRequest } from "../src/core/types.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
-import { retryReason, waitMs, withRetry } from "../src/providers/retry.ts";
+import { RETRY_BUDGET_MS, retryReason, waitMs, withRetry } from "../src/providers/retry.ts";
 
 const user = (text: string): Message => ({ role: "user", parts: [{ type: "text", text }] });
 const req = (extra: Partial<StepRequest> = {}): StepRequest => ({ system: "SYS", messages: [user("x")], tools: [], ...extra });
@@ -82,7 +84,7 @@ test("the wait grows with each attempt and stays below the cap", () => {
   const third = waitMs(3, undefined, () => 0.5);
   expect(first).toBe(750);
   expect(third).toBe(3000);
-  expect(waitMs(1, rate(new Headers({ "retry-after": "9999" })))).toBe(120_000);
+  expect(waitMs(1, rate(new Headers({ "retry-after": "9999" })))).toBe(9_999_000);
 });
 
 test("retryReason names the network errors and skips the others", () => {
@@ -96,6 +98,77 @@ test("retryReason reads the HTTP status of a plain error", () => {
   expect(retryReason(Object.assign(new Error("slow"), { status: 429 }))).toBe("rate limit");
   expect(retryReason(Object.assign(new Error("down"), { status: 503 }))).toBe("server error (503)");
   expect(retryReason(Object.assign(new Error("bad"), { status: 400 }))).toBeUndefined();
+  expect(retryReason(Object.assign(new Error("busy"), { status: 409 }))).toBe("server error (409)");
+});
+
+test("a 4xx with x-should-retry true is not retried", () => {
+  expect(retryReason(new Anthropic.BadRequestError(400, {} as any, "bad", new Headers({ "x-should-retry": "true" })))).toBeUndefined();
+  expect(retryReason(Object.assign(new Error("bad"), { status: 403, headers: { "x-should-retry": "true" } }))).toBeUndefined();
+});
+
+function mockServer(status: number, headers: Record<string, string> = {}) {
+  let count = 0;
+  const srv = createServer((req, res) => {
+    count++;
+    req.resume();
+    res.writeHead(status, { "content-type": "application/json", ...headers });
+    res.end(JSON.stringify({ type: "error", error: { type: "error", message: `refused ${status}` } }));
+  });
+  return {
+    count: () => count,
+    start: () => new Promise<string>((r) => srv.listen(0, "127.0.0.1", () => r(`http://127.0.0.1:${(srv.address() as AddressInfo).port}`))),
+    close: () => new Promise<void>((r) => srv.close(() => r())),
+  };
+}
+
+async function refusedBy(status: number, headers: Record<string, string> = {}) {
+  const srv = mockServer(status, headers);
+  const client = new Anthropic({ apiKey: "x", baseURL: await srv.start(), maxRetries: 0 });
+  const waits: number[] = [];
+  const p = new ClaudeProvider("claude-haiku-5-5", { client, sleep: async (ms) => void waits.push(ms) });
+  const err = await p.step(req()).catch((e) => e);
+  await srv.close();
+  return { err, requests: srv.count(), waits };
+}
+
+test.each([400, 401, 403, 404, 422])("HTTP %i from the server is not retried", async (status) => {
+  const { err, requests, waits } = await refusedBy(status);
+  expect(err.transient ?? false).toBe(false);
+  expect(requests).toBe(1);
+  expect(waits).toEqual([]);
+});
+
+test.each([408, 409, 429, 500, 503, 529])("HTTP %i from the server is retried three times and stays inside the wait limit", async (status) => {
+  const { err, requests, waits } = await refusedBy(status);
+  expect(err.transient).toBe(true);
+  expect(requests).toBe(4);
+  expect(waits.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(RETRY_BUDGET_MS);
+});
+
+test("a 429 waits for retry-after and stops before the total wait passes the limit", async () => {
+  const { err, requests, waits } = await refusedBy(429, { "retry-after": "50" });
+  expect(waits).toEqual([50_000]);
+  expect(requests).toBe(2);
+  expect(err.message).toMatch(/rate limit \(HTTP 429\)\. It asks for a wait of 50 s\./);
+});
+
+test("a 429 with a retry-after longer than the limit stops at once", async () => {
+  const { err, requests, waits } = await refusedBy(429, { "retry-after": "120" });
+  expect(requests).toBe(1);
+  expect(waits).toEqual([]);
+  expect(err.message).toMatch(/120 s/);
+});
+
+test("withRetry shares one wait budget between calls", async () => {
+  const budget = { leftMs: 5000 };
+  const waits: number[] = [];
+  const fail = () => Promise.reject(Object.assign(new Error("down"), { status: 503 }));
+  await withRetry(fail, { budget, sleep: async (ms) => void waits.push(ms) }).catch(() => {});
+  const first = waits.length;
+  await withRetry(fail, { budget, sleep: async (ms) => void waits.push(ms) }).catch(() => {});
+  expect(waits.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(5000);
+  expect(budget.leftMs).toBeGreaterThanOrEqual(0);
+  expect(waits.length - first).toBeLessThan(3);
 });
 
 test("withRetry returns the first success without a wait", async () => {

@@ -110,7 +110,18 @@ def find(spec):
     return obj
 
 
+def preload(names):
+    for name in names:
+        try:
+            importlib.import_module(name)
+        except Exception as e:
+            print("cuvette: preload of %s failed: %s" % (name, e), file=sys.stderr)
+    return {"result": None, "files": [], "metrics": {}}
+
+
 def handle_request(req):
+    if "preload" in req:
+        return preload(req["preload"])
     out_dir = req.get("out_dir") or os.getcwd()
     os.makedirs(out_dir, exist_ok=True)
     os.chdir(out_dir)

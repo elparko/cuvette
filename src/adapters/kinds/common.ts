@@ -781,6 +781,7 @@ export function makeRuntime(c: KindContext, parts: {
   running?: () => boolean;
   cancel?: () => Promise<void> | void;
   close?: () => Promise<void> | void;
+  warm?: (load: boolean) => void;
 }): AdapterRuntime {
   let closed = false;
   let interpreter: string[] = [];
@@ -802,6 +803,7 @@ export function makeRuntime(c: KindContext, parts: {
     async cancel() {
       await parts.cancel?.();
     },
+    warm: parts.warm,
     async close() {
       closed = true;
       await parts.close?.();
