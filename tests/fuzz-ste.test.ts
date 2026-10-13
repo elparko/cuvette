@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { checkText, sentences, uiStrings } from "../src/core/ste.ts";
-import { linear, Rng, runs } from "./fuzz-rng.ts";
+import { linear as once, Rng, runs } from "./fuzz-rng.ts";
+
+// A busy machine can slow one timing. A real quadratic cost fails all three tries.
+function linear(make: (n: number) => string, run: (s: string) => void, n: number) {
+  let res = once(make, run, n);
+  for (let k = 0; k < 2 && !res.ok; k++) res = once(make, run, n);
+  return res;
+}
 
 const TOKENS = ["The", "script", "deletes", "the", "file.", "Run", "tests.", "is", "was", "removed", "utilize", "e.g.", "and/or", "should", "may", "5", "leverage", "Fig.", "Dr.", "i.e.", "<b>", "</b>", "<", ">", "[", "]", "(", ")", "[link](https://x.org)", "![img](a.png)", "`code`", "`", "*", "**", "_", "__", "#", "##", "-", "1.", "|", "```", "~~~", "<!--", "-->", "\"", "'", "${x}", "\\", "日本語", "🧪", "\u0000", "\t", "    ", "carry out", "prior to", "x".repeat(300)];
 
@@ -20,6 +27,7 @@ describe("fuzz: STE text checker", () => {
         expect(issue.message).toMatch(/^Sentence \d+ /);
       }
       for (const s of sentences(t)) expect(s.text.trim().length).toBeGreaterThan(0);
+      expect(sentences("See [the guide](https://x.org/a_(b)) for more.")[0]!.text).toBe("See the guide for more.");
       const code = `const a = "${t.replace(/["\\\n]/g, " ")}";\nconst b = \`${t.replace(/[`\\]/g, " ")}\`;\n`;
       for (const s of uiStrings(code)) expect(s.line).toBeGreaterThanOrEqual(1);
     }

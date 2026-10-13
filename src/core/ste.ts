@@ -69,8 +69,8 @@ const MODAL = /\b(should|shall|might|may)\b(?!\s+\d)/i;
 function clean(line: string): string {
   return line
     .replace(/`[^`]*`/g, "X")
-    .replace(/!\[[^[\]]*\]\([^()]*\)/g, "")
-    .replace(/\[([^[\]]*)\]\([^()]*\)/g, "$1")
+    .replace(/!\[[^[\]]*\]\((?:[^()]|\([^()]*\))*\)/g, "")
+    .replace(/\[([^[\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, "$1")
     .replace(/<[^<>]+>/g, " ")
     .replace(/https?:\/\/\S+/g, "X")
     .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1");
