@@ -1,6 +1,6 @@
 # Roadmap
 
-This file lists planned work that is not built yet. Each item says what it is for and the first step.
+This file lists planned work that Cuvette does not have yet. Each item says what it is for and the first step.
 
 ## An approachable UI for scientists who do not use a terminal
 
@@ -16,23 +16,29 @@ This file lists planned work that is not built yet. Each item says what it is fo
 - Model and API key settings in a settings page, with the spend shown.
 - The terminal UI and the browser app use the same session and the same event bus, so a session can move between them.
 
-**Status (2026-10-08).** `cuvette app` is built: the conversation, the cards, the Analysis, Results, Decisions and Record tabs, Settings, Sessions with titles, the first-start setup page and the sample analysis. See "Browser app" in `docs/architecture.md`. Next: the desktop wrapper, a facelift for the Settings page, and a live view of one session from two processes (now the second view runs in the same process).
+**Status (2026-10-08).** `cuvette app` exists. It has these parts. The conversation, the cards, the Analysis, Results, Decisions and Record tabs, Settings, Sessions with titles, the first-start setup page and the sample analysis. See "Browser app" in `docs/architecture.md`. Next: the desktop wrapper, a facelift for the Settings page, and a live view of one session from two processes. Now the second view runs in the same process.
 
 ## A flow canvas: analyses as connected nodes, built from prompts
 
-**Problem.** A long analysis is hard to see and to reuse as a list of steps. Automation tools such as n8n, Node-RED, KNIME and Galaxy show a workflow as boxes with connections, but each box must be built by hand, and none of them stops for a scientific decision in the middle.
+**Problem.** A long analysis is hard to see and to reuse as a list of steps. Automation tools such as n8n, Node-RED, KNIME and Galaxy show a workflow as boxes with connections. You must build each box by hand. None of them stops for a scientific decision in the middle.
 
 **Plan.** A canvas in the app (and the desktop app) that shows an analysis as connected nodes.
-- You describe a step in plain words. The agent turns it into a node: the program, the tool, the settings and the inputs, with the manual route. You can also describe a whole flow ("segment the cells, count red-positive cells per field, compare the groups") and the agent proposes the nodes and the connections.
-- Human nodes are part of the flow: a question node (a decision card), a demonstration node (run on one sample and wait for approval), a review node (look at the QC images), and a hand-entry node (type in a value or a hand count). The flow stops at each one and continues after your answer.
+- You describe a step in plain words. The agent turns it into a node: the program, the tool, the settings and the inputs, with the manual route. You can also describe a whole flow ("segment the cells, count red-positive cells per field, compare the groups"). Then the agent proposes the nodes and the connections.
+- Human nodes are part of the flow. These are the human nodes:
+  - A question node (a decision card).
+  - A demonstration node (run on one sample and wait for approval).
+  - A review node (look at the QC images).
+  - A hand-entry node (type in a value or a hand count).
+
+  The flow stops at each one and continues after your answer.
 - Each node shows its status (waiting, running, done, out of date), its key numbers and a thumbnail of its output. A click opens its record: the settings, who chose each one, the inputs with their hashes, and the outputs.
 - Change a node's setting and only the nodes after it become out of date. Run them again from the canvas.
 - Branch from any node to try another method, and compare the branches side by side.
-- Save a flow as a method, share it as one file, and run it on new data with its human nodes still in place.
+- Save a flow as a method. Share it as one file. Run it on new data with its human nodes still in place.
 
-**What exists.** The session record is already a graph of steps with inputs, outputs and decisions. The graph window draws it. `/branch`, `/compare`, `/rerun`, saved methods, the pilot gate and `cuvette replay` give most of the run logic. The canvas adds editing and the human nodes as first-class parts of a flow.
+**What exists.** The session record is already a graph of steps with inputs, outputs and decisions. The graph window draws it. `/branch`, `/compare`, `/rerun`, saved methods, the pilot gate and `cuvette replay` give most of the run logic. The canvas adds editing and the human nodes as full parts of a flow.
 
-**First step.** Turn the graph window into an editable canvas for one session: show human steps (questions, the demonstration) as nodes, let the scientist change a node's settings and rerun from there, and save the result as a method.
+**First step.** Turn the graph window into an editable canvas for one session. Show human steps (questions, the demonstration) as nodes. Let the scientist change a node's settings and rerun from there. Save the result as a method.
 
 ## Other planned items
 

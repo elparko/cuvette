@@ -14,7 +14,7 @@ OpenCode:
 - Paths below are relative to the repo root. `src/` means `packages/opencode/src/`.
 - I read the code. I did not run it.
 - The code is in a change. The `session.next.*` events and `packages/core/src/session/` show a second session model. This survey describes the model that the loop in `src/session/prompt.ts` uses.
-- The code uses the Effect library for all services. The shapes below are plain types. The Effect wrappers are not shown.
+- The code uses the Effect library for all services. The shapes below are plain types. The shapes do not show the Effect wrappers.
 
 Claude Code:
 
@@ -108,7 +108,7 @@ Compaction triggers:
 
 #### Tool definition
 
-From `src/tool/tool.ts`. The Effect wrapper is removed.
+From `src/tool/tool.ts`. This listing leaves out the Effect wrapper.
 
 ```ts
 interface Def<Parameters, Metadata> {
@@ -311,7 +311,7 @@ Agents and modes:
 
 - `build` is the default primary agent. `plan` denies all edit tools except plan files.
 - `general` and `explore` are subagents. `explore` denies everything except read tools and `bash`.
-- `compaction`, `title`, `summary` are hidden agents with `"*": "deny"` and a fixed prompt.
+- `compaction`, `title`, `summary` are agents that the UI hides. They have `"*": "deny"` and a fixed prompt.
 - User config `agent.<name>` merges over the built-ins, or creates a new agent.
 - The `task` tool lists the allowed subagents in its own description (`src/tool/registry.ts`, `describeTask`).
 - A subagent session gets the parent `deny` rules and `external_directory` rules (`src/agent/subagent-permissions.ts`).
@@ -344,7 +344,7 @@ Compaction details (`src/session/compaction.ts`, `src/session/overflow.ts`):
 - Config keys: `compaction.auto`, `compaction.prune`, `compaction.reserved`, `compaction.tail_turns`, `compaction.preserve_recent_tokens`.
 - The recent tail stays verbatim. Its size is 25 percent of usable context, limited to 2,000 through 15,000 tokens.
 - The older part goes to the hidden `compaction` agent. The hook `experimental.session.compacting` can add context or replace the prompt.
-- Tool output in the summary input is cut to 2,000 characters.
+- OpenCode cuts tool output in the summary input to 2,000 characters.
 - Pruning: walk back from the newest tool parts. Keep 40,000 tokens of output. Mark older completed outputs as compacted. Only prune if it frees more than 20,000 tokens.
 
 Storage and snapshots:
@@ -434,8 +434,8 @@ Compaction (`how-claude-code-works`, "When context fills up"; `agent-sdk/agent-l
 - Claude Code first clears older tool output. It then summarizes the conversation.
 - The stream yields a `system` message with subtype `compact_boundary`.
 - `PreCompact` can block (exit code two). `PostCompact` gets the `compact_summary`.
-- `CLAUDE.md` is read again on every request. It survives compaction. Text in a "Compact Instructions" section guides the summary.
-- Invoked skills are attached again after the summary: 5,000 tokens for each skill, 25,000 tokens in total (`skills`, "Skill content lifecycle").
+- Claude Code reads `CLAUDE.md` again on every request. It survives compaction. Text in a "Compact Instructions" section guides the summary.
+- Claude Code attaches invoked skills again after the summary: 5,000 tokens for each skill, 25,000 tokens in total (`skills`, "Skill content lifecycle").
 - If one output refills the context at once, Claude Code stops after a few tries and shows an error.
 
 ### 2.3 Hook data shapes
@@ -553,7 +553,7 @@ Facts:
 - A deny rule at any level beats an allow rule at any level (`permissions`, "Settings precedence").
 - Rule order inside the permission system is deny, then ask, then allow. The first match decides. Rule specificity does not matter.
 - A bare tool name in a deny rule removes the tool from the model context. A scoped rule such as `Bash(rm *)` keeps the tool and blocks the call.
-- Permission rules are enforced by the harness, not by the model. The docs state this in a note.
+- The harness enforces permission rules, not the model. The docs state this in a note.
 
 Permission rules in settings:
 
@@ -593,9 +593,9 @@ Memory (`https://code.claude.com/docs/en/memory`):
 
 - The harness loads `CLAUDE.md` and `CLAUDE.local.md` from the working folder and each parent folder. It joins them. The file nearest the working folder comes last.
 - Files in subfolders load on demand when a tool reads a file there.
-- Block-level HTML comments are removed before the text enters context.
+- Claude Code removes block-level HTML comments before the text enters context.
 - `.claude/rules/*.md` files can limit rules to paths.
-- `AGENTS.md` is read as project instructions when no `CLAUDE.md` is present.
+- Claude Code reads `AGENTS.md` as project instructions when no `CLAUDE.md` is present.
 - Auto memory: the first 200 lines or 25 KB of `MEMORY.md` load at session start.
 
 Skill frontmatter (`https://code.claude.com/docs/en/skills`, "Frontmatter reference"). All fields are optional. `description` is the most useful.
@@ -622,13 +622,13 @@ Instructions in Markdown. Supporting files sit beside this file.
 
 Facts:
 
-- The model sees the name and description of each skill at session start. The listing text is cut at 1,536 characters for each skill.
-- The body enters context when the skill runs. It stays there. It is not read again.
+- The model sees the name and description of each skill at session start. Claude Code cuts the listing text at 1,536 characters for each skill.
+- The body enters context when the skill runs. It stays there. Claude Code does not read it again.
 - Supporting files (`reference.md`, `scripts/`) load only if the skill body points to them.
-- The listing budget is one percent of the context window. Over the budget, some descriptions are dropped.
+- The listing budget is one percent of the context window. Over the budget, Claude Code drops some descriptions.
 - Same name in several places: enterprise, then personal, then project. Plugin skills use the name `plugin-name:skill-name`.
 
-Subagent frontmatter (`https://code.claude.com/docs/en/sub-agents`, "Frontmatter reference"). `name` and `description` are required.
+Subagent frontmatter (`https://code.claude.com/docs/en/sub-agents`, "Frontmatter reference"). `name` and `description` are mandatory fields.
 
 ```yaml
 ---
@@ -691,7 +691,7 @@ MCP (`https://code.claude.com/docs/en/mcp`):
 - MCP tool names are `mcp__<server>__<tool>`. Permission rules and hook matchers use this name.
 - Tool search is on by default. At start only tool names and server instructions load. The model fetches a definition when it needs one. The setting `ENABLE_TOOL_SEARCH=auto:N` loads all definitions up front while they use less than N percent of the context.
 - Tool search needs a model that supports `tool_reference` blocks. Claude Code turns it off when the base URL is not a first-party host. A local model server does not get tool search from Claude Code.
-- Each tool description and each server instructions text is cut at 2,048 characters.
+- Claude Code cuts each tool description and each server instructions text at 2,048 characters.
 
 Output styles (`https://code.claude.com/docs/en/output-styles`): a markdown file with frontmatter (`name`, `description`, `keep-coding-instructions`) and a body. The body changes the system prompt. A non-fork subagent does not use the output style.
 
@@ -714,8 +714,8 @@ Source: `https://code.claude.com/docs/en/headless`.
 - Transcripts are JSONL files at `~/.claude/projects/<project>/<session-id>.jsonl`. `<project>` is the working folder path with non-alphanumeric characters replaced by `-` (`sessions`).
 - The file holds every message, tool call and tool result (`claude-directory`).
 - Resume reopens the same session id. Fork copies history to a new id.
-- A tool that was running when the process died is marked as cut off on resume. It does not run again (`sessions`).
-- Secrets that a tool prints are written to the transcript in plain text (`claude-directory`).
+- On resume, Claude Code marks a tool that was running when the process died as cut off. It does not run again (`sessions`).
+- Claude Code writes secrets that a tool prints to the transcript in plain text (`claude-directory`).
 - Checkpoints snapshot file contents before an edit. They do not cover remote systems.
 
 ### 2.8 JSONL transcript line shape (observed, not documented)
@@ -803,7 +803,7 @@ Useful ideas:
 
 1. Use the Claude Code hook contract as our own: JSON in, JSON out, exit code two blocks. It lets us write hooks in any language and test them as plain programs.
 2. Use Claude Code rule precedence: deny, then ask, then allow. OpenCode uses last match wins. That lets a later allow undo an earlier deny. Our fixed decisions need the first.
-3. Run the check in the harness, before the tool. OpenCode puts the ask inside each tool. A new adapter tool would then need to call `ask` itself. A central check cannot be skipped.
+3. Run the check in the harness, before the tool. OpenCode puts the ask inside each tool. A new adapter tool would then need to call `ask` itself. A tool cannot skip a central check.
 4. Take the OpenCode part model for the record. It stores the model input and the output of each call in one object with a state.
 5. Take the OpenCode server shape: HTTP routes, one SSE stream, `promptAsync`, a permission reply route. Add a question reply route.
 6. Build deferred tool loading and skill listing ourselves. Do not depend on a model feature that local servers lack.
@@ -826,7 +826,7 @@ Useful ideas:
 
 ## 4. Open items
 
-- The `permission.ask` plugin hook in OpenCode may be a better pattern than `tool.execute.before` for decisions. I did not find its call site, so I cannot confirm it runs.
+- The `permission.ask` plugin hook in OpenCode can be a better pattern than `tool.execute.before` for decisions. I did not find its call site, so I cannot confirm it runs.
 - I did not run either harness. Every claim about OpenCode comes from reading the source at commit `663fbd7`. Every claim about Claude Code comes from the docs pages named above.
 - The default auto-compact threshold of Claude Code is not in the pages I read.
 - `docs/design.md` proposes Python for the core. This survey assumes TypeScript on Node 24, as the task states. The two plans need one decision.
