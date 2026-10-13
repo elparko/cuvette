@@ -7,7 +7,7 @@ description: Name lipids for a set of m/z values with the in-silico database, an
 
 1. Call `state`. Read the polarity (`mode`). The decision record owns the polarity and the identification tolerance.
 2. Make sure that the working feature set exists, or pass `mz` to `annotate`.
-3. Call `annotate` with `mode` and `match_ppm` from the decision record. The tool default for `match_ppm` is 5. The dialog default is 10. Use the value in the record.
+3. Call `annotate`. The harness sets `mode` and `match_ppm` from the decision record. The tool default for `match_ppm` is 5. The dialog default is 10.
 4. Read these columns for each feature: `lipid`, `adduct`, `ppm`, `confidence`, `isotopologue`, `adducts_seen`, `msi_level`.
 5. Remove the rows where `isotopologue` is true from the list of lipids. They are isotopes of another feature. Name the feature they belong to.
 6. For a row with no match, write "no match within the tolerance". Do not guess.

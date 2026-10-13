@@ -172,11 +172,6 @@ decisions:
     stage: when_needed
     links:
       - { tool: find_differential_peaks, arg: blocking_factors }
-    sensitivity:
-      options: ["none", "tissue"]
-      tool: find_differential_peaks
-      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
-      max_runs: 2
 
   - key: fit_type
     label: Dispersion fit of DESeq2

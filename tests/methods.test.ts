@@ -28,7 +28,7 @@ const METRICS = {
   steps: [{ step: "Count the particles", tool: "count", settings: [{ key: "method", label: "Threshold method", value: "Otsu", by: "agent" }, { key: "min_size", label: "Smallest particle", value: 8, by: "agent" }] }],
 };
 
-async function finished(): Promise<Session> {
+async function finished(answer = "One cluster", note = ""): Promise<Session> {
   const p = new FakeProvider([
     { calls: [{ name: "inspect_data", args: { path: join(__dirname, "fixtures/lab") } }, { name: "clarify", args: { found: "I see one image with about 60 dark particles.", questions: [{ question: QUESTION, options: ["One dark spot", "One cluster"] }] } }] },
     { calls: [{ name: "plan", args: METRICS }] },
@@ -39,7 +39,7 @@ async function finished(): Promise<Session> {
   open.push(s);
   s.decisions.applySetup({});
   s.bus.on((e) => {
-    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, "One cluster"), 0);
+    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, answer, note), 0);
     if (e.type === "plan") setTimeout(() => s.respondPlan({ action: "approve" }), 0);
   });
   await s.send("Count the particles in a.tif");
@@ -80,6 +80,23 @@ test("/save-method saves the confirmed analysis as one file in the home folder, 
   expect(existsSync(path)).toBe(false);
   expect(() => loadMethod("particles")).toThrow(/No method named particles/);
   expect(() => readMethod("{}")).toThrow(/is not a Cuvette method file/);
+});
+
+test("a saved answer keeps its own brackets and drops only the note of the scientist", async () => {
+  const s = await finished("One cluster (merged spots)");
+  expect(s.saveMethod("brackets").method.questions).toEqual([{ question: QUESTION, answer: "One cluster (merged spots)" }]);
+  const t = await finished("One cluster", "touching spots too");
+  expect(t.saveMethod("noted").method.questions).toEqual([{ question: QUESTION, answer: "One cluster" }]);
+});
+
+test("the method list gives the name that loads, also for a file that a scientist copied under another name", () => {
+  const dir = methodsDir();
+  mkdirSync(dir, { recursive: true });
+  const m = { cuvette_method: 1, name: "original", saved: "2026-10-01T10:00:00Z", questions: [], analysis: { steps: [] }, programs: [], decisions: {}, pilot: { required: true, shows: [] } };
+  writeFileSync(join(dir, "copy-for-mice.json"), JSON.stringify(m));
+  const names = listMethods().map((r) => r.name);
+  expect(names).toEqual(["copy-for-mice"]);
+  for (const n of names) expect(loadMethod(n).path).toBe(join(dir, "copy-for-mice.json"));
 });
 
 test("a new session from a method shows the questions pre-answered and still demands the demonstration before the batch", async () => {

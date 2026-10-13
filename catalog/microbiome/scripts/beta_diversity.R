@@ -50,7 +50,7 @@ run_tool(function() {
     fail(paste0("unknown normalization: ", norm, ". Use relative, rarefy, clr or none."))
   }
   if (norm == "clr" && distance != "euclidean") fail("CLR values can be negative. Use distance euclidean (the Aitchison distance) with normalization clr.")
-  d <- vegdist(x, method = distance)
+  d <- vegdist(x, method = distance, binary = distance == "jaccard")
   perms <- permute::how(nperm = nperm)
   strata <- pick(p, "strata", "none")
   if (!identical(strata, "none")) {
@@ -87,6 +87,6 @@ run_tool(function() {
     metrics = metrics,
     data = list(formula = rhs, distance = distance, normalization = norm, by = by, strata = strata, seed = seed, min_p_possible = 1 / (nperm + 1), dispersion = disp, vegan_version = as.character(packageVersion("vegan"))),
     table = table_of(df, out, 20),
-    manualRoute = sprintf("set.seed(%d); d <- vegdist(x, \"%s\"); adonis2(d ~ %s, data = md, permutations = %d, by = \"%s\"); permutest(betadisper(d, md$%s))", seed, distance, rhs, nperm, by, v1)
+    manualRoute = sprintf("set.seed(%d); d <- vegdist(x, \"%s\"%s); adonis2(d ~ %s, data = md, permutations = %d, by = \"%s\"); permutest(betadisper(d, md$%s))", seed, distance, if (distance == "jaccard") ", binary = TRUE" else "", rhs, nperm, by, v1)
   ))
 })

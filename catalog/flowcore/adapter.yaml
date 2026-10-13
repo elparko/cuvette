@@ -107,7 +107,7 @@ decisions:
     help: >
       The gate that selects the cells before you count positives, as limits on channels. Write FSC-A:50000:250000 for a range
       of FSC-A. Write several gates with commas. Use min or max for no limit. Write none to use all events. Choose the limits from
-      the scatter plot of an unstained or control sample.
+      the scatter plot of an unstained or control sample. The limits are in the values of the file, before any log conversion.
     essential: true
     owner: human
     stage: when_needed
@@ -372,7 +372,8 @@ tests:
     description: >
       The three ctl samples and the three trt samples. Percent CD4 positive: ctl 50, 46.6667, 53.3333; trt 33.3333, 36.6667, 30.
       A SciPy Welch test (data/make_synthetic.py, checks/check_synthetic.out) gives p 0.0036022 and, for CD8, p 0.0018486. The
-      Mann-Whitney test gives p 0.080856.
+      Mann-Whitney test is exact for small groups without ties, as in R wilcox.test and Prism: 3 against 3 with no overlap gives
+      p 0.1 (R 4.6.1), the smallest two-sided p for these group sizes.
     data: [data/synthetic_design.csv]
     calls:
       - tool: population_stats
@@ -392,7 +393,7 @@ tests:
       - { path: saved.welch.metrics.mean_CD4pos_trt, approx: 33.333333, abs: 0.00001 }
       - { path: saved.welch.metrics.p_CD4pos_ctl_trt, approx: 0.0036022, abs: 0.0000001 }
       - { path: saved.welch.metrics.p_CD8pos_ctl_trt, approx: 0.0018486, abs: 0.0000001 }
-      - { path: metrics.p_CD4pos_ctl_trt, approx: 0.080856, abs: 0.000001 }
+      - { path: metrics.p_CD4pos_ctl_trt, approx: 0.1, abs: 0.000001 }
 
   - id: population-named-like-marker
     description: A combined population with the name of a single marker (CD4+) does not make a second row. n_populations stays 2 for CD4 and CD8.

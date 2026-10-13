@@ -85,15 +85,14 @@ decisions:
 
   - key: database
     label: Molecular database and version
-    kind: choice
-    choices: ["HMDB v4", "LipidMaps 2017-12-12", "SwissLipids 2018-02-02", "HMDB v2.5", "ChEBI 2018-01", "LIPID_MAPS 2016"]
+    kind: text
     default: "HMDB v4"
     owner: human
     group: Annotation
     stage: when_needed
     essential: true
     changes_conclusion: true
-    help: The engine scores only the molecular formulas that are in this database. Write the name and the version, such as LipidMaps 2017-12-12. The dataset must have been processed with it. Use get_dataset_info for the databases of a dataset and list_databases for all of them.
+    help: The engine scores only the molecular formulas that are in this database. Write the name and the version, such as LipidMaps 2017-12-12. The engine must have processed the dataset with it. Use get_dataset_info for the databases of a dataset and list_databases for all of them.
     links:
       - { tool: list_annotations, arg: database }
       - { tool: compare_fdr_counts, arg: database }

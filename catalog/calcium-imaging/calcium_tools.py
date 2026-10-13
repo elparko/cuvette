@@ -813,8 +813,19 @@ def _test(groups, test):
     if test == "rank":
         r = stats.kruskal(*groups)
         return "Kruskal-Wallis H", float(r.statistic), float(r.pvalue)
-    r = stats.f_oneway(*groups)
-    return "one-way ANOVA F", float(r.statistic), float(r.pvalue)
+    return ("Welch ANOVA F",) + _welch_anova(groups)
+
+
+def _welch_anova(groups):
+    g = [np.asarray(x, float) for x in groups]
+    k = len(g)
+    n = np.array([len(x) for x in g], float)
+    m = np.array([x.mean() for x in g])
+    w = n / np.array([x.var(ddof=1) for x in g])
+    mw = (w * m).sum() / w.sum()
+    tmp = (((1 - w / w.sum()) ** 2) / (n - 1)).sum()
+    f = ((w * (m - mw) ** 2).sum() / (k - 1)) / (1 + 2 * (k - 2) / (k * k - 1) * tmp)
+    return float(f), float(stats.f.sf(f, k - 1, (k * k - 1) / (3 * tmp)))
 
 
 def compare_groups(table, group_column, animal_column, value_column, field_column="", test="welch"):

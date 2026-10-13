@@ -13,7 +13,7 @@ Follow these rules in each answer. The review checks look for the same errors.
 
 - The exposure, the outcome, the number of variants and the source of the summary statistics.
 - Each method that you ran, with the estimate, the standard error, the confidence interval and the p value.
-- The scale of the estimate. For a binary outcome it is a log odds ratio for one unit of the exposure. Give the odds ratio only after you take the exponential of the estimate and of both limits.
+- The scale of the estimate. For a binary outcome it is a log odds ratio for one unit of the exposure. Give the odds ratio only after you call calculate with exp of the estimate and of both limits.
 - Cochran Q with its degrees of freedom and p value, and I-squared.
 - The MR-Egger intercept with its p value.
 - The F statistic. Name the weak instruments if there are any.

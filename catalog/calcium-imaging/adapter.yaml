@@ -409,7 +409,7 @@ decisions:
     choices: [welch, rank]
     default: welch
     group: Statistics
-    help: Welch compares means and does not assume equal variances. Rank compares the ranks (Mann-Whitney for 2 groups, Kruskal-Wallis for more). Both use the animal means.
+    help: Welch compares means and does not assume equal variances (Welch t for 2 groups, Welch ANOVA for more). Rank compares the ranks (Mann-Whitney for 2 groups, Kruskal-Wallis for more). Both use the animal means.
     owner: human
     stage: when_needed
     links:
@@ -843,6 +843,19 @@ tests:
       - { path: metrics.n_animals, equals: 6 }
       - { path: metrics.n_cells, equals: 60 }
       - { path: metrics.p_cell_level_not_valid, max: 0.000001 }
+
+  - id: groups_three_welch
+    description: >
+      Designed table: 3 groups with animal means 1, 2, 3, 4.5 and 2, 4, 6, 7, 9 and 10, 11, 15. R oneway.test with
+      var.equal = FALSE on the animal means gives F = 13.65339282 and p = 0.01058858669 (checks/check_groups.R, output
+      checks/check_groups.out).
+    data: [data/synthetic_groups3.csv]
+    calls:
+      - { tool: compare_groups, args: { table: "{adapter_dir}/data/synthetic_groups3.csv", group_column: group, animal_column: animal, value_column: event_rate_hz, test: welch } }
+    expect:
+      - { path: metrics.statistic, approx: 13.65339282, abs: 0.000001 }
+      - { path: metrics.p_animal_level, approx: 0.01058858669, abs: 0.00000001 }
+      - { path: metrics.n_animals, equals: 12 }
 
   - id: allen_threshold
     description: >

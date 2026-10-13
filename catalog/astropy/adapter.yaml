@@ -642,7 +642,7 @@ tests:
     description: >
       With the sources masked, the clipped median must return to the true background of 5 (within 0.05) and
       the standard deviation to the true noise of 2 (within 0.05). The clipped standard deviation of Gaussian noise at 3 sigma
-      reads 1.5 percent low, which is inside this limit.
+      reads 1.3 percent low, which is inside this limit.
     data: [data/gaussians_noisy.fits]
     calls:
       - tool: clip_statistics

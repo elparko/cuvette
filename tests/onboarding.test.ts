@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
-import { approveAdapter, checkAdapter, installHint, missingDependencies, missingDependency } from "../src/onboarding/checker.ts";
+import { approveAdapter, checkAdapter, installHint, missingDependencies, missingDependency, pythonSignature, scriptReads } from "../src/onboarding/checker.ts";
 import { runTests, substitute } from "../src/onboarding/kat.ts";
 import { onboardCommand } from "../src/onboarding/agent.ts";
 import type { Tool, ToolOutput } from "../src/core/types.ts";
@@ -97,6 +97,51 @@ describe("checker", () => {
     expect((await checkAdapter(high)).errors).toContain('decision "trim_fraction": the default 0.7 is above "hi" (0.5)');
     const text = broken("deftext", (y) => y.replace("default: 0.1\n", "default: '0.1'\n"));
     expect((await checkAdapter(text)).errors).toContain('decision "trim_fraction": kind is "float" but the default "0.1" is not a number');
+  });
+
+  test("pythonSignature reads names, defaults and **kwargs; scriptReads finds the params that a script reads and not those that it sets", () => {
+    const src = 'def other(a):\n    pass\n\ndef fit(path, cols=("a", "b"), *, alpha: float = 0.05, mode="x,#y", # don\'t (note), here\n        n: int, **extra):\n    pass\n';
+    expect(pythonSignature(src, "fit")).toEqual({ names: ["path", "cols", "alpha", "mode", "n"], required: ["path", "n"], kwargs: true });
+    expect(pythonSignature(src, "missing")).toBeUndefined();
+    const r = 'p <- read_params()\nx <- pick(p, "alpha", 0.05)\nif (p$test == "a") p$input <- 1\ny <- p[["n"]]\nq <- t.test(1)$p.value';
+    expect([...scriptReads(r, "run.R")].sort()).toEqual(["alpha", "n", "test"]);
+    expect([...scriptReads('p = json.load(f)\nv = p.get("cut", 1)\nw = params["mode"]', "run.py")].sort()).toEqual(["cut", "mode"]);
+    expect([...scriptReads("const p = readParams();\nrun(p.folder, p?.every_nth, p.items.map(f));", "run.mjs")].sort()).toEqual(["every_nth", "folder", "items"]);
+  });
+
+  test("a manifest argument that the Python function does not take is an error, and a function argument outside params is a warning", async () => {
+    const dir = join(tmp, "tables-args");
+    cpSync("catalog/tables", dir, { recursive: true });
+    const file = join(dir, "adapter.yaml");
+    writeFileSync(file, readFileSync(file, "utf8").replace("      path: { type: string, description: CSV or xlsx path. }\n      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }\n", "      path: { type: string, description: CSV or xlsx path. }\n      decimals: { type: integer, description: Number of decimals (a count). }\n"));
+    const r = await checkAdapter(dir, { static: true });
+    expect(r.errors).toContain('tool "summarize_table": argument "decimals" is in "params" but not in the signature of ga_tables:summarize_table. The call fails');
+    expect(r.warnings).toContain('tool "summarize_table": ga_tables:summarize_table takes "sheet", but it is not in "params", so the model cannot set it');
+  });
+
+  test("a manifest argument that no script reads, and a script read that is not in params, are warnings", async () => {
+    const dir = join(tmp, "pwr-args");
+    cpSync("catalog/pwr", dir, { recursive: true });
+    const file = join(dir, "adapter.yaml");
+    writeFileSync(file, readFileSync(file, "utf8").replace('      d: { type: number, description: "Cohen\'s d', '      tails_wanted: { type: integer, description: "Number of tails (a count)." }\n      d: { type: number, description: "Cohen\'s d'));
+    const script = join(dir, "scripts", "power_t_test.R");
+    writeFileSync(script, readFileSync(script, "utf8").replace("p <- read_params()", 'p <- read_params()\n  extra <- pick(p, "hidden_knob", 1)'));
+    const r = await checkAdapter(dir, { static: true });
+    expect(r.warnings).toContain('tool "power_t_test": argument "tails_wanted" is in "params", but no script reads it');
+    expect(r.warnings).toContain('tool "power_t_test": scripts/power_t_test.R reads "hidden_knob", but it is not in "params", so the model cannot set it');
+    expect((await checkAdapter("catalog/pwr", { static: true })).warnings.join("\n")).not.toMatch(/no script reads it|so the model cannot set it/);
+  });
+
+  test("a decision value outside the enum of a linked argument, and a sensitivity tool without a link, are errors", async () => {
+    const dir = join(tmp, "bedtools-links");
+    cpSync("catalog/bedtools", dir, { recursive: true });
+    const file = join(dir, "adapter.yaml");
+    const yaml = readFileSync(file, "utf8")
+      .replace("      - { tool: coverage_intervals, arg: strand }\n", "      - { tool: coverage_intervals, arg: strand }\n      - { tool: merge_intervals, arg: strand }\n    sensitivity:\n      options: [any, same]\n      tool: intersect_intervals\n");
+    writeFileSync(file, yaml.replace("      - { tool: intersect_intervals, arg: strand }\n", ""));
+    const r = await checkAdapter(dir, { static: true });
+    expect(r.errors).toContain('decision "strand": the value "opposite" is not in the enum of merge_intervals.strand');
+    expect(r.errors).toContain('decision "strand", sensitivity: the decision has no link to "intersect_intervals", so the comparison never runs. Link the decision to that tool, or name a linked tool');
   });
 
   test("a static check does not call a tool of the module unknown", async () => {

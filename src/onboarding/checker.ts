@@ -169,8 +169,17 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
       if (need(`${what}, link`, l.tool)) argOk(`${what}, link`, l.tool, l.arg);
     }
     if (d.sensitivity?.tool) {
-      need(`${what}, sensitivity`, d.sensitivity.tool);
+      if (need(`${what}, sensitivity`, d.sensitivity.tool) && !d.links.some((l) => l.tool === d.sensitivity!.tool))
+        errors.push(`${what}, sensitivity: the decision has no link to "${d.sensitivity.tool}", so the comparison never runs. Link the decision to that tool, or name a linked tool`);
     }
+    for (const l of d.links) {
+      const p = m.tools.find((t) => t.name === l.tool)?.params[l.arg] as { enum?: unknown[] } | undefined;
+      if (!Array.isArray(p?.enum)) continue;
+      for (const c of [...d.choices, ...(d.default === undefined ? [] : [d.default])])
+        if (!p.enum.some((e) => String(e) === String(c))) errors.push(`${what}: the value ${JSON.stringify(c)} is not in the enum of ${l.tool}.${l.arg}`);
+    }
+    if (d.sensitivity && d.kind === "choice" && d.choices.length)
+      for (const o of d.sensitivity.options) if (!d.choices.some((c) => JSON.stringify(c) === JSON.stringify(o))) errors.push(`${what}, sensitivity: the option ${JSON.stringify(o)} is not in "choices"`);
     if (d.kind === "choice" && !d.choices.length) warnings.push(`${what}: kind is "choice" but "choices" is empty`);
     if (d.kind === "choice" && d.choices.length && d.default !== undefined && !d.choices.some((c) => JSON.stringify(c) === JSON.stringify(d.default))) {
       errors.push(`${what}: the default is not in "choices"`);
@@ -214,6 +223,100 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
     for (const e of t.expect) {
       const known = [e.equals, e.approx, e.min, e.max, e.contains].some((v) => v !== undefined);
       if (!known) warnings.push(`test "${t.id}": expectation on "${e.path}" has no comparison`);
+    }
+  }
+}
+
+export function pythonSignature(source: string, fn: string): { names: string[]; required: string[]; kwargs: boolean } | undefined {
+  const start = new RegExp(`^def\\s+${fn}\\s*\\(`, "m").exec(source);
+  if (!start) return undefined;
+  const parts: string[] = [];
+  let cur = "";
+  let depth = 0;
+  let quote = "";
+  for (let i = start.index + start[0].length; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (ch === "\\") cur += source[i++];
+      else if (ch === quote) quote = "";
+    } else if (ch === "#") {
+      while (i + 1 < source.length && source[i + 1] !== "\n") i++;
+      continue;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if ("([{".includes(ch)) depth++;
+    else if (")]}".includes(ch)) {
+      if (depth === 0) break;
+      depth--;
+    } else if (ch === "," && depth === 0) {
+      parts.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  parts.push(cur);
+  const out = { names: [] as string[], required: [] as string[], kwargs: false };
+  for (const raw of parts.map((x) => x.trim()).filter(Boolean)) {
+    if (raw.startsWith("**")) out.kwargs = true;
+    if (raw.startsWith("*") || raw === "/") continue;
+    const name = /^([A-Za-z_]\w*)/.exec(raw)?.[1];
+    if (!name || name === "self") continue;
+    out.names.push(name);
+    if (!/=/.test(raw.replace(/:[^=]*/, ""))) out.required.push(name);
+  }
+  return out;
+}
+
+const PARAM_READS: Record<string, RegExp[]> = {
+  r: [/pick\(\s*p\s*,\s*["']([A-Za-z_]\w*)["']/g, /\bp\$([A-Za-z_]\w*)/g, /\bp\[\[\s*["']([A-Za-z_]\w*)["']\s*\]\]/g],
+  py: [/\b(?:p|params)\.get\(\s*["']([A-Za-z_]\w*)["']/g, /\b(?:p|params)\[\s*["']([A-Za-z_]\w*)["']\s*\]/g],
+  js: [/\bp\??\.([A-Za-z_]\w*)\b(?!\s*\()/g, /\bp\[\s*["']([A-Za-z_]\w*)["']\s*\]/g],
+};
+
+export function scriptReads(source: string, file: string): Set<string> {
+  const lang = /\.[Rr]$/.test(file) ? "r" : /\.py$/.test(file) ? "py" : /\.m?js$/.test(file) ? "js" : "";
+  const out = new Set<string>();
+  for (const re of PARAM_READS[lang] ?? []) for (const m of source.matchAll(re)) out.add(m[1]);
+  for (const m of source.matchAll(/\b(?:p\$|p\.|p\[\[?["'])([A-Za-z_]\w*)["']?\]?\]?\s*(?:<-|=(?!=))/g)) out.delete(m[1]);
+  return out;
+}
+
+function codeText(dir: string): string {
+  if (!existsSync(dir)) return "";
+  return readdirSync(dir)
+    .filter((f) => /\.(R|r|py|mjs|js|ts|ijm|groovy|sh)$/.test(f))
+    .map((f) => readFileSync(join(dir, f), "utf8"))
+    .join("\n");
+}
+
+function checkArgsAgainstCode(adapter: LoadedAdapter, errors: string[], warnings: string[]) {
+  const m = adapter.manifest;
+  const read = (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : undefined);
+  for (const t of m.tools) {
+    const declared = Object.keys(t.params);
+    if (m.connection.kind === "python" && t.function.includes(":")) {
+      const [mod, fn] = t.function.split(":");
+      const source = read(join(adapter.root, mod.endsWith(".py") ? mod : `${mod}.py`));
+      const sig = source && !fn.includes(".") ? pythonSignature(source, fn) : undefined;
+      if (!sig) continue;
+      if (!sig.kwargs) for (const a of declared) if (!sig.names.includes(a)) errors.push(`tool "${t.name}": argument "${a}" is in "params" but not in the signature of ${t.function}. The call fails`);
+      for (const a of sig.required) if (!declared.includes(a)) errors.push(`tool "${t.name}": ${t.function} needs the argument "${a}", but it is not in "params"`);
+      for (const a of sig.names) if (!sig.required.includes(a) && !declared.includes(a)) warnings.push(`tool "${t.name}": ${t.function} takes "${a}", but it is not in "params", so the model cannot set it`);
+    }
+    if (m.connection.kind === "script" && t.script) {
+      const file = join(adapter.root, t.script);
+      const own = read(file);
+      if (own === undefined) continue;
+      const ownReads = scriptReads(own, file);
+      if (!ownReads.size) continue;
+      const code = `${codeText(join(file, ".."))}\n${codeText(adapter.root)}`;
+      const word = (w: string) => new RegExp(`\\b${w}\\b`).test(code);
+      const built = (a: string) => {
+        const stem = a.replace(/_[A-Za-z0-9]+$/, "");
+        return stem !== a && word(stem) && code.includes(`"${a.slice(stem.length)}"`);
+      };
+      for (const a of declared) if (!word(a) && !built(a)) warnings.push(`tool "${t.name}": argument "${a}" is in "params", but no script reads it`);
+      for (const a of ownReads) if (!declared.includes(a)) warnings.push(`tool "${t.name}": ${t.script} reads "${a}", but it is not in "params", so the model cannot set it`);
     }
   }
 }
@@ -340,6 +443,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
 
   checkFiles(adapter, errors, warnings);
+  checkArgsAgainstCode(adapter, errors, warnings);
   await checkVersions(adapter, warnings, opts.static);
   benchCache ??= benchmarkValues();
   const toolsForLint = [...lintTools(adapter, raw as Record<string, any>, schemaTools, "module"), ...lintTools(adapter, raw as Record<string, any>, serverTools, "server").filter((t) => t.source === "server")];

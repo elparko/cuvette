@@ -7,8 +7,8 @@ description: How to integrate peaks and quantify a sample from a chromatogram th
 2. Run `read_trace` on one standard. Check the time range, the step and the drift. Note the names of the time and signal columns.
 3. Ask for the peak of interest and its approximate retention time and width.
 4. Run `integrate_peaks` on that standard. Compare the peak count and the retention times with what the scientist expects.
-5. If the tool finds too many peaks, raise `prominence`. If it misses the peak, lower it, or name the retention time in `known_peaks`.
-6. Check one area with `area_in_window`. Divide the trapezoid area by the sampling step to compare the two numbers.
+5. If the tool finds too many peaks, call `propose_change` with the key `prominence` and a higher value. If it misses the peak, propose a lower value, or name the retention time in `known_peaks`.
+6. Check one area with `area_in_window`. To compare the two numbers, call `calculate` to divide the trapezoid area by the sampling step.
 7. Run `integrate_peaks` with the same settings on every standard and every sample. Do not change a setting between runs.
 8. Run `calibration_curve` with the standard concentrations and their areas. Read the residual of each standard, not R squared alone.
 9. Run `quantify_areas` with the slope and the intercept. Report each sample that falls outside the range of the standards.

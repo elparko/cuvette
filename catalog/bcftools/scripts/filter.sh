@@ -12,6 +12,7 @@ case $qual in 0|0.0) qual=;; esac
 case $depth in 0) depth=;; esac
 [ "$types" = all ] && types=
 [ "$status" = any ] && status=
+[ "$status" = PASS ] && status="PASS,."
 if [ -n "$region" ]; then
   prepare "$bcf" "$in" "$CUVETTE_CALL_DIR" || { echo "cannot index the input file" >&2; exit 1; }
   in=$prepared

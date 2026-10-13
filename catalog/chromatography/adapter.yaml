@@ -383,6 +383,18 @@ tests:
       - { path: metrics.height, approx: 132.981, abs: 0.001 }
       - { path: metrics.retention_time, approx: 10, abs: 0.0001 }
 
+  - id: calibration-through-origin
+    description: >
+      Four standards (1, 2, 3, 4) with areas 2.1, 3.9, 6.2 and 7.8, fitted through zero. R 4.6.1 summary(lm(y ~ x + 0))
+      gives the slope 1.99 and the R squared 0.999184188394. R uses the sum of y squared, not the spread about the mean, for a
+      line through zero.
+    calls:
+      - tool: calibration_curve
+        args: { concentrations: [1, 2, 3, 4], areas: [2.1, 3.9, 6.2, 7.8], through_origin: true }
+    expect:
+      - { path: metrics.slope, approx: 1.99, abs: 0.0000001 }
+      - { path: metrics.r_squared, approx: 0.999184188394, abs: 0.000000001 }
+
   - id: lactose-calibration
     description: >
       The lactose calibration of the hplc-py tutorial: four traces at 0.5, 1, 3 and 6 mM and a test trace at 2 mM.

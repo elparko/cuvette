@@ -24,14 +24,16 @@ run_tool(function() {
 
   prep <- function(path) {
     ff <- read_fcs(path)
-    ff <- apply_compensation(ff, comp, comp_file)
-    x <- exprs(ff)
+    raw <- exprs(ff)
     if (decades > 0) {
+      x <- raw
       rng <- pData(parameters(ff))$range
       names(rng) <- pData(parameters(ff))$name
       for (ch in colnames(x)) if (!grepl("^(Time|Event)", ch, ignore.case = TRUE)) x[, ch] <- 10^(x[, ch] * decades / rng[[ch]])
+      exprs(ff) <- x
     }
-    list(ff = ff, x = x)
+    ff <- apply_compensation(ff, comp, comp_file)
+    list(ff = ff, x = exprs(ff), raw = raw)
   }
   cmarkers <- NULL
   first <- prep(files[1])
@@ -54,7 +56,7 @@ run_tool(function() {
   if (length(control_paths)) {
     cx <- do.call(rbind, lapply(control_paths, function(cp) {
       cc <- prep(cp)
-      cc$x[gate(cc$x), , drop = FALSE]
+      cc$x[gate(cc$raw), , drop = FALSE]
     }))
     cx <- tx(cx)
     for (i in seq_along(markers)) cutoff[i] <- quantile(cx[, chan[i]], control_pct / 100, names = FALSE)
@@ -72,7 +74,7 @@ run_tool(function() {
     s <- prep(f)
     xa <- s$x
     n_total <- nrow(xa)
-    xg <- tx(xa[gate(xa), , drop = FALSE])
+    xg <- tx(xa[gate(s$raw), , drop = FALSE])
     n_parent <- nrow(xg)
     pos <- sapply(seq_along(markers), function(i) xg[, chan[i]] > cutoff[i])
     if (is.null(dim(pos))) pos <- matrix(pos, ncol = length(markers))

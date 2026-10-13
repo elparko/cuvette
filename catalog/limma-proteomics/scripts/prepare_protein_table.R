@@ -153,7 +153,7 @@ run_tool(function() {
   tab <- table(groups)
   per_group <- paste(sprintf("%s n=%d", names(tab), as.integer(tab)), collapse = ", ")
   metrics <- list(n_input = n_input, n_flagged_removed = n_flagged, n_after_flags = n_after_flags, n_after_peptide_filter = n_after_peptides, n_quantified = n_quantified, n_kept = nrow(m), n_samples = length(cols),
-                  n_groups = length(tab), min_valid = min_valid, n_missing_before_imputation = n_missing_before, median_of_column_medians = round(mean(med_before), 6), column_median_range_before = round(diff(range(med_before)), 6), column_median_range_after = round(diff(range(med_after)), 6), n_imputed = if (imp == "none") 0L else n_missing_before,
+                  n_groups = length(tab), min_valid = min_valid, n_missing_before_imputation = n_missing_before, mean_of_column_medians = round(mean(med_before), 6), column_median_range_before = round(diff(range(med_before)), 6), column_median_range_after = round(diff(range(med_after)), 6), n_imputed = if (imp == "none") 0L else n_missing_before,
                   pct_missing_kept = round(100 * n_missing_before / length(m), 2))
   emit(list(
     ok = TRUE,

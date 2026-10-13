@@ -154,8 +154,8 @@ decisions:
       - { tool: prepare_protein_table, arg: normalization }
     sensitivity:
       options: [none, median, quantile]
-      tool: test_differential_proteins
-      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      tool: prepare_protein_table
+      compare: [metrics.column_median_range_before, metrics.column_median_range_after, metrics.n_kept]
       max_runs: 3
 
   - key: imputation
@@ -484,7 +484,7 @@ tests:
         args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 2, normalization: median }
     expect:
       - { path: metrics.n_kept, equals: 5022 }
-      - { path: metrics.median_of_column_medians, approx: 25.783378, abs: 0.000001 }
+      - { path: metrics.mean_of_column_medians, approx: 25.783378, abs: 0.000001 }
       - { path: metrics.column_median_range_before, approx: 0.210136, abs: 0.000001 }
       - { path: metrics.column_median_range_after, approx: 0, abs: 0.000000001 }
       - { path: metrics.n_missing_before_imputation, equals: 613 }

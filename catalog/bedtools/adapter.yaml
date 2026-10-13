@@ -127,7 +127,8 @@ decisions:
     help: >
       any ignores the strand. same keeps only pairs on the same strand. opposite keeps only pairs on
       opposite strands. Both files must have a strand column (column 6) for same or opposite.
-      For gene and read data the strand rule can change the count a lot.
+      For gene and read data the strand rule can change the count a lot. The rule sets intersect_intervals and
+      coverage_intervals. merge_intervals has its own strand argument, because opposite has no meaning for a merge.
     essential: true
     owner: human
     stage: when_needed
@@ -135,7 +136,6 @@ decisions:
     links:
       - { tool: intersect_intervals, arg: strand }
       - { tool: coverage_intervals, arg: strand }
-      - { tool: merge_intervals, arg: strand }
 
   - key: merge_distance
     label: Largest gap to merge across

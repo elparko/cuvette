@@ -70,7 +70,8 @@ decisions:
     group: Growth curve
     help: >
       min subtracts the lowest reading of each well from all its readings. This is the growthcurver default. blank
-      subtracts the mean of the medium-only wells at each time point. none fits the readings as they are.
+      subtracts the mean of the medium-only wells at each time point. none fits the readings as they are. The lag time fit
+      (easylinear) takes the log of the readings, so it uses the readings without the min subtraction. It subtracts a blank.
     essential: true
     owner: human
     stage: when_needed
@@ -79,7 +80,7 @@ decisions:
     sensitivity:
       options: [min, none]
       tool: fit_growth_curves
-      compare: [metrics.n_wells, metrics.n_with_note]
+      compare: [metrics.median_r, metrics.median_k, metrics.n_with_note]
       max_runs: 2
 
   - key: blank_wells

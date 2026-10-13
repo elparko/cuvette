@@ -198,7 +198,7 @@ def count_events(raw, stim_channel="STI 014", event_id=None, min_duration=0.0):
 
 def set_bad_channels(raw, bads=None):
     r = _get(raw)
-    names = _names(bads)
+    names = list(r.info["bads"]) if str(bads).strip().lower() == "file" else _names(bads)
     missing = [n for n in names if n not in r.ch_names]
     if missing:
         return _fail("channels not found: %s" % ", ".join(missing))

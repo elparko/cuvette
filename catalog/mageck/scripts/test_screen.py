@@ -77,9 +77,13 @@ def body(p):
     def col(g, name):
         return number(g.get(name))
 
+    def below(g, name):
+        v = col(g, name)
+        return v is not None and v < fdr_cutoff
+
     sign = {"neg": "neg", "pos": "pos"}
-    n_neg = sum(1 for g in genes if (col(g, "neg|fdr") or 1) < fdr_cutoff)
-    n_pos = sum(1 for g in genes if (col(g, "pos|fdr") or 1) < fdr_cutoff)
+    n_neg = sum(1 for g in genes if below(g, "neg|fdr"))
+    n_pos = sum(1 for g in genes if below(g, "pos|fdr"))
     ranked = sorted(genes, key=lambda g: int(g[sign[direction] + "|rank"]))
     metrics = {"n_genes": len(genes), "n_sgrnas": n_sgrna, "n_neg_fdr": n_neg, "n_pos_fdr": n_pos, "fdr_cutoff": fdr_cutoff,
                "sgrnas_removed_zero": int(removed[0]) if removed else 0}

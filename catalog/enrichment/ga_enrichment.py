@@ -231,6 +231,8 @@ def run_ora(path, gene_sets, id_column, background, padj_column=None, padj_max=N
     else:
         if not (padj_column and padj_max is not None) and not (lfc_column and lfc_min is not None):
             return _fail("A gene list needs padj_column with padj_max, or lfc_column with lfc_min, or gene_list. The cutoff for a significant gene is a decision.")
+        if padj_max is not None and float(padj_max) < 1 and not padj_column:
+            return _fail("padj_column is missing, so the cutoff padj_max %g cannot apply. Give the adjusted p value column." % float(padj_max))
         sel = pd.Series(True, index=frame.index)
         rules = []
         if padj_column and padj_max is not None:

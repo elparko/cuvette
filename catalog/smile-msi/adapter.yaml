@@ -236,7 +236,7 @@ map:
       source: program_definitions
       test: ""
       note: Read-only tool.
-    summary: Listed {n_rows} slides.
+    summary: Listed the slides.
   - tool: history
     route: File > Analyses... > History lists the runs on a slide. Data > Acquisition & matching... shows the extraction settings.
     fidelity: code_only

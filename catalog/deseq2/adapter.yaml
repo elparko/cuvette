@@ -125,7 +125,6 @@ decisions:
   - key: design
     label: Design formula
     kind: text
-    default: "~ cell + dex"
     group: Design
     help: >
       The formula lists the terms of the model. Put the variable of interest last. Put a pairing
@@ -140,7 +139,6 @@ decisions:
   - key: variable
     label: Variable of interest
     kind: text
-    default: dex
     group: Design
     help: The column of the sample table that you test. It must be a term of the design.
     essential: true
@@ -152,7 +150,6 @@ decisions:
   - key: reference_level
     label: Reference level
     kind: text
-    default: untrt
     group: Design
     help: >
       The level that the others are compared with, such as the control. A positive log2 fold
@@ -167,7 +164,6 @@ decisions:
   - key: test_level
     label: Test level
     kind: text
-    default: trt
     group: Design
     help: The level that you compare with the reference level, such as the treated group.
     essential: true
@@ -384,7 +380,7 @@ map:
       The tool reads the counts assay and the length (or avgTxLength) assay and calls
       DESeqDataSetFromTximport. For tximeta output this is the same as DESeqDataSet(se). An object
       with no length assay goes to DESeqDataSetFromMatrix. countsFromAbundance other than no turns
-      the offsets off.
+      the offsets off: the tool rounds the counts and uses DESeqDataSetFromMatrix, as the tximport vignette says.
     evidence:
       source: docs
       test: gse_subset_rds

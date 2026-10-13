@@ -93,7 +93,7 @@ decisions:
     lo: 0.000001
     hi: 1
     group: Over-representation
-    help: A gene goes on the list if its adjusted p is below this value. Use the cutoff of the differential expression report.
+    help: A gene goes on the list if its adjusted p is below this value. Use the cutoff of the differential expression report. 1 uses no adjusted p cutoff, for a table without adjusted p values.
     owner: human
     stage: when_needed
     links:
@@ -106,7 +106,7 @@ decisions:
     lo: 0
     hi: 20
     group: Over-representation
-    help: 0 uses no fold change cutoff. 1 keeps genes that change 2-fold or more. A cutoff after the test gives a shorter list and can change which pathways pass.
+    help: 0 uses no fold change cutoff. 1 keeps genes that change more than 2-fold. A cutoff after the test gives a shorter list and can change which pathways pass.
     owner: human
     stage: when_needed
     links:
@@ -478,6 +478,16 @@ tests:
       - { path: metrics.top_p_value, approx: 2.862919941e-20, rel: 0.0001 }
       - { path: metrics.top_p_adjusted, approx: 1.534525089e-17, rel: 0.0001 }
       - { path: metrics.top_odds_ratio, approx: 6.524116848, rel: 0.000001 }
+
+  - id: padj-cutoff-needs-column
+    description: A padj cutoff below 1 without the padj column fails. Without the check, the list would hold every gene above the fold change cutoff.
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: run_ora
+        args: { path: "{adapter_dir}/data/fgsea_exampleRanks.rnk", gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt", id_column: gene, background: measured genes, lfc_column: score, lfc_min: 15, padj_max: 0.05, min_size: 15, max_size: 500 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "padj_column is missing" }
 
   - id: wrong-id-type
     description: Gene symbols against a GMT file of Entrez IDs give no overlap. The error names both ID types.

@@ -11,5 +11,5 @@ description: Steps to find the ChIP-seq or ATAC-seq peaks that differ between tw
 4. Ask for the method and the normalization. Ask for the false discovery rate cutoff.
 5. Run find_differential_peaks with the count table and the sample table. Use the files that count_reads_in_peaks wrote, or the tables of the scientist.
 6. Read the number of tested peaks, the numbers that gain and lose signal, and each warning.
-7. If the scientist wants a check of the choices, run the tool again with the other method or with another normalization. Compare the numbers.
+7. If the scientist wants a check of the choices, call compare_options with the key method or normalization. Compare the numbers.
 8. Report the design, the normalization and the cutoff. Report the numbers that gain and lose signal, and the level that has more signal.

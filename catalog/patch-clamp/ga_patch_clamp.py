@@ -81,7 +81,7 @@ def _need_ljp(ljp_mv):
 
 def _need_window(spec, name, what):
     if spec is None:
-        raise ValueError("%s is missing. It is a decision: %s Give two times in seconds, such as 0.1,0.9." % (name, what))
+        raise ValueError("%s is missing: %s Give two times in seconds, such as 0.1,0.9." % (name, what))
     return R.parse_window(spec, name)
 
 

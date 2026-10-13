@@ -245,7 +245,7 @@ map:
     summary: "{metrics.n_records} records. {metrics.n_snps} SNPs. {metrics.n_indels} indels. Ts/Tv {metrics.ts_tv}."
 
   - tool: filter_variants
-    route: "Run: bcftools view [-i 'QUAL>=<q> && INFO/DP>=<d>'] [-v <types>] [-f PASS] [-r <region>] -Oz -o <out>.vcf.gz <in>.vcf.gz"
+    route: "Run: bcftools view [-i 'QUAL>=<q> && INFO/DP>=<d>'] [-v <types>] [-f PASS,.] [-r <region>] -Oz -o <out>.vcf.gz <in>.vcf.gz"
     params:
       - { arg: path, label: "<in>.vcf.gz" }
       - { arg: min_qual, label: "QUAL>=", ui_default: "" }
@@ -393,5 +393,15 @@ tests:
     data: [data/g1k_chr20_1000000_1100000.vcf.gz, data/g1k_chr20_1000000_1100000.vcf.gz.tbi]
     calls:
       - { tool: filter_variants, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz", min_qual: 0, min_depth: 0, variant_types: all, filter_status: any } }
+    expect:
+      - { path: metrics.n_after, equals: 2210 }
+
+  - id: g1k_pass_keeps_dot
+    description: >
+      Every record of this file has FILTER ".". The bcftools manual says that -f .,PASS keeps the sites with no
+      filter set. So filter_status PASS keeps all 2210 records.
+    data: [data/g1k_chr20_1000000_1100000.vcf.gz, data/g1k_chr20_1000000_1100000.vcf.gz.tbi]
+    calls:
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz", min_qual: 0, min_depth: 0, variant_types: all, filter_status: PASS } }
     expect:
       - { path: metrics.n_after, equals: 2210 }

@@ -208,7 +208,7 @@ tools:
     description: Make a binary mask from one image channel with a threshold method. Writes the mask as TIFF and PNG. Use label_objects next.
     function: "skimage_tools:threshold_image"
     params:
-      path: { type: string, minLength: 1, description: "Path of an image file, or of a folder of images." }
+      path: { type: string, minLength: 1, description: "Path of an image file." }
       stain_channel: { type: string, enum: [gray, hematoxylin, eosin, red, green, blue], default: gray }
       threshold_method: { type: string, enum: [otsu, li, triangle, isodata, yen, mean, minimum, manual], default: otsu }
       threshold_value: { type: number, description: "Cutoff value, in the intensity units of the chosen channel: raw pixel values for a gray image file and for red, green or blue; 0 to 1 for gray made from a color image; stain density for hematoxylin and eosin. Only for method manual." }
@@ -349,7 +349,7 @@ tools:
       exclude_border_objects: { type: boolean, default: false, description: True to remove the objects that touch the image border. }
       split_touching: { type: boolean, default: false, description: True to split touching objects with a watershed on the distance map. }
       min_distance: { type: integer, minimum: 1, default: 7, description: "Smallest distance between watershed centers, in pixels." }
-      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. A folder run gives areas in pixels and does not use it. }
       intensity_image: { type: string, description: Optional image for the outline picture. }
     required: [mask]
 
@@ -374,7 +374,7 @@ tools:
       exclude_border_objects: { type: boolean, default: false, description: True to remove the objects that touch the image border. }
       split_touching: { type: boolean, default: false, description: True to split touching objects with a watershed on the distance map. }
       min_distance: { type: integer, minimum: 1, default: 7, description: "Smallest distance between watershed centers, in pixels. Used only when split_touching is true." }
-      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. A folder run gives areas in pixels and does not use it. }
     required: [path]
     citations:
       - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076

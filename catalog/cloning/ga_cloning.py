@@ -282,7 +282,7 @@ def _bind(primer, target, k):
     for m in re.finditer("(?=(%s))" % seed.pattern, target):
         end = m.start() + k
         foot = k
-        while foot < len(primer) and m.start() - 1 >= 0 and _pattern(primer[-foot - 1]).match(target[m.start() - (foot - k) - 1]):
+        while foot < len(primer) and m.start() - (foot - k) - 1 >= 0 and _pattern(primer[-foot - 1]).match(target[m.start() - (foot - k) - 1]):
             foot += 1
         hits.append({"end": end, "footprint": foot})
     return hits
@@ -441,7 +441,7 @@ def align_sanger_read(read, reference, trim=True):
     if trim and rfmt == "abi":
         rec = SeqIO.read(os.path.expanduser(read), "abi-trim")
     elif trim and "phred_quality" not in rec.letter_annotations:
-        return _fail("trim is true, but %s has no base qualities (%s). Use an .ab1 or FASTQ file, or set trim to false." % (read, rfmt))
+        return _fail("trim is true, but %s has no base qualities (%s). Use an .ab1 or FASTQ file, or ask the scientist to change the decision quality_trim to false." % (read, rfmt))
     elif trim:
         q = np.array(rec.letter_annotations["phred_quality"])
         score = np.cumsum(0.05 - 10 ** (-q / 10.0))

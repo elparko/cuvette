@@ -125,6 +125,8 @@ run_tool(function() {
   }
   if (is.finite(zph) && zph < 0.05) lines <- c(lines, "The proportional hazards test is below 0.05, so one hazard ratio does not describe the whole follow-up. Report the restricted mean survival time too.")
   if (n_dropped > 0) lines <- c(lines, sprintf("%d rows were dropped because of a missing time, event or stratum.", n_dropped))
+  endpoint <- pick(p, "endpoint", NULL)
+  if (!is.null(endpoint) && nzchar(endpoint)) lines <- c(sprintf("Endpoint: %s.", endpoint), lines)
   pop <- pick(p, "population", NULL)
   if (!is.null(pop)) lines <- c(lines, sprintf("Analysis population: %s (%d patients analyzed).", pop, nrow(d)))
   tab <- do.call(rbind, rows)

@@ -13,7 +13,7 @@ Ask the scientist for each decision that the setup lists. Do the steps in this o
 4. Pick the region. A whole slide is large. Ask the scientist for a region (x,y,width,height in pixels), or run detect_tissue first.
 5. Run detect_positive_cells on the state file. The score compartment, the cutoff and the cell settings are decisions.
 6. Read n_cells, n_positive and positive_percent. Say how many cells you counted.
-7. Run detect_positive_cells again with two other values of threshold_1. Report the percent for each value.
+7. Call compare_options with the key positive_threshold. Report the percent for each value.
 8. Run export_measurements if the scientist wants a table.
 9. Run get_workflow_script and give the script to the scientist. The scientist can repeat the steps in QuPath.
 

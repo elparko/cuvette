@@ -190,6 +190,10 @@ load_input <- function(p) {
     len <- if (!is.na(len_name) && (is.null(cfa) || cfa == "no")) assay(obj, len_name) else NULL
     if (is.null(cd)) cd <- as.data.frame(colData(obj))
     import <- sprintf("readRDS(), a %s with the assays %s", class(obj)[1], paste(an, collapse = ", "))
+    if (!is.null(cfa) && cfa != "no") {
+      counts <- round(counts)
+      import <- paste0(import, sprintf(". countsFromAbundance is %s, so the counts are rounded and have no length offsets (tximport vignette)", cfa))
+    }
   } else if (type == INPUT_TYPES[2]) {
     if (is.null(cd)) fail("give the sample table (coldata)")
     t <- run_tximport(p, cd)

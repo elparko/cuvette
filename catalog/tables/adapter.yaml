@@ -137,6 +137,7 @@ tools:
     function: "ga_tables:summarize_table"
     params:
       path: { type: string, description: CSV or xlsx path. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
       values: { type: array, items: { type: string }, description: Columns to summarize. Default is all numeric columns. }
       group_by: { type: array, items: { type: string }, description: Columns that define the groups. Leave out to summarize the whole table. }
       ratios: { type: object, description: 'New column to formula, for example {"Red %": "Red dots / Total cells * 100"}. Computed per row, then summarized.' }
@@ -150,6 +151,7 @@ tools:
     function: "ga_tables:reshape_table"
     params:
       path: { type: string, description: Absolute path of the CSV or xlsx file. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
       join: { type: object, description: '{path, on, how}. how is left (default), inner, right or outer.' }
       compute: { type: object, description: 'New column to formula, for example {"Ratio": "Red dots / Total cells"}.' }
       filter: { type: string, description: "Rows to keep, for example: Group == 'Control' and Age > 3" }
@@ -169,6 +171,7 @@ tools:
     function: "ga_tables:make_plot"
     params:
       path: { type: string, description: Absolute path of the CSV or xlsx file. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
       kind: { type: string, enum: [bar, box, scatter, line, histogram], description: "bar: mean with error bars. box: median and quartiles. scatter: one dot for each row. line: mean of y at each x. histogram: distribution of y." }
       y: { type: string, description: Value column. }
       y_label: { type: string, description: "Value axis label with unit, for example 'Red dots per cell (%)'." }

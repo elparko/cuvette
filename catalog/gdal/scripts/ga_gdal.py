@@ -158,7 +158,7 @@ def cmd_zonal_stats(a):
 
     with rasterio.open(a.raster) as src:
         rcrs = src.crs
-        nodata = src.nodata
+        nodata = src.nodatavals[a.band - 1] if 1 <= a.band <= src.count else src.nodata
     zones = gpd.read_file(a.zones)
     if zones.crs is not None and rcrs is not None and zones.crs != rcrs:
         sys.exit(f"The zones use {zones.crs.to_string()} and the raster uses {rcrs.to_string()}. Reproject one of them first.")

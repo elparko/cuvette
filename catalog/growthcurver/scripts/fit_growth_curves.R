@@ -79,6 +79,8 @@ run_tool(function() {
   if (nrow(res) == 1) for (m in setdiff(names(res), c("well", "note"))) metrics[[m]] <- res[[m]]
   metrics$n_wells <- nrow(res)
   metrics$n_with_note <- sum(nzchar(res$note))
+  metrics$median_r <- median(res$r, na.rm = TRUE)
+  metrics$median_k <- median(res$k, na.rm = TRUE)
   metrics$n_blank_wells <- length(blank_wells)
   metrics$n_excluded <- length(exclude)
   if (nzchar(out_path("results"))) write.csv(res, out_path("results"), row.names = FALSE)

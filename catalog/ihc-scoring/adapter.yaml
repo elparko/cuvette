@@ -333,7 +333,7 @@ decisions:
     group: Image
     help: >
       The distance that each nucleus grows to make the cell. The cytoplasm, the membrane and the cell compartments need a
-      value above 0. This is a fixed ring, not a measured cell outline. For a measured outline, use QuPath.
+      value of 1 pixel or more. This is a fixed ring, not a measured cell outline. For a measured outline, use QuPath.
     owner: human
     stage: when_needed
     links:
@@ -482,7 +482,7 @@ map:
     params:
       - { arg: intensity_rule, label: Intensity score of the positive cells }
     fidelity: close
-    difference: "A pathologist estimates the percent and the intensity by eye. The tool gets them from cell classes and an intensity rule. The boundaries 1, 10, 33.3 and 66.7 percent are included in the lower score."
+    difference: "A pathologist estimates the percent and the intensity by eye. The tool gets them from cell classes and an intensity rule. A value of exactly 1 percent goes to proportion score 2. The boundaries 10 percent, 1/3 and 2/3 go to the lower score."
     evidence: { source: docs, test: allred_synthetic_cells, note: "Designed cell table and a plain Python computation." }
     summary: "Allred score of {n_rows} group(s). {metrics.n_groups_scored} scored"
 

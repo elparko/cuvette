@@ -57,7 +57,7 @@ run_tool(function() {
         m <- merge(a[, c(pair_col, "value")], b[, c(pair_col, "value")], by = pair_col)
         tryCatch(t.test(m$value.y, m$value.x, paired = TRUE), error = function(e) NULL)
       } else if (test == "mann-whitney") {
-        tryCatch(wilcox.test(b$value, a$value, exact = FALSE, conf.int = FALSE), error = function(e) NULL)
+        tryCatch(suppressWarnings(wilcox.test(b$value, a$value, conf.int = FALSE)), error = function(e) NULL)
       } else tryCatch(t.test(b$value, a$value, var.equal = test == "student"), error = function(e) NULL)
       if (is.null(res)) { skipped <- c(skipped, sprintf("%s %s against %s (the test failed)", pp, pr[2], pr[1])); next }
       cmp_rows[[length(cmp_rows) + 1]] <- data.frame(population = pp, group_a = pr[1], group_b = pr[2], mean_a = mean(a$value), mean_b = mean(b$value), difference_b_minus_a = mean(b$value) - mean(a$value),

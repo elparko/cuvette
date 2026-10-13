@@ -11,4 +11,4 @@ description: Steps to read a MIC table as S, I or R and to report MIC50, MIC90 a
 4. Run show_breakpoints for the main organism and drugs. Tell the scientist the S and R breakpoints.
 5. Run interpret_mic. Read the counts, the percents and the note about values with no breakpoint.
 6. Run mic_summary for the MIC50 and the MIC90.
-7. Report the settings, n, the percent S, I and R with a 95% interval, the MIC50 and the MIC90.
+7. Report the settings, n, the MIC50 and the MIC90. Report the percent S and the percent R with their 95% intervals, and the percent I.

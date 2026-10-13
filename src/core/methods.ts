@@ -46,10 +46,14 @@ export function methodFrom(record: AnalysisRecord, name: string, decisions: Reco
   for (const s of plan.steps) s.status = "todo";
   const asked = new Set(((record.live(["clarify"]).filter((e) => e.data.action === "asked" && e.id < a.entry).at(-1)?.data.questions as string[]) ?? []));
   const answered = record.live(["clarify"]).filter((e) => e.data.action === "answered" && e.id < a.entry).at(-1);
+  const noted = record.entries(["answer"]).filter((e) => typeof e.data.note === "string" && e.data.note !== "").map((e) => ({ value: String(e.data.value ?? ""), line: `${String(e.data.value ?? "")} (${String(e.data.note)})` }));
   const questions = ((answered?.data.answers as string[]) ?? [])
     .map((x) => {
-      const i = x.lastIndexOf(" -> ");
-      return { question: x.slice(0, i), answer: x.slice(i + 4).replace(/ \(.*\)$/, "") };
+      const question = [...asked].find((q) => x.startsWith(`${q} -> `));
+      const i = question === undefined ? x.lastIndexOf(" -> ") : question.length;
+      const answer = x.slice(i + 4);
+      const hit = noted.find((n) => n.line === answer);
+      return { question: x.slice(0, i), answer: hit ? hit.value : answer };
     })
     .filter((q) => asked.has(q.question));
   const programs = new Map<string, Method["programs"][number]>();
@@ -117,7 +121,7 @@ function rowsIn(dir: string, where: MethodRow["where"], trusted: boolean): Metho
       const path = join(dir, f);
       try {
         const m = readMethod(readFileSync(path, "utf8"), f);
-        return [{ name: m.name, saved: m.saved, path, question: m.analysis.restatement ?? m.analysis.question ?? m.request ?? "", where, trusted }];
+        return [{ name: basename(f, ".json"), saved: m.saved, path, question: m.analysis.restatement ?? m.analysis.question ?? m.request ?? "", where, trusted }];
       } catch {
         return [];
       }

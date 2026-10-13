@@ -123,7 +123,7 @@ def inspect_fcs(path, ignore_offset_error=False):
             "data": {"cytometer": s.get_metadata().get("cyt", ""), "date": s.get_metadata().get("date", "")}}
 
 
-def apply_compensation(path, compensation="fcs", matrix_path=None, gating_file=None, sample_id=None, ignore_offset_error=False):
+def apply_compensation(path, compensation="none", matrix_path=None, gating_file=None, sample_id=None, ignore_offset_error=False):
     try:
         s = _sample(path, ignore_offset_error)
         if compensation == "gating_file":

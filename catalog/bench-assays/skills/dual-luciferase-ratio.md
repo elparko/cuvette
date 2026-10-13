@@ -23,7 +23,7 @@ The tool divides the ratio firefly / Renilla by the mean ratio of the control gr
 - A Renilla signal that the treatment changes. Some treatments change the Renilla promoter. Then the ratio is not valid. Say how you checked it.
 - A Renilla signal near the background. A low Renilla signal makes the ratio noisy. The tool leaves out a well with a Renilla signal at or below 0.
 - A saturated luminometer reading. Give saturation_max if the luminometer has a limit.
-- Different plates without a control on each plate. Use the plate scope and put the control on every plate.
+- Different plates without a control on each plate. Put the control on every plate. Then the scope within_block (the decision normalize_scope) with block_col set to the plate column divides each plate by its own control.
 - Only the ratio, not the raw values. Look at both signals. A drop of the firefly signal with a drop of the Renilla signal can mean cell death.
 
 ## Stop and ask
