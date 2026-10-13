@@ -128,6 +128,7 @@ decisions:
     stage: when_needed
     links:
       - { tool: estimate_causal_effect, arg: ivw_model }
+      - { tool: check_variants, arg: ivw_model }
 
   - key: distribution
     label: Distribution for the confidence interval
@@ -465,6 +466,7 @@ tools:
       alleles_harmonized: { type: boolean, description: "Leave out. The harness sets it from the decision record. true if the exposure and outcome effects refer to the same effect allele." }
       alpha: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Significance level as a fraction, for the chi-square limit of the Q contribution." }
       min_f: { type: number, description: "Leave out. The harness sets it from the decision record. F statistic (unitless) below which a variant is a weak instrument." }
+      ivw_model: { type: string, enum: [default, random, fixed], description: "Leave out. The harness sets it from the decision record. The inverse-variance model of the estimates without each variant." }
       exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Variant names to drop, as a list or as comma text. none keeps all variants." }
     required: [data]
     read_only: true

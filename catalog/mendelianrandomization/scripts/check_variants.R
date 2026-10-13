@@ -11,6 +11,8 @@ run_tool(function() {
   if (!is.null(inp$corr)) fail("check_variants needs uncorrelated variants. Give no correlation file.")
   alpha <- as.numeric(pick(p, "alpha", 0.05))
   min_f <- as.numeric(pick(p, "min_f", 10))
+  model <- pick(p, "ivw_model", "default")
+  if (!model %in% c("default", "random", "fixed")) fail(sprintf("ivw_model must be default, random or fixed, not '%s'", model))
   ratio <- inp$by / inp$bx
   ratio_se <- inp$byse / abs(inp$bx)
   w <- 1 / ratio_se^2
@@ -18,10 +20,10 @@ run_tool(function() {
   q_i <- w * (ratio - ivw_all)^2
   f_i <- (inp$bx / inp$bxse)^2
   loo <- vapply(seq_len(n), function(i) {
-    o <- mr_ivw(mr_input(bx = inp$bx[-i], bxse = inp$bxse[-i], by = inp$by[-i], byse = inp$byse[-i]))
+    o <- mr_ivw(mr_input(bx = inp$bx[-i], bxse = inp$bxse[-i], by = inp$by[-i], byse = inp$byse[-i]), model = model)
     c(o@Estimate, o@StdError)
   }, numeric(2))
-  full <- mr_ivw(mr_input(bx = inp$bx, bxse = inp$bxse, by = inp$by, byse = inp$byse))
+  full <- mr_ivw(mr_input(bx = inp$bx, bxse = inp$bxse, by = inp$by, byse = inp$byse), model = model)
   q_crit <- qchisq(1 - alpha, 1)
   tab <- data.frame(snp = inp$snps, beta_exposure = inp$bx, beta_outcome = inp$by, wald_ratio = ratio, wald_ratio_se = ratio_se, f_statistic = f_i, q_contribution = q_i, ivw_without = loo[1, ], ivw_without_se = loo[2, ], shift = loo[1, ] - full@Estimate, stringsAsFactors = FALSE)
   tab$flag <- ifelse(f_i < min_f, "weak instrument", ifelse(q_i > q_crit, "outlier in Q", ""))
