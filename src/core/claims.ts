@@ -1,3 +1,4 @@
+import type { AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Claim } from "./types.ts";
 
@@ -221,11 +222,18 @@ function versionParts(v: unknown, out: number[]): void {
 
 function inputValues(record: AnalysisRecord): Target[] {
   const out: number[] = [];
-  for (const e of record.entries(["user", "setup", "session", "tool_call"])) {
+  for (const e of record.entries(["user", "setup", "session", "tool_call", "decision", "plan_approved"])) {
     if (e.kind === "user") leaves(String(e.data.text ?? ""), out);
     else if (e.kind === "setup") leaves(e.data.values, out);
     else if (e.kind === "tool_call") {
       if (!FREE_TEXT_TOOLS.has(String(e.data.tool))) leaves(e.data.args, out);
+    }
+    else if (e.kind === "decision") {
+      if (e.data.by !== "agent") leaves(e.data.new, out);
+    }
+    else if (e.kind === "plan_approved") {
+      const plan = (e.data.plan ?? {}) as Partial<AnalysisPlan>;
+      leaves([plan.steps?.map((s) => s.decisions?.map((d) => d.value)), plan.data?.n, plan.definitions, plan.exclusions], out);
     }
     else for (const a of (e.data.adapters ?? []) as { version?: string; programVersion?: string }[]) {
       versionParts(a.version, out);
@@ -233,6 +241,47 @@ function inputValues(record: AnalysisRecord): Target[] {
     }
   }
   return out.map((value) => ({ value }));
+}
+
+const COUNT_AFTER =
+  /^[ \t]*(?:rows?|columns?|samples?|subjects?|observations?|animals?|mice|rats?|patients?|participants?|replicates?|measurements?|records?|data points?|images?|files?|fields?|channels?)\b|^[ \t]*(?:per group|in each group|in total|total)\b/i;
+const COUNT_BEFORE = /(?:\b[nN][ \t]*=|\b(?:sample size|group size|total of|all)[ \t]*(?:of|=|:|is)?)[ \t]*$/i;
+
+function knownCounts(record: AnalysisRecord): Target[] {
+  const out: number[] = [];
+  for (const e of record.entries(["data_check", "inspection"])) {
+    if (e.kind === "inspection") {
+      leaves(String(e.data.summary ?? ""), out);
+      continue;
+    }
+    leaves(String(e.data.size ?? ""), out);
+    const sizes = ((e.data.groups as { sizes?: [string, number][] } | null)?.sizes ?? []).map(([, n]) => n);
+    out.push(...sizes, sizes.reduce((a, b) => a + b, 0));
+  }
+  return out.filter((v) => Number.isInteger(v) && v > 0).map((value) => ({ value }));
+}
+
+function countContext(text: string, f: Found): boolean {
+  if (f.percent || f.unit || f.step !== 1 || f.value < 0) return false;
+  return COUNT_AFTER.test(text.slice(f.end, f.end + 40)) || COUNT_BEFORE.test(text.slice(Math.max(0, f.start - 40), f.start));
+}
+
+// A design constant is a conventional value next to its cue word: "80% power", "power of 0.8", "95% CI", "alpha = 0.05".
+// The power is 80% only, because the system prompt asks for it. Another power, or "power 80" with no percent sign, is still a claim.
+// A number next to a power cue matches only a logged key with "power" in its name, or a number in script output text.
+const DESIGN: { values: number[]; before: RegExp; after: RegExp }[] = [
+  { values: [0.8], before: /\bpower[ \t]*(?:of|=|:)?[ \t]*$/i, after: /^[ \t]*(?:statistical[ \t]+)?power\b/i },
+  { values: [0.9, 0.95, 0.99], before: /\b(?:confidence[ \t]+level|level[ \t]+of[ \t]+confidence)[ \t]*(?:of|=|:)?[ \t]*$/i, after: /^[ \t]*(?:confidence|CIs?\b)/i },
+  { values: [0.001, 0.01, 0.05, 0.1], before: /(?:\b(?:alpha|significance[ \t]+level|level[ \t]+of[ \t]+significance)|α)[ \t]*(?:of|=|:|at)?[ \t]*$/i, after: /^[ \t]*(?:significance[ \t]+level|level[ \t]+of[ \t]+significance)\b/i },
+];
+
+function cued(text: string, f: Found, d: (typeof DESIGN)[number]): boolean {
+  return d.before.test(text.slice(Math.max(0, f.start - 40), f.start)) || d.after.test(text.slice(f.end, f.end + 40));
+}
+
+function designConstant(text: string, f: Found): boolean {
+  const v = f.percent ? f.value / 100 : f.value;
+  return DESIGN.some((d) => d.values.some((x) => Math.abs(x - v) < 1e-9) && cued(text, f, d));
 }
 
 export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
@@ -244,7 +293,9 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const logged = record.numbers().sort((a, b) => rank(a.node) - rank(b.node) || (order.get(b.node) ?? 0) - (order.get(a.node) ?? 0));
   const targets = logged.map((n) => target(n.path, n.value));
   const plain = new Set(logged.flatMap((n, i) => (comparison.has(n.node) || stale.has(n.node) ? [] : [i])));
+  const power = new Set(logged.flatMap((n, i) => (/power|^stdout$|^file:/i.test(n.path) ? [i] : [])));
   const inputs = inputValues(record);
+  const counts = knownCounts(record);
   const found = extractNumbers(text, { small: true });
   const claims: Claim[] = [];
   for (const s of splitSentences(text)) {
@@ -252,7 +303,7 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
     const hedged = HEDGE.test(s.text);
     const own = found.filter((f) => f.start >= s.start && f.start < s.end);
     const sentenceText = s.text.length > 300 ? s.text.slice(0, 297) + "..." : s.text;
-    const hits = own.map((f) => ({ f, i: matchesAny(f, targets, f.small ? plain : undefined, DOWN.test(text.slice(Math.max(s.start, f.start - NEAR), Math.min(s.end, f.end + NEAR)))) }));
+    const hits = own.map((f) => ({ f, i: matchesAny(f, targets, cued(text, f, DESIGN[0]!) ? (f.small ? new Set([...power].filter((i) => plain.has(i))) : power) : f.small ? plain : undefined, DOWN.test(text.slice(Math.max(s.start, f.start - NEAR), Math.min(s.end, f.end + NEAR)))) }));
     const anyMatched = hits.some((h) => h.i !== undefined && !h.f.small);
     const before = claims.length;
     for (const { f, i } of hits) {
@@ -262,6 +313,8 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
         continue;
       }
       if (matchesAny(f, inputs) !== undefined) continue;
+      if (designConstant(text, f)) continue;
+      if (countContext(text, f) && matchesAny(f, counts) !== undefined) continue;
       const label = cited ? "literature" : hedged && !anyMatched ? "inferred" : "unsourced";
       claims.push({ text: sentenceText, value: f.value, label });
     }

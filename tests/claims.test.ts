@@ -276,8 +276,8 @@ describe("checkAnswer inputs and small counts", () => {
   });
 
   test("a number only in the script source, or in a code file that the script wrote, is not sourced", () => {
-    const r = scriptRun("power = 0.8\nprint('done')", { "copy.py": "power = 0.8\n", "out.csv": "min_effect\n1.62\n" });
-    expect(checkAnswer("At 80% power, the test can find an effect of 1.62 hours.", r).map((c) => c.label)).toEqual(["unsourced", "measured"]);
+    const r = scriptRun("power = 0.9\nprint('done')", { "copy.py": "power = 0.9\n", "out.csv": "min_effect\n1.62\n" });
+    expect(checkAnswer("At 90% power, the test can find an effect of 1.62 hours.", r).map((c) => c.label)).toEqual(["unsourced", "measured"]);
   });
 
   test("a wrong number that no step wrote is still flagged", () => {
@@ -348,5 +348,101 @@ describe("checkAnswer inputs and small counts", () => {
 
   test("a unit converts for a value in a list", () => {
     expect(labels("The second pellet weighed 250 mg.", [{ node: "n1", path: "metrics.mass_g[1]", value: 0.25 }])).toEqual(["measured"]);
+  });
+
+  test("80% power and other design constants next to their cue word are not claims", () => {
+    expect(labels("At 80% power, the test can find d = 1.81.", [{ node: "n1", path: "min_d", value: 1.81 }])).toEqual(["measured"]);
+    expect(labels("With a power of 0.8, the test can find d = 1.81.", [{ node: "n1", path: "min_d", value: 1.81 }])).toEqual(["measured"]);
+    expect(labels("The confidence level of 95% is the default, and the 5% significance level is the threshold.", [])).toEqual([]);
+  });
+
+  test("the same digits with no cue word, another power or power 80 with no percent sign are still flagged", () => {
+    expect(labels("About 80% of the samples are above the cut.", [])).toEqual(["unsourced"]);
+    expect(labels("The treated mean is 80.", [])).toEqual(["unsourced"]);
+    expect(labels("The study has 90% power.", [])).toEqual(["unsourced"]);
+    expect(labels("The achieved power was 0.83.", [])).toEqual(["unsourced"]);
+    expect(labels("Power 80 is enough.", [])).toEqual(["unsourced"]);
+    expect(labels("At 90% power, the mean difference is 0.9.", [{ node: "n1", path: "metrics.estimate", value: 0.9 }])).toEqual(["unsourced", "measured"]);
+    expect(labels("The test has a power of 0.83.", [{ node: "n1", path: "stdout", value: 0.83 }])).toEqual(["measured"]);
+    expect(labels("The 95% CI is 0.95 to 1.20, and the significance of 0.01 holds.", [])).toEqual(["unsourced", "unsourced", "unsourced"]);
+    expect(labels("Effect size d = 1.81\nPower: 80%", [{ node: "n1", path: "metrics.min_d", value: 1.81 }])).toEqual(["measured"]);
+    expect(labels("Difference: 0.9\nConfidence level: 95%", [])).toEqual(["unsourced"]);
+  });
+
+  test("a row count or a group size from the data check is sourced only next to a count word", () => {
+    const { record, entries } = fake([]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "data_check", data: { size: "12 rows, 3 columns", groups: { column: "group", sizes: [["control", 16], ["treated", 16]] } } });
+    expect(checkAnswer("The file has 12 rows and 32 samples, 16 per group (n = 32).", record)).toHaveLength(0);
+    expect(checkAnswer("The mean difference is 12. The file has 14 rows.", record).map((c) => [c.value, c.label])).toEqual([[12, "unsourced"], [14, "unsourced"]]);
+  });
+
+  test("a count from the inspect result is sourced", () => {
+    const { record, entries } = fake([]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "inspection", data: { summary: "data.csv: 24 rows, 3 columns: sample_id (text), group (text), value (number)." } });
+    expect(checkAnswer("All 24 samples are in the test.", record)).toHaveLength(0);
+    expect(checkAnswer("There are 24 outliers.", record).map((c) => c.label)).toEqual(["unsourced"]);
+  });
+
+  test("values of the confirmed plan and decisions of the scientist are inputs, a choice of the agent is not", () => {
+    const { record, entries } = fake([]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "decision", data: { key: "trim", new: 12.5, by: "human" } });
+    entries.push({ id: 61, ts: "", session: "s", kind: "decision", data: { key: "bins", new: 40, by: "agent" } });
+    entries.push({ id: 62, ts: "", session: "s", kind: "plan_approved", data: { plan: { steps: [{ step: "test", status: "planned", decisions: [{ label: "minimum", value: 150 }] }], data: { n: "18 mice" }, definitions: [{ measure: "responder", definition: "a drop of 30 percent or more" }] } } });
+    expect(checkAnswer("The trim was 12.5, the minimum was 150 and 18 mice had 30% drops.", record)).toHaveLength(0);
+    expect(checkAnswer("The data had 40 bins.", record).map((c) => c.label)).toEqual(["unsourced"]);
+  });
+});
+
+describe("answer check on the two-group whole task", () => {
+  const logged = [
+    { node: "n2", path: "metrics.mean_control", value: 4.2 },
+    { node: "n2", path: "metrics.mean_treated", value: 5.1 },
+    { node: "n2", path: "metrics.estimate", value: 0.9 },
+    { node: "n2", path: "metrics.t", value: 4.89 },
+    { node: "n2", path: "metrics.df", value: 9.8 },
+    { node: "n2", path: "metrics.p", value: 0.00063 },
+    { node: "n2", path: "metrics.ci_low", value: 0.49 },
+    { node: "n2", path: "metrics.ci_high", value: 1.31 },
+    { node: "n2", path: "metrics.cohen_d", value: 2.82 },
+    { node: "n2", path: "metrics.n1", value: 6 },
+    { node: "n2", path: "metrics.n2", value: 6 },
+    { node: "n3", path: "metrics.min_effect_d", value: 1.81 },
+  ];
+  const cases: [string, number[]][] = [
+    ["At 80% power, the test can detect an effect of d = 1.81 or larger.", []],
+    ["With a power of 0.8, the smallest effect it can detect is d = 1.81.", []],
+    ["The study has 80% power to detect d = 1.81.", []],
+    ["The data have 12 rows and 3 columns.", []],
+    ["Each group has 6 samples (12 samples in total).", []],
+    ["n = 12 in total, 6 per group.", []],
+    ["The Welch t-test gives t = 4.89 and p = 0.00063.", []],
+    ["The mean difference is 0.9 (95% CI 0.49 to 1.31).", []],
+    ["At the 95% confidence level, the interval is 0.49 to 1.31.", []],
+    ["The two-sided test at alpha = 0.05 is significant (p = 0.00063).", []],
+    ["The 5% significance level is the threshold, and p = 0.00063.", []],
+    ["Cohen d is 2.82, a large effect.", []],
+    ["The control mean is 4.2 and the treated mean is 5.1.", []],
+    ["| group | n | mean |\n|---|---|---|\n| control | 6 | 4.2 |\n| treated | 6 | 5.1 |", []],
+    ["All 12 samples are in the test, and no rows are left out.", []],
+    ["The confidence level of 95% is the default of the tool.", []],
+    ["At 90% power, the test can detect d = 1.81.", [90]],
+    ["The study has 85% power.", [85]],
+    ["Power 80 is enough for d = 1.81.", [80]],
+    ["About 80% of the samples are above 4.5.", [80, 4.5]],
+    ["The treated mean is 80.", [80]],
+    ["The data have 14 rows (n = 13).", [14, 13]],
+    ["The mean difference is 12.", [12]],
+    ["There are 12 outliers in the treated group.", [12]],
+    ["The achieved power was 0.83.", [0.83]],
+    ["The 99% CI is 0.31 to 1.49.", [0.31, 1.49]],
+    ["The test gives t = 4.98 and p = 0.00063.", [4.98]],
+    ["At 80% power, the test can detect d = 1.95.", [1.95]],
+    ["The mean difference is 1.2 (95% CI 0.49 to 1.31).", [1.2]],
+    ["Each group has 16 samples.", [16]],
+  ];
+  test.each(cases)("%s", (text, wrong) => {
+    const { record, entries } = fake(logged, ["Compare the two groups and tell me if they differ."]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "data_check", data: { size: "12 rows, 3 columns", groups: { column: "group", sizes: [["control", 6], ["treated", 6]] } } });
+    expect(checkAnswer(text, record).filter((c) => c.label === "unsourced").map((c) => c.value)).toEqual(wrong);
   });
 });
