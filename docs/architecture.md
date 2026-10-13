@@ -415,6 +415,12 @@ cuvette mcp
 With `--output json`, the output has `stop`: `answer`, `max_steps` (the step limit), `error` or
 `stopped`. After an `error`, the exit code is 1.
 
+In a run with `-p`, the harness answers each decision question. It uses the first value of
+this list: the answers file, the recommendation, the decision default. If the question has none of
+these, the recommendation is the default of the linked tool argument. If there is no tool
+default, the harness withdraws the question and the step does not run. The harness does not
+take the first option of a list.
+
 ## Changes made during the build (2026-10-08)
 
 - **Permission order.** Rules are checked deny, then ask, then allow; the first match decides

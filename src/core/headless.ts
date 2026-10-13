@@ -4,7 +4,7 @@ import { METHOD_DATA_TITLE } from "./datacompare.ts";
 import type { Question } from "./types.ts";
 
 export async function answerHeadless(s: Session, q: Question, value: unknown, note: string): Promise<void> {
-  const tries = [value, q.recommendation?.value, q.default, q.options[0]?.value].filter((x, i, a) => x !== undefined && a.findIndex((y) => String(y) === String(x)) === i);
+  const tries = [value, q.recommendation?.value, q.default].filter((x, i, a) => x !== undefined && a.findIndex((y) => String(y) === String(x)) === i);
   let refusal = "";
   for (const v of tries) {
     try {
@@ -17,6 +17,7 @@ export async function answerHeadless(s: Session, q: Question, value: unknown, no
     return;
   }
   const text = `No answer for ${q.decisionKey || q.title} was accepted: ${refusal}`;
+  s.questions.withdraw(q.qid, text);
   s.record.append("notice", { text });
   console.error(text);
 }
@@ -34,17 +35,18 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         return;
       }
       const catchAll = "*" in answers && !(q.decisionKey && !q.options.length && q.recommendation?.value !== undefined);
-      const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : q.recommendation?.value;
+      const fromFile = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : undefined;
+      const wanted = fromFile ?? q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
-      const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted) : wanted) : wanted ?? fallback;
+      const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted, { first: false }) : wanted ?? q.default) : wanted ?? fallback;
       if (v === undefined) {
-        const why = `The answers file has no value for ${q.decisionKey || q.title}, and the question has no recommendation. No one can answer it in a headless run.`;
+        const why = `The answers file has no value for ${q.decisionKey || q.title} that fits the question, and the question has no recommendation and no default. No one can answer it in a headless run. Give the value in the answers file.`;
         setTimeout(() => {
           if (s.questions.withdraw(q.qid, why)) s.record.append("notice", { text: why });
         }, 0);
         return;
       }
-      const note = wanted === undefined ? "no answer in the answers file; the harness used the recommendation or the first option" : "answered from the answers file";
+      const note = fromFile !== undefined ? "answered from the answers file" : q.recommendation ? `no answer in the answers file; the harness used the recommendation${q.recommendation.reason ? `: ${q.recommendation.reason}` : ""}` : q.decisionKey ? "no answer in the answers file; the harness used the default" : "no answer in the answers file; the agent uses its own recommendation";
       setTimeout(() => void answerHeadless(s, q, v, note), 0);
     }
     if (e.type === "permission") {
