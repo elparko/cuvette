@@ -46,6 +46,7 @@ import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan,
 import { modeHook, Permissions } from "./permissions.ts";
 import { FOLDER_LIST_MAX, folderListNote, foldersNote, systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
+import { RETRY_BUDGET_MS, realSleep, type Sleep } from "../providers/retry.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
@@ -236,6 +237,8 @@ export class Session {
   refereeProvider?: Provider;
   adapters: LoadedAdapter[] = [];
   runtimes: AdapterRuntime[] = [];
+  private defaultNames = new Set<string>();
+  private warmed = false;
   adapterInfo: { name: string; title: string; version: string; programVersion: string; trust?: string }[] = [];
   private codeAsks = new Map<string, string>();
   private selfTestAsks = new Map<string, string>();
@@ -428,6 +431,7 @@ export class Session {
       this.notes.push(`The default adapter ${a.name} did not start: ${(r.reason as Error).message}`);
     });
     defaults.splice(0, defaults.length, ...defaults.filter((_, i) => launched[named.length + i]!.status === "fulfilled"));
+    this.defaultNames = new Set(defaults.map((a) => a.name));
 
     this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS, REPORTING_DECISION]);
     this.interactive = !!opts.interactive;
@@ -653,6 +657,16 @@ export class Session {
     }
     this.adapters.push(...out);
     return out;
+  }
+
+  // A named adapter gets a worker with its modules imported. A default adapter gets one only if the request names a file that it reads.
+  private warmAdapters(text: string) {
+    if (this.warmed) return;
+    this.warmed = true;
+    for (const rt of this.runtimes) {
+      if (!rt.warm) continue;
+      if (!this.defaultNames.has(rt.adapter.name) || filesFor(text, { fileTypes: rt.adapter.manifest.adapter.file_types }, this.cwd).length) rt.warm(true);
+    }
   }
 
   private starting: Promise<void> = Promise.resolve();
@@ -1091,6 +1105,7 @@ export class Session {
       else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.realRequest()?.data.text ?? text), true);
       this.turnNo++;
       this.chooseActiveTools(text, true);
+      this.warmAdapters(text);
       if (this.pick) {
         const hint = fileTypeHint(text, () => this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
         if (hint) this.notes.push(hint);
@@ -1286,12 +1301,17 @@ export class Session {
   endedBy: "answer" | "max_steps" | "error" | "stopped" = "stopped";
 
   private cutReply = false;
-  recoveryWaitMs = 60_000;
-  recoveryRounds = 3;
+  retryBudgetMs = RETRY_BUDGET_MS;
+  recoveryWaitMs = 20_000;
+  recoveryRounds = 1;
+  recoverySleep: Sleep = realSleep;
 
   private async stepWithRecovery(noTools: boolean, signal: AbortSignal): Promise<StepResult> {
     let rounds = 0;
     let compacted = false;
+    let budget = { leftMs: this.retryBudgetMs };
+    let started = Date.now();
+    let allTries = 0;
     for (;;) {
       let retried = false;
       let tries = 1;
@@ -1311,6 +1331,7 @@ export class Session {
           knownTools: [...this.tools.keys()],
           noToolCalls: noTools,
           signal,
+          retryBudget: budget,
           onDelta: (d) => {
             streamed = true;
             if (d.type === "text") partial += d.text;
@@ -1350,14 +1371,22 @@ export class Session {
         }
         dropStreamed();
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
-        this.record.append("notice", { text: `The model did not answer after ${countWord(tries)} ${tries === 1 ? "try" : "tries"}. The conversation is saved up to the last finished step.` });
+        allTries += tries;
+        const seconds = Math.round(Math.max(Date.now() - started, this.retryBudgetMs - budget.leftMs) / 1000);
+        const after = `after ${countWord(allTries)} ${allTries === 1 ? "try" : "tries"} in ${seconds} s`;
+        this.record.append("notice", { text: `The model did not answer ${after}. The conversation is saved up to the last finished step.` });
         if (this.settings.headless) {
-          if (++rounds > this.recoveryRounds) throw new ProviderError(`${e.message} The run waited ${this.recoveryRounds} times and then stopped.`);
-          this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting to try again (round ${rounds} of ${this.recoveryRounds}).` });
-          await abortable(new Promise((r) => setTimeout(r, this.recoveryWaitMs)), signal);
+          if (++rounds > this.recoveryRounds || this.recoveryWaitMs > budget.leftMs)
+            throw new ProviderError(`The model did not answer ${after}. ${e.message} The run stopped. Wait a few minutes, then start the run again.`);
+          budget.leftMs -= this.recoveryWaitMs;
+          this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting ${Math.round(this.recoveryWaitMs / 1000)} s to try again (round ${rounds} of ${this.recoveryRounds}).` });
+          await this.recoverySleep(this.recoveryWaitMs, signal);
           continue;
         }
         const choice = await this.askRecovery(e.message, signal);
+        budget = { leftMs: this.retryBudgetMs };
+        started = Date.now();
+        allTries = 0;
         if (choice === "stop") throw e;
         if (choice === "local") {
           const problem = await this.useLocalModel("the Claude API could not be reached");

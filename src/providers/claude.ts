@@ -6,7 +6,7 @@ import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { RETRIES, retryReason, withRetry, type Sleep } from "./retry.ts";
+import { RETRIES, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
@@ -29,7 +29,10 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return new ProviderError(keyApiProblem(e.status, e.message));
   if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message} ${keyApiProblem(403)}`);
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
-  if (e instanceof Anthropic.RateLimitError) return new ProviderError("Claude rate limit reached. Wait a moment and retry.", true);
+  if (e instanceof Anthropic.RateLimitError) {
+    const wait = retryAfterMs(e);
+    return new ProviderError(`The Claude API refused the request because of a rate limit (HTTP 429).${wait ? ` It asks for a wait of ${Math.ceil(wait / 1000)} s.` : ""}`, true);
+  }
   if (e instanceof Anthropic.APIError && e.status === 413) return new ProviderError(`The request is too large for the Claude API: ${e.message}`, false, true);
   if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`, false, CONTEXT_OVERFLOW.test(e.message));
@@ -107,8 +110,8 @@ export class ClaudeProvider implements Provider {
     this.mark = opts.cache === "off" ? undefined : opts.cache === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
   }
 
-  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
-    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"], budget?: StepRequest["retryBudget"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry, budget });
   }
 
   private get client(): any {
@@ -200,11 +203,11 @@ export class ClaudeProvider implements Provider {
     let msg: any;
     try {
       try {
-        msg = await this.retry(run, req.signal, req.onRetry);
+        msg = await this.retry(run, req.signal, req.onRetry, req.retryBudget);
       } catch (e) {
         if (this.fallbacks && e instanceof Anthropic.BadRequestError && /fallback|betas?\b|server-side/i.test(e.message)) {
           this.fallbacks = false;
-          msg = await this.retry(run, req.signal, req.onRetry);
+          msg = await this.retry(run, req.signal, req.onRetry, req.retryBudget);
         } else throw e;
       }
     } catch (e) {

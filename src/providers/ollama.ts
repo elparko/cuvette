@@ -164,8 +164,8 @@ export class OllamaProvider implements Provider {
     return out;
   }
 
-  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
-    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"], budget?: StepRequest["retryBudget"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry, budget });
   }
 
   private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
@@ -183,10 +183,10 @@ export class OllamaProvider implements Provider {
     return res;
   }
 
-  private async post(body: Record<string, unknown>, idle: IdleSignal, onRetry?: StepRequest["onRetry"]): Promise<Response> {
+  private async post(body: Record<string, unknown>, idle: IdleSignal, onRetry?: StepRequest["onRetry"], budget?: StepRequest["retryBudget"]): Promise<Response> {
     const host = ollamaHost();
     try {
-      return await this.retry(() => this.attempt(body, idle), idle.signal, onRetry);
+      return await this.retry(() => this.attempt(body, idle), idle.signal, onRetry, budget);
     } catch (e) {
       if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
       throw this.networkError(e, host, idle.signal);
@@ -262,13 +262,13 @@ export class OllamaProvider implements Provider {
   }
 
   private async run(req: StepRequest, body: Record<string, unknown>, sent: number, idle: IdleSignal): Promise<StepResult> {
-    let res = await this.post(body, idle, req.onRetry);
+    let res = await this.post(body, idle, req.onRetry, req.retryBudget);
     if (res.status === 400 && "think" in body) {
       const err = await res.text();
       if (/think/i.test(err)) {
         this.thinkOk = false;
         delete body.think;
-        res = await this.post(body, idle, req.onRetry);
+        res = await this.post(body, idle, req.onRetry, req.retryBudget);
       } else throw ollamaError(err, res.status);
     }
     if (!res.ok) {

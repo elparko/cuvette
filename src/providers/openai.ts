@@ -105,7 +105,7 @@ export class OpenAIProvider implements Provider {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
     const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
-    if (res.status === 429 || res.status === 408 || res.status >= 500) {
+    if (res.status === 429 || res.status === 408 || res.status === 409 || res.status >= 500) {
       const txt = hideKeys(await res.text()).text;
       if (body.stream && NO_STREAM.test(txt)) return new Response(txt, { status: 400 });
       throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
@@ -150,7 +150,7 @@ export class OpenAIProvider implements Provider {
   }
 
   // One try reads the whole reply, so that a reply that stops early is tried again.
-  private async exchange(make: () => Record<string, unknown>, user: AbortSignal | undefined, onRetry: StepRequest["onRetry"], onDelta: StepRequest["onDelta"]): Promise<Reply> {
+  private async exchange(make: () => Record<string, unknown>, user: AbortSignal | undefined, onRetry: StepRequest["onRetry"], onDelta: StepRequest["onDelta"], budget?: StepRequest["retryBudget"]): Promise<Reply> {
     const idle = idleSignal(TIMEOUT_MS, user);
     try {
       for (let again = 0; ; again++) {
@@ -158,7 +158,7 @@ export class OpenAIProvider implements Provider {
         const res = await this.retry(async () => {
           const r = await this.attempt(body, idle);
           return r.ok ? { r, reply: await this.read(r, idle, onDelta) } : { r };
-        }, idle.signal, onRetry);
+        }, idle.signal, onRetry, budget);
         if (res.reply) return res.reply;
         const err = await this.httpError(res.r, body);
         if (err !== "again") throw err;
@@ -171,11 +171,11 @@ export class OpenAIProvider implements Provider {
     }
   }
 
-  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
-    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"], budget?: StepRequest["retryBudget"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry, budget });
   }
 
-  private async read(res: Response, idle: IdleSignal, onDelta: StepRequest["onDelta"]): Promise<Reply> {
+  private async read(res: Response, idle: IdleSignal, onDelta: StepRequest["onDelta"], budget?: StepRequest["retryBudget"]): Promise<Reply> {
     const reader = res.body?.getReader();
     if (!reader) throw partial("the reply has no body");
     const dec = new TextDecoder();
@@ -293,7 +293,7 @@ export class OpenAIProvider implements Provider {
     const reply = await this.exchange(() => this.body(native, req.tools), req.signal, req.onRetry, (d) => {
       if (d.type === "text") streamed += d.text;
       req.onDelta?.(d);
-    });
+    }, req.retryBudget);
     let n = lastCallNumber(req.messages);
     const used = new Set(req.messages.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : []))));
     const freshId = (id: string) => {

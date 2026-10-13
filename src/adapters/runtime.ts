@@ -22,6 +22,7 @@ export interface AdapterRuntime {
   tools(): Promise<Tool[]>;
   cancel(): Promise<void>;
   close(): Promise<void>;
+  warm?(load: boolean): void;
 }
 
 // With quick, a Python adapter starts before its version command ends. The worker waits for the command.

@@ -1650,7 +1650,30 @@ test("a headless run waits, tries again and then stops with a clear error", asyn
   session.bus.on((e) => e.type === "question" && cards.push(e));
   await session.send("go");
   expect(cards).toHaveLength(0);
-  expect(String(session.record.entries(["error"]).at(-1)!.data.message)).toMatch(/waited 2 times and then stopped/);
+  expect(String(session.record.entries(["error"]).at(-1)!.data.message)).toMatch(/did not answer after three tries .*The run stopped\. Wait a few minutes, then start the run again\./);
+});
+
+test("a headless run stops when the next wait passes the total wait limit", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  failOn(provider, new Set([0, 1, 2, 3]));
+  session = await recoverySession(provider, { headless: true });
+  const waits: number[] = [];
+  session.recoverySleep = async (ms) => void waits.push(ms);
+  session.recoveryRounds = 5;
+  session.recoveryWaitMs = 25_000;
+  await session.send("go");
+  expect(waits).toEqual([25_000, 25_000]);
+  expect(String(session.record.entries(["error"]).at(-1)!.data.message)).toMatch(/after three tries/);
+});
+
+test("the provider gets the retry budget of the step", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  const seen: unknown[] = [];
+  const step = provider.step.bind(provider);
+  provider.step = async (r) => (seen.push(r.retryBudget), step(r));
+  session = await recoverySession(provider, { headless: true });
+  await session.send("go");
+  expect(seen[0]).toEqual({ leftMs: 60_000 });
 });
 
 test("a headless run goes on if the network comes back", async () => {
@@ -1658,7 +1681,30 @@ test("a headless run goes on if the network comes back", async () => {
   failOn(provider, new Set([1, 2]));
   session = await recoverySession(provider, { headless: true });
   session.recoveryWaitMs = 0;
+  session.recoveryRounds = 2;
   expect(await session.send("go")).toBe("Back again.");
+});
+
+async function warmSession(isDefault: boolean, text: string): Promise<boolean[]> {
+  session = await recoverySession(new FakeProvider([{ text: "ok" }, { text: "ok" }]));
+  const rt = session.runtimes[0]!;
+  rt.adapter.manifest.adapter.file_types = [".csv"];
+  if (isDefault) (session as any).defaultNames = new Set([rt.adapter.name]);
+  const calls: boolean[] = [];
+  rt.warm = (load) => void calls.push(load);
+  await session.send(text);
+  await session.send("again data.csv");
+  return calls;
+}
+
+test("the first request warms a named adapter once", async () => {
+  expect(await warmSession(false, "go")).toEqual([true]);
+});
+
+test("the first request warms a default adapter only if the request names a file that it reads", async () => {
+  expect(await warmSession(true, "go")).toEqual([]);
+  await session!.close();
+  expect(await warmSession(true, "Summarize data.csv")).toEqual([true]);
 });
 
 function nearLimit(): void {
@@ -1957,7 +2003,7 @@ test("a retry removes the partial streamed text, and the notice counts the real 
   });
   expect(await session.send("go")).toBe("All done.");
   expect(events).toEqual(["half a rep", "reset", "half a rep", "reset", "All done."]);
-  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The model did not answer after four tries. The conversation is saved up to the last finished step.");
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The model did not answer after four tries in 0 s. The conversation is saved up to the last finished step.");
 });
 
 test("a reply after a full context is kept if the summary cannot make the context shorter", async () => {

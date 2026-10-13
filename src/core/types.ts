@@ -126,6 +126,7 @@ export interface StepRequest {
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;
   onRetry?: (r: { attempt: number; of: number; waitMs: number; reason: string }) => void;
+  retryBudget?: { leftMs: number };
 }
 
 export interface StepResult {
