@@ -6,7 +6,7 @@ import sqlite3
 import subprocess
 import sys
 
-QP = os.environ.get("CUVETTE_PROGRAM_PATH", "qgis_process")
+QP = os.environ.get("CUVETTE_PROGRAM_PATH") or "qgis_process"
 CALL_DIR = os.environ.get("CUVETTE_CALL_DIR", ".")
 RESAMPLING = ["near", "bilinear", "cubic", "cubicspline", "lanczos", "average", "mode", "max", "min", "med", "q1", "q3"]
 ZSTATS = ["count", "sum", "mean", "median", "stdev", "min", "max", "range", "minority", "majority", "variety", "variance"]
@@ -22,7 +22,10 @@ def quote(a):
 
 def qgis(algorithm, inputs):
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "LANG": "en_US.UTF-8", "PYTHONUTF8": "1"}
-    r = subprocess.run([QP, "run", algorithm, "-"], input=json.dumps({"inputs": inputs}), capture_output=True, text=True, env=env)
+    try:
+        r = subprocess.run([QP, "run", algorithm, "-"], input=json.dumps({"inputs": inputs}), capture_output=True, text=True, env=env)
+    except OSError:
+        sys.exit(f"{os.path.basename(QP)}: command not found. Install QGIS or set CUVETTE_QGIS_PROCESS to the path of qgis_process.")
     try:
         res = json.loads(r.stdout)
     except ValueError:

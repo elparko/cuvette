@@ -193,6 +193,7 @@ async function runOne(
       values.push({ expect: e, got });
       failures.push(...judge(e, got));
     }
+    if (failures.length && !last.ok && last.error && !failures.some((f) => f.includes(last.error!))) failures.push(`the tool failed: ${last.error}`);
   }
   return { id: test.id, ok: failures.length === 0, failures, durationMs: Date.now() - started, outputs, values };
 }

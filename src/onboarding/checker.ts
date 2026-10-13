@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml, parseDocument, YAMLSeq } from "yaml";
 import type { z } from "zod";
 import { locate } from "../adapters/locate.ts";
+import { ENVS, envNameIn, PROGRAM_INSTALL, R_PACKAGES } from "../core/doctor.ts";
 import { adapterDirs, loadAdapter, Manifest } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { runTests as runKnownAnswerTests } from "./kat.ts";
@@ -17,6 +18,42 @@ export interface Report {
   warnings: string[];
   findings: Finding[];
   tests?: TestOutcome[];
+  notInstalled?: { name: string; ids: string[] }[];
+}
+
+const MISSING: RegExp[] = [
+  /there is no package called ['‘’"]?([\w.]+)/,
+  /No module named ['"]?([\w]+)/,
+  /Package ([\w.]+) not found in current path/,
+  /spawn (?:\S*\/)?([^\s/]+) ENOENT/,
+  /([\w.+-]+): command not found/,
+  /: \d+: ([\w.+-]+): not found/,
+  /(?:^|: )([^:"]+?) was not found\. Set [A-Z][A-Z0-9_]+ /,
+  /(?:^|: )([\w.+-]+) is not installed/,
+];
+
+export function missingDependency(text: string, program: string): string | undefined {
+  if (/the program was not found/.test(text)) return program;
+  for (const re of MISSING) {
+    const hit = re.exec(text);
+    if (hit) return hit[1];
+  }
+  return undefined;
+}
+
+export function installHint(name: string, m: z.infer<typeof Manifest>): string {
+  const env = envNameIn(m);
+  const doctorFixes = R_PACKAGES[name] || (env && ENVS[env]) || PROGRAM_INSTALL[name]?.command;
+  return doctorFixes ? "Run cuvette doctor --fix" : "Install it with the steps in program.install of adapter.yaml";
+}
+
+export function missingDependencies(tests: TestOutcome[], program: string): { name: string; ids: string[] }[] {
+  const byName = new Map<string, string[]>();
+  for (const t of tests) {
+    const name = t.failures.map((f) => missingDependency(f, program)).find(Boolean);
+    if (name) byName.set(name, [...(byName.get(name) ?? []), t.id]);
+  }
+  return [...byName].map(([name, ids]) => ({ name, ids }));
 }
 
 interface ToolInfo {
@@ -265,6 +302,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
 
   let tests: TestOutcome[] | undefined;
+  let notInstalled: { name: string; ids: string[] }[] = [];
   let toolsKnown = ((tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files") && !(opts.static && m.module);
   if (opts.runTests && !opts.static) {
     const work = mkdtempSync(join(tmpdir(), "cuvette-check-"));
@@ -283,6 +321,10 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       tests = await runKnownAnswerTests(adapter, runtime, { workDir: work, gui: opts.gui });
       const skipped = m.tests.filter((t) => t.gui && !opts.gui).length;
       if (skipped) warnings.push(`${skipped} known-answer test(s) open a window (gui: true) and did not run. Run with --gui to include them`);
+      notInstalled = missingDependencies(tests, m.program.name);
+      errors.unshift(...notInstalled.map((n) => `${n.ids.length} of ${tests!.filter((t) => !t.skipped).length} tests could not run: ${n.name} is not installed. ${installHint(m.adapter.name, m)}`));
+      const notRun = new Set(notInstalled.flatMap((n) => n.ids));
+      tests = tests.filter((t) => !notRun.has(t.id));
       for (const t of tests) for (const f of t.failures) errors.push(`test "${t.id}" failed: ${f}`);
       for (const t of tests) if (t.skipped) warnings.push(`test "${t.id}" did not run: ${t.skipped}`);
     } catch (err) {
@@ -305,6 +347,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   applyLint({ errors, warnings }, findings);
   const report: Report = { ok: errors.length === 0, errors, warnings, findings };
   if (tests) report.tests = tests;
+  if (notInstalled.length) report.notInstalled = notInstalled;
   return report;
 }
 

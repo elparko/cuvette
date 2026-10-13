@@ -4,7 +4,8 @@ cd "$(dirname "$0")"
 U="${OPENMS_TUTORIAL_URL:-https://abibuilder.cs.uni-tuebingen.de/archive/openms/Tutorials/Example_Data/Metabolomics/datasets}"
 SRC=2012_02_03_PStd_050_1.mzML
 OUT=PStd_050_1_rt600-660_mz100-200.mzML
-PY="${PYOPENMS_PYTHON:-python3}"
+PY="${PYOPENMS_PYTHON:-}"
+if [ -z "$PY" ]; then [ -x "$HOME/.cuvette/envs/pyopenms/bin/python" ] && PY="$HOME/.cuvette/envs/pyopenms/bin/python" || PY=python3; fi
 sha() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 [ -f "$OUT" ] && exit 0
 TMP="$(mktemp -d)"

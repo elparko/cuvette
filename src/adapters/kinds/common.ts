@@ -449,6 +449,7 @@ export function readFields(obj: unknown, opts: { inferMetrics?: boolean; scanPat
   const o = obj as Record<string, unknown>;
   if (typeof o.ok === "boolean") f.ok = o.ok;
   if (typeof o.error === "string") f.error = o.error;
+  else if (Array.isArray(o.error) && o.error.length && o.error.every((e) => typeof e === "string")) f.error = [...new Set(o.error)].join("; ");
   if (typeof o.summary === "string") f.summary = o.summary;
   if (o.metrics && typeof o.metrics === "object" && !Array.isArray(o.metrics)) f.metrics = numericTop(o.metrics as Record<string, unknown>);
   else if (opts.inferMetrics) {

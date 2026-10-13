@@ -11,7 +11,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 curl -fsSL --retry 3 -o "$TMP/bcrxl.rda" "$URL"
 [ "$(sha "$TMP/bcrxl.rda")" = "$SHA" ] || { echo "checksum mismatch: Bodenmiller_BCR_XL_flowSet.rda" >&2; exit 1; }
-for d in "${GA_R_LIBS:-}" /Volumes/T7/guided-analysis/tools/R-library "$HOME/.guided-analysis/R-library"; do
+for d in "${CUVETTE_R_LIBS:-}" /Volumes/T7/guided-analysis/tools/R-library "$HOME/.cuvette/R-library"; do
   [ -n "$d" ] && [ -d "$d" ] && R_LIBS_USER="${R_LIBS_USER:+$R_LIBS_USER:}$d" && export R_LIBS_USER
 done
 Rscript -e '

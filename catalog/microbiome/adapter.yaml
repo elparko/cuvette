@@ -23,9 +23,9 @@ program:
     - https://vegandevs.github.io/vegan/
   install: >
     Install R (brew install r on macOS). Then install Maaslin2, ALDEx2, vegan, permute and jsonlite from CRAN and
-    Bioconductor into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER,
-    /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
-    Rscript -e 'install.packages("BiocManager"); BiocManager::install(c("Maaslin2", "ALDEx2", "vegan", "permute", "jsonlite"), lib = "~/.guided-analysis/R-library")'
+    Bioconductor into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER,
+    /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    Rscript -e 'install.packages("BiocManager"); BiocManager::install(c("Maaslin2", "ALDEx2", "vegan", "permute", "jsonlite"), lib = "~/.cuvette/R-library")'
   citation:
     - text: "Mallick, H., Rahnavard, A., McIver, L. J., Ma, S., Zhang, Y., Nguyen, L. H., Tickle, T. L., Weingart, G., Ren, B., Schwager, E. H., Chatterjee, S., Thompson, K. N., Wilkinson, J. E., Subramanian, A., Lu, Y., Waldron, L., Paulson, J. N., Franzosa, E. A., Bravo, H. C., & Huttenhower, C. (2021). Multivariable association discovery in population-scale meta-omics studies. PLOS Computational Biology, 17(11), e1009442. https://doi.org/10.1371/journal.pcbi.1009442"
       doi: 10.1371/journal.pcbi.1009442
@@ -85,7 +85,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that
-  exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library.
+  exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library.
   The program version in this adapter is the version of the R package Maaslin2, not of R. Each random step
   (rarefaction, permutations, Monte Carlo draws) calls set.seed with the seed decision first. The tools never
   change the input files.

@@ -6,7 +6,7 @@ import { afterAll, expect, test } from "vitest";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
-import { parseCsv, parseKeyValue, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
+import { parseCsv, parseKeyValue, readFields, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-kinds-"));
 const started: AdapterRuntime[] = [];
@@ -478,3 +478,9 @@ test.skipIf(process.platform === "win32")("runProcess returns after the program 
     process.kill(Number(r.stdout.trim()), "SIGKILL");
   } catch {}
 }, 15_000);
+
+test("readFields joins an error that comes as a list of messages", () => {
+  expect(readFields({ ok: false, error: ["step failed on a.fcs. R says: x", "step failed on b.fcs. R says: x"] }).error).toBe("step failed on a.fcs. R says: x; step failed on b.fcs. R says: x");
+  expect(readFields({ ok: false, error: ["same", "same"] }).error).toBe("same");
+  expect(readFields({ ok: false, error: [1, 2] }).error).toBeUndefined();
+});
