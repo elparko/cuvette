@@ -175,6 +175,31 @@ test("the short list hides the unused model when Cuvette can start", async () =>
   expect(short).toContain("Cuvette can start");
 });
 
+test("the short list puts the missing environments on one line, with no install command and no citation", () => {
+  const env = (name: string): Check => ({ id: `env:${name}`, group: "Python environments", name, status: "missing", detail: "not made", fix: { command: `uv venv ${name}`, safe: true }, cite: "Author (2020)." });
+  const checks: Check[] = [
+    { id: "node", group: "Needed to start", name: "Node", status: "ok", detail: "version 22" },
+    { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: "set" },
+    { id: "java", group: "Tools", name: "Java", status: "missing", detail: "ImageJ needs it.", fix: { command: "brew install openjdk" }, cite: "Java (1995)." },
+    { id: "uv", group: "Tools", name: "uv", status: "ok", detail: "uv" },
+    env("biostats"),
+    env("science"),
+    { id: "prog:qupath", group: "Programs", name: "qupath", status: "missing", detail: "QuPath was not found.", fix: { link: "https://qupath.github.io" } },
+    { id: "prog:mzmine", group: "Programs", name: "mzmine", status: "missing", detail: "MZmine was not found.", fix: { link: "https://mzmine.github.io" } },
+  ];
+  expect(doctorText(checks, { only: ["missing"], brief: true })).toContain("Programs\n  missing  qupath, mzmine");
+  expect(doctorText(checks, { only: ["missing"], brief: true })).not.toContain("qupath.github.io");
+  expect(doctorText(checks.filter((c) => c.id !== "uv"), { only: ["missing"], brief: true })).toContain("Install: uv venv biostats");
+  const short = doctorText(checks, { only: ["missing", "old"], brief: true });
+  expect(short).toContain("Python environments\n  missing  biostats, science");
+  expect(short).toContain("Install: brew install openjdk");
+  expect(short).not.toContain("uv venv");
+  expect(short).not.toContain("How to cite");
+  expect(short).toContain("cuvette doctor --fix installs 2");
+  expect(doctorText(checks)).toContain("How to cite: Author (2020).");
+  expect(doctorText(checks, { only: ["missing"] })).toContain("Download: https://qupath.github.io");
+});
+
 test("the install commands are exact", () => {
   expect(uvCommand("/Users/a/.cuvette", "biostats")).toBe(
     "uv venv --python 3.12 /Users/a/.cuvette/envs/biostats && uv pip install --python /Users/a/.cuvette/envs/biostats/bin/python statsmodels pingouin lifelines matplotlib openpyxl 'pandas<3' scipy",

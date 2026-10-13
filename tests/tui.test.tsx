@@ -303,6 +303,16 @@ describe("cards", () => {
     expect(s.record.entries(["follow_step"])[0]!.data.agentDoes).toBe(true);
   });
 
+  test("the sample request at first start does not open the setup card", async () => {
+    const h = makeHarness();
+    const s = new FakeSession({ delayMs: 0 });
+    const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: true, env: {}, firstMessage: "Is drug 2 better than drug 1?" });
+    live = { h, s, done };
+    await until(() => s.sent.includes("Is drug 2 better than drug 1?") && h.all().includes("Type /help for commands."));
+    await settle();
+    expect(h.all()).not.toContain("Setup: your choices for this analysis");
+  });
+
   test("setup card edits a field and saves", async () => {
     const { h, s } = start({ autoSetup: true });
     const card = () => {

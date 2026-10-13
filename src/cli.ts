@@ -6,6 +6,7 @@ import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import type { Mode } from "./core/types.ts";
 
 readOldEnv();
+if (process.env.NO_COLOR && process.env.FORCE_COLOR === undefined) process.env.FORCE_COLOR = "0";
 if (!process.env.CUVETTE_HOME) {
   const moved = moveOldHome();
   if (moved) console.error(moved);
@@ -294,6 +295,11 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
         i--;
         continue;
       }
+      if (!pasted.trim()) {
+        i--;
+        continue;
+      }
+      if (!(await import("./core/credentials.ts")).keyProblem(pasted.trim())) process.stderr.write("Checking the key...\n");
       const r = await fs.chooseClaude(pasted);
       console.log(r.text);
       if (r.ok) break;
@@ -305,7 +311,8 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
     if (st.models.length > 1) {
       console.log("\nModels in Ollama on this computer:");
       st.models.forEach((m, i) => console.log(`  ${i + 1}  ${m}${m === model ? " (recommended)" : ""}`));
-      const a = (await ask(`Type a number, or press Enter for ${model}: `)).trim();
+      let a = (await ask(`Type a number, or press Enter for ${model}: `)).trim();
+      while (/^\d+$/.test(a) && !st.models[Number(a) - 1]) a = (await ask(`Type a number from 1 to ${st.models.length}, or press Enter for ${model}: `)).trim();
       model = st.models[Number(a) - 1] ?? (a || model);
     }
     const r = await fs.chooseLocal(model);
@@ -318,7 +325,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   console.log("\nChecking this computer for the programs that Cuvette uses (about 15 seconds)...");
   const dr = await import("./core/doctor.ts");
   const checks = await dr.runDoctor();
-  console.log(dr.doctorText(checks, { only: ["missing", "old"] }) + "\nThe full list: cuvette doctor\n");
+  console.log(dr.doctorText(checks, { only: ["missing", "old"], brief: true }) + "\nThe full list: cuvette doctor\n");
   const yes = (await ask("Try a 2-minute sample analysis? It uses a small public data set: extra sleep of 10 patients with two drugs (Student, 1908). [Y/n] ")).trim();
   if (/^n/i.test(yes)) return undefined;
   const s = fs.copySample();
@@ -330,6 +337,7 @@ async function interactive(resumeId?: string, folder?: string) {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
+  if (!process.stdin.isTTY) fail('The terminal app needs a terminal for the input. For a request from a pipe or a script, use cuvette -p "<request>". For the browser app, use cuvette app.');
   if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
   let sample: { cwd: string; message: string } | undefined;
   if (!resumeId && !str(o.model) && process.stdin.isTTY && (await import("./core/firststart.ts")).needsFirstStart()) sample = await firstStart();
@@ -386,6 +394,7 @@ async function app(folder?: string) {
     if (!resume) fail("There is no session to resume.");
   }
   if (folder && !existsSync(folder)) fail(`No folder ${folder}.`);
+  if (folder && !statSync(folder).isDirectory()) fail(`${folder} is not a folder. Give the folder that has the data.`);
   if (resume) {
     const url = await sharedApp(resume);
     if (url) {
@@ -910,7 +919,15 @@ async function ask(prompt: string): Promise<string> {
     if (process.stdin.isTTY) {
       const { createInterface } = await import("node:readline");
       const rl = createInterface({ input: process.stdin, terminal: false });
-      return new Promise((resolve) => rl.once("line", (l) => (rl.close(), resolve(l))));
+      const stop = () => {
+        process.stderr.write("\n");
+        process.exit(130);
+      };
+      process.once("SIGINT", stop);
+      return new Promise((resolve) => {
+        rl.once("line", (l) => (process.off("SIGINT", stop), resolve(l), rl.close()));
+        rl.once("close", () => (process.off("SIGINT", stop), resolve("")));
+      });
     }
     for await (const c of process.stdin) all += c;
     lines = all.split("\n");

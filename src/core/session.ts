@@ -15,7 +15,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -383,7 +383,10 @@ export class Session {
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
     const place = findPlace(ref, { cwd: opts.cwd, outputFolder: loadSettings(opts.cwd ?? process.cwd(), opts.settings ?? {}).output_folder });
-    if (!place) throw new Error(`No session ${ref}`);
+    if (!place) {
+      const row = readIndex().find((r) => r.id === ref);
+      throw new Error(row ? `The folder of session ${ref} is gone: ${row.folder}. Someone moved or deleted it` : `No session ${ref}`);
+    }
     const log = join(place.recordDir, "log.jsonl");
     if (!existsSync(log)) throw new Error(`No session ${ref}`);
     const id = place.id;
@@ -1034,6 +1037,8 @@ export class Session {
 
   async send(text: string, opts: { internal?: boolean; plan?: boolean } = {}): Promise<string> {
     if (this.busy) throw new Error("the agent is busy; wait or press Esc to stop it");
+    const gone = [this.cwd, this.record.dir].find((d) => !existsSync(d));
+    if (gone) throw new Error(`the folder ${gone} is gone. Someone moved or deleted it. Nothing was sent. Open a folder again, or start a new session`);
     text = this.withoutKeys(text);
     this.busy = true;
     this.endedBy = "stopped";

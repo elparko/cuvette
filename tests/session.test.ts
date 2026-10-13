@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -103,6 +103,24 @@ test("resume rebuilds the history from the log", async () => {
   await session.close();
   session = await Session.resume(id, { provider: new FakeProvider([{ text: "again" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
   expect(session.history.length).toBe(2);
+});
+
+test("a deleted folder gives a plain error on send and on resume", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "hello" }]), cwd, settings: { guidance: false } });
+  await session.send("hi");
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  rmSync(cwd, { recursive: true, force: true });
+  await expect(Session.resume(id, { provider: new FakeProvider([]) })).rejects.toThrow(`The folder of session ${id} is gone: ${join(cwd, "cuvette")}`);
+  const cwd2 = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const provider = new FakeProvider([{ text: "never" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: cwd2, settings: { guidance: false } });
+  rmSync(cwd2, { recursive: true, force: true });
+  await expect(session.send("hi")).rejects.toThrow(`the folder ${cwd2} is gone. Someone moved or deleted it. Nothing was sent.`);
+  expect(provider.requests).toHaveLength(0);
+  expect(session.busy).toBe(false);
 });
 
 test("a promise of an action with no tool call gets one nudge", async () => {

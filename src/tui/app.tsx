@@ -180,7 +180,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     const first = startCards(session, env);
     line("▸", planIntro(session), undefined, true);
     if (opts.firstMessage) session.send(opts.firstMessage).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
-    if (opts.autoSetup !== false && needsSetup(session)) void openSetup({ openCard: addCard } as CommandCtx);
+    if (!opts.firstMessage && opts.autoSetup !== false && needsSetup(session)) void openSetup({ openCard: addCard } as CommandCtx);
     for (const c of first) addCard(c);
   }, []);
 
@@ -451,7 +451,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         </CardRows.Provider>
       ) : null}
       {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
-        <Text color="cyan">{"> "}</Text>
+        <Box flexShrink={0}>
+          <Text color="cyan">{"> "}</Text>
+        </Box>
         {card ? (
           <Text dimColor>Answer the card above.</Text>
         ) : (

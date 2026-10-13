@@ -337,17 +337,24 @@ export function safeFixes(checks: Check[]): string[] {
   return [...new Set(cmds)];
 }
 
-export function doctorText(checks: Check[], opts: { only?: Status[] } = {}): string {
+export function doctorText(checks: Check[], opts: { only?: Status[]; brief?: boolean } = {}): string {
   const lines: string[] = [];
   let group = "";
   const modelRow = (c: Check) => c.id === "claude-key" || c.id === "ollama";
   const shown = opts.only ? checks.filter((c) => opts.only!.includes(c.status) && !(modelRow(c) && canStart(checks))) : checks;
+  const fixable = new Set(safeFixes(checks));
+  const short = (c: Check) => !!opts.brief && c.status === "missing" && (c.group === "Programs" || fixable.has(c.fix?.command ?? ""));
   for (const c of shown) {
-    if (c.group !== group) lines.push(`${lines.length ? "\n" : ""}${(group = c.group)}`);
+    if (c.group !== group) {
+      lines.push(`${lines.length ? "\n" : ""}${(group = c.group)}`);
+      const names = shown.filter((x) => x.group === group && short(x)).map((x) => x.name);
+      if (names.length) lines.push(`  missing  ${names.join(", ")}`);
+    }
+    if (short(c)) continue;
     lines.push(`  ${c.status.padEnd(8)} ${c.name}: ${c.detail}`);
     if (c.status !== "ok" && c.fix?.command) lines.push(`           Install: ${c.fix.command}`);
     if (c.status !== "ok" && c.fix?.link) lines.push(`           ${c.fix.command ? "Or download" : "Download"}: ${c.fix.link}`);
-    if (c.cite) lines.push(`           How to cite: ${c.cite}`);
+    if (c.cite && !opts.brief) lines.push(`           How to cite: ${c.cite}`);
   }
   const n = (s: Status) => checks.filter((c) => c.status === s).length;
   lines.push("", `${n("ok")} ok, ${n("missing")} missing, ${n("old")} old.`);
