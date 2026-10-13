@@ -1,5 +1,13 @@
 import { expect, test } from "vitest";
-import { foldersNote, foldersText, systemPrompt } from "../src/core/prompt.ts";
+import { folderListNote, foldersNote, foldersText, systemPrompt } from "../src/core/prompt.ts";
+
+test("the folder list note uses the list_dir format and quotes a name with a line break", () => {
+  const note = folderListNote([{ name: "data.csv", folder: false, size: 120 }, { name: "raw", folder: true }, { name: "a\n- b", folder: false, size: 1 }], false);
+  expect(note).toContain("\n  - data.csv  120\n  d raw\n");
+  expect(note).toContain('  - "a\\n- b"  1');
+  expect(note).not.toContain("\n- b");
+  expect(folderListNote([], false)).toBe("The project folder is empty.");
+});
 
 const base = { adapters: [], mode: "watch" as const, lab: "", guidance: true };
 

@@ -121,6 +121,17 @@ export const SETTINGS: SettingDef[] = [
     shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
   },
   {
+    name: "show_thinking",
+    group: "Model",
+    label: "Show thinking",
+    help: "on: the Claude model sends a summary of its thinking at each step. The app shows it, and the record keeps it. off: the model sends no summary, so the text of each step comes sooner. The bill is the same.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+    def: "on",
+    lockedInTurn: true,
+    shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
+  },
+  {
     name: "mode",
     group: "Session",
     label: "Mode",

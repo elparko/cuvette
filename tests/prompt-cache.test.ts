@@ -145,4 +145,33 @@ test("a resumed session sends the note again once, in its first new message", as
   expect(noteCount(q.requests.at(-1)!.messages)).toBe(2);
   expect(texts.find((t) => t.endsWith("Second"))).toContain("Folders of this session.");
   expect(texts.find((t) => t.endsWith("Third"))).not.toContain("Folders of this session.");
+  expect(texts.filter((t) => t.includes("The harness listed the project folder")).length).toBe(1);
+});
+
+test("the first message lists the project folder; a later turn does not list it again", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"));
+  writeFileSync(join(cwd, "data.csv"), "group,value\na,1\n");
+  mkdirSync(join(cwd, "raw"));
+  const p = new FakeProvider([{ text: "one" }, { text: "two" }]);
+  const s = await fakeSession(p, cwd);
+  await s.send("First");
+  await s.send("Second");
+  const [first, second] = userTexts(p.requests.at(-1)!.messages);
+  expect(first).toContain("The harness listed the project folder at the start");
+  expect(first).toContain("  - data.csv  16");
+  expect(first).toContain("  d raw");
+  expect(first!.indexOf("Folders of this session.")).toBeLessThan(first!.indexOf("The harness listed the project folder"));
+  expect(second).not.toContain("The harness listed the project folder");
+  expect(p.requests[0]!.system).not.toContain("data.csv");
+});
+
+test("the folder list stops at 50 entries and names list_dir for the rest", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"));
+  for (let i = 0; i < 60; i++) writeFileSync(join(cwd, `f${i}.txt`), "x");
+  const p = new FakeProvider([{ text: "one" }]);
+  const s = await fakeSession(p, cwd);
+  await s.send("First");
+  const first = userTexts(p.requests[0]!.messages)[0]!;
+  expect(first.match(/^ {2}[-d] /gm)!.length).toBe(50);
+  expect(first).toContain("The list shows the first 50 entries. Call list_dir to see all.");
 });

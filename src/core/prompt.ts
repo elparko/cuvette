@@ -87,6 +87,15 @@ export function foldersNote(f: { project: string; work: string; output?: string 
   return `Folders of this session. The project folder is ${pathText(f.project)}. The session folder is ${pathText(f.work)}. The output folder is ${pathText(out)}. The figures folder is ${pathText(join(out, "figures"))}.`;
 }
 
+export const FOLDER_LIST_MAX = 50;
+
+export function folderListNote(entries: { name: string; folder: boolean; size?: number }[], more: boolean): string {
+  if (!entries.length) return "The project folder is empty.";
+  const lines = entries.map((e) => `  ${e.folder ? "d" : "-"} ${pathText(e.name)}${e.size === undefined ? "" : `  ${e.size}`}`);
+  const tail = more ? `\n  The list shows the first ${FOLDER_LIST_MAX} entries. Call list_dir to see all.` : "";
+  return `The harness listed the project folder at the start, in the format of list_dir (d is a folder, - is a file with its size in bytes):\n${lines.join("\n")}${tail}`;
+}
+
 export function systemPrompt(opts: {
   adapters: { adapter: LoadedAdapter; programVersion: string; instructions: string }[];
   model: ModelInfo;

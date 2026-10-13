@@ -16,6 +16,7 @@ const NO_CREDENTIALS = "No valid Claude credentials. Type /key to add your API k
 export interface ClaudeOpts {
   apiKey?: string;
   effort?: string;
+  showThinking?: boolean;
   client?: any;
   sleep?: Sleep;
   retries?: number;
@@ -89,6 +90,7 @@ export class ClaudeProvider implements Provider {
   private apiKey?: string;
   private made?: { client: any; version: number };
   private effort: string;
+  private display: "summarized" | "omitted";
   private fallbacks = true;
   private sleep?: Sleep;
   private retries: number;
@@ -97,6 +99,7 @@ export class ClaudeProvider implements Provider {
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
     this.info = { provider: "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
     this.effort = opts.effort && opts.effort !== "auto" ? opts.effort : model === "claude-haiku-5-5" ? "medium" : "high";
+    this.display = opts.showThinking === false ? "omitted" : "summarized";
     this.fixedClient = opts.client;
     this.apiKey = opts.apiKey;
     this.sleep = opts.sleep;
@@ -170,7 +173,7 @@ export class ClaudeProvider implements Provider {
       max_tokens: MAX_TOKENS,
       system: [{ type: "text", text: system, ...(this.mark ? { cache_control: this.mark } : {}) }],
       messages: cacheLast(this.toNative(messages), this.mark),
-      thinking: { type: "adaptive", display: "summarized" },
+      thinking: { type: "adaptive", display: this.display },
       output_config: { effort: this.effort },
     };
     if (tools.length) p.tools = this.toolsNative(tools);

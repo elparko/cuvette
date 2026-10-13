@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, opendirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -23,7 +23,7 @@ import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
-import { loadSettings, xlsxOn, type Settings } from "./config.ts";
+import { loadSettings, thinkingShown, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
 import { ADAPTER_DECISION, decisionHook, DecisionRecord, REPORTING_DECISION, TEST_DECISIONS } from "./decisions.ts";
@@ -44,7 +44,7 @@ import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
-import { foldersNote, systemPrompt } from "./prompt.ts";
+import { FOLDER_LIST_MAX, folderListNote, foldersNote, systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
@@ -406,7 +406,7 @@ export class Session {
     if (resumed) this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache }));
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
@@ -609,6 +609,29 @@ export class Session {
 
   private foldersText(): string {
     return foldersNote({ project: this.cwd, work: this.workDir, output: this.outputDir });
+  }
+
+  // The first message gives the list of the project folder, so the model does not need a list_dir call before its first real step.
+  private folderList(): string | undefined {
+    try {
+      const dir = opendirSync(this.cwd);
+      const entries: { name: string; folder: boolean; size?: number }[] = [];
+      let more = false;
+      try {
+        for (let e = dir.readSync(); e; e = dir.readSync()) {
+          if (entries.length === FOLDER_LIST_MAX) {
+            more = true;
+            break;
+          }
+          entries.push({ name: e.name, folder: e.isDirectory(), size: e.isFile() ? statSync(join(this.cwd, e.name), { throwIfNoEntry: false })?.size : undefined });
+        }
+      } finally {
+        dir.closeSync();
+      }
+      return folderListNote(entries, more);
+    } catch {
+      return undefined;
+    }
   }
 
   private buildSystem(): string {
@@ -1060,7 +1083,8 @@ export class Session {
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
       if (this.history.length === 0 || !this.foldersSent) {
-        this.notes.unshift(this.foldersText());
+        const list = this.history.length === 0 ? this.folderList() : undefined;
+        this.notes.unshift(...[this.foldersText(), list].filter((n): n is string => !!n));
         this.foldersSent = true;
       }
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
@@ -2731,7 +2755,7 @@ export class Session {
       runner.onError = this.hooks.onError;
       await runner.event("SessionStart", { session: this.id });
     }
-    const later = ["model", "referee", "mode", "effort", "promptCache", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
+    const later = ["model", "referee", "mode", "effort", "promptCache", "show_thinking", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
     const shadowed = this.adapters.filter((a) => { try { return findAdapter(a.name, this.cwd).root !== a.root; } catch { return false; } }).map((a) => a.name);
     const parts = [choice === "trust" ? "This folder is trusted. Its settings, hooks and adapters apply now." : "This folder is trusted for this session. Its settings, hooks and adapters apply now."];
     if (later.length) parts.push(`These folder settings apply in the next session: ${later.join(", ")}.`);
@@ -2811,8 +2835,8 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = name === "model" || name === "effort" || name === "promptCache" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache }) : this.provider;
-    const referee = ["model", "referee", "effort"].includes(name)
+    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next) }) : this.provider;
+    const referee = ["model", "referee", "effort"].includes(name) || (name === "show_thinking" && next.referee === "same")
       ? next.referee === "same"
         ? provider
         : next.referee && next.referee !== "none"
