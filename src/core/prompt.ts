@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { outputRules } from "./results.ts";
 import { STE_PROMPT, STE_PROMPT_SMALL } from "./ste.ts";
@@ -60,18 +61,24 @@ The session started with no adapter for a science program. An adapter gives the 
 - Do not guess tool names. The program tools appear after use_adapter.
 - If no adapter fits, say so and use the generic tools.`;
 
-type Folders = { project: string; work: string; output?: string; figureFormats?: string; xlsx?: boolean };
+type Folders = { figureFormats?: string; xlsx?: boolean };
 
+// The system prompt and the tool descriptions contain no session paths. Thus a new session reads the prompt cache of an earlier session.
+// The paths go in the first user message (foldersNote).
 export function foldersText(f: Folders): string {
-  const out = f.output ?? f.work;
   return [
     "# Folders",
-    `- The project folder is ${f.project}. A relative path in read_file, list_dir, run_script and run_command starts there.`,
-    `- Files that scripts write go to the session folder ${f.work}. If the scientist names another place in the project folder, save there with an absolute path.`,
-    `- The output folder is ${out}. ${outputRules({ output: out, figureFormats: f.figureFormats ?? "png,svg", xlsx: f.xlsx ?? true })}`,
+    "- A note from the harness gives the paths of the project folder, the session folder and the output folder. A relative path in read_file, list_dir, run_script and run_command starts in the project folder.",
+    "- Files that scripts write go to the session folder. If the scientist names another place in the project folder, save there with an absolute path.",
+    `- ${outputRules({ figureFormats: f.figureFormats ?? "png,svg", xlsx: f.xlsx ?? true })}`,
     "- Use the absolute paths from earlier tool results. Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.",
     "- For run_script and run_command, give purpose (one short line) and does (what the code does, in plain words for a scientist, with no code terms).",
   ].join("\n");
+}
+
+export function foldersNote(f: { project: string; work: string; output?: string }): string {
+  const out = f.output ?? f.work;
+  return `Folders of this session. The project folder is ${f.project}. The session folder is ${f.work}. The output folder is ${out}. The figures folder is ${join(out, "figures")}.`;
 }
 
 export function systemPrompt(opts: {

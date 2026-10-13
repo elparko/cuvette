@@ -55,7 +55,7 @@ test("the merged settings show each value and its source", () => {
   expect(row(rows, "model")).toMatchObject({ value: "claude:claude-haiku-5-5", source: "user" });
   expect(row(rows, "referee")).toMatchObject({ value: "none", source: "project" });
   expect(row(rows, "mode")).toMatchObject({ value: "plan", source: "project" });
-  expect(row(rows, "effort")).toMatchObject({ value: "high", source: "default" });
+  expect(row(rows, "effort")).toMatchObject({ value: "auto", source: "default" });
   expect(row(rows, "output_folder")).toMatchObject({ value: "cuvette", source: "default" });
   expect(row(rows, "permissions").value).toBe("1 allow, 1 deny");
   expect(find("permissions")!.details!({ cwd }).join("\n")).toContain("deny  run_script  (user settings)");

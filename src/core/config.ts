@@ -50,7 +50,7 @@ export const DEFAULTS: Settings = {
   guidance: true,
   autoResume: true,
   reviseOnFindings: true,
-  effort: "high",
+  effort: "auto",
   promptCache: "5m",
   numCtx: 32768,
   think: false,

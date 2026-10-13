@@ -245,13 +245,13 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
     title: "Run a Python script",
     get description() {
       return "Run Python 3 code for statistics and plots. " +
-      `The script runs in the project folder ${project}, so a relative path reads from there, the same as in list_dir and read_file. ` +
-      `A relative path that the script opens for writing goes to the session folder ${dirs.workDir}; new files there are returned. Write to another place in the project folder only if the scientist names it, with an absolute path. ` +
+      "The script runs in the project folder, so a relative path reads from there, the same as in list_dir and read_file. " +
+      "A relative path that the script opens for writing goes to the session folder; new files there are returned. Write to another place in the project folder only if the scientist names it, with an absolute path. " +
       "os.environ['PROJECT_DIR'], os.environ['WORK_DIR'] and os.environ['OUTPUT_DIR'] give the folders. Do not search the home folder, / or /Volumes for files: use the paths from earlier results or ask the scientist. " +
       "Give purpose and does in plain language: the scientist sees them, not the code. " +
       "Use `from ga_api import call, save_table, save_figure`. `call(tool, **args)` runs another tool and returns its result as a dict. " +
       "`save_table(name, rows)` writes a CSV. `save_figure(name)` writes the current figure to the figures folder. " +
-      outputRules({ output: dirs.outputDir ?? dirs.workDir, figureFormats: dirs.figureFormats ?? "png,svg", xlsx: dirs.xlsx ?? true }) + " " +
+      outputRules({ figureFormats: dirs.figureFormats ?? "png,svg", xlsx: dirs.xlsx ?? true }) + " " +
       (scriptPython().includes("science") ? "numpy, pandas, scipy, statsmodels, scikit-learn and matplotlib are installed. " : "Only the standard library is sure to exist; use csv and statistics. ") +
       describeLimits(opts.network);
     },

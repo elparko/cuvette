@@ -44,7 +44,7 @@ import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
-import { systemPrompt } from "./prompt.ts";
+import { foldersNote, systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
@@ -485,7 +485,7 @@ export class Session {
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
     if (this.pick) extra.push(...this.adapterTools());
-    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.runTool(t, a, id, sig), guard: (m, all) => this.phiForHelper(m, all) }));
+    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.runTool(t, a, id, sig), guard: (m, all) => this.phiForHelper(m, all), folders: () => this.foldersText() }));
     if (this.pilotOn()) extra.push(...this.pilotTools());
     if (this.planFirst || this.interactive) extra.push(this.clarifyTool());
     extra.push(this.inspectTool());
@@ -602,8 +602,14 @@ export class Session {
     return this.reporting;
   }
 
+  private foldersSent = false;
+
+  private foldersText(): string {
+    return foldersNote({ project: this.cwd, work: this.workDir, output: this.outputDir });
+  }
+
   private buildSystem(): string {
-    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir, output: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) }, textStyle: this.settings.text_style });
+    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) }, textStyle: this.settings.text_style });
   }
 
   private defaultAdapters(): LoadedAdapter[] {
@@ -1048,6 +1054,10 @@ export class Session {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
+      if (this.history.length === 0 || !this.foldersSent) {
+        this.notes.unshift(this.foldersText());
+        this.foldersSent = true;
+      }
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
       else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.realRequest()?.data.text ?? text), true);
       this.turnNo++;
@@ -1489,7 +1499,7 @@ export class Session {
       return false;
     }
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
-    const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
+    const summary = summaryMessage(`${steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary}\n## Folders\n${this.foldersText()}`);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
     const rest = [...(res.request ? [res.request] : []), ...res.kept];
     this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo, kept: rest as unknown as Record<string, unknown>[] });
@@ -1614,6 +1624,7 @@ export class Session {
     entry(action, by, rid);
     if (action === "stop") {
       for (let i = from; i < this.history.length; i++) this.history[i] = withheld(this.history[i]!);
+      this.foldersSent = false;
       return false;
     }
     this.phiChoice = action;

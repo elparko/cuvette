@@ -53,14 +53,17 @@ export function vectorFormats(formats: string): string[] {
   return formats.split(",").map((f) => f.trim().toLowerCase().replace(/^\./, "")).filter((f) => f === "svg" || f === "pdf" || f === "eps");
 }
 
-export function outputRules(o: { output: string; figureFormats: string; xlsx: boolean }): string {
+// With no output path, the rules name the folders only. The paths are then in the first message, so the text stays the same in each session.
+export function outputRules(o: { output?: string; figureFormats: string; xlsx: boolean }): string {
   const vec = vectorFormats(o.figureFormats).map((f) => f.toUpperCase());
+  const figuresFolder = o.output ? `the figures folder ${join(o.output, "figures")}` : "the figures folder of the output folder";
+  const outputFolder = o.output ?? "the output folder";
   const figures =
-    `Save every figure in the figures folder ${join(o.output, "figures")} as PNG (300 dpi)${vec.length ? ` and ${vec.join(" and ")}` : ""}, with axis labels and units.` +
+    `Save every figure in ${figuresFolder} as PNG (300 dpi)${vec.length ? ` and ${vec.join(" and ")}` : ""}, with axis labels and units.` +
     (vec.length ? ` A PNG that matplotlib saves gets the ${vec.join(" and ")} copy automatically.` : "");
   const tables = o.xlsx
-    ? `Write each result table as a CSV file in ${o.output}. The harness adds each CSV to results.xlsx. Do not write an xlsx file yourself, unless the scientist asks for a specific layout.`
-    : `Write each result table as a CSV file in ${o.output}.`;
+    ? `Write each result table as a CSV file in ${outputFolder}. The harness adds each CSV to results.xlsx. Do not write an xlsx file yourself, unless the scientist asks for a specific layout.`
+    : `Write each result table as a CSV file in ${outputFolder}.`;
   return `${figures} ${tables}`;
 }
 

@@ -99,6 +99,7 @@ test("a long single turn on a small window first shortens old output, then summa
   expect(compactions.length).toBeGreaterThan(0);
   expect(notices[0]!.id).toBeLessThan(compactions[0]!.id);
   expect(String(compactions[0]!.data.summary)).toMatch(/^\[Summary of the earlier part of this session\]\n## Question/);
+  expect(String(compactions[0]!.data.summary)).toContain(`## Folders\nFolders of this session. The project folder is ${session.cwd}.`);
   const last = provider.requests.at(-1)!;
   const sent = last.messages[1]!.parts[0] as { text: string };
   expect(sent.text).toMatch(/^\[Notes from the harness\]\n- [\s\S]*\n\nRead each plate file\.$/);

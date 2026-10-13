@@ -68,7 +68,7 @@ export interface SettingRow {
 
 const ALL: Scope[] = ["session", "user", "project"];
 const MODELS = () => CLAUDE_MODELS.map((m) => m.spec);
-export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+export const EFFORTS = ["auto", "low", "medium", "high", "xhigh", "max"];
 
 export type Paper = "a4" | "letter";
 const LETTER_REGIONS = new Set(["US", "CA", "MX", "PH", "CL", "CO", "VE", "GT", "CR", "PR", "PA", "DO", "SV", "NI", "BZ"]);
@@ -104,7 +104,7 @@ export const SETTINGS: SettingDef[] = [
     name: "effort",
     group: "Model",
     label: "Effort",
-    help: "How much the Claude model thinks before it acts. More effort costs more.",
+    help: "How much the Claude model thinks before it acts. More effort costs more. auto: medium for Haiku, high for the other Claude models.",
     scopes: ALL,
     choices: () => EFFORTS,
     lockedInTurn: true,

@@ -6,6 +6,7 @@ export interface TaskDeps {
   run: (tool: Tool, args: Record<string, unknown>, callId: string, signal: AbortSignal) => Promise<{ text: string; isError: boolean }>;
   maxSteps?: number;
   guard?: (m: Message, history: Message[]) => Message | string;
+  folders?: () => string;
 }
 
 const SYSTEM = `You are a helper agent inside a Cuvette session. You have read-only tools. Do the task you get, then answer with a short report: what you looked at, what you found, with the numbers from tool results. Do not guess values.`;
@@ -21,7 +22,8 @@ export function taskTool(d: TaskDeps): Tool {
     async execute(args, ctx): Promise<ToolOutput> {
       const tools = d.tools().filter((t) => t.readOnly && t.name !== "task" && t.name !== "ask_scientist" && t.name !== "propose_change" && t.name !== "compare_options");
       const schemas = tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
-      const history: Message[] = [{ role: "user", parts: [{ type: "text", text: String(args.job) }] }];
+      const job = d.folders ? `${d.folders()}\n\n${String(args.job)}` : String(args.job);
+      const history: Message[] = [{ role: "user", parts: [{ type: "text", text: job }] }];
       for (let i = 0; i < (d.maxSteps ?? 12); i++) {
         const res = await d.provider().step({ system: SYSTEM, messages: history, tools: schemas, signal: ctx.signal });
         history.push(res.message);

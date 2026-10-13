@@ -45,7 +45,7 @@ export function controlOf(r: SettingRow): Control {
   if (!choices.length) return "text";
   if (choices.some((c) => choiceNote(d, c))) return "options";
   if (!d.free && choices.length === 2 && choices.includes("on") && choices.includes("off")) return "toggle";
-  if (!d.free && choices.length <= 5 && choices.every((c) => c.length <= 12)) return "segmented";
+  if (!d.free && choices.length <= 6 && choices.every((c) => c.length <= 12)) return "segmented";
   return "select";
 }
 
