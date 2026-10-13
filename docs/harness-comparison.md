@@ -29,6 +29,21 @@ Each time is the median of three runs, except where the table gives a different 
 Cuvette without the default `tables` adapter starts in 193 ms (after the fixes, peak RSS
 103 MB). Thus most of the remaining start time is the `tables` adapter.
 
+## Start time after the start fixes
+
+A second change removes the wait for the `tables` adapter and the largest Node costs.
+"Before" is the Cuvette code at commit d171ef9. "After" includes the start fixes.
+Each time is the median of nine runs. The runs of the two versions alternate.
+
+| Metric | Cuvette before | Cuvette after | Claude Code |
+| --- | --- | --- | --- |
+| Cold start: process start to first API request (mock) | 578 ms | 148 ms | 230 ms |
+| Process start to first streamed text token (mock) | 583 ms | 152 ms | 235 ms |
+
+Both Cuvette versions use the default `tables` adapter. The Claude Code values are the
+values of the first table. The computer had a load average of about 11 during the runs.
+Without the Node compile cache, the "after" value is 161 ms.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
@@ -58,6 +73,11 @@ Cuvette without the default `tables` adapter starts in 193 ms (after the fixes, 
    and give one line. Cuvette has `maxSteps` 4 and Claude Code has `--max-turns 4`.
    The two real runs made six model calls.
 
+For the start fixes, each Cuvette version is a copy with no `.git` folder and a new bundle.
+Thus `bin/cuvette.js` does not compare the file times, as in an installed package. The
+mock sends one text reply to each request. Each run has a new empty `CUVETTE_HOME`, so the
+saved program versions are not available. `node --cpu-prof` gave the Node profile.
+
 The cache read share is `cache_read_input_tokens` divided by the sum of `input_tokens`,
 `cache_creation_input_tokens` and `cache_read_input_tokens`.
 
@@ -84,13 +104,56 @@ adapters for the named files. This took about 400 ms, also when the request name
 Fix: `fileTypeHint` now makes the index only if the request names a file. A request that
 names a file still pays this time once in each session.
 
-### Python version check of the tables adapter (not fixed)
+### Python version check of the tables adapter (fixed)
 
-Before the first request, Cuvette starts the `tables` Python process and runs its version
-command. On a loaded computer, this took 11 s to 31 s in four runs. The limit is 30 s
-(`VERSION_TIMEOUT_MS` in `src/adapters/locate.ts`). The first request waits for it.
-A fix needs a start of the adapter in parallel with the first request. That is a design
-change, so it is not in this change.
+Before the first request, Cuvette ran the version command of the `tables` adapter. This
+command starts Python and imports openpyxl. After it, Cuvette ran Python again to record the
+package versions of the environment. The first request waited for the two commands, about
+400 ms on this computer. On a loaded computer, the version command took 11 s to 31 s in four
+runs. The limit was 30 s.
+
+Fix: a Python adapter that the session loads at the start now starts at once
+(`startAdapter` with `quick` in `src/adapters/runtime.ts`). The Python worker already starts
+at the first call. The tools and the instructions of the adapter are in the first request.
+
+- The version command runs after the start, with a limit of 5 s
+  (`START_VERSION_TIMEOUT_MS` in `src/adapters/locate.ts`).
+- The first call to the adapter waits for the version command.
+- If the command runs longer than 5 s, the record gets a notice. The notice names the
+  adapter and the program path, and gives the version from the adapter manifest.
+- The record of the package versions also runs after the start. A step of the adapter
+  waits for it, and so does the end of the session.
+- Each identified version goes to `cache/program-versions.json` in `CUVETTE_HOME`, with the
+  time and size of the program file. The next session uses this version at the start.
+- If the version command gives a different version than the saved version, the record
+  gets a notice. This can occur after a package update in the same Python environment.
+
+Before the version command ends, the session uses the saved version. If there is no saved
+version, it uses the version in the adapter manifest, as it did before after a time-out. The
+system prompt and the `session` entry of the record keep this value. The adapter steps and
+`/adapters` show the version from the version command.
+
+Commands that check a program on request, such as `cuvette doctor`, still wait for the
+version command, with the limit of 30 s.
+
+### Node start costs (fixed)
+
+A CPU profile of the start showed these costs before the first request:
+
+| Cost | Time | Fix |
+| --- | --- | --- |
+| YAML parse of `catalog/tables/adapter.yaml` (26 kB) | about 17 ms | The build writes the parsed file to `dist/catalog/<name>/adapter.json` |
+| Load of the `yaml` package | about 10 ms | The package loads at the first YAML parse (`src/core/yaml.ts`) |
+| Load of the MCP SDK and `ajv` | about 15 ms | `src/adapters/runtime.ts` loads `mcp.ts` only for an MCP adapter |
+| Compile of the bundle | about 13 ms | `bin/cuvette.js` turns on the Node compile cache |
+
+The loader uses `adapter.json` only when the CLI runs from the bundle, and only if the file
+is not older than `adapter.yaml`. The compile cache is in the temporary folder of the
+system. The first start after a new bundle compiles the code again.
+
+Most of the remaining start time is the load and compile of the bundle (about 40 ms).
+The Claude SDK takes about 18 ms and `zod` takes about 15 ms. The record, the settings and
+the key read took less than 5 ms each.
 
 ### Extra model calls (not fixed, behavior)
 

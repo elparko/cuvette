@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, statSync } from "node:fs";
+import module from "node:module";
 
 const root = new URL("../", import.meta.url);
 const bundle = new URL("dist/cli.js", root);
@@ -17,7 +18,11 @@ function bundleIsCurrent() {
   }
 }
 
-if (bundleIsCurrent()) await import(bundle.href);
+if (bundleIsCurrent()) {
+  // Node keeps the compiled bundle code on disk. The next start does not compile it again.
+  module.enableCompileCache?.();
+  await import(bundle.href);
+}
 else {
   const { register } = await import("tsx/esm/api");
   register();

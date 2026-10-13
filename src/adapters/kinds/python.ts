@@ -118,6 +118,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   };
 
   const ensure = async () => {
+    await c.ready;
     if (!child) {
       ready = spawnWorker();
       ready.catch(() => {});

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parse as parseYaml } from "yaml";
+import { parseYaml } from "../core/yaml.ts";
 import { z } from "zod";
 import { homeFolder } from "../core/old-names.ts";
 import { folderKey, folderTrusted, projectAdapterDirs } from "../core/trust.ts";
@@ -299,10 +299,29 @@ function frontmatter(text: string): Record<string, string> {
   return typeof out === "object" && out ? out : {};
 }
 
+const FROM_BUNDLE = !/\.tsx?$/.test(import.meta.url);
+
+// scripts/build-cli.mjs writes the parsed adapter.yaml of each catalog adapter to dist/catalog/<name>/adapter.json.
+export function bundledManifestFile(file: string, fromBundle = FROM_BUNDLE): string | undefined {
+  const dir = dirname(resolve(file));
+  if (!fromBundle || basename(file) !== "adapter.yaml" || dir !== join(CATALOG_DIR, basename(dir))) return undefined;
+  const json = join(ROOT, "dist", "catalog", basename(dir), "adapter.json");
+  const built = statSync(json, { throwIfNoEntry: false });
+  return built && built.mtimeMs >= statSync(file).mtimeMs ? json : undefined;
+}
+
+function manifestData(file: string): unknown {
+  const json = bundledManifestFile(file);
+  try {
+    if (json) return JSON.parse(readFileSync(json, "utf8"));
+  } catch {}
+  return parseYaml(readFileSync(file, "utf8"));
+}
+
 export function loadAdapter(path: string): LoadedAdapter {
   const file = statSync(path).isDirectory() ? join(path, "adapter.yaml") : path;
   const root = dirname(resolve(file));
-  const manifest = Manifest.parse(parseYaml(readFileSync(file, "utf8")));
+  const manifest = Manifest.parse(manifestData(file));
   let mod: Promise<AdapterModule> | undefined;
   return {
     manifest,

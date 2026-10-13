@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -7,6 +7,8 @@ import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, coerceArgs, endsWithPromise } from "../src/core/session.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
+import { loadAdapter } from "../src/adapters/manifest.ts";
+import { saveVersion } from "../src/adapters/locate.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { recordSpend } from "../src/core/spend.ts";
@@ -2491,4 +2493,65 @@ test("resume restores a pilot that a pilot card change started from the approved
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
   expect(session.pilotStage).toBe(true);
   expect(session["pilotPlan"]!.plan.steps.map((x: { step: string }) => x.step)).toEqual(["Approved step", "Added step"]);
+});
+
+function slowPython(delayS: number): string {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-slowpy-"));
+  const exe = join(dir, "python");
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; esac\n`);
+  chmodSync(exe, 0o755);
+  writeFileSync(
+    join(dir, "adapter.yaml"),
+    [
+      "adapter: { name: slowpy }",
+      'program: { name: openpyxl, version: "from the manifest" }',
+      'connection: { kind: python, interpreter: ["{program_path}"] }',
+      "locate:",
+      `  paths: [${JSON.stringify(exe)}]`,
+      '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
+      "  version_pattern: 'openpyxl (\\S+)'",
+      "  identity: 'openpyxl \\d'",
+    ].join("\n"),
+  );
+  return dir;
+}
+
+test("the first request does not wait for the version command of a Python adapter", async () => {
+  if (process.platform === "win32") return;
+  const sent: number[] = [];
+  const provider = new FakeProvider([{ text: "done" }]);
+  const step = provider.step.bind(provider);
+  provider.step = (req) => (sent.push(Date.now()), step(req));
+  const t0 = Date.now();
+  session = await Session.create({ adapters: [slowPython(2)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  await session.send("Say done.");
+  expect(sent[0]! - t0).toBeLessThan(1500);
+  expect((session.record.entries(["session"])[0]!.data.adapters as { programVersion: string }[])[0]!.programVersion).toBe("from the manifest");
+  expect(session.adapterInfo[0]!.programVersion).toBe("from the manifest");
+  await session["starting"];
+  expect(session.adapterInfo[0]!.programVersion).toBe("9.9");
+  expect(session.record.entries(["notice"]).some((e) => String(e.data.text).includes("version command"))).toBe(false);
+});
+
+test("a saved program version that the version command does not confirm gives a notice", async () => {
+  if (process.platform === "win32") return;
+  const dir = slowPython(0);
+  const a = loadAdapter(dir);
+  saveVersion(a.manifest, join(dir, "python"), "8.0");
+  session = await Session.create({ adapters: [dir], provider: new FakeProvider([{ text: "done" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  expect((session.record.entries(["session"])[0]!.data.adapters as { programVersion: string }[])[0]!.programVersion).toBe("8.0");
+  await session.send("Say done.");
+  await session["starting"];
+  expect(session.adapterInfo[0]!.programVersion).toBe("9.9");
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The version command of the adapter slowpy gives the program version 9.9. The start of this session used the saved version 8.0. The steps record 9.9.");
+});
+
+test("a version command that runs longer than the time limit gives a notice", async () => {
+  if (process.platform === "win32") return;
+  session = await Session.create({ adapters: [slowPython(7)], provider: new FakeProvider([{ text: "done" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  await session.send("Say done.");
+  await session["starting"];
+  const notice = session.record.entries(["notice"]).find((e) => String(e.data.text).includes("version command"));
+  expect(notice?.data.text).toContain("The version command of the adapter slowpy ran longer than 5 s.");
+  expect(session.adapterInfo[0]!.programVersion).toBe("from the manifest");
 });

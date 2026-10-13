@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parseYaml } from "./yaml.ts";
 import type { Citation, LoadedAdapter } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";

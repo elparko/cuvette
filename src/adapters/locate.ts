@@ -1,15 +1,18 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, sep } from "node:path";
 import { oldHomePath } from "../core/old-names.ts";
 import { accessOf } from "./access.ts";
-import { adapterDirs, type Manifest } from "./manifest.ts";
+import { adapterDirs, cuvetteHome, type Manifest } from "./manifest.ts";
 import { runProcess } from "./kinds/common.ts";
 
 export interface Located {
   path?: string;
   version: string;
   how: string;
+  identified?: boolean;
+  measured?: boolean;
+  timedOut?: boolean;
 }
 
 function expandPath(p: string): string {
@@ -74,26 +77,70 @@ export function which(name: string, pathVar = process.env.PATH ?? ""): string | 
 }
 
 const VERSION_TIMEOUT_MS = 30_000;
+export const START_VERSION_TIMEOUT_MS = 5_000;
 
-async function versionRun(m: Manifest, path: string | undefined, adapterDir: string): Promise<{ text?: string; timedOut: boolean }> {
+async function versionRun(m: Manifest, path: string | undefined, adapterDir: string, timeoutMs = VERSION_TIMEOUT_MS): Promise<{ text?: string; timedOut: boolean }> {
   const l = m.locate;
   if (!l.version_command.length) return { timedOut: false };
   const uses = l.version_command.some((a) => a.includes("{program_path}"));
   if (uses && !path) return { timedOut: false };
   const argv = l.version_command.map((a) => a.replaceAll("{program_path}", path ?? "").replaceAll("{adapter_dir}", adapterDir));
-  const r = await runProcess(argv, { timeoutMs: VERSION_TIMEOUT_MS, cwd: tmpdir() });
+  const r = await runProcess(argv, { timeoutMs, cwd: tmpdir() });
   return { text: `${r.stdout}\n${r.stderr}`, timedOut: r.timedOut };
 }
 
-async function versionText(m: Manifest, path: string | undefined, adapterDir: string): Promise<string | undefined> {
-  return (await versionRun(m, path, adapterDir)).text;
+function versionCacheFile(): string {
+  return join(cuvetteHome(), "cache", "program-versions.json");
+}
+
+function readVersions(): Record<string, { version: string; mtimeMs: number; size: number }> {
+  try {
+    return JSON.parse(readFileSync(versionCacheFile(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function versionKey(m: Manifest, path: string): string {
+  return `${m.adapter.name}\n${path}\n${m.locate.version_command.join(" ")}`;
+}
+
+export function cachedVersion(m: Manifest, path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  const hit = readVersions()[versionKey(m, path)];
+  const st = statSync(path, { throwIfNoEntry: false });
+  return hit && st && st.mtimeMs === hit.mtimeMs && st.size === hit.size ? hit.version : undefined;
+}
+
+export function saveVersion(m: Manifest, path: string, version: string): void {
+  try {
+    const st = statSync(path);
+    const file = versionCacheFile();
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify({ ...readVersions(), [versionKey(m, path)]: { version, mtimeMs: st.mtimeMs, size: st.size } }));
+    renameSync(`${file}.${process.pid}.tmp`, file);
+  } catch {}
+}
+
+// The path and version that a session uses before the version command ends: the last checked version, or the version in the manifest.
+export function quickLocate(manifest: Manifest, custom = accessOf(manifest.adapter.name).path): Located & { cached: boolean } {
+  const usesPath = manifest.locate.version_command.some((a) => a.includes("{program_path}"));
+  const list = usesPath ? candidates(manifest, custom) : [findProgram(manifest, custom)];
+  for (const c of list) {
+    const cached = cachedVersion(manifest, c.path);
+    if (cached !== undefined) return { path: c.path, version: cached, how: c.how, cached: true };
+  }
+  return { path: list[0]?.path, version: manifest.program.version, how: list[0]?.how ?? "not found", cached: false };
+}
+
+function versionRead(m: Manifest, text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  if (m.locate.version_pattern) return new RegExp(m.locate.version_pattern).exec(text)?.[1];
+  return text.trim().split(/\r?\n/)[0] || undefined;
 }
 
 function versionFrom(m: Manifest, text: string | undefined): string {
-  const fallback = m.program.version;
-  if (text === undefined) return fallback;
-  if (m.locate.version_pattern) return new RegExp(m.locate.version_pattern).exec(text)?.[1] ?? fallback;
-  return text.trim().split(/\r?\n/)[0] || fallback;
+  return versionRead(m, text) ?? m.program.version;
 }
 
 export const CUSTOM_HOW = "custom path in settings";
@@ -134,12 +181,14 @@ export function findProgram(manifest: Manifest, custom?: string): { path?: strin
   return candidates(manifest, custom ?? accessOf(manifest.adapter.name).path)[0] ?? { how: "not found" };
 }
 
-export async function locate(manifest: Manifest, dir = "", custom?: string): Promise<Located> {
+export async function locate(manifest: Manifest, dir = "", custom?: string, timeoutMs = VERSION_TIMEOUT_MS): Promise<Located> {
   const l = manifest.locate;
   const adapterDir = dir || (l.version_command.some((a) => a.includes("{adapter_dir}")) ? (adapterDirs()[manifest.adapter.name] ?? "") : "");
   if (!l.identity || !l.version_command.length) {
     const { path, how } = findProgram(manifest, custom);
-    return { path, version: versionFrom(manifest, await versionText(manifest, path, adapterDir)), how };
+    const r = await versionRun(manifest, path, adapterDir, timeoutMs);
+    const read = r.timedOut ? undefined : versionRead(manifest, r.text);
+    return { path, version: versionFrom(manifest, r.text), how, ...(r.timedOut ? { timedOut: true } : {}), ...(path && read !== undefined ? { measured: true } : {}) };
   }
   const id = new RegExp(l.identity);
   const list: { path?: string; how: string }[] = l.version_command.some((a) => a.includes("{program_path}")) ? candidates(manifest, custom ?? accessOf(manifest.adapter.name).path) : [findProgram(manifest, custom)];
@@ -149,12 +198,12 @@ export async function locate(manifest: Manifest, dir = "", custom?: string): Pro
   for (const c of list) {
     if (c.path && seen.has(c.path)) continue;
     if (c.path) seen.add(c.path);
-    const r = await versionRun(manifest, c.path, adapterDir).catch(() => ({ text: undefined, timedOut: false }));
-    if (r.text !== undefined && id.test(r.text)) return { path: c.path, version: versionFrom(manifest, r.text), how: c.how };
+    const r = await versionRun(manifest, c.path, adapterDir, timeoutMs).catch(() => ({ text: undefined, timedOut: false }));
+    if (r.text !== undefined && id.test(r.text)) return { path: c.path, version: versionFrom(manifest, r.text), how: c.how, identified: true, ...(versionRead(manifest, r.text) !== undefined ? { measured: true } : {}) };
     if (r.timedOut) slow ??= c;
     else rejected.push(c.path ?? c.how);
   }
-  if (slow) return { path: slow.path, version: manifest.program.version, how: `${slow.how}; identity not checked: the version command ran longer than ${VERSION_TIMEOUT_MS / 1000} s` };
+  if (slow) return { path: slow.path, version: manifest.program.version, how: `${slow.how}; identity not checked: the version command ran longer than ${timeoutMs / 1000} s`, timedOut: true };
   const why = rejected.length ? `; ${rejected.join(", ")} did not identify as ${manifest.program.name} (the version output has no match for ${l.identity})` : "";
   return { path: undefined, version: manifest.program.version, how: `not found${why}` };
 }
