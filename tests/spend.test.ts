@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { BUDGET_WARN, budgetProblem, budgetState, budgetUsd, cheaperModel, costUsd, dollars, entryCost, monthStart, promptTokens, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
+import { BUDGET_WARN, budgetProblem, budgetState, budgetUsd, cheaperModel, costUsd, dollars, entryCost, monthStart, promptTokens, readSpend, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { WebView } from "../src/server/app-view.ts";
@@ -48,6 +49,49 @@ test("the budget counts from the first day of this month", () => {
   } finally {
     process.env.CUVETTE_SPEND_FILE = file;
   }
+});
+
+function withSpendFile(body: string, fn: () => void) {
+  const file = process.env.CUVETTE_SPEND_FILE;
+  process.env.CUVETTE_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+  try {
+    writeFileSync(spendFile(), body);
+    fn();
+  } finally {
+    rmSync(dirname(spendFile()), { recursive: true, force: true });
+    process.env.CUVETTE_SPEND_FILE = file;
+  }
+}
+
+test("a damaged ledger keeps the good rows: no crash on null, a number, a cut line, a row with no time or an infinite cost", () => {
+  const good = JSON.stringify({ t: "2026-10-01T00:00:00Z", model: "claude-opus-5-5", usd: 1.5 });
+  withSpendFile([good, "null", "5", '"text"', '{"t":', '{"model":"x","usd":3}', '{"t":7,"usd":3}', '{"t":"2026-10-02T00:00:00Z","usd":1e400}', '{"t":"2026-10-02T00:00:00Z","usd":-4}', good].join("\n"), () => {
+    expect(readSpend()).toEqual([
+      { t: "2026-10-01T00:00:00Z", model: "claude-opus-5-5", usd: 1.5 },
+      { t: "2026-10-02T00:00:00Z", model: "unknown", usd: 0 },
+      { t: "2026-10-02T00:00:00Z", model: "unknown", usd: 0 },
+      { t: "2026-10-01T00:00:00Z", model: "claude-opus-5-5", usd: 1.5 },
+    ]);
+    expect(totalSpend()).toBeCloseTo(3, 9);
+  });
+});
+
+test("a large ledger reads in parts: the rows across each part boundary stay whole", () => {
+  const row = JSON.stringify({ t: "2026-10-01T00:00:00Z", model: "claude-haiku-5-5", usd: 0.001, inputTokens: 123456, outputTokens: 789 });
+  const n = Math.ceil((3.5 * (1 << 20)) / (row.length + 1));
+  withSpendFile(`${row}\n`.repeat(n), () => {
+    expect(readSpend()).toHaveLength(n);
+    expect(totalSpend()).toBeCloseTo(n * 0.001, 6);
+  });
+});
+
+test("cuvette spend prints the total of a damaged ledger and exits 0", () => {
+  withSpendFile(['{"t":"2026-10-01T00:00:00Z","model":"claude-opus-5-5","usd":2}', "null", "{bad", '{"usd":5}'].join("\n"), () => {
+    const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "spend"], { env: { ...process.env, CUVETTE_HOME: dirname(spendFile()) }, encoding: "utf8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("2026-10-01 claude-opus-5-5");
+    expect(r.stdout).toContain("Total: $2.00");
+  });
 });
 
 const opus = { model: "claude-opus-5-5", provider: "claude", contextWindow: 1_000_000, local: false };

@@ -1,4 +1,5 @@
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
@@ -43,21 +44,52 @@ export function indexPath(): string {
   return join(cuvetteHome(), "sessions-index.json");
 }
 
-export function readIndex(): IndexRow[] {
+const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+function parseIndex(json: string): { rows: IndexRow[]; dropped: number } {
+  const data: unknown = JSON.parse(json);
+  if (!Array.isArray(data)) throw new Error("the session index is not a list");
+  const rows = data.flatMap((r): IndexRow[] => {
+    if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id || typeof r.folder !== "string" || !r.folder) return [];
+    return [{ ...r, id: r.id, project: text(r.project) ?? "", folder: r.folder, title: text(r.title) ?? "", date: text(r.date) ?? "", name: text(r.name), custom: text(r.custom), description: text(r.description) }];
+  });
+  return { rows, dropped: data.length - rows.length };
+}
+
+export function indexRows(json: string): IndexRow[] {
+  return parseIndex(json).rows;
+}
+
+export function readIndex(path = indexPath()): IndexRow[] {
   try {
-    return JSON.parse(readFileSync(indexPath(), "utf8")) as IndexRow[];
+    return indexRows(readFileSync(path, "utf8"));
   } catch {
     return [];
   }
 }
 
+// The write keeps a damaged index next to the new one. Then no row of the damaged file goes away.
+function writeIndex(rows: IndexRow[]): void {
+  const path = indexPath();
+  mkdirSync(dirname(path), { recursive: true });
+  if (existsSync(path)) {
+    let damaged = true;
+    try {
+      damaged = parseIndex(readFileSync(path, "utf8")).dropped > 0;
+    } catch {}
+    if (damaged) renameSync(path, `${path}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
+  }
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(rows, null, 1));
+  renameSync(tmp, path);
+}
+
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
-  const old = readIndex().find((r) => r.id === p.id);
+  const all = readIndex();
+  const old = all.find((r) => r.id === p.id);
   const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
-  const rows = readIndex().filter((r) => r.id !== p.id);
-  mkdirSync(cuvetteHome(), { recursive: true });
-  writeFileSync(indexPath(), JSON.stringify([...rows, row], null, 1));
+  writeIndex([...all.filter((r) => r.id !== p.id), row]);
 }
 
 export function renameIndexRow(id: string, custom: string): boolean {
@@ -65,14 +97,14 @@ export function renameIndexRow(id: string, custom: string): boolean {
   const row = rows.find((r) => r.id === id);
   if (!row) return false;
   row.custom = custom.replace(/\s+/g, " ").trim().slice(0, 60) || undefined;
-  writeFileSync(indexPath(), JSON.stringify(rows, null, 1));
+  writeIndex(rows);
   return true;
 }
 
 export function removeIndexRow(id: string): boolean {
   const rows = readIndex();
   if (!rows.some((r) => r.id === id)) return false;
-  writeFileSync(indexPath(), JSON.stringify(rows.filter((r) => r.id !== id), null, 1));
+  writeIndex(rows.filter((r) => r.id !== id));
   return true;
 }
 

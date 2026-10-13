@@ -367,8 +367,14 @@ export function loadAdapter(path: string): LoadedAdapter {
       const pick = built !== file && existsSync(built) ? built : fromBundle && manifest.module === "adapter.ts" && root === join(CATALOG_DIR, basename(root)) && existsSync(inBundle) ? inBundle : file;
       const url = pathToFileURL(pick).href;
       // Other adapter modules in .ts load with tsx, because the bundle has no TypeScript loader.
-      const load = /\.tsx?$/.test(url) && fromBundle ? import("tsx/esm/api").then((t) => t.tsImport(url, import.meta.url)) : import(url);
-      mod = load.then((m) => (m.default ?? m) as AdapterModule);
+      // A .ts module outside this package has no package.json with "type": "module". A plain import fails on it, so tsImport loads it.
+      const outside = !resolve(pick).startsWith(ROOT + sep);
+      const load = /\.tsx?$/.test(url) && (fromBundle || outside) ? import("tsx/esm/api").then((t) => t.tsImport(url, import.meta.url)) : import(url);
+      // tsImport of a module that loads as CommonJS gives its default export one level deeper.
+      mod = load.then((m) => {
+        const x = m.default ?? m;
+        return (x && typeof x.default === "object" && !x.tools && !x.hooks && !x.checks ? x.default : x) as AdapterModule;
+      });
       return mod;
     },
   };

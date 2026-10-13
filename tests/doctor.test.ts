@@ -245,3 +245,41 @@ test("self-tests: one adapter only, and a runtime that does not start", async ()
   const only = await runSelfTests([], { adapters, only: "b", start: async () => { throw new Error("no interpreter"); } });
   expect(only).toMatchObject([{ name: "b", status: "error", detail: "Could not run: no interpreter" }]);
 });
+
+test("self-tests: an Unlisted adapter with code that is not confirmed does not start", async () => {
+  const adapters = [selfTestAdapter("unlisted", -4.0621), selfTestAdapter("good", -4.0621)];
+  const started: string[] = [];
+  const start = async (a: LoadedAdapter) => {
+    started.push(a.name);
+    return { programVersion: "1", tools: (a as unknown as { tools: () => Promise<never[]> }).tools, close: async () => {} };
+  };
+  const trust = (a: LoadedAdapter) => (a.name === "unlisted" ? { codeConfirmed: false, codeFiles: ["server.py"] } : { codeConfirmed: true, codeFiles: [] });
+  const rows = await runSelfTests([], { adapters, start, trust });
+  expect(started).toEqual(["good"]);
+  expect(rows.find((r) => r.name === "unlisted")).toMatchObject({ status: "skipped", detail: "Skipped. The adapter is Unlisted and ships code (server.py). To let it run: cuvette adapter allow-code unlisted" });
+});
+
+test("the text shows ok, missing and old rows together, with the counts and the fixes", () => {
+  const checks: Check[] = [
+    { id: "node", group: "Needed to start", name: "Node", status: "ok", detail: "version 24.1.0" },
+    { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "missing", detail: "no key is saved.", fix: { command: "cuvette key", link: "https://platform.claude.com/settings/keys" } },
+    { id: "ollama", group: "Needed to start", name: "Ollama", status: "ok", detail: "1 local model: qwen3:8b" },
+    { id: "java", group: "Tools", name: "Java", status: "old", detail: "version 1.6 is older than 8.", fix: { command: "brew install --cask temurin", link: "https://adoptium.net" } },
+    { id: "uv", group: "Tools", name: "uv", status: "ok", detail: "the Python package manager" },
+    { id: "env:science", group: "Python environments", name: "science", status: "missing", detail: "no Python.", fix: { command: "uv venv x", safe: true } },
+    { id: "program:cellprofiler", group: "Programs", name: "cellprofiler", status: "missing", detail: "CellProfiler was not found.", fix: { link: "https://cellprofiler.org/releases" }, cite: "Stirling 2021" },
+  ];
+  const text = doctorText(checks);
+  expect(text).toContain("Needed to start\n  ok       Node: version 24.1.0\n  missing  Claude API key: no key is saved.\n           Install: cuvette key\n           Or download: https://platform.claude.com/settings/keys");
+  expect(text).toContain("  old      Java: version 1.6 is older than 8.\n           Install: brew install --cask temurin");
+  expect(text).toContain("  missing  cellprofiler: CellProfiler was not found.\n           Download: https://cellprofiler.org/releases\n           How to cite: Stirling 2021");
+  expect(text).toContain("3 ok, 3 missing, 1 old.");
+  expect(text).toContain("Cuvette can start");
+  expect(text).toContain("cuvette doctor --fix installs 1 missing Python environment or R package set.");
+  const short = doctorText(checks, { only: ["missing", "old"] });
+  expect(short).not.toContain("Claude API key");
+  expect(short).not.toContain("ok       Node");
+  expect(short).toContain("old      Java");
+  const none = doctorText(checks.map((c) => ({ ...c, status: "ok" as const })), { only: ["missing", "old"] });
+  expect(none.trim().split("\n")[0]).toBe("7 ok, 0 missing, 0 old.");
+});

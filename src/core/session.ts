@@ -4229,7 +4229,7 @@ export class Session {
       case "jsonl": return trail.exportJsonl(this.record, join(out, "log.jsonl"));
       case "pdf": return trail.exportPdf(this.record, a, join(out, "trail.pdf"), this.citationStyle());
       case "protocol": return ex.exportProtocol(this.record, a, join(out, "protocol.md"), this.citationStyle());
-      case "script": return ex.exportScript(this.record, a, join(out, "replay.ts"));
+      case "script": return ex.exportScript(this.record, a, join(out, "replay.mts"));
       case "notebook": return ex.exportNotebook(this.record, a, join(out, "analysis.ipynb"));
       case "flow": return ex.exportFlow(this.record, a, join(out, "flow.json"));
       case "xlsx": {

@@ -221,19 +221,31 @@ function toCode(v: unknown, refs: Map<string, string>): string {
 
 export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const nodes = liveNodes(record);
-  const names = [...new Set(nodes.map((n) => n.adapter))];
+  const names = [...new Set(nodes.map((n) => n.adapter).filter(Boolean))];
   const lines = [
     `import { ToolRunner } from ${JSON.stringify(REPLAY_PATH)};`,
     "",
+    "// Run: npx tsx <this file>. Each step prints its metrics. A failed step stops the script with exit code 1.",
     `const run = await ToolRunner.start(${JSON.stringify(names)});`,
+    "const step = async (n, adapter, tool, args) => {",
+    "  const r = await run.call(adapter, tool, args);",
+    "  console.log(`Step ${n} ${tool}: ${r.ok ? JSON.stringify(r.metrics ?? {}) : `failed: ${r.error}`}`);",
+    "  if (r.ok) return r;",
+    "  await run.close();",
+    "  process.exit(1);",
+    "};",
     "",
   ];
   const seen = new Map<string, string>();
   nodes.forEach((n, k) => {
+    if (!n.adapter) {
+      lines.push(`// Step ${k + 1} (${n.tool}) is a step of the harness, not of an adapter. This script runs adapter steps only.`);
+      return;
+    }
     const route = stepRoute(adapters, n)?.route ?? n.manualRoute;
     if (route) lines.push(`// Step ${k + 1}: ${route.split("\n")[0]}`);
     const refs = new Map(seen);
-    lines.push(`const s${k + 1} = await run.call(${JSON.stringify(n.adapter)}, ${JSON.stringify(n.tool)}, ${toCode(n.args, refs)});`);
+    lines.push(`const s${k + 1} = await step(${k + 1}, ${JSON.stringify(n.adapter)}, ${JSON.stringify(n.tool)}, ${toCode(n.args, refs)});`);
     n.outputs.forEach((o, i) => { if (!seen.has(o.path)) seen.set(o.path, `s${k + 1}.outputs[${i}].path`); });
   });
   lines.push("", "await run.close();", "");
@@ -261,7 +273,9 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
     const md = [`## Step ${k + 1}: ${n.summary || n.tool}`, ""];
     if (r) md.push(`Route: ${r.route}`, ...r.steps.map((s) => `- ${s}`), ...r.params.map((p) => `- ${p}`), ...r.warnings.map((w) => `- ${w}`));
     else md.push(n.manualRoute ? `Route: ${n.manualRoute}` : "This step has no manual route.");
+    if (!n.adapter) md.push("", "This is a step of the harness, not of an adapter. cuvette run-step cannot run it.");
     cells.push({ cell_type: "markdown", metadata: {}, source: cellSource(md.join("\n")) });
+    if (!n.adapter) return;
     const json = JSON.stringify(n.args).replace(/\{/g, "{{").replace(/\}/g, "}}").replace(/\$/g, "$$$$");
     cells.push({
       cell_type: "code",
