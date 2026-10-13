@@ -157,6 +157,23 @@ describe("the actions", () => {
     expect(record.append).toHaveBeenCalledWith("program", expect.objectContaining({ action: "install", adapter: "zeta", ok: true }));
   });
 
+  test("an install command does not get the API keys and tokens of the shell", async () => {
+    const old = { key: process.env.ANTHROPIC_API_KEY, gh: process.env.GITHUB_TOKEN };
+    process.env.ANTHROPIC_API_KEY = "sk-ant-secret";
+    process.env.GITHUB_TOKEN = "ghp-secret";
+    try {
+      const plan: Plan = { action: "install", name: "envtest", title: "", lines: [], runs: true, command: 'echo "key=${ANTHROPIC_API_KEY:-none} token=${GITHUB_TOKEN:-none} home=${HOME:+set}"' };
+      const lines: string[] = [];
+      expect((await runAction(plan, { home, via: "terminal", confirmed: true, onLine: (l) => lines.push(l) })).ok).toBe(true);
+      expect(lines).toContain("key=none token=none home=set");
+    } finally {
+      if (old.key === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = old.key;
+      if (old.gh === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = old.gh;
+    }
+  });
+
   test("Homebrew runs only after an explicit confirmation; a download shows the link and runs nothing", async () => {
     const r = await rows();
     const brew = await planAction(r.samtools!, "install");

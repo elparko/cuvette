@@ -3137,7 +3137,7 @@ export class Session {
     const plan = this.pilotPlan?.plan ?? this.plan;
     const definitions = plan?.definitions ?? [];
     const figs = this.figuresDir();
-    const images = (Array.isArray(a.images) ? a.images.map((p) => resolve(this.cwd, String(p))) : []).filter((p) => existsSync(p)).map((p) => {
+    const images = (Array.isArray(a.images) ? a.images.map((p) => resolve(this.cwd, String(p))) : []).filter((p) => /\.(png|jpe?g|gif|webp|svg|tiff?)$/i.test(p) && !isCredentialsFile(p) && existsSync(p) && statSync(p).isFile()).map((p) => {
       const name = `pilot-${norm(sample) || "sample"}-${basename(p)}`;
       let to = join(figs, name);
       if (resolve(p) === to) return to;

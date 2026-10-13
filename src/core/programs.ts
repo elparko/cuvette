@@ -6,6 +6,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Access } from "../adapters/access.ts";
 import { DRIVE_ROOT } from "../adapters/blind.ts";
+import { withoutSecrets } from "../adapters/kinds/common.ts";
 import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
@@ -216,7 +217,7 @@ function installFor(name: string, m: Manifest, home: string, lib: string, find: 
 
 async function rVersions(run: Run, rscript: string | undefined, lib: string, pkgs: string[]): Promise<Map<string, string>> {
   if (!rscript || !pkgs.length) return new Map();
-  const code = `.libPaths(c("${lib}", .libPaths())); for (p in c(${pkgs.map((x) => `"${x}"`).join(", ")})) cat(p, if (requireNamespace(p, quietly = TRUE)) as.character(packageVersion(p)) else "-", "\\n")`;
+  const code = `.libPaths(c(${JSON.stringify(lib)}, .libPaths())); for (p in c(${pkgs.map((x) => `"${x}"`).join(", ")})) cat(p, if (requireNamespace(p, quietly = TRUE)) as.character(packageVersion(p)) else "-", "\\n")`;
   const out = await run([rscript, "-e", code], 120_000);
   return new Map(out.stdout.split("\n").map((l) => l.trim().split(/\s+/) as [string, string]).filter((x) => x.length === 2 && x[1] !== "-"));
 }
@@ -504,7 +505,7 @@ function defaultExec(command: string, onLine: (line: string) => void, signal?: A
   const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
   return new Promise((done) => {
     if (signal?.aborted) return done(null);
-    const child = spawn("/bin/sh", ["-c", command], { env: { ...process.env, PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: !!signal });
+    const child = spawn("/bin/sh", ["-c", command], { env: { ...withoutSecrets(), PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: !!signal });
     for (const s of [child.stdout, child.stderr]) createInterface({ input: s }).on("line", onLine);
     const kill = (sig: NodeJS.Signals) => {
       try {
