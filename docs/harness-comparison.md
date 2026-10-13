@@ -44,6 +44,97 @@ Both Cuvette versions use the default `tables` adapter. The Claude Code values a
 values of the first table. The computer had a load average of about 11 during the runs.
 Without the Node compile cache, the "after" value is 161 ms.
 
+## First token with the real model after the start fixes
+
+Before the start fixes, one real run gave 4,210 ms for Cuvette and 2,649 ms for Claude Code.
+A new measurement with real Haiku uses five runs for each row and the same prompt.
+Each value is the median of five runs. The range is the lowest and the highest run.
+
+| Harness | Effort | Process start to first text token | Range |
+| --- | --- | --- | --- |
+| Cuvette | high (settings default) | 957 ms | 909 to 1,118 ms |
+| Cuvette | medium | 951 ms | 887 to 990 ms |
+| Claude Code | medium (default for Haiku) | 1,792 ms | 1,554 to 1,868 ms |
+| Claude Code | high | 1,738 ms | 1,625 to 1,948 ms |
+
+Cuvette is now about 800 ms faster than Claude Code to the first token. The old gap came from
+the start time of Cuvette. That start time included the wait for the Python version check.
+The old real runs also had a task with tools, so the first text came after more model work.
+
+### Effort high and medium
+
+For this prompt, the effort has no measurable effect on the first token in either harness.
+The difference is smaller than the spread of the runs. The prompt asks for one short
+sentence, so Haiku thinks very little at the two efforts.
+
+This result does not cover a task with tools. In the first real run with tools, the first
+Cuvette reply at effort high had 534 output tokens. The Claude Code reply at medium had 175.
+More output tokens before the text make the first token later. The owner must decide the
+default effort for Haiku. `src/core/config.ts:53` sets `effort: "high"` for all models, and
+this value replaces the Haiku default (`medium`) of `ClaudeProvider`.
+
+### Request comparison
+
+A capture server on localhost recorded the first request of each harness. These runs used
+no real model call.
+
+| Item | Cuvette | Claude Code |
+| --- | --- | --- |
+| Process start to first token on the capture server | 174 to 222 ms | 582 to 603 ms |
+| Request body size | 29,301 bytes | 75,099 bytes |
+| Tools in the request | 25 | 21 (20 in the first table) |
+| `output_config.effort` for Haiku | `high` | `medium` |
+| `thinking` | `adaptive`, `display: "summarized"` | `adaptive`, `display: "updates"` |
+| `stream` in the first request | true | true |
+| `max_tokens` | 64,000 | 128,000 |
+| `anthropic-beta` header | `server-side-fallback-2026-07-01` | 10 beta flags |
+| Other body fields | `fallbacks: "default"` | `metadata`, `context_management` |
+| Hypertext Transfer Protocol (HTTP) version and connection | HTTP/1.1, keep-alive | HTTP/1.1, keep-alive |
+| Request before the first model request | none | `HEAD /api/hello` |
+| Model requests before the first token | 1 | 1 |
+
+Cuvette streams from the first request. It sends a smaller request than Claude Code. Thus the
+model reads fewer input tokens before the first token. On a mock server on localhost, the
+steps of a session use the same connection (`tests/claude-e2e.test.ts`).
+
+### Connection setup and the warm-up request
+
+On this computer, a new connection to `api.anthropic.com` takes about 70 ms:
+
+- Domain Name System (DNS) lookup: 2 ms.
+- Transmission Control Protocol (TCP) connection: 31 ms.
+- Transport Layer Security (TLS) handshake: 35 ms.
+
+Claude Code sends `HEAD /api/hello` at the start. The API answers a `HEAD` request with
+`connection: close`. Thus this warm-up cannot give an open connection to the model request.
+A `GET /api/hello` gets `connection: keep-alive`.
+
+A test added a `GET` warm-up to Cuvette at the start of the session. Cuvette sent the model
+request about 25 ms later, while the warm-up was not complete. Thus the fetch pool opened a
+second connection, and the warm-up gave no gain. In an interactive session, the person types
+for longer than the 4 s idle limit of the Node fetch pool. Thus the warm-up is not in
+Cuvette.
+
+### Not measured
+
+- The effect of the `server-side-fallback-2026-07-01` beta and the `fallbacks` field.
+- The effect of the thinking field `display: "summarized"` against `display: "updates"`.
+
+The limit of 20 real model calls did not permit these runs. The two harnesses send different
+values, but Cuvette is the faster harness with these values.
+
+### Method of the real runs
+
+1. The prompt is "Say hello in one short sentence. Do not use tools."
+2. Each run has a new empty `CUVETTE_HOME` or `CLAUDE_CONFIG_DIR`, and a new empty folder.
+3. Cuvette runs the bundle with `-p`, `--model claude:claude-haiku-5-5`, `--generic`,
+   `--referee none` and `--output stream-json`. A `settings.json` file sets the effort.
+4. Claude Code runs with `-p`, `--model claude-haiku-5-5`, `--output-format stream-json`,
+   `--include-partial-messages` and `--effort`.
+5. The runner stops the process at the first text token. Thus each run makes one model call.
+6. The runs alternate in the order Cuvette high, Cuvette medium, Claude Code medium,
+   Claude Code high. The 20 runs made 20 model calls.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
