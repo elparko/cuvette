@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 suppressMessages(library(ropls))
 here <- commandArgs(trailingOnly = TRUE)[1]
 data(sacurine)

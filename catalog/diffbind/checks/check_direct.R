@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 suppressMessages({library(DESeq2); library(edgeR)})
 here <- commandArgs(trailingOnly = TRUE)[1]
 cts <- read.csv(file.path(here, "tamoxifen_counts.csv"), check.names = FALSE)

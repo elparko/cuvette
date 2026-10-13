@@ -25,8 +25,8 @@ program:
     - https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.2.8/modules/objectprocessing.html
   install: >
     Download CellProfiler from https://cellprofiler.org and install it. The macOS build is x86_64, so it runs through Rosetta and needs an x86_64 Java 17.
-    Set CELLPROFILER_JAVA_HOME or JAVA_HOME to that Java, or put it in /Volumes/T7/guided-analysis/tools/cellprofiler/jre17x64 on the T7 drive.
-    The adapter reads the cp executable from CELLPROFILER_PATH, from CellProfiler.app on the T7 drive or in /Applications, or from the PATH:
+    Set CELLPROFILER_JAVA_HOME or JAVA_HOME to that Java, or put it in ~/.cuvette/cellprofiler/jre17x64.
+    The adapter reads the cp executable from CELLPROFILER_PATH, from CellProfiler.app in ~/.cuvette/cellprofiler or in /Applications, or from the PATH:
     export CELLPROFILER_PATH=/Applications/CellProfiler.app/Contents/MacOS/cp
   citation:
     - text: "Stirling, D. R., Swain-Bowden, M. J., Lucas, A. M., Carpenter, A. E., Cimini, B. A., & Goodman, A. (2021). CellProfiler 4: improvements in speed, utility and usability. BMC Bioinformatics, 22(1), 433. https://doi.org/10.1186/s12859-021-04344-9"
@@ -52,7 +52,7 @@ connection:
 locate:
   env: CELLPROFILER_PATH
   paths:
-    - /Volumes/T7/guided-analysis/tools/cellprofiler/CellProfiler.app/Contents/MacOS/cp
+    - ~/.cuvette/cellprofiler/CellProfiler.app/Contents/MacOS/cp
     - /Applications/CellProfiler.app/Contents/MacOS/cp
     - ~/Applications/CellProfiler.app/Contents/MacOS/cp
     - C:\Program Files\CellProfiler\CellProfiler.exe

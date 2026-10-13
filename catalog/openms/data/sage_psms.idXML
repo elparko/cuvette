@@ -5,10 +5,10 @@
 		<FixedModification name="Carbamidomethyl (C)" />
 		<VariableModification name="Oxidation (M)" />
 				<UserParam type="string" name="extra_features" value="score,SAGE:ln(-poisson),SAGE:ln(delta_best),SAGE:ln(delta_next),SAGE:ln(matched_intensity_pct),SAGE:longest_b,SAGE:longest_y,SAGE:longest_y_pct,SAGE:matched_peaks,SAGE:scored_candidates"/>
-				<UserParam type="stringList" name="SageAdapter:1:in" value="[/Volumes/T7/guided-analysis/data/sage-bsa/mini/bsa1.mzML,/Volumes/T7/guided-analysis/data/sage-bsa/mini/bsa2.mzML,/Volumes/T7/guided-analysis/data/sage-bsa/mini/bsa3.mzML]"/>
+				<UserParam type="stringList" name="SageAdapter:1:in" value="[bsa1.mzML,bsa2.mzML,bsa3.mzML]"/>
 				<UserParam type="string" name="SageAdapter:1:out" value="s3.idXML"/>
 				<UserParam type="string" name="SageAdapter:1:database" value="td.fasta"/>
-				<UserParam type="string" name="SageAdapter:1:sage_executable" value="/Volumes/T7/guided-analysis/tools/sage/sage-v0.14.7-aarch64-apple-darwin/sage"/>
+				<UserParam type="string" name="SageAdapter:1:sage_executable" value="sage"/>
 				<UserParam type="string" name="SageAdapter:1:decoy_prefix" value="DECOY_"/>
 				<UserParam type="int" name="SageAdapter:1:batch_size" value="0"/>
 				<UserParam type="float" name="SageAdapter:1:precursor_tol_left" value="-10.0"/>

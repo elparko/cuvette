@@ -1,6 +1,6 @@
 local({
   home <- Sys.getenv("HOME")
-  cand <- c(Sys.getenv("CUVETTE_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-library", file.path(home, ".cuvette", "R-library"))
+  cand <- c(Sys.getenv("CUVETTE_R_LIBS"), Sys.getenv("R_LIBS_USER"), file.path(home, ".cuvette", "R-library"))
   cand <- unique(cand[nzchar(cand) & dir.exists(cand)])
   if (length(cand)) {
     Sys.setenv(R_LIBS_USER = paste(cand, collapse = .Platform$path.sep))

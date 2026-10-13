@@ -24,7 +24,7 @@ program:
     - https://mzmine.github.io/mzmine_documentation/
   install: >
     Download the MZmine portable zip for your system from the MZmine GitHub releases page (linked from https://mzmine.github.io) and unzip it.
-    The adapter looks for /Volumes/T7/guided-analysis/tools/mzmine/mzmine.app, then /Applications and ~/Applications,
+    The adapter looks for mzmine.app in ~/.cuvette/mzmine, then in /Applications and ~/Applications,
     or the program that MZMINE_PATH names. The steps after the chromatogram builder need an MZmine user file; set MZMINE_USER_FILE to it.
   citation:
     - text: Schmid, R., Heuckeroth, S., Korf, A., Smirnov, A., Myers, O., Dyrlund, T. S., Bushuiev, R., Murray, K. J., Hoffmann, N., Lu, M., . . . Pluskal, T. (2023). Integrative analysis of multimodal mass spectrometry data in MZmine 3. Nature Biotechnology, 41(4), 447–449. https://doi.org/10.1038/s41587-023-01690-2
@@ -50,7 +50,7 @@ connection:
 locate:
   env: MZMINE_PATH
   paths:
-    - /Volumes/T7/guided-analysis/tools/mzmine/mzmine.app/Contents/MacOS/mzmine
+    - ~/.cuvette/mzmine/mzmine.app/Contents/MacOS/mzmine
     - /Applications/mzmine.app/Contents/MacOS/mzmine
     - ~/Applications/mzmine.app/Contents/MacOS/mzmine
     - C:\Program Files\mzmine\mzmine.exe

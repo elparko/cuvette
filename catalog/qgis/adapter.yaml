@@ -61,7 +61,6 @@ connection:
 locate:
   env: CUVETTE_QGIS_PROCESS
   paths:
-    - /Volumes/T7/guided-analysis/tools/qgis/QGIS*.app/Contents/MacOS/qgis_process
     - /Applications/QGIS*.app/Contents/MacOS/qgis_process
   which: [qgis_process]
   version_command: ["{program_path}", "--version"]

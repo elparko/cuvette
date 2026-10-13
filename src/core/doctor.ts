@@ -128,7 +128,7 @@ export function uvCommand(home: string, name: string): string {
 }
 
 export function rLibrary(env: Record<string, string | undefined>, home = homedir()): string {
-  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, "/Volumes/T7/guided-analysis/tools/R-library", join(home, ".cuvette", "R-library"), join(home, ".guided-analysis", "R-library")].filter((x): x is string => !!x);
+  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, join(home, ".cuvette", "R-library"), join(home, ".guided-analysis", "R-library")].filter((x): x is string => !!x);
   return cand.find((c) => existsSync(c)) ?? join(home, ".cuvette", "R-library");
 }
 

@@ -308,6 +308,14 @@ describe("lint: known-answer tests and data", () => {
     writeFileSync(join(dir, "data/fetch.sh"), "echo 'checksum mismatch' >&2; exit 1\n");
     expect((await fetchData(t, dir)).error).toContain("checksum mismatch");
   });
+  test("an empty data folder does not stop the fetch script", async () => {
+    const dir = make((y) => y.replace("    data: [data/a.csv]\n", "    data: [data/set]\n    fetch: data/fetch.sh\n"), { "data/fetch.sh": "exit 7\n" });
+    mkdirSync(join(dir, "data/set"));
+    const t = loadAdapter(dir).manifest.tests[0];
+    expect((await fetchData(t, dir)).skip).toContain("exit code 7");
+    writeFileSync(join(dir, "data/set/a.csv"), "x\n");
+    expect(await fetchData(t, dir)).toEqual({});
+  });
   test("a fetch test with no data list still runs its fetch script", async () => {
     const dir = make((y) => y.replace("    data: [data/a.csv]\n", "    fetch: data/fetch.sh\n"), { "data/fetch.sh": "exit 7\n" });
     const t = loadAdapter(dir).manifest.tests[0];

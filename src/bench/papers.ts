@@ -57,12 +57,12 @@ export interface PapersResult {
   modelOptions?: Record<string, unknown>;
 }
 
-const T7 = "/Volumes/T7";
 export const REPO_ROOT = resolve(CATALOG_DIR, "..");
 const RESULTS_DIR = resolve(PAPERS_DIR, "../results");
 
 export function scratchRoot(date: string): string {
-  return existsSync(T7) ? join(T7, "guided-analysis/tools/bench-runs", date) : join(tmpdir(), "cuvette-bench-runs", date);
+  const drive = process.env.CUVETTE_DRIVE_ROOT;
+  return drive && existsSync(drive) ? join(drive, "tools", "bench-runs", date) : join(tmpdir(), "cuvette-bench-runs", date);
 }
 
 const slug = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_");

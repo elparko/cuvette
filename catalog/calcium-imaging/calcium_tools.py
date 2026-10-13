@@ -930,7 +930,7 @@ suite2p.run_s2p(settings=settings, db=db)
 
 
 def _find_suite2p_python(explicit):
-    cands = [explicit] if explicit else [os.environ.get("CUVETTE_SUITE2P_PYTHON", ""), os.path.expanduser("~/.cuvette/envs/suite2p/bin/python"), os.path.expanduser("~/.cuvette/envs/suite2p/Scripts/python.exe"), os.path.expanduser("~/.guided-analysis/envs/suite2p/bin/python"), "/Volumes/ga-envs/suite2p/bin/python"]
+    cands = [explicit] if explicit else [os.environ.get("CUVETTE_SUITE2P_PYTHON", ""), os.path.expanduser("~/.cuvette/envs/suite2p/bin/python"), os.path.expanduser("~/.cuvette/envs/suite2p/Scripts/python.exe"), os.path.expanduser("~/.guided-analysis/envs/suite2p/bin/python")]
     for c in cands:
         if c and Path(c).is_file():
             return c

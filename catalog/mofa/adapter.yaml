@@ -43,7 +43,6 @@ locate:
   paths:
     - ~/.cuvette/envs/mofa/bin/python
     - ~/.cuvette/envs/mofa/Scripts/python.exe
-    - /Volumes/ga-envs/mofa/bin/python
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('mofapy2', m.version('mofapy2'))"]
   version_pattern: 'mofapy2 (\S+)'

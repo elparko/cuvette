@@ -22,7 +22,7 @@ program:
     - https://doi.org/10.1021/acs.jproteome.5b00354
   install: >
     Install R (brew install r on macOS). Then install the Bioconductor package ropls and the CRAN packages svglite and jsonlite
-    into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER or
     ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install("ropls")'
   citation:
@@ -50,7 +50,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that exists
-  of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library. The
+  of these: CUVETTE_R_LIBS, R_LIBS_USER, ~/.cuvette/R-library. The
   program version in this adapter is the version of the R package ropls, not of R. The input is a table with one row for
   each sample and one column for each feature.
 

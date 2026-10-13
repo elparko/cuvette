@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-ROOT="${GA_DIFFBIND_DATA:-/Volumes/T7/guided-analysis/data/ross-innes2012-diffbind-tamoxifen}"
+ROOT="${GA_DIFFBIND_DATA:-${CUVETTE_HOME:-$HOME/.cuvette}/cache/data/diffbind-vignette}"
 mkdir -p "$ROOT"
 TAR="$ROOT/DiffBind_vignette_data.tar.gz"
 SUM="8d08067509c819d1b0e8df07781045c6ac86d4093db2bd0be62b78e4ec8b1cef"

@@ -2,7 +2,7 @@
 # growthdata: 96 wells of OD over 24 hours, R package growthcurver (the data of the vignette).
 # bactgrowth: bacterial growth with an antibiotic, R package growthrates. The file keeps the first experiment
 # (strain D, concentration 0, replicate 1), the data of the easylinear example in the growthrates vignette.
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 out <- if (length(commandArgs(TRUE))) commandArgs(TRUE)[1] else "."
 write.csv(growthcurver::growthdata, file.path(out, "growthdata.csv"), row.names = FALSE)
 b <- growthrates::bactgrowth

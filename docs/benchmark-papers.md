@@ -54,11 +54,11 @@ Options:
 - `--out file` sets the report name. The benchmark writes `<file>.md` and `<file>.json`. The default is `bench/results/papers-<date>-<models>.md`.
 - `--dry-run` checks the model specs, the adapters, and the data paths. It runs no model.
 
-Runs are sequential. Each run uses a new `CUVETTE_HOME` under `/Volumes/T7/guided-analysis/tools/bench-runs/<date>/`. If that disk is absent, the folder is in the system temporary folder. The session record of each run stays there. The report names its path. The benchmark copies `credentials.json` from the real `CUVETTE_HOME` so that Claude runs find the key.
+Runs are sequential. Each run uses a new `CUVETTE_HOME` under `$CUVETTE_DRIVE_ROOT/tools/bench-runs/<date>/`. Without `CUVETTE_DRIVE_ROOT` or its folder, the run folder is in the system temporary folder. The author sets `CUVETTE_DRIVE_ROOT=/Volumes/T7/guided-analysis`, the folder on the external drive of the author. The session record of each run stays there. The report names its path. The benchmark copies `credentials.json` from the real `CUVETTE_HOME` so that Claude runs find the key.
 
 The benchmark uses the code of the headless mode (`cuvette -p`). It answers the questions of the harness from `answers`, applies `setup`, and allows the tools in `allow`. A run stops when it reaches `timeout_s`.
 
-Environment variable `CUVETTE_BENCH_DATA` sets the data root. The default is `/Volumes/T7/guided-analysis/data`.
+Environment variable `CUVETTE_BENCH_DATA` sets the data root. The default is `$CUVETTE_DRIVE_ROOT/data`, or `~/.cuvette/cache/bench-data` without `CUVETTE_DRIVE_ROOT`.
 
 ## Limits
 

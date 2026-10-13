@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 out <- dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))
 
 Rabbits <- array(c(0, 0, 6, 5, 3, 0, 3, 6, 6, 2, 0, 4, 5, 6, 1, 0, 2, 5, 0, 0),
@@ -17,7 +17,9 @@ suppressMessages(library(survRM2))
 D <- rmst2.sample.data()
 write.csv(data.frame(time = D$time, status = D$status, arm = D$arm), file.path(out, "pbc_rmst.csv"), row.names = FALSE)
 
-shock <- "/Volumes/T7/guided-analysis/tools/metab-epi-trials/dl/shock"
+# TRIAL_SHOCK_DATA is the folder with trial_deident.csv and survival_deident.csv from Zenodo DOI 10.5281/zenodo.14046978.
+shock <- Sys.getenv("TRIAL_SHOCK_DATA")
+if (!nzchar(shock)) stop("set TRIAL_SHOCK_DATA to the folder of the SHOCK trial files")
 s <- read.csv(file.path(shock, "survival_deident.csv"), na.strings = c("", ".", "NA"))
 t <- read.csv(file.path(shock, "trial_deident.csv"), na.strings = c("", ".", "NA"))
 m <- merge(t[, c("ID", "GROUP", "VITAL30", "agelt75")], s[, c("ID", "realsurv", "realcens")], by = "ID", all.x = TRUE)
