@@ -221,6 +221,11 @@ function delimited(text: string): { columns: string[]; rows: string[][]; first: 
 function tablesIn(v: unknown, out: { columns: string[]; rows: unknown[][] }[] = [], depth = 0): typeof out {
   if (!v || typeof v !== "object" || depth > 6) return out;
   if (Array.isArray(v)) {
+    const records = v.length > 0 && v.every((x) => x && typeof x === "object" && !Array.isArray(x));
+    const cols = records ? [...new Set(v.flatMap((x) => Object.keys(x as object)))] : [];
+    if (cols.length && cols.length <= 500) {
+      out.push({ columns: cols, rows: v.map((x) => cols.map((c) => (x as Record<string, unknown>)[c])) });
+    }
     v.forEach((x) => tablesIn(x, out, depth + 1));
     return out;
   }
@@ -340,11 +345,17 @@ export class Masker {
     }
   }
 
+  // A value can also be in JSON text, where a quote, a backslash or a line break has an escape.
   text(s: string): string {
     if (!this.map.size) return s;
-    const keys = [...this.map.keys()].sort((a, b) => b.length - a.length);
+    const all = new Map(this.map);
+    for (const [k, v] of this.map) {
+      const e = JSON.stringify(k).slice(1, -1);
+      if (!all.has(e)) all.set(e, v);
+    }
+    const keys = [...all.keys()].sort((a, b) => b.length - a.length);
     const re = new RegExp(`(?<![A-Za-z0-9])(?:${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![A-Za-z0-9])`, "g");
-    return s.replace(re, (m) => this.map.get(m) ?? m);
+    return s.replace(re, (m) => all.get(m) ?? m);
   }
 
   private marked(path: string): boolean {

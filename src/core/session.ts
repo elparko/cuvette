@@ -19,7 +19,7 @@ import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outsi
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
-import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
+import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
@@ -511,6 +511,11 @@ export class Session {
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
+      // A summary or a kept message can hold placeholders from before the restart. The masker gives each value its old placeholder again.
+      if (this.phiChoice !== "send" && this.record.entries(["phi"]).some((e) => e.data.action === "mask")) {
+        const all = this.record.entries(["message"]).map((e) => e.data.message as unknown as Message);
+        this.masker.add(scanMessages(all, all));
+      }
       this.restorePilot();
       this.closeUnfinishedClarify();
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
@@ -627,6 +632,11 @@ export class Session {
       const info = this.adapterInfo.find((x) => x.name === name);
       const before = info?.programVersion;
       if (info) info.programVersion = f.version;
+      const shown = this.runtimeInfo.find((x) => x.adapter.name === name);
+      if (shown && shown.programVersion !== f.version) {
+        shown.programVersion = f.version;
+        this.system = this.buildSystem();
+      }
       if (before && before !== f.version && before !== rt.adapter.manifest.program.version && !f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} gives the program version ${f.version}. The start of this session used the saved version ${before}. The steps record ${f.version}.` });
       this.envTargets.set(name, envTarget({ kind: rt.adapter.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: f.path, program: rt.adapter.manifest.program.name, programVersion: f.version }));
       if (f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} ran longer than ${START_VERSION_TIMEOUT_MS / 1000} s. Cuvette did not check the program at ${f.path ?? "the found path"}. The record shows the version from the adapter manifest: ${f.version}.` });
@@ -972,6 +982,8 @@ export class Session {
     if (!turnStart) return;
     const hits = request ? searchTools(adapterTools.filter((t) => !this.baseTools.has(t.name)), request, 4) : [];
     this.useTools(hits.map((t) => t.name));
+    const planned = new Set((this.plan?.steps ?? []).filter((s) => s.status === "todo" || s.status === "doing").flatMap((s) => (s.tool ?? "").toLowerCase().split(/[\s,;/()]+/)));
+    this.useTools(adapterTools.filter((t) => !this.baseTools.has(t.name) && planned.has((t.remoteName ?? t.name).toLowerCase())).map((t) => t.name));
     const extras = [...this.active].filter((n) => this.tools.get(n)?.source === "adapter" && !this.baseTools.has(n));
     for (const n of extras) if (this.turnNo - (this.toolTurn.get(n) ?? 0) > TOOL_IDLE_TURNS) this.active.delete(n);
     const kept = extras.filter((n) => this.active.has(n)).sort((x, y) => (this.toolTurn.get(y) ?? 0) - (this.toolTurn.get(x) ?? 0));
@@ -1970,7 +1982,7 @@ export class Session {
     const r = await this.pipeline(tool, this.callArgs(tool, call.args), call.id, signal);
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     const earlier = tool.readOnly && !r.isError && !r.images?.length && r.text.length > 400 ? this.sameEarlierResult(call, r.text) : undefined;
-    if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: `[The output is the same as the output of the earlier call ${earlier} with the same input. It is still above in this conversation.]` };
+    if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: pointerText(earlier) };
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
 
@@ -2247,7 +2259,7 @@ export class Session {
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
     if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") {
       const reason = !o.ok && o.error && !o.text.includes(o.error) ? `ERROR: ${o.error}\n` : "";
-      return { text: reason + (o.text.length > limit ? `${o.text.slice(0, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text) };
+      return { text: reason + (o.text.length > limit ? `${headText(o.text, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text) };
     }
     const obj: Record<string, unknown> = { ok: o.ok };
     if (o.error) obj.error = o.error;
@@ -2271,7 +2283,7 @@ export class Session {
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = small ? JSON.stringify(obj) : `{\n${Object.entries(obj).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n")}\n}`;
-    if (text.length > limit) text = text.slice(0, limit) + `\n[cut ${text.length - limit} characters; read the files for the rest]`;
+    if (text.length > limit) text = headText(text, limit) + `\n[cut ${text.length - limit} characters; read the files for the rest]`;
     const images = vis === "all" && this.provider.info.vision ? (o.outputs ?? []).filter((f) => f.kind === "image" && /\.(png|jpe?g)$/i.test(f.path)).map((f) => f.path).slice(0, 4) : [];
     return { text, images };
   }
@@ -4089,7 +4101,9 @@ export class Session {
     const point = rewindPoints(this.record).find((p) => p.n === n);
     if (!point) throw new Error(`No point ${n}. Type /rewind to see the list.`);
     const nodes = this.record.entries(["node"]).filter((e) => e.id > point.upTo && !this.record.setAside(e.id)).map((e) => String(e.node ?? e.data.id));
+    const asked = new Set(this.record.entries(["question"]).filter((e) => e.id > point.upTo).map((e) => String(e.data.qid)));
     this.record.append("rewind", { upTo: point.upTo, entry: point.entry, kind: point.kind, point: point.label, nodes });
+    for (const q of this.questions.open()) if (asked.has(q.qid)) this.questions.withdraw(q.qid, "The scientist rewound the conversation to a point before this question.");
     const decisions = this.decisions.restoreTo(point.upTo, `rewind to ${point.label}`);
     const modeThen = this.record.entries(["mode"]).filter((e) => e.id <= point.upTo).at(-1)?.data.new ?? this.record.entries(["session"])[0]?.data.mode ?? this.mode;
     if (modeThen !== this.mode && modeThen !== "plan") {

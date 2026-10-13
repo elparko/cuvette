@@ -22,6 +22,19 @@ const BULKY_CHARS = 1500;
 const KEEP_CHARS = 400;
 const SUMMARY_HEAD = "[Summary of the earlier part of this session]";
 
+// A cut between the two halves of a surrogate pair leaves text that the Claude API refuses as JSON.
+export function headText(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const c = s.charCodeAt(n - 1);
+  return s.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 1 : n);
+}
+
+function tailText(s: string, n: number): string {
+  const t = s.slice(-n);
+  const c = t.charCodeAt(0);
+  return c >= 0xdc00 && c <= 0xdfff ? t.slice(1) : t;
+}
+
 function partChars(p: Part): number {
   if (p.type === "text" || p.type === "thinking") return p.text.length;
   if (p.type === "tool_call") return JSON.stringify(p.args ?? {}).length + p.name.length;
@@ -46,7 +59,7 @@ export function transcriptText(messages: Message[]): string {
     for (const p of m.parts) {
       if (p.type === "text") out.push(`${m.role}: ${p.text}`);
       else if (p.type === "tool_call") out.push(`tool call ${p.name} ${JSON.stringify(p.args)}`);
-      else if (p.type === "tool_result") out.push(`result of ${p.name}: ${p.text.slice(0, 1500)}`);
+      else if (p.type === "tool_result") out.push(`result of ${p.name}: ${headText(p.text, 1500)}`);
     }
   return out.join("\n");
 }
@@ -76,6 +89,34 @@ export function elisionStub(p: Extract<Part, { type: "tool_result" }>): string {
 
 const isElided = (text: string) => text.includes("[Older tool output shortened:");
 
+export const pointerText = (callId: string) => `[The output is the same as the output of the earlier call ${callId} with the same input. It is still above in this conversation.]`;
+const POINTER = /^\[The output is the same as the output of the earlier call (\S+) with the same input\. It is still above in this conversation\.\]$/;
+
+function pointerTargets(messages: Message[]): Set<string> {
+  const out = new Set<string>();
+  for (const m of messages)
+    for (const p of m.parts) {
+      const hit = p.type === "tool_result" ? POINTER.exec(p.text) : null;
+      if (hit) out.add(hit[1]!);
+    }
+  return out;
+}
+
+function resultTexts(messages: Message[], keep: (text: string) => boolean): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of messages) for (const p of m.parts) if (p.type === "tool_result" && !POINTER.test(p.text) && keep(p.text)) out.set(p.callId, p.text);
+  return out;
+}
+
+// A pointer gets the text of its earlier result when that result leaves the context or becomes shorter.
+function fillPointers(messages: Message[], texts: Map<string, string>, to = messages.length): Message[] {
+  const target = (p: Part) => (p.type === "tool_result" ? texts.get(POINTER.exec(p.text)?.[1] ?? "") : undefined);
+  return messages.map((m, i) => {
+    if (i >= to || !m.parts.some((p) => target(p) !== undefined)) return m;
+    return { ...m, parts: m.parts.map((p) => (target(p) !== undefined ? { ...p, text: target(p)! } as Part : p)) };
+  });
+}
+
 // Claude ties each thinking block to the exact history before it. After an edit, the thinking
 // blocks after that point must go, or the API refuses the request. The text and tool calls stay.
 export function dropThinking(messages: Message[], from = 0): Message[] {
@@ -84,22 +125,23 @@ export function dropThinking(messages: Message[], from = 0): Message[] {
 
 export function elideOld(messages: Message[], contextWindow: number): { messages: Message[]; elided: number } {
   const end = recentStart(messages, contextWindow);
+  const needed = pointerTargets(messages.slice(end));
   let elided = 0;
   let first = -1;
   const out = messages.map((m, i) => {
     if (i >= end || !isResults(m)) return m;
     let changed = false;
     const parts = m.parts.map((p) => {
-      if (p.type !== "tool_result" || isElided(p.text) || (p.text.length <= BULKY_CHARS && !p.images?.length)) return p;
+      if (p.type !== "tool_result" || needed.has(p.callId) || isElided(p.text) || (p.text.length <= BULKY_CHARS && !p.images?.length)) return p;
       changed = true;
       elided++;
-      const head = p.text.length > KEEP_CHARS ? `${p.text.slice(0, KEEP_CHARS)}\n…\n` : `${p.text}\n`;
+      const head = p.text.length > KEEP_CHARS ? `${headText(p.text, KEEP_CHARS)}\n…\n` : `${p.text}\n`;
       return { type: "tool_result", callId: p.callId, name: p.name, text: head + elisionStub(p), ...(p.isError ? { isError: true } : {}) } as Part;
     });
     if (changed && first < 0) first = i;
     return changed ? { ...m, parts } : m;
   });
-  return { messages: first < 0 ? out : dropThinking(out, first), elided };
+  return { messages: first < 0 ? out : dropThinking(fillPointers(out, resultTexts(out, isElided), end), first), elided };
 }
 
 export interface Summarized {
@@ -121,10 +163,10 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).trim() : "";
   const room = Math.max(4000, Math.floor(contextWindow * 3.5 * 0.6) - SUMMARY_SYSTEM.length - prev.length);
   const all = transcriptText(old);
-  const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${all.slice(-room)}` : all;
+  const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${tailText(all, room)}` : all;
   const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${text}`;
   const summary = await provider.complete(SUMMARY_SYSTEM, input, signal);
-  return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: dropThinking(messages.slice(end)) };
+  return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: fillPointers(dropThinking(messages.slice(end)), resultTexts(old, () => true)) };
 }
 
 export function summaryMessage(summary: string): Message {

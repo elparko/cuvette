@@ -127,8 +127,14 @@ export function startPython(c: KindContext): AdapterRuntime {
   };
 
   const request = (fn: string, args: Args, outDir: string, signal: AbortSignal): Promise<Reply> => {
+    const cut = { ok: false, error: "interrupted: the scientist stopped this call before it started" };
+    const stopped = new Promise<void>((r) => (signal.aborted ? r() : signal.addEventListener("abort", () => r(), { once: true })));
     const run = async (): Promise<Reply> => {
-      await ensure();
+      if (signal.aborted) return cut;
+      const started = ensure();
+      started.catch(() => {});
+      await Promise.race([started, stopped]);
+      if (signal.aborted) return cut;
       const id = nextId++;
       const reply = new Promise<Reply>((done) => waiting.set(id, done));
       const timeout = setTimeout(() => {
@@ -151,8 +157,10 @@ export function startPython(c: KindContext): AdapterRuntime {
         signal.removeEventListener("abort", abort);
       }
     };
-    const next = queue.then(run, run);
-    queue = next.catch(() => {});
+    // A stopped call leaves the queue at once. The next call still waits for the call before it.
+    const before = queue;
+    const next = Promise.race([before, stopped]).then(run);
+    queue = Promise.all([before, next]).then(() => undefined, () => undefined);
     return next;
   };
 

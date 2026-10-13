@@ -2585,3 +2585,144 @@ test("a version command that runs longer than the time limit gives a notice", as
   expect(notice?.data.text).toContain("The version command of the adapter slowpy ran longer than 5 s.");
   expect(session.adapterInfo[0]!.programVersion).toBe("from the manifest");
 });
+
+test("the system prompt shows the program version that the version command gives", async () => {
+  if (process.platform === "win32") return;
+  session = await Session.create({ adapters: [slowPython(1)], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  expect(session["system"]).toContain("# Program: openpyxl from the manifest");
+  await session["starting"];
+  expect(session["system"]).toContain("# Program: openpyxl 9.9");
+});
+
+function napPython(delayS: number): string {
+  const dir = slowPython(delayS);
+  writeFileSync(join(dir, "python"), `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; *) exec python3 "$@";; esac\n`);
+  writeFileSync(join(dir, "napmod.py"), "import time\n\ndef nap(seconds=0):\n    time.sleep(seconds)\n    return {'slept': seconds}\n");
+  writeFileSync(join(dir, "adapter.yaml"), `${readFileSync(join(dir, "adapter.yaml"), "utf8")}\ntools:\n  - name: nap\n    description: Wait.\n    function: "napmod:nap"\n    params: { seconds: { type: number } }\n`);
+  return dir;
+}
+
+test("a tool call that arrives while the version command runs waits for it, runs, and records the checked version", async () => {
+  if (process.platform === "win32") return;
+  const provider = new FakeProvider([{ calls: [{ name: "nap", args: { seconds: 0 } }] }, { text: "Done." }]);
+  session = await Session.create({ adapters: [napPython(1)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  await session.send("Nap.");
+  expect(session.record.entries(["tool_result"])[0]!.data.ok).toBe(true);
+  expect(session.record.nodes()[0]!.programVersion).toBe("9.9");
+});
+
+test("Stop while a tool call waits for the version command ends the turn at once", async () => {
+  if (process.platform === "win32") return;
+  const provider = new FakeProvider([{ calls: [{ name: "nap", args: { seconds: 5 } }] }, { text: "Done." }]);
+  session = await Session.create({ adapters: [napPython(2)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  session.bus.on((e) => {
+    if (e.type === "status" && e.state === "running") setTimeout(() => session!.interrupt(), 100);
+  });
+  const t0 = Date.now();
+  await session.send("Nap.");
+  expect(Date.now() - t0).toBeLessThan(1500);
+  expect(session.record.entries(["tool_result"])[0]!.data.ok).toBe(false);
+  expect(session.endedBy).toBe("stopped");
+});
+
+test("with deferred tools, a tool that an open plan step names stays in the list; a call to a tool that left the list still runs", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "find_tools", args: { query: "zeta spectrum" } }] },
+    { text: "Found it." },
+    { text: "Two." },
+    { text: "Three." },
+    { calls: [{ name: "extra_18", args: {} }] },
+    { text: "Four." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none", toolExposure: "search" } });
+  const s = session;
+  const tools = s["tools"] as Map<string, any>;
+  let ran = 0;
+  for (let i = 0; i < 20; i++) tools.set(`extra_${i}`, { name: `extra_${i}`, description: i >= 18 ? "Zeta spectrum fit." : `Tool ${i}.`, inputSchema: { type: "object", properties: {} }, source: "adapter", adapter: "lab", readOnly: true, permission: "allow", execute: async () => (ran++, { ok: true, summary: "Ran." }) });
+  s.plan = { steps: [{ step: "Fit the spectrum", tool: "extra_19", status: "todo" }] } as any;
+  const names = (i: number) => provider.requests[i]!.tools.map((t) => t.name);
+  await s.send("Start");
+  expect(names(1)).toEqual(expect.arrayContaining(["extra_18", "extra_19"]));
+  await s.send("two");
+  await s.send("three");
+  await s.send("four");
+  expect(names(4)).toContain("extra_19");
+  expect(names(4)).not.toContain("extra_18");
+  expect(ran).toBe(1);
+  expect(names(5)).toContain("extra_18");
+});
+
+test("a cut tool result does not end in half of an emoji, so the request stays valid JSON for the API", async () => {
+  const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+  for (const limit of [1001, 1002]) {
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+    writeFileSync(join(cwd, "notes.txt"), "😀".repeat(3000));
+    const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "notes.txt") } }] }, { text: "Done." }]);
+    session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none", maxResultChars: limit } });
+    await session.send("Read notes.txt");
+    const text = toolTexts(provider)[0]!;
+    expect(text).toContain("The harness cut");
+    expect(lone.test(text)).toBe(false);
+    await session.close();
+    session = undefined;
+  }
+});
+
+// Each pointer to an earlier result in a request must have that result, in full, in the same request.
+function pointersResolve(messages: { parts: any[] }[]): string[] {
+  const parts = messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result");
+  const bad: string[] = [];
+  for (const p of parts) {
+    const id = /earlier call (\S+) with the same input/.exec(p.text)?.[1];
+    if (!id) continue;
+    const target = parts.find((x) => x.callId === id);
+    if (!target || target.text.includes("[Older tool output shortened:")) bad.push(id);
+  }
+  return bad;
+}
+
+test("a repeated-call pointer keeps its result after the older output is shortened", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const big = (name: string) => {
+    writeFileSync(join(cwd, name), Array.from({ length: 300 }, (_, i) => `${name}-row${i},${i * 3},${i * 7}`).join("\n"));
+    return { name: "read_file", args: { path: join(cwd, name) } };
+  };
+  const a = big("a.csv");
+  const provider = new FakeProvider([{ calls: [a] }, { calls: [big("b.csv")] }, { calls: [a] }, { calls: [big("c.csv")] }, { text: "Done." }]);
+  provider.info = { ...provider.info, contextWindow: 16000 };
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none" } });
+  await session.send("Read the files.");
+  expect(toolTexts(provider)[0]).toContain("a.csv-row299");
+  for (const r of provider.requests) expect(pointersResolve(r.messages)).toEqual([]);
+});
+
+test("a repeated-call pointer gets the full result when the summary removes the earlier call", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const big = (name: string) => {
+    writeFileSync(join(cwd, name), Array.from({ length: 300 }, (_, i) => `${name}-row${i},${i * 3},${i * 7}`).join("\n"));
+    return { name: "read_file", args: { path: join(cwd, name) } };
+  };
+  const a = big("a.csv");
+  const provider = new FakeProvider({ steps: [{ calls: [a] }, { calls: [big("b.csv")] }, { calls: [a] }, { calls: [big("c.csv")] }, { calls: [big("d.csv")] }, { text: "Done." }], complete: "## Steps done\nRead a.csv." });
+  provider.info = { ...provider.info, contextWindow: 9000 };
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none" } });
+  await session.send("Read the files.");
+  expect(session.record.entries(["compaction"]).length).toBeGreaterThan(0);
+  for (const r of provider.requests) expect(pointersResolve(r.messages)).toEqual([]);
+  const resumed = session.record.messages();
+  expect(pointersResolve(resumed)).toEqual([]);
+});
+
+test("rewind withdraws the open questions of the part that it removes, so a late answer does not change a decision", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "ask_scientist", args: { question: "Which cutoff?", options: ["5", "10"], wait: false } }] },
+    { text: "The question waits." },
+  ]);
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none", autoResume: true } });
+  await session.send("First request.");
+  const open = session.questions.open();
+  expect(open).toHaveLength(1);
+  session.rewind(1);
+  expect(session.questions.get(open[0]!.qid)!.status).toBe("withdrawn");
+  expect(session.questions.open()).toHaveLength(0);
+});
