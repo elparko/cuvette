@@ -279,7 +279,19 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     return "";
   };
 
-  const jobs = new Map<string, { key: string; lines: string[]; done?: { ok: boolean; text: string }; subs: Set<ServerResponse> }>();
+  interface Job {
+    key: string;
+    command?: string;
+    action: string;
+    started: number;
+    lines: string[];
+    done?: { ok: boolean; text: string };
+    subs: Set<ServerResponse>;
+    abort: AbortController;
+  }
+  const jobs = new Map<string, Job>();
+  const runningJob = (name: string, command?: string) => [...jobs].find(([, j]) => !j.done && (j.key === name || (!!command && j.command === command)));
+  const JOB_LINES = 500;
   const progHooks = (): ProgramHooks => ({ cwd: settingCtx().cwd, env, ...opts.programs });
   const jobSend = (j: { subs: Set<ServerResponse> }, msg: unknown) => {
     for (const r of j.subs) r.write(`data: ${JSON.stringify(msg)}\n\n`);
@@ -329,7 +341,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (get && p === "/api/settings.json") return send(res, 200, settingsJson(settingCtx(), !!current?.view.busy));
     if (get && p === "/api/programs.json") {
       const quick = url.searchParams.get("quick") === "1";
-      return send(res, 200, programsJson(await listPrograms({ ...progHooks(), quick }), { checking: quick }));
+      const running = [...jobs].filter(([, j]) => !j.done).map(([id, j]) => ({ id, name: j.key, action: j.action, started: j.started }));
+      return send(res, 200, { ...programsJson(await listPrograms({ ...progHooks(), quick }), { checking: quick }), jobs: running });
     }
     if (get && p === "/api/thumb") {
       const f = listSessions().find((s) => s.id === url.searchParams.get("id"))?.figure;
@@ -458,16 +471,22 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       if (!r.plan) return send(res, 404, { error: (r as { error?: string }).error });
       if (p === "/api/programs/plan") return send(res, 200, { plan: r.plan });
       const run = { ...hooks, confirmed: body.confirmed === true, record: current?.session.record as ProgramHooks["record"] };
-      const long = (action === "install" || action === "update") && r.plan.runs && !r.plan.refused && run.confirmed;
-      if (!long) return send(res, 200, await runFor(r.plan, "app", run));
-      // A second install of the same program while the first runs shows the first one.
+      const long = (r.plan.action === "install" || r.plan.action === "update") && r.plan.runs && !r.plan.refused && run.confirmed;
       const key = r.plan.name || name;
-      const running = [...jobs].find(([, j]) => j.key === key && !j.done);
-      if (running) return send(res, 200, { job: running[0] });
+      // A second install or an update of the same program while the first runs shows the first one.
+      const running = runningJob(key, r.plan.command);
+      if (running && run.confirmed && (r.plan.action === "install" || r.plan.action === "update")) return send(res, 200, { job: running[0] });
+      if (running && r.plan.action !== "check" && run.confirmed) return send(res, 409, { error: `${key}: an ${running[1].action === "update" ? "update" : "install"} runs now. Wait for it to end, or stop it. Nothing changed.` });
+      if (!long) return send(res, 200, await runFor(r.plan, "app", run));
       const id = randomBytes(8).toString("hex");
-      const job = { key, lines: [] as string[], done: undefined as { ok: boolean; text: string } | undefined, subs: new Set<ServerResponse>() };
+      const job: Job = { key, command: r.plan.command, action: r.plan.action, started: Date.now(), lines: [], subs: new Set(), abort: new AbortController() };
       jobs.set(id, job);
-      void runFor(r.plan, "app", { ...run, onLine: (line) => (job.lines.push(line), jobSend(job, { line })) }).then((d) => {
+      const onLine = (line: string) => {
+        job.lines.push(line);
+        if (job.lines.length > JOB_LINES) job.lines.splice(0, job.lines.length - JOB_LINES);
+        jobSend(job, { line });
+      };
+      void runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal }).then((d) => {
         job.done = { ok: d.ok, text: d.text };
         jobSend(job, { done: true, ...job.done });
         for (const x of job.subs) x.end();
@@ -475,6 +494,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         setTimeout(() => jobs.delete(id), 600_000).unref();
       });
       return send(res, 200, { job: id });
+    }
+    if (p === "/api/programs/stop") {
+      const j = jobs.get(String(body.job ?? ""));
+      if (!j) return send(res, 404, { error: "No such job." });
+      if (!j.done) j.abort.abort();
+      return send(res, 200, { ok: true });
     }
     if (p === "/api/choose-folder") {
       if (process.platform !== "darwin" || noOpen()) return send(res, 501, { error: "The Finder dialog works only on a Mac." });
@@ -550,6 +575,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const beat = setInterval(() => {
     current?.view.beat();
     for (const c of idle) c.write(": keep-alive\n\n");
+    for (const j of jobs.values()) for (const r of j.subs) r.write(": keep-alive\n\n");
   }, 20000);
   beat.unref();
 

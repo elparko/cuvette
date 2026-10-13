@@ -151,7 +151,7 @@ describe("the actions", () => {
     const lines: string[] = [];
     const yes = await runAction(plan, { ...fakes(), via: "terminal", exec, record, confirmed: true, onLine: (l) => lines.push(l) });
     expect(yes).toMatchObject({ ok: true, text: "Installed zeta." });
-    expect(exec).toHaveBeenCalledWith(plan.command, expect.any(Function));
+    expect(exec).toHaveBeenCalledWith(plan.command, expect.any(Function), undefined);
     expect(lines).toEqual([`$ ${plan.command}`, "Resolved 12 packages"]);
     expect(readLog(home).at(-1)).toMatchObject({ action: "install", adapter: "zeta", ok: true, via: "terminal", command: plan.command });
     expect(record.append).toHaveBeenCalledWith("program", expect.objectContaining({ action: "install", adapter: "zeta", ok: true }));
@@ -374,5 +374,94 @@ describe("the browser app", () => {
     const third = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
     expect(third.job).not.toBe(first.job);
     release();
+  });
+});
+
+describe("a long install: stop, password, and a second action at the same time", () => {
+  const server = async (exec: (c: string, l: (x: string) => void, s?: AbortSignal) => Promise<number | null>) => {
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, ...(await r.json()) }));
+    const get = (p: string) => fetch(`${base}${p}${p.includes("?") ? "&" : "?"}t=${app!.token}`).then((r) => r.text());
+    return { post, get };
+  };
+  const waitAbort = (line: (l: string) => void, signal?: AbortSignal) =>
+    new Promise<number | null>((done) => {
+      line("Downloading 1.2 GB");
+      signal?.addEventListener("abort", () => done(null));
+    });
+
+  test("Stop ends the job, and the result says that the install can be partial", async () => {
+    const { post, get } = await server(async (_c, line, signal) => waitAbort(line, signal));
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const list = JSON.parse(await get("api/programs.json?quick=1"));
+    expect(list.jobs).toEqual([expect.objectContaining({ id: job.job, name: "zeta", action: "install" })]);
+    expect(await post("api/programs/stop", { job: job.job })).toMatchObject({ status: 200, ok: true });
+    const stream = await get(`api/programs/progress?job=${job.job}`);
+    expect(stream).toContain('"line":"Downloading 1.2 GB"');
+    expect(stream).toMatch(/"done":true,"ok":false,"text":"You stopped the install\. Part of zeta can be on this computer\. Choose Install again/);
+    expect(readLog(home).at(-1)).toMatchObject({ action: "install", adapter: "zeta", ok: false, stopped: true });
+    expect(JSON.parse(await get("api/programs.json?quick=1")).jobs).toEqual([]);
+    expect((await post("api/programs/stop", { job: "nope" })).status).toBe(404);
+  });
+
+  test("an update of the program while its install runs gets the install job, and a remove is refused", async () => {
+    const { post, get } = await server(async (_c, line, signal) => waitAbort(line, signal));
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    const staged = await post("api/programs/run", { name: "zeta", action: "update", confirmed: true });
+    expect(staged.job ?? staged.error).toBe(job.job);
+    const removed = await post("api/programs/run", { name: "zeta", action: "path", path: "", confirmed: true });
+    expect(removed.status).toBe(409);
+    expect(removed.error).toMatch(/zeta: an install runs now/);
+    expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec: async () => 0 })).toMatchObject({ ok: false, text: expect.stringMatching(/zeta: an install runs now/) });
+    await post("api/programs/stop", { job: job.job });
+    await get(`api/programs/progress?job=${job.job}`);
+  });
+
+  test("a command that asks for a password says so and names the command to run in Terminal", async () => {
+    const { post, get } = await server(async (_c, line) => (line("Password:"), line("sudo: a terminal is required to read the password; either use the -S option"), 1));
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const stream = await get(`api/programs/progress?job=${job.job}`);
+    expect(stream).toMatch(/"ok":false,"text":"The command asks for your password, and Cuvette cannot type it\. Run the command in Terminal/);
+  });
+
+  test("a stop ends the real command and its child processes at once", async () => {
+    const plan: Plan = { action: "install", name: "zeta", title: "", lines: [], runs: true, confirm: "Install", command: "sh -c 'sleep 30'; echo after" };
+    const abort = new AbortController();
+    const lines: string[] = [];
+    setTimeout(() => abort.abort(), 300);
+    const t0 = Date.now();
+    const r = await runAction(plan, { ...fakes(), via: "app", confirmed: true, signal: abort.signal, onLine: (l) => lines.push(l) });
+    expect(Date.now() - t0).toBeLessThan(3000);
+    expect(r.text).toMatch(/^You stopped the install/);
+    expect(lines).not.toContain("after");
+  });
+
+  test("two programs install at the same time, but two Homebrew commands do not", async () => {
+    const plan = (name: string, command: string): Plan => ({ action: "install", name, title: "", lines: [], runs: true, confirm: "Install", command });
+    let release = () => {};
+    const slow = vi.fn(() => new Promise<number>((r) => (release = () => r(0))));
+    const first = runAction(plan("samtools", "brew install samtools"), { ...fakes(), via: "app", confirmed: true, exec: slow });
+    await vi.waitFor(() => expect(slow).toHaveBeenCalled());
+    const exec = vi.fn(async () => 0);
+    expect(await runAction(plan("zeta", "uv pip install zeta"), { ...fakes(), via: "app", confirmed: true, exec })).toMatchObject({ ok: true });
+    expect(await runAction(plan("qupath", "brew install --cask qupath"), { ...fakes(), via: "app", confirmed: true, exec })).toMatchObject({ ok: false, text: expect.stringMatching(/^samtools: an install runs now/) });
+    expect(exec).toHaveBeenCalledTimes(1);
+    release();
+    expect(await first).toMatchObject({ ok: true });
+    expect(await runAction(plan("qupath", "brew install --cask qupath"), { ...fakes(), via: "app", confirmed: true, exec })).toMatchObject({ ok: true });
+  });
+
+  test("an install that runs in another process blocks a second one until that process ends", async () => {
+    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    mkdirSync(join(home, "programs-running"), { recursive: true });
+    writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: process.ppid, action: "update", name: "zeta" }));
+    const exec = vi.fn(async () => 0);
+    expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: false, text: expect.stringMatching(/zeta: an update runs now/) });
+    expect(exec).not.toHaveBeenCalled();
+    writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: 999999, action: "update", name: "zeta" }));
+    expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: true });
+    expect(exec).toHaveBeenCalledTimes(1);
   });
 });

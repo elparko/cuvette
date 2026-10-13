@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { encodePng } from "../bench/png.ts";
@@ -94,15 +94,29 @@ export function readTable(path: string): Sheet[] {
 
 export const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-function filesIn(dir: string, depth: number): string[] {
-  if (!existsSync(dir)) return [];
-  const out: string[] = [];
+// A folder listing and a table read stay until the folder or the file changes.
+// Without this, each request reads the parent folder again, and a parent folder with many files makes each turn take seconds.
+const listings = new Map<string, { mtime: number; files: string[]; dirs: string[] }>();
+const tables = new Map<string, { mtime: number; size: number; sheets: { name: string; columns: string[]; hay: string[] }[] }>();
+
+function listing(dir: string): { files: string[]; dirs: string[] } {
+  let mtime: number;
+  try {
+    const st = statSync(dir);
+    if (!st.isDirectory()) return { files: [], dirs: [] };
+    mtime = st.mtimeMs;
+  } catch {
+    listings.delete(dir);
+    return { files: [], dirs: [] };
+  }
+  const hit = listings.get(dir);
+  if (hit && hit.mtime === mtime) return hit;
+  const files: string[] = [];
+  const dirs: string[] = [];
   let names: string[] = [];
   try {
     names = readdirSync(dir);
-  } catch {
-    return [];
-  }
+  } catch {}
   for (const n of names) {
     if (n.startsWith(".") || n === "node_modules") continue;
     const p = join(dir, n);
@@ -112,10 +126,26 @@ function filesIn(dir: string, depth: number): string[] {
     } catch {
       continue;
     }
-    if (st.isDirectory() && depth > 0) out.push(...filesIn(p, depth - 1));
-    else if (st.isFile() && /\.(xlsx|csv|tsv)$/i.test(n) && st.size < 20_000_000) out.push(p);
+    if (st.isDirectory()) dirs.push(p);
+    else if (st.isFile() && /\.(xlsx|csv|tsv)$/i.test(n) && st.size < 20_000_000) files.push(p);
   }
+  const out = { mtime, files, dirs };
+  listings.set(dir, out);
   return out;
+}
+
+function filesIn(dir: string, depth: number): string[] {
+  const l = listing(dir);
+  return depth > 0 ? [...l.files, ...l.dirs.flatMap((d) => filesIn(d, depth - 1))] : l.files;
+}
+
+function tableHay(f: string): { name: string; columns: string[]; hay: string[] }[] {
+  const st = statSync(f);
+  const hit = tables.get(f);
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.sheets;
+  const sheets = readTable(f).map((s) => ({ name: s.name, columns: s.columns, hay: [s.name, basename(f), ...s.columns, ...s.rows.map((r) => r[0])].map(norm).filter(Boolean) }));
+  tables.set(f, { mtime: st.mtimeMs, size: st.size, sheets });
+  return sheets;
 }
 
 export function findReferences(dirs: string[], names: string[], skip: string[] = []): Candidate[] {
@@ -127,16 +157,15 @@ export function findReferences(dirs: string[], names: string[], skip: string[] =
     for (const f of filesIn(dir, i === 0 ? 1 : 0)) {
       if (seen.has(f)) continue;
       seen.add(f);
-      let sheets: Sheet[];
+      let sheets: ReturnType<typeof tableHay>;
       try {
-        sheets = readTable(f);
+        sheets = tableHay(f);
       } catch {
+        tables.delete(f);
         continue;
       }
       for (const s of sheets) {
-        const firstCol = s.rows.map((r) => r[0]);
-        const hay = [s.name, basename(f), ...s.columns, ...firstCol].map(norm).filter(Boolean);
-        const matched = wanted.filter((w) => hay.some((h) => h.includes(w) || (h.length >= 3 && w.includes(h))));
+        const matched = wanted.filter((w) => s.hay.some((h) => h.includes(w) || (h.length >= 3 && w.includes(h))));
         if (matched.length) out.push({ path: f, sheet: s.name, columns: s.columns.filter(Boolean), matched, score: matched.length });
       }
     }

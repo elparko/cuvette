@@ -97,3 +97,22 @@ test("readTable reads xlsx cells that have no r attribute or that have r after o
   expect(s!.rows[0]).toEqual(["Set 1", undefined, 900]);
   expect(s!.rows[1]).toEqual(["Set 2", 410, null]);
 });
+
+test("a second search reads the folders again only after they change, so a parent folder with many files does not slow each turn", () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-refbig-"));
+  for (let i = 0; i < 20000; i++) writeFileSync(join(root, `n${i}.txt`), "");
+  const proj = join(root, "proj");
+  mkdirSync(join(proj, "sub"), { recursive: true });
+  writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,count\nwell_a,3\n");
+  const t0 = performance.now();
+  expect(findReferences([proj, root], ["counts"]).map((c) => c.path)).toEqual([join(proj, "sub", "old_counts.csv")]);
+  const first = performance.now() - t0;
+  const t1 = performance.now();
+  findReferences([proj, root], ["counts"]);
+  expect(performance.now() - t1).toBeLessThan(Math.max(20, first / 5));
+  writeFileSync(join(root, "counts_summary.csv"), "sample,count\nwell_a,3\n");
+  writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,area,count\nwell_a,3,4\n");
+  const again = findReferences([proj, root], ["counts", "area"]);
+  expect(again.map((c) => c.path).sort()).toEqual([join(proj, "sub", "old_counts.csv"), join(root, "counts_summary.csv")].sort());
+  expect(again.find((c) => c.path.endsWith("old_counts.csv"))!.columns).toEqual(["sample", "area", "count"]);
+});

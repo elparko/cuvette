@@ -13,6 +13,6 @@ export function dropFolder(items: unknown): string | null {
   return cut === 0 ? first.path.slice(0, 1) : first.path.slice(0, cut);
 }
 
-export const dropZones = { n: 0 };
+export const dropZones = { n: 0, dragging: false };
 
 export const hasFiles = (e: { dataTransfer: DataTransfer | null }) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
