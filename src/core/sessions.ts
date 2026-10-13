@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { readIndex } from "./places.ts";
 
 export type SessionStatus = "answered" | "waiting for you" | "running" | "not started";
 
@@ -138,7 +139,8 @@ function parseLog(log: string): Parsed {
     } catch {
       continue;
     }
-    const d = e.data ?? {};
+    if (!e || typeof e !== "object") continue;
+    const d = e.data && typeof e.data === "object" ? e.data : {};
     if (!first && e.kind === "session") first = e;
     else if (!ask && e.kind === "user" && !d.during) ask = e;
     else if (e.kind === "title") title = { title: String(d.title ?? ""), description: String(d.description ?? "") };
@@ -187,13 +189,7 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
 }
 
 function indexed(home: string): SessionInfo[] {
-  let rows: { id: string; project: string; folder: string; title: string; date: string; name?: string; custom?: string; description?: string }[] = [];
-  try {
-    rows = JSON.parse(readFileSync(join(home, "sessions-index.json"), "utf8"));
-  } catch {
-    return [];
-  }
-  return rows.map((r) => {
+  return readIndex(join(home, "sessions-index.json")).map((r) => {
     const log = join(r.folder, ".record", "log.jsonl");
     if (!existsSync(log)) return { id: r.id, cwd: r.project, used: Date.parse(r.date) || 0, ask: r.title, folder: r.folder, moved: true, name: r.custom || r.name, description: r.description };
     return info(r.id, log, { cwd: r.project, folder: r.folder }, r.title, r);

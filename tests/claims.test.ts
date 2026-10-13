@@ -263,4 +263,57 @@ describe("checkAnswer inputs and small counts", () => {
     const { record } = fake([{ node: "n1", path: "x", value: 1 }]);
     expect(checkAnswer("The value was 1e400.", record).filter((c) => c.value !== null)).toEqual([]);
   });
+
+  const labels = (text: string, n: { node: string; path: string; value: number }[]) => checkAnswer(text, fake(n).record).map((c) => c.label);
+
+  test("a unit in the answer converts to the unit in the name of the logged key", () => {
+    expect(labels("The decay time constant was 21 ms.", [{ node: "n1", path: "metrics.decay_tau_s", value: 0.0213 }])).toEqual(["measured"]);
+    expect(labels("The pellet weighed 250 mg.", [{ node: "n1", path: "metrics.mass_g", value: 0.25 }])).toEqual(["measured"]);
+    expect(labels("The run took 2.5 hours.", [{ node: "n1", path: "metrics.duration_min", value: 150 }])).toEqual(["measured"]);
+    expect(labels("The pixel size is 650 nm.", [{ node: "n1", path: "metrics.pixel_size_um", value: 0.65 }])).toEqual(["measured"]);
+  });
+
+  test("a unit converts only to a key with a unit of the same kind, and a key with no unit does not convert", () => {
+    expect(labels("The pellet weighed 250 mg.", [{ node: "n1", path: "metrics.mass", value: 0.25 }])).toEqual(["unsourced"]);
+    expect(labels("The pellet weighed 250 mg.", [{ node: "n1", path: "metrics.time_s", value: 0.25 }])).toEqual(["unsourced"]);
+    expect(labels("The value was 250.", [{ node: "n1", path: "metrics.mass_g", value: 0.25 }])).toEqual(["unsourced"]);
+  });
+
+  test("a fraction matches a percent key, and a percent matches a fraction", () => {
+    expect(labels("The CD4 fraction was 0.42 of live cells.", [{ node: "n1", path: "metrics.cd4_pct", value: 42.1 }])).toEqual(["measured"]);
+    expect(labels("The CD4 fraction was 0.42 of live cells.", [{ node: "n1", path: "metrics.cd4", value: 42.1 }])).toEqual(["unsourced"]);
+    expect(labels("About 42% were positive.", [{ node: "n1", path: "metrics.frac", value: 0.421 }])).toEqual(["measured"]);
+  });
+
+  test("a decrease word lets a number with no sign match the negative logged value", () => {
+    expect(labels("Drug B lowered sleep by 1.58 hours.", [{ node: "n1", path: "metrics.mean_diff", value: -1.58 }])).toEqual(["measured"]);
+    expect(labels("IL6 was downregulated with a log2 fold change of 2.07.", [{ node: "n1", path: "table.rows[0][2]", value: -2.07 }])).toEqual(["measured"]);
+  });
+
+  test("with no decrease word, or with a written sign, the sign must match", () => {
+    expect(labels("Drug B raised sleep by 1.58 hours.", [{ node: "n1", path: "metrics.mean_diff", value: -1.58 }])).toEqual(["unsourced"]);
+    expect(labels("Drug B lowered sleep: the difference was +1.58 hours.", [{ node: "n1", path: "metrics.mean_diff", value: -1.58 }])).toEqual(["unsourced"]);
+  });
+
+  test("N-fold matches log2(N) in a log key, and with a decrease word -log2(N), and 1/N in a ratio key", () => {
+    expect(labels("IL6 rose 4.2-fold.", [{ node: "n1", path: "metrics.log2_fold_change", value: 2.07 }])).toEqual(["measured"]);
+    expect(labels("IL6 fell 4.2-fold.", [{ node: "n1", path: "data.genes[0].log2FoldChange", value: -2.07 }])).toEqual(["measured"]);
+    expect(labels("IL6 fell 4.2-fold.", [{ node: "n1", path: "metrics.ratio", value: 0.238 }])).toEqual(["measured"]);
+    expect(labels("IL6 rose 4.2-fold.", [{ node: "n1", path: "metrics.log2_fold_change", value: -2.07 }])).toEqual(["unsourced"]);
+    expect(labels("IL6 rose 4.2-fold.", [{ node: "n1", path: "metrics.log2_fold_change", value: 2.5 }])).toEqual(["unsourced"]);
+  });
+
+  test("a fold claim does not match log2 or 1/N in a key that is not a log or a ratio key", () => {
+    expect(labels("IL6 rose 2.0-fold.", [{ node: "n1", path: "metrics.n_groups", value: 1 }])).toEqual(["unsourced"]);
+    expect(labels("IL6 fell 4.0-fold.", [{ node: "n1", path: "metrics.alpha_level", value: 0.25 }])).toEqual(["unsourced"]);
+  });
+
+  test("the decrease word must be near the number, and a key in _l or _h does not convert", () => {
+    expect(labels("Sleep was lower with drug B. In the full cohort of 120 subjects, the trial ran for many weeks and 35.5 percent dropped out.", [{ node: "n1", path: "metrics.n", value: -120 }])).toEqual(["unsourced", "unsourced"]);
+    expect(labels("The interval ended at 250 mg.", [{ node: "n1", path: "metrics.ci_l", value: 0.25 }])).toEqual(["unsourced"]);
+  });
+
+  test("a unit converts for a value in a list", () => {
+    expect(labels("The second pellet weighed 250 mg.", [{ node: "n1", path: "metrics.mass_g[1]", value: 0.25 }])).toEqual(["measured"]);
+  });
 });

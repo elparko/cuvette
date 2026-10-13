@@ -12,6 +12,7 @@ import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapter
 import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
 import { adapterTrust, confirmCode, TRUST_NAME, type InstalledEntry, type TrustLevel } from "../adapters/source.ts";
 import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
+import { readIndex } from "./places.ts";
 import { ageText } from "./sessions.ts";
 import { howToCite } from "./citations.ts";
 
@@ -168,7 +169,7 @@ async function duSize(paths: string[]): Promise<number | undefined> {
 export function lastUsedMap(home = cuvetteHome()): Map<string, number> {
   const logs = new Set<string>();
   try {
-    for (const r of JSON.parse(readFileSync(join(home, "sessions-index.json"), "utf8")) as { folder: string }[]) logs.add(join(r.folder, ".record", "log.jsonl"));
+    for (const r of readIndex(join(home, "sessions-index.json"))) logs.add(join(r.folder, ".record", "log.jsonl"));
   } catch {}
   const dir = join(home, "sessions");
   if (existsSync(dir)) for (const id of readdirSync(dir)) logs.add(join(dir, id, "log.jsonl"));
