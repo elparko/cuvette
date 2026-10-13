@@ -103,7 +103,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
       addOldEnv(env);
       t = new StdioClientTransport({ command: argv[0], args: argv.slice(1), env, cwd: conn.cwd ? expand(conn.cwd, c.ph) : c.adapter.root, stderr: "pipe" });
-      log ??= createWriteStream(logPath, { flags: "a" });
+      log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
       t.stderr?.on("data", (d: Buffer) => {
         log?.write(d);
         stderrTail = tail(stderrTail + d.toString("utf8"), 2000);

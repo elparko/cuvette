@@ -65,7 +65,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   };
 
   const spawnWorker = (): Promise<void> => {
-    log ??= createWriteStream(logPath, { flags: "a" });
+    log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
     stderrTail = "";
     const argv = blindArgv([...interpreter(), "-u", WORKER, c.adapter.root]);
     const p = spawn(argv[0], argv.slice(1), {
