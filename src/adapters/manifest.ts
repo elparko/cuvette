@@ -342,9 +342,13 @@ export function loadAdapter(path: string): LoadedAdapter {
       const file = join(root, manifest.module);
       const built = file.replace(/\.tsx?$/, ".mjs");
       if (mod) return mod;
-      const url = pathToFileURL(built !== file && existsSync(built) ? built : file).href;
-      // The bundle in dist/ has no TypeScript loader, so it loads a .ts adapter module with tsx.
-      const load = /\.tsx?$/.test(url) && !/\.tsx?$/.test(import.meta.url) ? import("tsx/esm/api").then((t) => t.tsImport(url, import.meta.url)) : import(url);
+      const fromBundle = !/\.tsx?$/.test(import.meta.url);
+      // scripts/build-cli.mjs puts each catalog adapter module into the bundle. It shares the code of the CLI, so tsx does not start.
+      const inBundle = join(ROOT, "dist", "catalog", basename(root), "adapter.js");
+      const pick = built !== file && existsSync(built) ? built : fromBundle && manifest.module === "adapter.ts" && root === join(CATALOG_DIR, basename(root)) && existsSync(inBundle) ? inBundle : file;
+      const url = pathToFileURL(pick).href;
+      // Other adapter modules in .ts load with tsx, because the bundle has no TypeScript loader.
+      const load = /\.tsx?$/.test(url) && fromBundle ? import("tsx/esm/api").then((t) => t.tsImport(url, import.meta.url)) : import(url);
       mod = load.then((m) => (m.default ?? m) as AdapterModule);
       return mod;
     },

@@ -1010,7 +1010,7 @@ export class Session {
       this.turnNo++;
       this.chooseActiveTools(text, true);
       if (this.pick) {
-        const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
+        const hint = fileTypeHint(text, () => this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
         if (hint) this.notes.push(hint);
       }
       this.record.append("user", { text, ...(opts.internal ? { internal: true } : {}) });

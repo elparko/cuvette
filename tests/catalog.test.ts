@@ -63,6 +63,15 @@ test("the file-type hint names adapters for the files in the request", () => {
   expect(fileTypeHint("Count reads in /data/x.bam", list, cwd, ["samtools"])).toBe("");
 });
 
+test("the file-type hint makes the index only if the request names a file", () => {
+  let made = 0;
+  const index = () => (made++, adapterIndex(cwd));
+  expect(fileTypeHint("No files here, just a question.", index, cwd)).toBe("");
+  expect(made).toBe(0);
+  expect(fileTypeHint("Data: /data/sleep.csv", index, cwd)).toContain("biostats");
+  expect(made).toBe(1);
+});
+
 test("a 10x folder named in the request matches through the files in it", () => {
   const tenx = join(cwd, "filtered");
   mkdirSync(tenx);
