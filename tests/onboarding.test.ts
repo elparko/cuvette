@@ -132,6 +132,18 @@ describe("checker", () => {
     expect((await checkAdapter("catalog/pwr", { static: true })).warnings.join("\n")).not.toMatch(/no script reads it|so the model cannot set it/);
   });
 
+  test("a decision value outside the enum of a linked argument, and a sensitivity tool without a link, are errors", async () => {
+    const dir = join(tmp, "bedtools-links");
+    cpSync("catalog/bedtools", dir, { recursive: true });
+    const file = join(dir, "adapter.yaml");
+    const yaml = readFileSync(file, "utf8")
+      .replace("      - { tool: coverage_intervals, arg: strand }\n", "      - { tool: coverage_intervals, arg: strand }\n      - { tool: merge_intervals, arg: strand }\n    sensitivity:\n      options: [any, same]\n      tool: intersect_intervals\n");
+    writeFileSync(file, yaml.replace("      - { tool: intersect_intervals, arg: strand }\n", ""));
+    const r = await checkAdapter(dir, { static: true });
+    expect(r.errors).toContain('decision "strand": the value "opposite" is not in the enum of merge_intervals.strand');
+    expect(r.errors).toContain('decision "strand", sensitivity: the decision has no link to "intersect_intervals", so the comparison never runs. Link the decision to that tool, or name a linked tool');
+  });
+
   test("a static check does not call a tool of the module unknown", async () => {
     const dir = broken("static", (y) => y);
     writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(dir, "adapter.yaml"), "utf8").replace(/^tests:\n/m, "tests:\n  - id: module-tool\n    calls: [{ tool: from_module }]\n    expect: [{ path: ok, equals: true }]\n"));
