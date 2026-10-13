@@ -227,3 +227,62 @@ test("locate: a version command that runs longer than the time limit gives the m
   expect(r.path).toBe(join(a.root, "python"));
   expect(r.how).toContain("longer than 0.3 s");
 });
+
+function napPythonAdapter(delayS: number): string {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-nappy-"));
+  const exe = join(dir, "python");
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; *) exec python3 "$@";; esac\n`);
+  chmodSync(exe, 0o755);
+  writeFileSync(join(dir, "napmod.py"), "import os, time\n\ndef nap(seconds=0):\n    time.sleep(seconds)\n    return {'pid': os.getpid()}\n");
+  writeFileSync(
+    join(dir, "adapter.yaml"),
+    [
+      "adapter: { name: nappy }",
+      'program: { name: openpyxl, version: "from the manifest" }',
+      'connection: { kind: python, interpreter: ["{program_path}"] }',
+      "locate:",
+      `  paths: [${JSON.stringify(exe)}]`,
+      '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
+      "  version_pattern: 'openpyxl (\\S+)'",
+      "  identity: 'openpyxl \\d'",
+      "tools:",
+      "  - name: nap",
+      "    description: Wait.",
+      '    function: "napmod:nap"',
+      "    params: { seconds: { type: number } }",
+    ].join("\n"),
+  );
+  return dir;
+}
+
+test("quick start: a stop while the version command runs ends the call at once, and the next call runs", async () => {
+  if (process.platform === "win32") return;
+  const home = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  try {
+    const a = loadAdapter(napPythonAdapter(2));
+    const d = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
+    const rt = await startAdapter(a, d, { quick: true });
+    const nap = (await rt.tools()).find((t) => t.name === "nap")!;
+    const stop = new AbortController();
+    setTimeout(() => stop.abort(), 100);
+    const t0 = Date.now();
+    const out = await nap.execute({ seconds: 5 }, { ...ctx(stop.signal), workDir: d.workDir, sessionDir: d.sessionDir });
+    expect(Date.now() - t0).toBeLessThan(1500);
+    expect(out.ok).toBe(false);
+    await rt.checked;
+    const next = await nap.execute({ seconds: 0 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
+    expect(next.ok).toBe(true);
+    const first = nap.execute({ seconds: 2 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
+    const queued = new AbortController();
+    setTimeout(() => queued.abort(), 100);
+    const t1 = Date.now();
+    const second = await nap.execute({ seconds: 0 }, { ...ctx(queued.signal), workDir: d.workDir, sessionDir: d.sessionDir });
+    expect(Date.now() - t1).toBeLessThan(1000);
+    expect(second.ok).toBe(false);
+    expect((await first).ok).toBe(true);
+    await rt.close();
+  } finally {
+    process.env.CUVETTE_HOME = home;
+  }
+}, 30000);

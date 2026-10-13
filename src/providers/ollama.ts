@@ -5,6 +5,7 @@ import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
 import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
+import { parseArgs } from "./openai.ts";
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
@@ -281,7 +282,7 @@ export class OllamaProvider implements Provider {
 
     let content = "";
     let thinkField = "";
-    const nativeCalls: { name: string; args: unknown }[] = [];
+    const nativeCalls: { name: string; args: unknown; parseError?: string }[] = [];
     let inTok = 0;
     let outTok = 0;
     let doneReason = "";
@@ -309,15 +310,9 @@ export class OllamaProvider implements Provider {
         }
       }
       for (const c of m?.tool_calls ?? []) {
-        let args = c.function?.arguments ?? {};
-        if (typeof args === "string") {
-          try {
-            args = JSON.parse(args);
-          } catch {
-            args = {};
-          }
-        }
-        nativeCalls.push({ name: c.function?.name ?? "", args });
+        const a = c.function?.arguments;
+        const { args, parseError } = parseArgs({ id: "", name: "", args: typeof a === "string" ? a : "", obj: typeof a === "string" ? undefined : (a ?? {}) }, false);
+        nativeCalls.push({ name: c.function?.name ?? "", args, ...(parseError ? { parseError } : {}) });
       }
       if (j.done) {
         finished = true;
@@ -340,7 +335,7 @@ export class OllamaProvider implements Provider {
     let n = lastCallNumber(req.messages);
     const parts: Part[] = [];
     let note: string | undefined;
-    const calls = nativeCalls.map((c) => ({ ...c }));
+    const calls: { name: string; args: unknown; parseError?: string }[] = nativeCalls.map((c) => ({ ...c }));
     if (!calls.length && text) {
       const hit = extractTextToolCall(text, req.tools.map((t) => t.name));
       if (hit) {
@@ -351,7 +346,7 @@ export class OllamaProvider implements Provider {
     }
     if (thinking) parts.push({ type: "thinking", text: thinking });
     if (text) parts.push({ type: "text", text });
-    for (const c of calls) parts.push({ type: "tool_call", id: `call_${++n}`, name: c.name, args: c.args });
+    for (const c of calls) parts.push({ type: "tool_call", id: `call_${++n}`, name: c.name, args: c.args, ...(c.parseError ? { parseError: c.parseError } : {}) });
     const raw = { content, thinking: thinkField, tool_calls: nativeCalls };
     const result: StepResult = {
       message: { role: "assistant", parts, provider: "ollama", model: this.model, raw },

@@ -896,3 +896,48 @@ describe("agent loop fixes, round three", () => {
     expect(retryReason(new ProviderError("Model server error 400: the request timed out", false))).toBeUndefined();
   });
 });
+
+describe("agent loop fixes, round seven", () => {
+  test("OpenAI: a stream that ends at [DONE] in the middle of the arguments gives a call with a parse error", async () => {
+    vi.stubGlobal("fetch", async () => sse([delta({ tool_calls: [{ index: 0, id: "c1", function: { name: "add", arguments: '{"a": 1, "b' } }] })]));
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("q")]));
+    const call = r.message.parts.find((x) => x.type === "tool_call") as { parseError?: string; args: unknown };
+    expect(call.args).toEqual({});
+    expect(call.parseError).toMatch(/not valid JSON/);
+    expect(r.stopReason).toBe("tool_use");
+  });
+
+  test("OpenAI: a cut last line after the finish reason does not lose the reply", async () => {
+    vi.stubGlobal("fetch", async () => {
+      const body = `data: ${JSON.stringify(delta({ content: "whole" }, "stop"))}\n\ndata: {"choices":[{"delta":{"con`;
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    });
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("q")]));
+    expect(r.message.parts).toEqual([{ type: "text", text: "whole" }]);
+  });
+
+  test("OpenAI: a server that sends no usage gives estimates and one notice for the session", async () => {
+    vi.stubGlobal("fetch", async () => sse([delta({ content: "ok" }, "stop")]));
+    const p = await makeProvider("openai:http://localhost:1234/v1|m");
+    const a = await p.step(req([user("hello there")]));
+    const b = await p.step(req([user("hello there"), { role: "assistant", parts: [{ type: "text", text: "ok" }] }, user("again")]));
+    expect(a.usage.inputTokens).toBeGreaterThan(0);
+    expect(b.usage.inputTokens).toBeGreaterThan(a.usage.inputTokens);
+    expect(a.note).toMatch(/estimates/);
+    expect(b.note).toBeUndefined();
+  });
+
+  test("Ollama: tool call arguments that are not valid JSON give a parse error, not an empty call", async () => {
+    stubOllama(() => ndjson([{ message: { content: "", tool_calls: [{ function: { name: "add", arguments: '{"a": 1, "b' } }] } }, { done: true, prompt_eval_count: 10, eval_count: 5 }]));
+    const r = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")]));
+    const call = r.message.parts.find((x) => x.type === "tool_call") as { parseError?: string; args: unknown };
+    expect(call.args).toEqual({});
+    expect(call.parseError).toMatch(/not valid JSON/);
+  });
+
+  test("Ollama: object arguments stay as they are", async () => {
+    stubOllama(() => ndjson([{ message: { content: "", tool_calls: [{ function: { name: "add", arguments: { a: 1, b: 2 } } }] } }, { done: true, prompt_eval_count: 10, eval_count: 5 }]));
+    const r = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")]));
+    expect(r.message.parts).toEqual([{ type: "tool_call", id: "call_1", name: "add", args: { a: 1, b: 2 } }]);
+  });
+});

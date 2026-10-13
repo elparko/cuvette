@@ -444,6 +444,63 @@ test("the MCP client gets masked values, a notice and a logged choice; phi_check
   await off.close();
 });
 
+test("the MCP client gets masked values in a JSON list of rows, also a value with a line break or a quote", async () => {
+  const session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")) });
+  const rows = [
+    { patient_name: "John Doe", home_address: "1501 Kings Highway\nShreveport", troponin: 54 },
+    { patient_name: "Mary Smith", home_address: "22 Oak Street\nBossier City", troponin: 12 },
+  ];
+  const text = JSON.stringify({ ok: true, rows }, null, 1);
+  expect(kinds(JSON.stringify(rows))).toEqual(expect.arrayContaining(["address", "name"]));
+  const out = session.phiForClient(text, "read_table");
+  expect(out).not.toContain("John Doe");
+  expect(out).not.toContain("Mary Smith");
+  expect(out).not.toContain("Kings Highway");
+  expect(out).not.toContain("Oak Street");
+  expect(out).toContain('"troponin": 54');
+  const m = new Masker();
+  m.add([{ kind: "name", value: 'Ann "Bo" Lee', where: "x" }]);
+  expect(m.text(JSON.stringify({ n: 'Ann "Bo" Lee' }))).toBe('{"n":"[NAME 1]"}');
+  await session.close();
+});
+
+test("a binary or very large tool result does not stop the MCP mask", async () => {
+  const session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")) });
+  const bin = Buffer.from(Array.from({ length: 200_000 }, (_, i) => (i * 7919) % 256)).toString("latin1");
+  expect(session.phiForClient(bin, "read_file")).toBe(bin);
+  const big = `${CLINIC_CSV}${"x,1\n".repeat(500_000)}`;
+  const t0 = Date.now();
+  const out = session.phiForClient(big, "read_file");
+  expect(Date.now() - t0).toBeLessThan(5000);
+  expect(out).not.toContain("John Doe");
+  await session.close();
+});
+
+test("after a summary and a resume, a masked value keeps its placeholder, so two patients do not share one", async () => {
+  const { session, provider, file } = await clinicSession({ action: "mask" });
+  await session.send("Summarize visits.csv");
+  await session.send("And the count?");
+  provider.info.contextWindow = 10;
+  provider.complete = async () => "## Steps done\n[NAME 1] has troponin 54.";
+  expect(await session.compact()).toBe(true);
+  const id = session.id;
+  const cwd = session.cwd;
+  await session.close();
+  const later = join(cwd, "later.csv");
+  writeFileSync(later, "patient_name,troponin_ng_l\nRobert Brown,230\nAnn Lee,7\n");
+  const next = new FakeProvider([{ calls: [{ name: "read_file", args: { path: later } }] }, { text: "Two rows." }, { text: "Two rows." }]);
+  next.info.local = false;
+  const resumed = await Session.resume(id, { provider: next, cwd });
+  await resumed.send("Read later.csv");
+  const sent = sentText(next);
+  expect(sent).toContain("[NAME 1] has troponin 54");
+  expect(sent).not.toContain("Robert Brown");
+  expect(sent).toContain("[NAME 3],230");
+  expect(sent).toContain("[NAME 4],7");
+  expect(readFileSync(file, "utf8")).toBe(CLINIC_CSV);
+  await resumed.close();
+});
+
 test("a phone notice to an outside server does not carry patient identifiers", async () => {
   const bodies: string[] = [];
   vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {

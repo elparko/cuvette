@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { dropThinking, elideOld, estimateTokens, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
+import { dropThinking, elideOld, estimateTokens, headText, pointerText, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
 import { Session } from "../src/core/session.ts";
 import type { Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -154,6 +154,41 @@ test("a failed summary does not stop the turn", async () => {
   expect(session.record.entries(["notice"]).some((e) => /could not summarize the older messages: network down\./.test(String(e.data.text)))).toBe(true);
   expect(session.record.entries(["compaction"])).toHaveLength(0);
   await session.close();
+});
+
+test("elision keeps a result that a recent pointer needs, and an old pointer gets the shortened text of its result", () => {
+  const h = oneLongTurn(6);
+  const recent = h.length - 1;
+  h[recent] = result("c6", pointerText("c1"));
+  h.splice(4, 1, result("c2", pointerText("c1")));
+  const { messages } = elideOld(h, 10);
+  expect((messages[2]!.parts[0] as { text: string }).text).toBe((h[2]!.parts[0] as { text: string }).text);
+  const h2 = oneLongTurn(6);
+  h2.splice(4, 1, result("c2", pointerText("c1")));
+  const out = elideOld(h2, 10).messages;
+  const c1 = (out[2]!.parts[0] as { text: string }).text;
+  expect(c1).toContain("[Older tool output shortened:");
+  expect((out[4]!.parts[0] as { text: string }).text).toBe(c1);
+});
+
+test("a kept pointer gets the full text of a result that the summary removes", async () => {
+  const h = oneLongTurn(6);
+  h[h.length - 1] = result("c6", pointerText("c1"));
+  const r = await summarizeOld(h, new FakeProvider({ steps: [], complete: "sum" }), 10);
+  const texts = r!.kept.flatMap((m) => m.parts).filter((p) => p.type === "tool_result").map((p) => (p as { text: string }).text);
+  expect(texts.at(-1)).toBe((h[2]!.parts[0] as { text: string }).text);
+});
+
+test("a shortened output does not keep half of an emoji", () => {
+  const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+  expect(headText("a😀", 2)).toBe("a");
+  for (const pad of ["", "x"]) {
+    const h: Message[] = [request("q")];
+    for (let i = 1; i <= 6; i++) h.push(call(`c${i}`), result(`c${i}`, pad + "😀".repeat(2000)));
+    const { messages, elided } = elideOld(h, 10);
+    expect(elided).toBeGreaterThan(0);
+    for (const m of messages) for (const p of m.parts) if (p.type === "tool_result") expect(lone.test(p.text)).toBe(false);
+  }
 });
 
 test("an empty summary does not replace the older messages", async () => {
