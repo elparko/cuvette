@@ -65,12 +65,13 @@ const WORD_RE = Object.entries(WORDS).map(([w, r]) => [w, r, wordRe(w)] as const
 const PHRASE_RE = PHRASES.map((p) => [p, new RegExp(`(^|[^A-Za-z])${esc(p)}${/[A-Za-z]$/.test(p) ? "(?![A-Za-z])" : ""}`, "i")] as const);
 const MODAL = /\b(should|shall|might|may)\b(?!\s+\d)/i;
 
+// Each pattern stops at the next opening mark. A line with many "<" and no ">" then takes linear time, not quadratic time.
 function clean(line: string): string {
   return line
     .replace(/`[^`]*`/g, "X")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/!\[[^[\]]*\]\([^()]*\)/g, "")
+    .replace(/\[([^[\]]*)\]\([^()]*\)/g, "$1")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/https?:\/\/\S+/g, "X")
     .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1");
 }
@@ -216,7 +217,13 @@ const STRING = /"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/
 
 export function uiStrings(code: string): Sentence[] {
   const out: Sentence[] = [];
-  const lineAt = (i: number) => code.slice(0, i).split("\n").length;
+  let seen = 0;
+  let lines = 1;
+  const lineAt = (i: number) => {
+    for (let k = code.indexOf("\n", seen); k >= 0 && k < i; k = code.indexOf("\n", k + 1)) lines++;
+    seen = Math.max(seen, i);
+    return lines;
+  };
   for (const m of code.matchAll(STRING)) {
     const raw = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{[^}]*\}/g, "X");
     const base = lineAt(m.index!);
