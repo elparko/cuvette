@@ -1,7 +1,8 @@
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { parse as parseYaml } from "yaml";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "dist");
@@ -41,5 +42,12 @@ const r = await build({
   logLevel: "warning",
   plugins: [metaUrl],
 });
+// The parsed adapter.yaml of each catalog adapter goes to dist/catalog/<name>/adapter.json. A YAML parse at each start takes about 20 ms.
+for (const d of readdirSync(join(ROOT, "catalog"), { withFileTypes: true })) {
+  const yaml = join(ROOT, "catalog", d.name, "adapter.yaml");
+  if (!d.isDirectory() || !existsSync(yaml)) continue;
+  mkdirSync(join(OUT, "catalog", d.name), { recursive: true });
+  writeFileSync(join(OUT, "catalog", d.name, "adapter.json"), JSON.stringify(parseYaml(readFileSync(yaml, "utf8"))));
+}
 // bin/cuvette.js compares the time of these files with the bundle. In a git checkout it uses tsx if a source file is newer.
 writeFileSync(join(OUT, "inputs.json"), JSON.stringify(Object.keys(r.metafile.inputs)));

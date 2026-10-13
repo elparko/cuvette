@@ -1,8 +1,27 @@
-import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { Manifest, loadAdapter } from "../src/adapters/manifest.ts";
+import { CATALOG_DIR, Manifest, bundledManifestFile, loadAdapter } from "../src/adapters/manifest.ts";
+import { parseYaml } from "../src/core/yaml.ts";
+
+test("each catalog adapter.yaml gives the same manifest after a JSON round trip, as in dist/catalog/<name>/adapter.json", () => {
+  const files = readdirSync(CATALOG_DIR).map((d) => join(CATALOG_DIR, d, "adapter.yaml")).filter(existsSync);
+  expect(files.length).toBeGreaterThan(10);
+  for (const f of files) {
+    const raw = parseYaml(readFileSync(f, "utf8"));
+    expect(JSON.parse(JSON.stringify(raw))).toEqual(raw);
+    expect(Manifest.parse(JSON.parse(JSON.stringify(raw)))).toEqual(Manifest.parse(raw));
+  }
+});
+
+test("only the bundle uses the parsed manifest file, only for a catalog adapter, and only if the file is not older than adapter.yaml", () => {
+  const tables = join(CATALOG_DIR, "tables", "adapter.yaml");
+  expect(bundledManifestFile(tables, false)).toBeUndefined();
+  expect(bundledManifestFile("tests/fixtures/mini/adapter.yaml", true)).toBeUndefined();
+  const got = bundledManifestFile(tables, true);
+  if (got) expect(got).toMatch(/dist[\\/]catalog[\\/]tables[\\/]adapter\.json$/);
+});
 
 test("map entries match on args and links resolve", () => {
   const a = loadAdapter("tests/fixtures/mini");

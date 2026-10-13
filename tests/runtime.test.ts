@@ -167,3 +167,63 @@ test("locate: the version command runs in the temporary folder, so a blind run t
   const { realpathSync } = await import("node:fs");
   expect(r.version).toBe(realpathSync(tmpdir()));
 });
+
+function slowPythonAdapter(delayS: number): string {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-slowpy-"));
+  const exe = join(dir, "python");
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; esac\n`);
+  chmodSync(exe, 0o755);
+  writeFileSync(
+    join(dir, "adapter.yaml"),
+    [
+      "adapter: { name: slowpy }",
+      'program: { name: openpyxl, version: "from the manifest" }',
+      'connection: { kind: python, interpreter: ["{program_path}"] }',
+      "locate:",
+      `  paths: [${JSON.stringify(exe)}]`,
+      '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
+      "  version_pattern: 'openpyxl (\\S+)'",
+      "  identity: 'openpyxl \\d'",
+    ].join("\n"),
+  );
+  return dir;
+}
+
+test("quick start: a Python adapter starts before its version command ends, and the next start uses the saved version", async () => {
+  if (process.platform === "win32") return;
+  const home = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  try {
+    const a = loadAdapter(slowPythonAdapter(1));
+    const dirs = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
+    const t0 = Date.now();
+    const rt = await startAdapter(a, dirs, { quick: true });
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(rt.programVersion).toBe("from the manifest");
+    const f = await rt.checked;
+    expect(f).toMatchObject({ version: "9.9", identified: true });
+    expect(rt.programVersion).toBe("9.9");
+    await rt.close();
+
+    const again = await startAdapter(a, dirs, { quick: true });
+    expect(again.programVersion).toBe("9.9");
+    await again.checked;
+    await again.close();
+
+    const slow = await startAdapter(a, dirs);
+    expect(slow.checked).toBeUndefined();
+    expect(slow.programVersion).toBe("9.9");
+    await slow.close();
+  } finally {
+    process.env.CUVETTE_HOME = home;
+  }
+});
+
+test("locate: a version command that runs longer than the time limit gives the manifest version and a reason", async () => {
+  if (process.platform === "win32") return;
+  const a = loadAdapter(slowPythonAdapter(3));
+  const r = await locate(a.manifest, a.root, undefined, 300);
+  expect(r).toMatchObject({ version: "from the manifest", timedOut: true });
+  expect(r.path).toBe(join(a.root, "python"));
+  expect(r.how).toContain("longer than 0.3 s");
+});

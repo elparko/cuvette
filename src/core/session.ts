@@ -10,6 +10,7 @@ import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindP
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
+import { START_VERSION_TIMEOUT_MS } from "../adapters/locate.ts";
 import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
@@ -410,7 +411,7 @@ export class Session {
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
     const defaults = opts.defaults ? this.defaultAdapters() : [];
-    const launched = await Promise.allSettled([...named, ...defaults].map((a) => this.launch(a)));
+    const launched = await Promise.allSettled([...named, ...defaults].map((a) => this.launch(a, true)));
     const failed = launched.flatMap((r, i) => (r.status === "rejected" && i < named.length ? [r.reason] : []));
     if (failed.length) {
       await Promise.all(launched.map((r) => (r.status === "fulfilled" ? r.value.rt.close().catch(() => {}) : undefined)));
@@ -527,8 +528,14 @@ export class Session {
         ...(defaults.length ? { defaults: defaults.map((a) => a.name) } : {}),
       });
     }
-    for (const a of this.adapterInfo) await this.envHashFor(a.name);
-    if (resumed) await this.checkStatus();
+    const started = [...this.runtimes];
+    this.starting = (async () => {
+      for (const rt of started) await this.afterStart(rt);
+    })();
+    if (resumed) {
+      await this.starting;
+      await this.checkStatus();
+    }
     if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
     await this.checkTrust(!!opts.interactive);
     await this.hooks.event("SessionStart", { session: this.id });
@@ -610,16 +617,33 @@ export class Session {
     return out;
   }
 
+  private starting: Promise<void> = Promise.resolve();
+
+  // The version command and the package list of an adapter run after the first request goes out.
+  private async afterStart(rt: AdapterRuntime) {
+    const name = rt.adapter.name;
+    const f = await rt.checked?.catch(() => undefined);
+    if (f) {
+      const info = this.adapterInfo.find((x) => x.name === name);
+      const before = info?.programVersion;
+      if (info) info.programVersion = f.version;
+      if (before && before !== f.version && before !== rt.adapter.manifest.program.version && !f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} gives the program version ${f.version}. The start of this session used the saved version ${before}. The steps record ${f.version}.` });
+      this.envTargets.set(name, envTarget({ kind: rt.adapter.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: f.path, program: rt.adapter.manifest.program.name, programVersion: f.version }));
+      if (f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} ran longer than ${START_VERSION_TIMEOUT_MS / 1000} s. Cuvette did not check the program at ${f.path ?? "the found path"}. The record shows the version from the adapter manifest: ${f.version}.` });
+    }
+    await this.envHashFor(name).catch(() => undefined);
+  }
+
   private async startOne(a: LoadedAdapter): Promise<string[]> {
     return this.register(await this.launch(a));
   }
 
   // The programs start at the same time. The tools register in a fixed order after that.
-  private async launch(a: LoadedAdapter) {
+  private async launch(a: LoadedAdapter, quick = false) {
     const trust = adapterTrust(a.root);
     if (!trust.codeConfirmed) throw new Error(`The adapter ${a.name} is Unlisted and ships code (${trust.codeFiles.join(", ")}). Confirm that it can run: cuvette adapter allow-code ${a.name}`);
     const { startAdapter } = await import("../adapters/runtime.ts");
-    const rt = await startAdapter(a, this.dirs());
+    const rt = await startAdapter(a, this.dirs(), { quick });
     try {
       const [mod, tools] = await Promise.all([a.module(), rt.tools()]);
       return { a, trust, rt, mod, tools };
@@ -2124,6 +2148,7 @@ export class Session {
             return { path: p, size: st.size, mtime: st.mtime.toISOString(), sha256: await fileSha(p), ...(!this.place.legacy && outside(p, this.cwd) ? { outside: true } : {}) };
           }),
       );
+      await this.starting;
       const envHash = tool.adapter || tool.name === "run_script" ? await this.envHashFor(tool.adapter || "run_script") : undefined;
       const before = await this.checkStatus();
       const n = this.record.addNode({
@@ -4222,6 +4247,7 @@ export class Session {
     }
     this.interrupt();
     await this.titling?.catch(() => {});
+    await this.starting.catch(() => {});
     this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }

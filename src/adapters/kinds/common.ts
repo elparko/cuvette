@@ -26,6 +26,7 @@ export interface KindContext {
   programPath?: string;
   programVersion: string;
   how: string;
+  ready?: Promise<void>;
 }
 
 export interface CallDir {

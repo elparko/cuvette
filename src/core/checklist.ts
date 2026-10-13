@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { parse as parseYaml } from "yaml";
+import { parseYaml } from "./yaml.ts";
 import { z } from "zod";
 import { stepNumbers } from "./housekeeping.ts";
 import { approvedPlan, currentPlan } from "./plan.ts";
