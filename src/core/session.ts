@@ -624,6 +624,7 @@ export class Session {
   }
 
   private starting: Promise<void> = Promise.resolve();
+  private systemSent = false;
 
   // The version command and the package list of an adapter run after the first request goes out.
   private async afterStart(rt: AdapterRuntime) {
@@ -638,7 +639,8 @@ export class Session {
       const shown = this.runtimeInfo.find((x) => x.adapter.name === name);
       if (shown && shown.programVersion !== f.version) {
         shown.programVersion = f.version;
-        this.system = this.buildSystem();
+        // After the first model request, a new system prompt makes the API write the prompt cache again.
+        if (!this.systemSent) this.system = this.buildSystem();
       }
       if (before && before !== f.version && before !== rt.adapter.manifest.program.version && !f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} gives the program version ${f.version}. The start of this session used the saved version ${before}. The steps record ${f.version}.` });
       this.envTargets.set(name, envTarget({ kind: rt.adapter.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: f.path, program: rt.adapter.manifest.program.name, programVersion: f.version }));
@@ -1262,6 +1264,7 @@ export class Session {
         partial = "";
       };
       try {
+        this.systemSent = true;
         const res = await this.provider.step({
           system: this.system,
           messages: this.history,
@@ -3871,7 +3874,7 @@ export class Session {
     const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
     const own = (p: string) => [this.dir, this.outputDir, cuvetteHome()].some((d) => p === d || p.startsWith(`${d}/`));
     const found: { path: string; label: string; kind: "table" | "files" }[] = [];
-    const saved = /^(read|load|import|open|inspect)/.test(name) ? (output.table?.path ?? output.outputs?.find((o) => o.kind === "table")?.path) : undefined;
+    const saved = /^(read|load|import|open)/.test(name) ? (output.table?.path ?? output.outputs?.find((o) => o.kind === "table")?.path) : undefined;
     if (saved && existsTable(saved)) found.push({ path: saved, label: given[0] ?? saved, kind: "table" });
     for (const g of given) {
       if (own(g) || !existsSync(g)) continue;

@@ -135,6 +135,137 @@ values, but Cuvette is the faster harness with these values.
 6. The runs alternate in the order Cuvette high, Cuvette medium, Claude Code medium,
    Claude Code high. The 20 runs made 20 model calls.
 
+## Cost of a whole task with real Haiku
+
+This section measures a full task, not only the first token. The two harnesses do different
+work. Cuvette asks the scientist for each method decision, runs the test in an adapter, checks
+the numbers of the answer and runs a referee. Claude Code reads the file and answers. Thus
+compare only the time, the tokens and the cost for each call. The total for each run is not
+a measure of the same work.
+
+### Task and method
+
+1. A new temporary folder holds `data.csv`: 12 rows, the columns `sample_id`, `group` and
+   `value`, and two groups of 6 (`control` and `treated`).
+2. The true values: control mean 4.2, treated mean 5.1, mean difference 0.9. The Welch t-test
+   gives t = 4.88 and p = 0.00066.
+3. The request to each harness is "Compare the two groups and tell me if they differ."
+4. Cuvette runs with `-p`, `--adapter biostats`, `--model claude:claude-haiku-5-5`,
+   `--allow all` and `--output json`. The other settings are the defaults: effort `high`,
+   referee `same`. Headless mode answers each question with the recommendation.
+5. Claude Code runs with `-p`, `--model claude-haiku-5-5`, `--output-format json` and
+   `--dangerously-skip-permissions`. `CLAUDE_CONFIG_DIR` is a new empty folder.
+6. Each run has a new empty `CUVETTE_HOME` or `CLAUDE_CONFIG_DIR`.
+7. A logging proxy on localhost forwards each request to the Claude API. It records the
+   usage and the tool calls of each reply. It refuses each request after the limit of
+   24 model calls, so a refused request makes no model call.
+8. The cost uses the Haiku prices in `src/core/spend.ts`. For each million tokens, the price in
+   US dollars (USD) is: input 0.10, output 0.50, cache read 0.01, cache write 0.125.
+
+The limit of 24 model calls did not permit three full Cuvette runs. A full Cuvette run needs
+about 10 calls. One call failed because the proxy did not send the workspace header. Claude
+Code used 9 calls in three runs, and Cuvette used 14 calls in two runs.
+
+### Results
+
+Claude Code values are the median of three runs. Each Cuvette run has its own column.
+Cuvette run 1 uses the code before the fixes of this section. Run 2 uses the code after the
+fixes. The proxy refused the referee call and the revision call in run 1. It refused the
+seventh call in run 2, so run 2 has no answer.
+
+| Metric | Claude Code (median of 3) | Cuvette run 1 (before) | Cuvette run 2 (after) |
+| --- | --- | --- | --- |
+| Wall time | 9.0 s | 27.6 s | 28.1 s |
+| Model time (sum of the requests) | 7.9 s | 24.2 s | 23.1 s |
+| Harness time (wall time minus model time) | 1.2 s | 3.4 s | 5.0 s |
+| Model calls | 3 | 8 (2 refused) | 6 (1 refused) |
+| Input tokens, not cached | 6 | 18 | 14 |
+| Cache write tokens | 6,703 | 28,364 | 26,054 |
+| Cache read tokens | 74,784 | 141,694 | 106,702 |
+| Output tokens | 1,319 | 3,392 | 3,477 |
+| Cost estimate | 0.0023 USD | 0.0067 USD | 0.0061 USD |
+| Tool calls | 2 | 7 | 9 |
+| Mean difference 0.9 in the answer | yes, 3 of 3 | yes | no answer |
+| Test result in the answer | yes, 3 of 3 | yes (Welch, p = 0.00066, 95% CI) | no answer |
+
+The first Claude Code run had a cold cache: 27,457 cache write tokens and a cost of
+0.0046 USD. Runs 2 and 3 read 20,764 tokens of the first request from the cache of run 1.
+
+Claude Code computed the t-test by hand in each run. It ran no statistics program. It gave
+p = 0.0006 in two runs and p = 0.001 in one run. Each answer says that the p value is
+approximate. Cuvette ran the t-test in the `biostats` adapter. The answer of run 1 gives the
+mean difference, the 95% confidence interval (CI), t, the degrees of freedom and Cohen d.
+
+### Comparable values
+
+For each model call, the two harnesses send about the same number of tokens. A Cuvette call
+reads 20,000 to 24,000 tokens, with 37 tools. A Claude Code call reads 27,000 tokens, with
+21 tools. After the first call, the cache read share is 90% to 99% for Cuvette and 99% for
+Claude Code. The one lower value, 74%, is the second call of Cuvette run 1. The fix of the
+system prompt below removes it.
+
+The output tokens for each call are also about equal: 424 for Cuvette run 1 and 440 for
+Claude Code. Thus the extra cost of Cuvette comes from the number of calls. It does not come
+from the size of each call.
+
+### Causes of the extra calls and tokens in Cuvette
+
+These causes are from the two records. A plain loop does not have them.
+
+| Cause | Calls or tokens | Status |
+| --- | --- | --- |
+| The data check after `inspect_table` checked the summary table of the tool and gave it the name of the data file. The model read the file again to make sure. | 1 call (run 1) | Fixed |
+| The version command of the adapter changed the system prompt after the first request. | 5,127 tokens written to the cache again (run 1) | Fixed |
+| The adapter hides the column table from a cloud model (`cloud_visibility: summaries`). The model reads the raw file with `read_file` to see the column names. | 1 call (run 2) | Not fixed |
+| Headless mode gave the first option (`paired: true`) because the question has no recommendation. The test failed, and the model asked to change the value. | 2 calls (run 1) | Not fixed |
+| The answer check marks "80% power" as a number with no source, because it does not read the arguments of `run_script`. This starts a revision. | 1 call (run 1) | Not fixed |
+| The tool descriptions and the system prompt contain the folders of the session. Thus a new session cannot read the cache of the last session. | about 19,700 tokens written at each session start | Not fixed |
+| The referee reads the answer. | 1 call | Not changed: part of the method |
+| The model added a power calculation, a rank test and a Holm correction. | 1 to 3 calls | Not changed: model behavior |
+
+The first Python step of a session waited about 1.2 s (worker start and version command). A
+`run_script` step took 1.6 s to 2.9 s, including the script. These are the largest harness
+gaps. Claude Code needed 0.26 s to 0.56 s for its first shell command.
+
+### Fixes
+
+- `src/core/session.ts`: `checkData` uses the saved table only for a tool that reads data
+  (`read`, `load`, `import`, `open`). An `inspect` tool saves a summary of the columns, so the
+  data check now reads the input file. The model now gets the correct size and the groups:
+  "Data check of data.csv: 12 rows, 3 columns. Groups in 'group': control 6, treated 6."
+- `src/core/session.ts`: after the first model request, the result of the version command
+  does not change the system prompt. This agrees with the text above: the system prompt keeps
+  the start value. The steps and `/adapters` still show the version from the version command.
+  A later new system prompt, for example after a new adapter loads, also shows that version.
+  In run 2, the second call read 19,693 tokens from the cache, against 14,674 in run 1.
+
+Two tests in `tests/session.test.ts` cover the fixes. Each test fails on the old code.
+
+### Not fixed
+
+- The column names for a cloud model. If the data check text gives the column names of the
+  input file, the model does not need `read_file`. The `summaries` visibility permits column
+  names. This change affects each data check, so the owner must decide.
+- The `paired` question has no recommendation. Headless mode then takes the first option.
+  This is a decision step, so it is not in this change.
+- The claim check does not read the arguments of free text tools. This rule is intentional.
+- The folders of the session in the tool descriptions and the system prompt. To move them to
+  the first user message is a change to the prompt text.
+- Effort `high` for Haiku, as in the sections above.
+
+### Limits
+
+- Two Cuvette runs, with different code. Run 1 has no referee and no revision. Run 2 has no
+  answer. Thus the Cuvette values are lower than the values of a full run.
+- The Haiku replies change from run to run. Run 2 took a different path from run 1.
+  Thus the difference between the two runs is not only the effect of the fixes.
+- For Claude Code, the `PATH` started with a Python that has `scipy`. The system Python has
+  no `scipy`. The model did not run a statistics script in the three runs.
+- The proxy did not record the command of each Claude Code shell call.
+- The cost is an estimate from the token counts. It is not the invoice.
+- The scripts are not in the repository. They are a proxy, a runner and a mock server of
+  about 200 lines in total.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model

@@ -2625,6 +2625,48 @@ test("Stop while a tool call waits for the version command ends the turn at once
   expect(session.endedBy).toBe("stopped");
 });
 
+test("after the first model request, the version command does not change the system prompt, so the prompt cache stays valid", async () => {
+  if (process.platform === "win32") return;
+  const provider = new FakeProvider([{ calls: [{ name: "nap", args: { seconds: 0 } }] }, { text: "Done." }]);
+  session = await Session.create({ adapters: [napPython(1)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  await session.send("Nap.");
+  expect(provider.requests).toHaveLength(2);
+  expect(provider.requests[0]!.system).toContain("# Program: openpyxl from the manifest");
+  expect(provider.requests[1]!.system).toBe(provider.requests[0]!.system);
+  expect(session.adapterInfo[0]!.programVersion).toBe("9.9");
+  expect(session.record.nodes()[0]!.programVersion).toBe("9.9");
+});
+
+test("the data check after an inspect tool reads the input file, not the summary table of the tool", async () => {
+  if (process.platform === "win32") return;
+  const dir = slowPython(0);
+  writeFileSync(join(dir, "python"), `#!/bin/sh\ncase "$1" in -W) echo "openpyxl 9.9";; *) exec python3 "$@";; esac\n`);
+  writeFileSync(
+    join(dir, "peekmod.py"),
+    [
+      "import csv, os",
+      "",
+      "def inspect_table(path):",
+      "    rows = list(csv.reader(open(path)))",
+      "    out = os.path.join(os.getcwd(), 'columns.csv')",
+      "    summary = [[c, ''] for c in rows[0]]",
+      "    with open(out, 'w', newline='') as f:",
+      "        csv.writer(f).writerows([['column', 'max']] + summary)",
+      "    return {'ok': True, 'summary': '%d rows' % (len(rows) - 1), 'table': {'columns': ['column', 'max'], 'rows': summary, 'n_rows': len(summary), 'path': out}}",
+    ].join("\n"),
+  );
+  writeFileSync(join(dir, "adapter.yaml"), `${readFileSync(join(dir, "adapter.yaml"), "utf8")}\ntools:\n  - name: inspect_table\n    description: List the columns.\n    read_only: true\n    function: "peekmod:inspect_table"\n    params: { path: { type: string } }\n`);
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "data.csv"), "sample_id,group,value\nS1,control,4.0\nS2,control,4.5\nS3,control,3.8\nS4,treated,5.0\nS5,treated,5.4\nS6,treated,4.7\n");
+  const provider = new FakeProvider([{ calls: [{ name: "inspect_table", args: { path: join(cwd, "data.csv") } }] }, { text: "Done." }]);
+  session = await Session.create({ adapters: [dir], provider, cwd, settings: { guidance: false, headless: true } });
+  await session.send("Look at data.csv.");
+  const text = lastToolText(provider);
+  expect(text).toContain("Data check of data.csv: 6 rows, 3 columns.");
+  expect(text).toContain("Groups in 'group': control 3, treated 3.");
+  expect(text).not.toContain("Column 'max'");
+});
+
 test("with deferred tools, a tool that an open plan step names stays in the list; a call to a tool that left the list still runs", async () => {
   const provider = new FakeProvider([
     { calls: [{ name: "find_tools", args: { query: "zeta spectrum" } }] },
