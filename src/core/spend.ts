@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { homeFolder } from "./old-names.ts";
@@ -33,20 +33,41 @@ export function recordSpend(model: string, u: Usage, session?: string): number {
   return usd;
 }
 
+const CHUNK = 1 << 20;
+const usdOf = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+
+function eachLine(path: string, fn: (line: string) => void): void {
+  const fd = openSync(path, "r");
+  try {
+    const buf = Buffer.alloc(CHUNK);
+    let rest = Buffer.alloc(0);
+    for (let n; (n = readSync(fd, buf, 0, CHUNK, null)) > 0; ) {
+      let data = Buffer.concat([rest, buf.subarray(0, n)]);
+      for (let i; (i = data.indexOf(10)) >= 0; data = data.subarray(i + 1)) fn(data.subarray(0, i).toString("utf8"));
+      rest = data.length > CHUNK * 4 ? Buffer.alloc(0) : Buffer.from(data);
+    }
+    if (rest.length) fn(rest.toString("utf8"));
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function readSpend(): { t: string; model: string; usd: number }[] {
   const path = spendFile();
   if (!existsSync(path)) return [];
-  return readFileSync(path, "utf8").split("\n").filter(Boolean).flatMap((l) => {
+  const rows: { t: string; model: string; usd: number }[] = [];
+  eachLine(path, (l) => {
+    if (!l.trim()) return;
     try {
-      return [JSON.parse(l)];
-    } catch {
-      return [];
-    }
+      const r = JSON.parse(l);
+      if (r && typeof r === "object" && typeof r.t === "string") rows.push({ t: r.t, model: String(r.model ?? "unknown"), usd: usdOf(r.usd) });
+    } catch {}
   });
+  return rows;
 }
 
 export function totalSpend(since?: string): number {
-  return readSpend().filter((e) => !since || e.t >= since).reduce((s, e) => s + (Number(e.usd) || 0), 0);
+  return readSpend().filter((e) => !since || e.t >= since).reduce((s, e) => s + e.usd, 0);
 }
 
 export function monthStart(now = new Date()): string {

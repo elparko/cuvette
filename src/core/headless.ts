@@ -1,7 +1,17 @@
+import { readFileSync, statSync } from "node:fs";
 import { fitAnswer } from "./answers.ts";
 import type { Session } from "./session.ts";
 import { METHOD_DATA_TITLE } from "./datacompare.ts";
 import type { Question } from "./types.ts";
+
+const MAX_JSON_BYTES = 5_000_000;
+
+export function readJsonObject(path: string): Record<string, unknown> {
+  if (statSync(path).size > MAX_JSON_BYTES) throw new Error(`the file is larger than ${MAX_JSON_BYTES / 1e6} MB`);
+  const v = JSON.parse(readFileSync(path, "utf8"));
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("the file must hold one JSON object, with a value for each key");
+  return v;
+}
 
 export async function answerHeadless(s: Session, q: Question, value: unknown, note: string): Promise<void> {
   const tries = [value, q.recommendation?.value, q.default].filter((x, i, a) => x !== undefined && a.findIndex((y) => String(y) === String(x)) === i);
@@ -34,8 +44,9 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record"), 0);
         return;
       }
-      const catchAll = "*" in answers && !(q.decisionKey && !q.options.length && q.recommendation?.value !== undefined);
-      const fromFile = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : undefined;
+      const has = (k: string) => Object.hasOwn(answers, k);
+      const catchAll = has("*") && !(q.decisionKey && !q.options.length && q.recommendation?.value !== undefined);
+      const fromFile = q.decisionKey && has(q.decisionKey) ? answers[q.decisionKey] : has(q.title) ? answers[q.title] : catchAll ? answers["*"] : undefined;
       const wanted = fromFile ?? q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
       const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted, { first: false }) : wanted ?? q.default) : wanted ?? fallback;

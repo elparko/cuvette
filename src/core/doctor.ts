@@ -4,6 +4,8 @@ import { join, resolve } from "node:path";
 import { locate, which } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type LoadedAdapter, type Manifest } from "../adapters/manifest.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
+import { accessOf } from "../adapters/access.ts";
+import { adapterTrust } from "../adapters/source.ts";
 import { howToCite } from "./citations.ts";
 import { claudeKey, credentialsPath } from "./credentials.ts";
 import { selfTestFor, selfTestOf, type SelfTestRuntime } from "./selftest.ts";
@@ -135,10 +137,11 @@ export function rLibrary(env: Record<string, string | undefined>, home = homedir
 export function rInstallCommand(lib: string, p: { cran?: string[]; bioc?: string[] }): string {
   const vec = (xs: string[]) => `c(${xs.map((x) => `"${x}"`).join(", ")})`;
   const repos = `repos = "https://cloud.r-project.org"`;
+  const l = JSON.stringify(lib);
   const body = p.bioc?.length
-    ? `.libPaths(c("${lib}", .libPaths())); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = "${lib}", ${repos}); BiocManager::install(${vec(p.bioc)}, lib = "${lib}", ask = FALSE, update = FALSE)`
-    : `.libPaths(c("${lib}", .libPaths())); install.packages(${vec(p.cran ?? [])}, lib = "${lib}", ${repos})`;
-  return `mkdir -p ${q(lib)} && Rscript -e '${body}'`;
+    ? `.libPaths(c(${l}, .libPaths())); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = ${l}, ${repos}); BiocManager::install(${vec(p.bioc)}, lib = ${l}, ask = FALSE, update = FALSE)`
+    : `.libPaths(c(${l}, .libPaths())); install.packages(${vec(p.cran ?? [])}, lib = ${l}, ${repos})`;
+  return `mkdir -p ${q(lib)} && Rscript -e ${q(body)}`;
 }
 
 async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
@@ -375,6 +378,7 @@ export interface SelfTestOpts {
   only?: string;
   adapters?: LoadedAdapter[];
   start?: (a: LoadedAdapter) => Promise<SelfTestRuntime & { close(): Promise<void> }>;
+  trust?: (a: LoadedAdapter) => { codeConfirmed: boolean; codeFiles: string[] };
   onProgress?: (text: string) => void;
 }
 
@@ -410,6 +414,9 @@ export async function runSelfTests(checks: Check[], opts: SelfTestOpts = {}): Pr
     const source = selfTestOf(a)!.source;
     const blocked = checks.filter((c) => (c.id === `program:${a.name}` || c.id === `r:${a.name}`) && c.status !== "ok");
     if (blocked.length) return { name: a.name, status: "skipped", detail: `Skipped. ${blocked.map((c) => c.detail).join(" ")}`, source };
+    const trust = opts.trust ? opts.trust(a) : adapterTrust(a.root);
+    if (!trust.codeConfirmed) return { name: a.name, status: "skipped", detail: `Skipped. The adapter is Unlisted and ships code (${trust.codeFiles.join(", ")}). To let it run: cuvette adapter allow-code ${a.name}`, source };
+    if (accessOf(a.name).off) return { name: a.name, status: "skipped", detail: `Skipped. The adapter is turned off in Programs. To turn it on: cuvette programs enable ${a.name}`, source };
     opts.onProgress?.(a.name);
     let rt: Awaited<ReturnType<typeof start>> | undefined;
     try {

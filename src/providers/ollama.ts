@@ -149,7 +149,7 @@ export class OllamaProvider implements Provider {
               if (images.length) body += `\n[${images.length} image(s) follow in the next message]`;
             } else body += `\n(image not shown to this model)`;
           }
-          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${p.isError ? errorBody(body) : body}\n</tool_result>`);
+          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${(p.isError ? errorBody(body) : body).replace(/<(\/?)(tool_result|tool_call)/gi, "<$1_$2")}\n</tool_result>`);
           else out.push({ role: "tool", tool_name: p.name, content: p.isError ? errorBody(body) : body });
         } else if (p.type === "text") texts.push(p.text);
         else if (p.type === "image") {

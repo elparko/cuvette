@@ -1,9 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { removeIndexRow, renameIndexRow } from "../src/core/places.ts";
+import { removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
 import { ageText, claimLock, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
@@ -70,6 +70,45 @@ test("sessions in project folders come from the home index; a missing folder is 
   expect(sessionLine(list[1]!)).toContain("moved: run cuvette open <new folder>");
   expect(defaultSession(list, join(folder, "figures"))?.info.id).toBe("20261008-100000-dddd");
   expect(defaultSession(list, project)).toMatchObject({ here: true, info: { id: "20261008-100000-dddd" } });
+});
+
+test("a damaged index does not stop the list: the good rows and the old sessions still show", () => {
+  const folder = mkdtempSync(join(tmpdir(), "cuvette-sessions-bad-"));
+  mkdirSync(join(folder, ".record"));
+  writeFileSync(join(folder, ".record", "log.jsonl"), ["null", "5", "{cut", JSON.stringify({ id: 2, kind: "user", data: { text: "Count the cells" } }), JSON.stringify({ id: 3, kind: "title", data: null })].join("\n") + "\n");
+  const good = { id: "20261008-100000-ffff", project: "/lab", folder, title: "Count", date: new Date().toISOString() };
+  for (const body of ["{cut", "null", "{}", '"text"', JSON.stringify([null, 5, { id: 7, folder }, { id: "x" }, { id: "y", folder: 3 }, good])]) {
+    const h = home();
+    writeFileSync(join(h, "sessions-index.json"), body);
+    const ids = listSessions(h).map((s) => s.id);
+    expect(ids).toContain("20261008-100000-bbbb");
+    if (body.startsWith("[")) expect(listSessions(h).find((s) => s.id === good.id)).toMatchObject({ ask: "Count the cells", cwd: "/lab" });
+    const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "sessions"], { env: { ...process.env, CUVETTE_HOME: h }, encoding: "utf8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("20261008-100000-bbbb");
+  }
+});
+
+test("a write to a damaged index keeps the damaged file next to it", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-keep-"));
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    writeFileSync(join(h, "sessions-index.json"), '[{"id":"20261001-000000-aaaa","folder":"/p/cuvette/a"},');
+    saveIndexRow({ id: "20261002-000000-bbbb", recordDir: "/p/cuvette/b/.record", outDir: "/p/cuvette/b", project: "/p", title: "b", created: "2026-10-02T00:00:00Z", legacy: false, fallback: false });
+    expect(JSON.parse(readFileSync(join(h, "sessions-index.json"), "utf8")).map((r: { id: string }) => r.id)).toEqual(["20261002-000000-bbbb"]);
+    const kept = readdirSync(h).filter((f) => f.startsWith("sessions-index.json.damaged-"));
+    expect(kept).toHaveLength(1);
+    expect(readFileSync(join(h, kept[0]!), "utf8")).toContain("20261001-000000-aaaa");
+    expect(readdirSync(h).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    writeFileSync(join(h, "sessions-index.json"), JSON.stringify([{ id: "20261003-000000-cccc", folder: "/p/c", extra: 1 }, { id: 5 }]));
+    renameIndexRow("20261003-000000-cccc", "named");
+    expect(JSON.parse(readFileSync(join(h, "sessions-index.json"), "utf8"))).toMatchObject([{ id: "20261003-000000-cccc", custom: "named", extra: 1 }]);
+    expect(readdirSync(h).filter((f) => f.startsWith("sessions-index.json.damaged-")).length).toBeGreaterThanOrEqual(1);
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
 });
 
 test("a session shows its title, its sentence and its status", () => {

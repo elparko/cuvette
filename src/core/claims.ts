@@ -8,6 +8,9 @@ interface Found {
   step: number;
   percent: boolean;
   small: boolean;
+  signed: boolean;
+  unit?: string;
+  fold: boolean;
 }
 
 interface Span {
@@ -51,6 +54,35 @@ const LABEL_BEFORE =
 const THRESHOLD_BEFORE =
   /(?:\b[pq]\s*(?:<|≤|<=)|\b(?:alpha|threshold|cut-?off|FDR|significance level)\s*(?:of|at|=|<|≤)?|α\s*(?:=|<|≤)?)\s*$/i;
 
+const UNITS: Record<string, [string, number]> = {
+  ng: ["mass", 1e-9], ug: ["mass", 1e-6], mg: ["mass", 1e-3], g: ["mass", 1], kg: ["mass", 1e3],
+  nl: ["volume", 1e-9], ul: ["volume", 1e-6], ml: ["volume", 1e-3], l: ["volume", 1],
+  nm: ["length", 1e-9], um: ["length", 1e-6], mm: ["length", 1e-3], cm: ["length", 1e-2],
+  us: ["time", 1e-6], ms: ["time", 1e-3], s: ["time", 1], min: ["time", 60], h: ["time", 3600],
+  pct: ["percent", 1],
+};
+
+const UNIT_AFTER = /^\s?(ng|[µμu]g|mg|kg|g|nl|[µμu]l|ml|nm|[µμu]m|mm|cm|[µμu]s|ms|seconds?|secs?|s|minutes?|mins?|hours?|hrs?|h)\b/i;
+const UNIT_KEY = /_(ng|ug|mg|g|kg|nl|ul|ml|nm|um|mm|cm|us|ms|s|sec|min|hr|hours|pct|percent)$/i;
+const FOLD_AFTER = /^\s?-?\s?fold\b/i;
+const NEAR = 60;
+const DOWN =
+  /\b(?:decreas\w*|lower\w*|reduc\w*|down-?regulat\w*|declin\w*|fell|falls?|dropp?\w*|less|fewer|loss|lost|shorter|smaller|slower)\b/i;
+
+function unitName(u: string): string {
+  const x = u.toLowerCase().replace(/^[µμ]/, "u");
+  if (/^sec/.test(x) || x === "second") return "s";
+  if (/^min/.test(x)) return "min";
+  if (/^h(ou)?rs?$|^hour/.test(x)) return "h";
+  return x === "percent" ? "pct" : x;
+}
+
+export function keyUnit(path: string): string | undefined {
+  const key = (path.split(".").pop() ?? "").replace(/(\[\d+\])+$/, "");
+  const m = UNIT_KEY.exec(key);
+  return m ? unitName(m[1]!) : undefined;
+}
+
 function mask(text: string): string {
   let out = text;
   for (const re of MASKS) out = out.replace(re, (m) => " ".repeat(m.length));
@@ -84,6 +116,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const before = masked.slice(0, start);
     const sign = before.match(/(^|[\s(=<>≤≥*_`~[:|])([-−+])$/);
     let from = start;
+    const signed = !!sign;
     if (sign) {
       from = start - 1;
       if (sign[2] !== "+") value = -value;
@@ -98,7 +131,9 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const sentence = spans.find((s) => start >= s.start && start < s.end);
     if (plain && value >= 1900 && value <= 2100 && sentence && hasCitation(sentence)) continue;
     if (percent) end = start + m[0].length;
-    out.push({ start: from, end, value, step, percent, small });
+    const after = masked.slice(end);
+    const unit = percent ? undefined : UNIT_AFTER.exec(after)?.[1];
+    out.push({ start: from, end, value, step, percent, small, signed, unit: unit ? unitName(unit) : undefined, fold: !percent && FOLD_AFTER.test(after) });
   }
   return out;
 }
@@ -120,26 +155,52 @@ function near(shown: number, step: number, logged: number): boolean {
   return Math.abs(shown - logged) <= Math.max(0.005 * Math.abs(logged), step / 2) * (1 + 1e-9);
 }
 
-function variants(f: Found): { value: number; step: number }[] {
+interface Target {
+  value: number;
+  unit?: string;
+  log?: boolean;
+  ratio?: boolean;
+}
+
+export function target(path: string, value: number): Target {
+  const key = (path.split(".").pop() ?? "").replace(/(\[\d+\])+$/, "");
+  return { value, unit: keyUnit(path), log: /log/i.test(key), ratio: /ratio|fold|(^|_)fc($|_)/i.test(key) && !/log/i.test(key) };
+}
+
+// A logged number matches in its own unit: mg against a key that ends in _g, a fraction against a key in _pct.
+// A number with no sign near a word such as lower or decrease also matches the negative logged value.
+// N-fold also matches log2(N) in a key with "log" in its name. Near a decrease word it matches -log2(N) there, and 1/N in a ratio or fold key.
+function variants(f: Found, t: Target, down: boolean): { value: number; step: number }[] {
   const base = [{ value: f.value, step: f.step }];
   if (f.percent) base.push({ value: f.value / 100, step: f.step / 100 });
+  const from = f.unit ? UNITS[f.unit] : undefined;
+  const to = t.unit ? UNITS[t.unit] : undefined;
+  if (from && to && from[0] === to[0] && f.unit !== t.unit) base.push({ value: (f.value * from[1]) / to[1], step: (f.step * from[1]) / to[1] });
+  if (t.unit === "pct" && !f.percent && !f.unit && Math.abs(f.value) <= 1) base.push({ value: f.value * 100, step: f.step * 100 });
+  if (f.fold && f.value > 0) {
+    const log = { value: Math.log2(f.value), step: f.step / (f.value * Math.LN2) };
+    if (t.log) base.push(log);
+    if (t.log && down && !f.signed) base.push({ value: -log.value, step: log.step });
+    if (t.ratio && down && !f.signed) base.push({ value: 1 / f.value, step: f.step / f.value ** 2 });
+  }
+  if (down && !f.signed) for (const v of [...base]) if (v.value > 0) base.push({ value: -v.value, step: v.step });
   return base;
 }
 
-function matchesAny(f: Found, values: number[], allowed?: Set<number>): number | undefined {
+function matchesAny(f: Found, targets: Target[], allowed?: Set<number>, down = false): number | undefined {
   let best: number | undefined;
   let bestDiff = Infinity;
-  for (const v of variants(f)) {
-    values.forEach((logged, i) => {
-      if (allowed && !allowed.has(i)) return;
-      if (!near(v.value, v.step, logged)) return;
-      const diff = Math.abs(v.value - logged) / (Math.abs(logged) || 1);
+  targets.forEach((t, i) => {
+    if (allowed && !allowed.has(i)) return;
+    for (const v of variants(f, t, down)) {
+      if (!near(v.value, v.step, t.value)) continue;
+      const diff = Math.abs(v.value - t.value) / (Math.abs(t.value) || 1);
       if (diff < bestDiff) {
         bestDiff = diff;
         best = i;
       }
-    });
-  }
+    }
+  });
   return best;
 }
 
@@ -158,7 +219,7 @@ function versionParts(v: unknown, out: number[]): void {
   out.push(...parts);
 }
 
-function inputValues(record: AnalysisRecord): number[] {
+function inputValues(record: AnalysisRecord): Target[] {
   const out: number[] = [];
   for (const e of record.entries(["user", "setup", "session", "tool_call"])) {
     if (e.kind === "user") leaves(String(e.data.text ?? ""), out);
@@ -171,7 +232,7 @@ function inputValues(record: AnalysisRecord): number[] {
       versionParts(a.programVersion, out);
     }
   }
-  return out;
+  return out.map((value) => ({ value }));
 }
 
 export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
@@ -181,7 +242,7 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const order = new Map(nodes.map((n, i) => [n.id, i]));
   const rank = (id: string) => Number(comparison.has(id)) * 2 + Number(stale.has(id));
   const logged = record.numbers().sort((a, b) => rank(a.node) - rank(b.node) || (order.get(b.node) ?? 0) - (order.get(a.node) ?? 0));
-  const loggedValues = logged.map((n) => n.value);
+  const targets = logged.map((n) => target(n.path, n.value));
   const plain = new Set(logged.flatMap((n, i) => (comparison.has(n.node) || stale.has(n.node) ? [] : [i])));
   const inputs = inputValues(record);
   const found = extractNumbers(text, { small: true });
@@ -191,7 +252,7 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
     const hedged = HEDGE.test(s.text);
     const own = found.filter((f) => f.start >= s.start && f.start < s.end);
     const sentenceText = s.text.length > 300 ? s.text.slice(0, 297) + "..." : s.text;
-    const hits = own.map((f) => ({ f, i: matchesAny(f, loggedValues, f.small ? plain : undefined) }));
+    const hits = own.map((f) => ({ f, i: matchesAny(f, targets, f.small ? plain : undefined, DOWN.test(text.slice(Math.max(s.start, f.start - NEAR), Math.min(s.end, f.end + NEAR)))) }));
     const anyMatched = hits.some((h) => h.i !== undefined && !h.f.small);
     const before = claims.length;
     for (const { f, i } of hits) {

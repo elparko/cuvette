@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
-import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
+import { applyHeadlessSetup, attachHeadless, readJsonObject } from "../src/core/headless.ts";
 import { Session, announcesStep, coerceArgs, endsWithPromise } from "../src/core/session.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -574,6 +574,24 @@ test("headless run: a refused answer from the catch-all falls back to the defaul
   expect(text).toMatch(/The answers file gave 'Use the values in the decision record\.' for min_size, which it refused: .* Used '5' instead\./);
 });
 
+test("headless run: a question title that is a name on the object prototype takes no value from the answers file", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "", title: "constructor", text: "?", options: [], evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).not.toBe("open"));
+  expect(String(session.questions.get(q.qid)!.answer)).toMatch(/^The scientist is not available/);
+});
+
+test("headless run: the answers file must be one JSON object of 5 MB or less", () => {
+  const dir = pickCwd();
+  const file = (name: string, text: string) => (writeFileSync(join(dir, name), text), join(dir, name));
+  expect(readJsonObject(file("ok.json", '{"method": "Otsu"}'))).toEqual({ method: "Otsu" });
+  expect(() => readJsonObject(file("list.json", "[1]"))).toThrow(/one JSON object/);
+  expect(() => readJsonObject(file("text.json", '"Otsu"'))).toThrow(/one JSON object/);
+  expect(() => readJsonObject(file("big.json", `{"a": "${"x".repeat(5_100_000)}"}`))).toThrow(/larger than 5 MB/);
+});
+
 test("headless run: a choice with no recommendation and no default is withdrawn, not answered with the first option", async () => {
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
   attachHeadless(session, { answers: {}, allow: new Set() });
@@ -983,7 +1001,7 @@ test("pilot: the plan card runs the pilot, the gate blocks the batch until the s
   const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
     { text: "I count all fields at once.", calls: [folder] },
     { calls: [{ name: "count", args: { input: join(images, "Set 1.tif"), method: "Otsu", min_size: 5 } }] },
-    { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [qc], check: "Clumps are left out." } }] },
+    { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [qc, join(proj, "notes.txt"), proj], check: "Clumps are left out." } }] },
     { calls: [folder] },
     { calls: [{ name: "batch_results", args: { measure: "positive cell", values: [{ sample: "Set 1", value: 41 }, { sample: "Set 2", value: 400 }, { sample: "Set 3", value: 290 }] } }] },
     { text: "Set 1 has 41 positive cells (a positive cell has at least 1 red pixel inside its outline)." },
@@ -1002,9 +1020,11 @@ test("pilot: the plan card runs the pilot, the gate blocks the batch until the s
     events.push(e);
     setTimeout(() => session!.respondPlan(e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }), 0);
   });
+  writeFileSync(join(proj, "notes.txt"), "not an image");
   await session.send(`Count the red-positive cells in ${images}`);
 
   expect(events.map((e) => e.stage)).toEqual(["plan", "pilot"]);
+  expect((session.record.entries(["pilot_run"])[0]!.data.images as string[]).length).toBe(1);
   expect(events[0].restatement).toBe("You want: for each field, the number of cells that took up red particles.");
   expect(events[0].pilot).toBe("Set 1");
   expect(asked).toEqual(["I found Analysis.xlsx (sheet Ox-LDL: Field, Red dots, Total cells). Is this an earlier analysis of these images? Should the demonstration compare with it?"]);

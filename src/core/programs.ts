@@ -6,11 +6,13 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Access } from "../adapters/access.ts";
 import { DRIVE_ROOT } from "../adapters/blind.ts";
+import { withoutSecrets } from "../adapters/kinds/common.ts";
 import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
 import { adapterTrust, confirmCode, TRUST_NAME, type InstalledEntry, type TrustLevel } from "../adapters/source.ts";
 import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
+import { readIndex } from "./places.ts";
 import { ageText } from "./sessions.ts";
 import { howToCite } from "./citations.ts";
 
@@ -167,7 +169,7 @@ async function duSize(paths: string[]): Promise<number | undefined> {
 export function lastUsedMap(home = cuvetteHome()): Map<string, number> {
   const logs = new Set<string>();
   try {
-    for (const r of JSON.parse(readFileSync(join(home, "sessions-index.json"), "utf8")) as { folder: string }[]) logs.add(join(r.folder, ".record", "log.jsonl"));
+    for (const r of readIndex(join(home, "sessions-index.json"))) logs.add(join(r.folder, ".record", "log.jsonl"));
   } catch {}
   const dir = join(home, "sessions");
   if (existsSync(dir)) for (const id of readdirSync(dir)) logs.add(join(dir, id, "log.jsonl"));
@@ -216,7 +218,7 @@ function installFor(name: string, m: Manifest, home: string, lib: string, find: 
 
 async function rVersions(run: Run, rscript: string | undefined, lib: string, pkgs: string[]): Promise<Map<string, string>> {
   if (!rscript || !pkgs.length) return new Map();
-  const code = `.libPaths(c("${lib}", .libPaths())); for (p in c(${pkgs.map((x) => `"${x}"`).join(", ")})) cat(p, if (requireNamespace(p, quietly = TRUE)) as.character(packageVersion(p)) else "-", "\\n")`;
+  const code = `.libPaths(c(${JSON.stringify(lib)}, .libPaths())); for (p in c(${pkgs.map((x) => `"${x}"`).join(", ")})) cat(p, if (requireNamespace(p, quietly = TRUE)) as.character(packageVersion(p)) else "-", "\\n")`;
   const out = await run([rscript, "-e", code], 120_000);
   return new Map(out.stdout.split("\n").map((l) => l.trim().split(/\s+/) as [string, string]).filter((x) => x.length === 2 && x[1] !== "-"));
 }
@@ -504,7 +506,7 @@ function defaultExec(command: string, onLine: (line: string) => void, signal?: A
   const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
   return new Promise((done) => {
     if (signal?.aborted) return done(null);
-    const child = spawn("/bin/sh", ["-c", command], { env: { ...process.env, PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: !!signal });
+    const child = spawn("/bin/sh", ["-c", command], { env: { ...withoutSecrets(), PATH, HOMEBREW_NO_AUTO_UPDATE: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: !!signal });
     for (const s of [child.stdout, child.stderr]) createInterface({ input: s }).on("line", onLine);
     const kill = (sig: NodeJS.Signals) => {
       try {

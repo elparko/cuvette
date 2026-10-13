@@ -4,7 +4,7 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 
 ## What the check does
 
-- Before each model step, the harness reads the new content that goes to the model: your messages and the tool results (for example `read_file`, `read_table` and `inspect_data`).
+- Before each model step, the harness reads the new content that goes to the model. This content is your messages and the tool results (for example `read_file`, `read_table` and `inspect_data`).
 - If the model is a cloud model and the content has a likely patient identifier, a card stops the turn. The card shows the kind, the masked value (`J*** D**`) and the place (file, column, line or row).
 - The four actions:
   1. Send anyway. The record logs the choice.
@@ -55,4 +55,4 @@ The reference is the list of 18 identifiers in the HIPAA Privacy Rule, 45 CFR 16
 - The check does not read the system prompt, the images, or the messages of the helper agent of the `task` tool.
 - The check reads text. It does not open binary files.
 - A study code (for example `P001`) is not an identifier under Safe Harbor, so the check ignores it.
-- The check was run on each text file of 1 MB or less in the benchmark data (`tests/phi.test.ts`). No file triggers it. Synthetic clinical tables and notes trigger it.
+- We ran the check on each text file of 1 MB or less in the benchmark data (`tests/phi.test.ts`). No file triggers it. Synthetic clinical tables and notes trigger it.

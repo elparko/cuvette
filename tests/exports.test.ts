@@ -86,8 +86,8 @@ test("script calls ToolRunner and reuses earlier output paths", () => {
   const ts = readFileSync(exportScript(rec, [adapter], join(dir, "s.ts")), "utf8");
   expect(ts).toMatch(/^import \{ ToolRunner \} from ".*replay\.ts";/);
   expect(ts).toContain('await ToolRunner.start(["fake"])');
-  expect(ts).toContain(`const s1 = await run.call("fake", "open", { "path": ${JSON.stringify(a)} });`);
-  expect(ts).toContain('const s3 = await run.call("fake", "blur", { "path": s1.outputs[0].path, "sigma": 2 });');
+  expect(ts).toContain(`const s1 = await step(1, "fake", "open", { "path": ${JSON.stringify(a)} });`);
+  expect(ts).toContain('const s3 = await step(3, "fake", "blur", { "path": s1.outputs[0].path, "sigma": 2 });');
   expect(ts).toContain('{ "src": s3.outputs[0].path }');
   expect(ts).not.toContain('"sigma": 3');
   expect(ts).toContain("await run.close();");
@@ -222,4 +222,48 @@ test("the flow leaves a harness step out of the adapter list", () => {
   r.addNode(nodeIn({ tool: "open", args: {} }));
   const flow = JSON.parse(readFileSync(exportFlow(r, [adapter], join(dir, "f-h.json")), "utf8"));
   expect(flow.adapters).toEqual(["fake"]);
+});
+
+test("replay skips a harness step and runs the adapter steps after it", async () => {
+  const r = new AnalysisRecord(join(dir, "harness2"), "20260101-000000-hrn2");
+  r.addNode(nodeIn({ tool: "calculate", adapter: "", args: { expression: "1+1" }, result: { metrics: { value: 2 } } }));
+  r.addNode(nodeIn({ tool: "open", args: {}, result: { metrics: { mean: 10 } } }));
+  const rt = fakeRuntime([10]);
+  const out = await replayFlow(exportFlow(r, [adapter], join(dir, "f-h2.json")), {}, { sessionDir: r.dir, runtimeFactory: rt.factory });
+  expect(rt.calls.map((c) => c.tool)).toEqual(["open"]);
+  expect(out.steps[0]).toMatchObject({ tool: "calculate", ok: true, diffs: [] });
+  expect(out.steps[0]!.skipped).toContain("harness");
+  expect(out.steps[1]).toMatchObject({ tool: "open", ok: true, diffs: [], before: { mean: 10 } });
+});
+
+test("a step that needs the output of a skipped harness step fails with a reason, and replay stops", async () => {
+  const r = new AnalysisRecord(join(dir, "harness3"), "20260101-000000-hrn3");
+  r.addNode(nodeIn({ tool: "run_script", adapter: "", args: {}, outputs: [{ path: "/w/made.csv", kind: "table" }] }));
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/made.csv" } }));
+  r.addNode(nodeIn({ tool: "fit", args: {} }));
+  const rt = fakeRuntime([1, 2]);
+  const out = await replayFlow(exportFlow(r, [adapter], join(dir, "f-h3.json")), {}, { runtimeFactory: rt.factory });
+  expect(rt.calls).toEqual([]);
+  expect(out.steps).toHaveLength(2);
+  expect(out.steps[1]!.ok).toBe(false);
+  expect(out.steps[1]!.diffs[0]).toContain("step1.outputs.0.path");
+});
+
+test("a file that is not a flow gives a clear error", async () => {
+  const p = join(dir, "not-flow.json");
+  writeFileSync(p, "{}");
+  await expect(replayFlow(p, {}, { runtimeFactory: fakeRuntime([]).factory })).rejects.toThrow(/not a flow file/);
+});
+
+test("the script comments out a harness step, and the notebook has no run-step cell for it", () => {
+  const r = new AnalysisRecord(join(dir, "harness4"), "20260101-000000-hrn4");
+  r.addNode(nodeIn({ tool: "calculate", adapter: "", args: { expression: "1+1" } }));
+  r.addNode(nodeIn({ tool: "open", args: { path: a } }));
+  const ts = readFileSync(exportScript(r, [adapter], join(dir, "h4.mts")), "utf8");
+  expect(ts).toContain("// Step 1 (calculate) is a step of the harness");
+  expect(ts).toContain('await ToolRunner.start(["fake"])');
+  expect(ts).not.toContain('step(1, ""');
+  const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "h4.ipynb")), "utf8"));
+  const code = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code").map((c: { source: string[] }) => c.source.join(""));
+  expect(code).toEqual([`!cuvette run-step fake open '{{"path":"${a}"}}'`]);
 });

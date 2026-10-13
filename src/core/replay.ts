@@ -1,7 +1,9 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { blocksCode, isCodeTool, usable } from "../adapters/access.ts";
 import { findAdapter } from "../adapters/manifest.ts";
+import { adapterTrust } from "../adapters/source.ts";
 import { AnalysisRecord } from "./record.ts";
 import type { Args, Tool, ToolOutput } from "./types.ts";
 
@@ -25,10 +27,17 @@ export class ToolRunner implements Runner {
     const runner = new ToolRunner(tools, closers, workDir);
     try {
       for (const name of adapters.filter(Boolean)) {
-        const a = findAdapter(name);
+        const a = usable(findAdapter(name));
+        const trust = adapterTrust(a.root);
+        if (!trust.codeConfirmed) throw new Error(`The adapter ${a.name} is Unlisted and ships code (${trust.codeFiles.join(", ")}). Confirm that it can run: cuvette adapter allow-code ${a.name}`);
         const rt = await startAdapter(a, { workDir, sessionDir: workDir });
         closers.push(() => rt.close());
-        for (const t of await rt.tools()) tools.push({ ...t, adapter: t.adapter ?? a.name, meta: { ...(t as { meta?: object }).meta, alias: name } } as Tool);
+        const noCode = blocksCode(a.name);
+        const mod = await a.module();
+        for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
+          if (noCode && isCodeTool(t.remoteName ?? t.name, (t.inputSchema as { properties?: object }).properties)) continue;
+          tools.push({ ...t, adapter: t.adapter ?? a.name, meta: { ...(t as { meta?: object }).meta, alias: name } } as Tool);
+        }
       }
     } catch (e) {
       await runner.close();
@@ -72,6 +81,7 @@ export interface ReplayStep {
   metrics: Record<string, number>;
   before?: Record<string, number>;
   diffs: string[];
+  skipped?: string;
 }
 
 interface Flow {
@@ -124,6 +134,8 @@ export async function replayFlow(
   opts: ReplayOptions = {},
 ): Promise<{ steps: ReplayStep[] }> {
   const flow = JSON.parse(readFileSync(flowPath, "utf8")) as Flow;
+  if (!flow || !Array.isArray(flow.steps)) throw new Error(`${flowPath} is not a flow file: it has no list of steps`);
+  flow.inputs ??= {};
   const values = new Map<string, string>();
   for (const k of Object.keys(flow.inputs)) {
     const v = inputs[k] ?? inputs[flow.inputs[k]];
@@ -133,11 +145,22 @@ export async function replayFlow(
   const record = opts.sessionDir ? new AnalysisRecord(opts.sessionDir, basename(opts.sessionDir)) : undefined;
   const rewound = record?.rewound() ?? new Set<string>();
   const original = record ? record.nodes().filter((n) => !n.sensitivityOf && !rewound.has(n.id)) : [];
-  const runner = await (opts.runtimeFactory ?? ((a) => ToolRunner.start(a, { workDir: opts.workDir })))(flow.adapters);
+  const runner = await (opts.runtimeFactory ?? ((a) => ToolRunner.start(a, { workDir: opts.workDir })))((flow.adapters ?? []).filter(Boolean));
   const steps: ReplayStep[] = [];
   try {
     for (const [k, s] of flow.steps.entries()) {
-      const out = await runner.call(s.adapter, s.tool, substitute(s.args, values) as Args);
+      if (!s.adapter) {
+        steps.push({ tool: s.tool, ok: true, metrics: {}, diffs: [], skipped: "a step of the harness, not of an adapter. Replay runs adapter steps only." });
+        continue;
+      }
+      let args: Args;
+      try {
+        args = substitute(s.args ?? {}, values) as Args;
+      } catch (e) {
+        steps.push({ tool: s.tool, ok: false, metrics: {}, diffs: [`step failed: ${(e as Error).message}. The step uses an output of a step that replay did not run.`] });
+        break;
+      }
+      const out = await runner.call(s.adapter, s.tool, args);
       out.outputs?.forEach((o, i) => values.set(`step${k + 1}.outputs.${i}.path`, o.path));
       const step: ReplayStep = { tool: s.tool, ok: out.ok, metrics: out.metrics ?? {}, diffs: [] };
       if (!out.ok) step.diffs.push(`step failed: ${out.error ?? "no error text"}`);

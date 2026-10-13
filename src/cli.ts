@@ -220,14 +220,6 @@ function fail(msg: string): never {
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const planSetting = () => (o.plan ? { planFirst: true } : o["no-plan"] ? { planFirst: false } : {});
-const readJson = (p?: string) => {
-  if (!p) return undefined;
-  try {
-    return JSON.parse(readFileSync(p, "utf8"));
-  } catch (e) {
-    fail(`Cannot read the JSON file ${p}: ${(e as Error).message}`);
-  }
-};
 const FORMATS = new Set(["text", "json", "stream-json"]);
 const outputFolder = () => {
   const v = str(o.output);
@@ -238,7 +230,15 @@ const bypass = () => ({ ...(o["bypass-permissions"] ? { permissionMode: "bypass"
 
 async function headless(prompt: string) {
   const { Session } = await import("./core/session.ts");
-  const { applyHeadlessSetup, attachHeadless } = await import("./core/headless.ts");
+  const { applyHeadlessSetup, attachHeadless, readJsonObject } = await import("./core/headless.ts");
+  const readJson = (p?: string) => {
+    if (!p) return undefined;
+    try {
+      return readJsonObject(p);
+    } catch (e) {
+      fail(`Cannot read the JSON file ${p}: ${(e as Error).message}`);
+    }
+  };
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
@@ -654,7 +654,10 @@ async function main() {
         if (!cmds.length) console.log("\nNothing to install: no Python environment or R package set is missing that --fix can install.");
         else {
           console.log(`\nThese commands install the missing parts:\n${cmds.map((c) => `  ${c}`).join("\n")}`);
-          if (!/^y(es)?$/i.test((await ask("Run them now? [y/N] ")).trim())) return console.log("Nothing was installed.");
+          if (!/^y(es)?$/i.test((await ask("Run them now? [y/N] ")).trim())) {
+            process.exitCode = dr.canStart(checks) && !selfTestFailed ? 0 : 1;
+            return console.log("Nothing was installed.");
+          }
           const { spawnSync } = await import("node:child_process");
           const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
           for (const c of cmds) {
@@ -802,8 +805,12 @@ async function main() {
       const { findPlace } = await import("./core/places.ts");
       const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`No session ${str(o.session)}. See cuvette sessions.`)) : undefined;
       const r = await replayFlow(a1, inputs, { sessionDir });
-      for (const st of r.steps) console.log(`${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : "same"}`);
+      for (const st of r.steps) console.log(st.skipped ? `- ${st.tool} skipped: ${st.skipped}` : `${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : st.before ? "same" : `ran, no original to compare: ${JSON.stringify(st.metrics)}`}`);
       if (r.steps.some((st) => !st.ok || st.diffs.length)) process.exitCode = 1;
+      if (r.steps.every((st) => st.skipped)) {
+        console.error("Replay ran no step: the flow has no adapter step.");
+        process.exitCode = 1;
+      }
       return;
     }
     case "run-step": {
@@ -852,7 +859,9 @@ async function main() {
         const models = (str(o.models) ?? str(o.model) ?? "").split(",").filter(Boolean);
         if (!models.length) return fail("usage: cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]");
         const papers = str(o.papers);
-        const r = await runPapers({ papers: !papers || papers === "all" ? "all" : papers.split(","), models, runs: str(o.runs) ? Number(str(o.runs)) : 1, out: str(o.out), dryRun: !!o["dry-run"], blind: !o["no-blind"] });
+        const runs = o.runs === undefined ? 1 : Number(str(o.runs));
+        if (!Number.isInteger(runs) || runs < 1) return fail(`--runs must be a whole number of 1 or more, not "${str(o.runs) ?? ""}".`);
+        const r = await runPapers({ papers: !papers || papers === "all" ? "all" : papers.split(",").filter(Boolean), models, runs, out: str(o.out), dryRun: !!o["dry-run"], blind: !o["no-blind"] });
         if (r.problems.length) process.exitCode = 1;
         if (r.paths) console.log(`${r.paths.md}\n${r.paths.json}`);
         return;
@@ -894,8 +903,13 @@ async function main() {
         return;
       }
       const { runBench } = await import("./bench/run.ts");
-      const g = (str(o.guidance) ?? "both") as "on" | "off" | "both";
-      const r = await runBench(!a1 || a1 === "all" ? "all" : a1.split(","), { model: str(o.model) ?? "claude", guidance: g });
+      const { scenarioIds } = await import("./bench/scenario.ts");
+      const g = str(o.guidance) ?? "both";
+      if (g !== "on" && g !== "off" && g !== "both") return fail(`--guidance must be on, off or both, not "${g}".`);
+      const ids = !a1 || a1 === "all" ? "all" : a1.split(",").filter(Boolean);
+      const unknown = ids === "all" ? [] : ids.filter((id) => !scenarioIds().includes(id));
+      if (unknown.length) return fail(`No scenario ${unknown.join(", ")}. The scenarios: ${scenarioIds().join(", ")}, all, papers, rescore, compare, site, cases.`);
+      const r = await runBench(ids, { model: str(o.model) ?? "claude", guidance: g });
       console.log(typeof r === "string" ? r : JSON.stringify(r, null, 1));
       return;
     }
