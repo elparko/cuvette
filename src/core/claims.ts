@@ -78,6 +78,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const expText = m[2] ?? m[3] ?? m[4] ?? (m[5] ? [...m[5]].map((c) => SUPERSCRIPT[c]).join("") : undefined);
     const exp = Number((expText ?? "0").replace("−", "-"));
     let value = Number(`${mantissa}e${exp}`);
+    if (!Number.isFinite(value)) continue;
     const step = Number(`1e${exp - dec}`);
     const percent = Boolean(m[6]);
     const before = masked.slice(0, start);
@@ -116,7 +117,7 @@ export function splitSentences(text: string): Span[] {
 }
 
 function near(shown: number, step: number, logged: number): boolean {
-  return Math.abs(shown - logged) <= Math.max(0.005 * Math.abs(logged), step / 2) + 1e-12;
+  return Math.abs(shown - logged) <= Math.max(0.005 * Math.abs(logged), step / 2) * (1 + 1e-9);
 }
 
 function variants(f: Found): { value: number; step: number }[] {

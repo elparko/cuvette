@@ -192,3 +192,17 @@ test("decodeText reads UTF-16 with no byte order mark in both byte orders", () =
 test("typed keeps a column of IDs with a leading zero as text", () => {
   expect(typed([["001", "1.5"], ["002", "2"]], 2)).toEqual([["001", 1.5], ["002", 2]]);
 });
+
+test("an integer with more than 15 digits stays text, so the workbook keeps each digit", () => {
+  expect(typed([["12345678901234567890"], ["98765432109876543210"]], 1)).toEqual([["12345678901234567890"], ["98765432109876543210"]]);
+  expect(typed([["0.30000000000000004"], ["123456789012345"]], 1)).toEqual([[0.30000000000000004], [123456789012345]]);
+});
+
+test("readTable keeps the cells of a wide row after row 1000", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-wide-"));
+  const p = join(dir, "t.csv");
+  writeFileSync(p, ["a,b", ...Array.from({ length: 1200 }, (_, i) => (i === 1100 ? "1,2,3" : "1,2"))].join("\n"));
+  const t = readTable(p)!;
+  expect(t.columns).toEqual(["a", "b", "column 3"]);
+  expect(t.rows[1100]).toEqual([1, 2, 3]);
+});

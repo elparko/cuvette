@@ -195,3 +195,31 @@ test("the protocol and the replay exports leave out the steps and the decisions 
   const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "rw.ipynb")), "utf8"));
   expect(nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code")).toHaveLength(1);
 });
+
+test("replay compares with the live steps only, and a metric that becomes NaN or text differs", async () => {
+  const r = new AnalysisRecord(join(dir, "rw2"), "20260101-000000-rwn2");
+  r.addNode(nodeIn({ tool: "open", args: {}, result: { metrics: { mean: 10 } } }));
+  const upTo = r.entries().at(-1)!.id;
+  r.addNode(nodeIn({ tool: "blur", args: { sigma: 9 }, result: { metrics: { mean: 99 } } }));
+  r.append("rewind", { upTo });
+  r.addNode(nodeIn({ tool: "fit", args: {}, result: { metrics: { r2: 0.5, k: 3 } } }));
+  const flowPath = exportFlow(r, [adapter], join(dir, "f-rw.json"));
+  const runner: Runner = {
+    async call(_a, tool): Promise<ToolOutput> {
+      return tool === "open" ? { ok: true, metrics: { mean: 10 } } : { ok: true, metrics: { r2: Number.NaN, k: "three" as unknown as number } };
+    },
+    async close() {},
+  };
+  const out = await replayFlow(flowPath, {}, { sessionDir: r.dir, runtimeFactory: async () => runner });
+  expect(out.steps.map((s) => s.tool)).toEqual(["open", "fit"]);
+  expect(out.steps[0]!.diffs).toEqual([]);
+  expect(out.steps[1]!.diffs).toEqual(["r2: was 0.5, now NaN", "k: was 3, now three"]);
+});
+
+test("the flow leaves a harness step out of the adapter list", () => {
+  const r = new AnalysisRecord(join(dir, "harness"), "20260101-000000-hrns");
+  r.addNode(nodeIn({ tool: "run_script", adapter: undefined, args: {} }));
+  r.addNode(nodeIn({ tool: "open", args: {} }));
+  const flow = JSON.parse(readFileSync(exportFlow(r, [adapter], join(dir, "f-h.json")), "utf8"));
+  expect(flow.adapters).toEqual(["fake"]);
+});

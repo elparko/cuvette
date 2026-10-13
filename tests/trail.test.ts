@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { loadAdapter, type LoadedAdapter } from "../src/adapters/manifest.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
-import { exportHtml, exportJsonl, exportMarkdown, exportPdf, groupTrail, parseRoute, renderMarkdown, shortReason, trail, TRAIL_CSP } from "../src/core/trail.ts";
+import { exportHtml, exportJsonl, exportMarkdown, exportPdf, groupTrail, parseRoute, renderMarkdown, shortReason, trail, trailHtml, TRAIL_CSP } from "../src/core/trail.ts";
 import type { NodeIn } from "../src/core/types.ts";
 
 const YAML = `
@@ -134,7 +134,7 @@ test("exportMarkdown and exportJsonl", () => {
   expect(md).toContain("3. Ran blur [out of date]");
   expect(md).toContain("Warning: If you keep the default 1");
   expect(md).toContain("| a | b |");
-  expect(md).toContain("![Result image]");
+  expect(md).toMatch(/!\[Result image\]\(<[^>]+>\)/);
   const lines = readFileSync(exportJsonl(rec, join(dir, "t.jsonl")), "utf8").trim().split("\n");
   expect(lines).toHaveLength(rec.entries().length);
   expect(JSON.parse(lines[0]).kind).toBe("session");
@@ -268,4 +268,12 @@ test("a message typed during a turn is a note in the same group, with the step i
   r.append("user", { text: "use TIC", during: true, afterStep: 2, afterTool: "blur" });
   const t = trail(r, 1, [adapter]);
   expect(t.map((x) => [x.line, x.group, !!x.request])).toEqual([["You asked: go", 1, true], ["You wrote while the agent worked (after step 2): use TIC", 1, false]]);
+});
+
+test("the report with linked images lets the page load them; the embedded report allows data images only", () => {
+  const html = trailHtml(rec, [adapter], "apa", { linkFrom: dir });
+  const csp = /Content-Security-Policy" content="([^"]+)"/.exec(html)![1]!;
+  expect(csp).toContain("img-src data: 'self' file:");
+  expect(csp).toContain("default-src 'none'");
+  expect(trailHtml(rec, [adapter])).toContain(`content="${TRAIL_CSP}"`);
 });

@@ -251,4 +251,16 @@ describe("checkAnswer inputs and small counts", () => {
     entries.push({ id: 60, ts: "", session: "s", kind: "tool_call", data: { tool: "run_script", args: { code: "x = 2.718" } } });
     expect(checkAnswer("The value is 2.718.", record).map((c) => c.label)).toEqual(["unsourced"]);
   });
+
+  test("a very small number must match its logged value, not any small value", () => {
+    const { record } = fake([{ node: "n1", path: "p", value: 1e-20 }]);
+    expect(checkAnswer("The p value was 3e-14.", record).map((c) => c.label)).toEqual(["unsourced"]);
+    const ok = fake([{ node: "n1", path: "p", value: 3.04e-14 }]);
+    expect(checkAnswer("The p value was 3e-14.", ok.record).map((c) => c.label)).toEqual(["measured"]);
+  });
+
+  test("a number too large for a double gives no claim", () => {
+    const { record } = fake([{ node: "n1", path: "x", value: 1 }]);
+    expect(checkAnswer("The value was 1e400.", record).filter((c) => c.value !== null)).toEqual([]);
+  });
 });

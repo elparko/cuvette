@@ -267,6 +267,14 @@ describe("referee", () => {
     expect(out[0].severity).toBe("info");
     expect(out[0].message).toContain("I think it is fine overall.");
   });
+
+  test("the referee call gets the stop signal of the turn", async () => {
+    let got: AbortSignal | undefined;
+    const provider = { complete: async (_s: string, _t: string, signal?: AbortSignal) => ((got = signal), "[]") } as unknown as Provider;
+    const ac = new AbortController();
+    await referee(provider, ctx(makeRecord(seed), "a"), ac.signal);
+    expect(got).toBe(ac.signal);
+  });
 });
 
 test("an answer that names the wrong choice of a decision is an error", async () => {

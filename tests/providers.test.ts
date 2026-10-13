@@ -195,6 +195,13 @@ describe("claude", () => {
     expect(r.note).toContain("declined");
   });
 
+  test("raw content drops an empty text block and gives a tool_use with no input an empty object", async () => {
+    const { client } = fakeClient([claudeMsg([{ type: "text", text: "" }, { type: "tool_use", id: "t", name: "add" }], "tool_use")]);
+    const r = await new ClaudeProvider("claude-opus-5-5", { client }).step(req([user("x")]));
+    expect(r.message.raw).toEqual([{ type: "tool_use", id: "t", name: "add", input: {} }]);
+    expect(r.message.parts).toEqual([{ type: "tool_call", id: "t", name: "add", args: {} }]);
+  });
+
   test("drops fallback params after a 400 about them and retries once", async () => {
     const bad = new Anthropic.BadRequestError(400, { error: { message: "unknown field fallbacks" } } as any, "unknown field fallbacks", new Headers());
     const { client, calls } = fakeClient([bad, claudeMsg([{ type: "text", text: "ok" }]), claudeMsg([{ type: "text", text: "again" }])]);

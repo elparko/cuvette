@@ -319,6 +319,6 @@ export function exportFlow(record: AnalysisRecord, _adapters: LoadedAdapter[], p
     n.outputs.forEach((o, i) => { if (!produced.has(o.path)) produced.set(o.path, `step${k + 1}.outputs.${i}.path`); });
     return { adapter: n.adapter, tool: n.tool, args };
   });
-  const flow = { adapters: [...new Set(nodes.map((n) => n.adapter))], decisions: setupValues(record), steps, inputs };
+  const flow = { adapters: [...new Set(nodes.map((n) => n.adapter).filter(Boolean))], decisions: setupValues(record), steps, inputs };
   return writeOut(path, JSON.stringify(flow, null, 2) + "\n");
 }
