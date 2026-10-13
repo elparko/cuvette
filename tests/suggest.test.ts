@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
@@ -123,4 +123,33 @@ test("in a folder with more files than the scan reads, the counts say at least",
   const few = folder();
   put(few, "a.csv", "a,b\n");
   expect(suggestPrograms(few, list).matches[0]!.reason).toBe("1 .csv file");
+});
+
+test("a csv file whose first bytes look like an FCS header stays a table", () => {
+  const d = folder();
+  put(d, "export.csv", "FCS file,count\na.fcs,12\n");
+  const m = first(d);
+  expect(m.table).toBe(true);
+  expect(m.adapter).toBe("tables");
+});
+
+test("an HDF5 file with the extension of one adapter does not match the other HDF5 adapters by header", () => {
+  const d = folder();
+  put(d, "cell1.nwb", Buffer.from([0x89, 0x48, 0x44, 0x46, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]));
+  const r = suggestPrograms(d, list);
+  expect(r.matches[0].adapter).toBe("patch-clamp");
+  expect(r.matches.map((m) => m.adapter)).not.toContain("harmony");
+});
+
+test("the scan follows a link to a data file or a data folder", () => {
+  const d = folder();
+  const real = folder();
+  put(real, "s1.fcs", "FCS3.0");
+  put(real, "s2.fcs", "FCS3.0");
+  symlinkSync(join(real, "s1.fcs"), join(d, "s1.fcs"));
+  symlinkSync(real, join(d, "linked"));
+  symlinkSync(join(real, "missing.fcs"), join(d, "broken.fcs"));
+  const m = first(d);
+  expect(m.adapter).toBe("flowkit");
+  expect(m.count).toBe(3);
 });

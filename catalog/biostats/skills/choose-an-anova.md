@@ -12,7 +12,7 @@ Ask these questions in order.
 3. Do the residuals look normal, and do the groups have a similar spread? The Levene test p in the result is one clue.
    - If not, use `kruskal_dunn` for independent groups, or `friedman_test` for repeated conditions.
    - For two groups only, use `rank_test`.
-4. For a factorial ANOVA, ask for the type of sums of squares. It matters only for an unbalanced design.
+4. For a factorial ANOVA, the harness asks the scientist for the type of sums of squares (ss_type). It matters only for an unbalanced design.
 5. Ask which comparisons the scientist planned before the data. Run only those. Report the adjusted p values.
 
 The matching menus in the programs that the scientist knows:

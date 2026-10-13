@@ -17,6 +17,7 @@ while [ $# -gt 0 ]; do
   shift 2
 done
 [ -s "$aln" ] || { echo "error: alignment file not found: $aln" >&2; exit 1; }
+[ "$mode" != select ] && [ "$btype" = ufboot ] && [ "$nrep" -lt 1000 ] && { echo "error: replicates is $nrep. The ultrafast bootstrap of IQ-TREE needs 1000 or more. Use 1000, or bootstrap_type standard." >&2; exit 1; }
 set -- -s "$aln" -pre "$pre" -seed "$seed" -T 1 -redo -quiet
 if [ "$mode" = select ]; then
   set -- "$@" -m MF

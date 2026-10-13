@@ -243,7 +243,7 @@ decisions:
     default: bray
     group: Beta diversity
     help: >
-      Bray-Curtis uses abundance. Jaccard uses presence when the normalization is none. Euclidean on CLR values is
+      Bray-Curtis uses abundance. Jaccard uses only presence and absence (vegdist with binary = TRUE). Euclidean on CLR values is
       the Aitchison distance. The distance sets what different means and can change R2 and p.
     essential: true
     owner: human

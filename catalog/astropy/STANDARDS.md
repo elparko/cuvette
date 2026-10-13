@@ -14,7 +14,7 @@ Follow these rules in each answer. The review checks look for the same errors.
 
 - Report the method, the clip level, the box size and the estimator. Say if sources were masked.
 - Sources raise the sigma-clipped median. Mask them, or say that the background is an upper limit.
-- Clipping at 3 sigma makes the standard deviation of Gaussian noise read about 1.5 percent low.
+- Clipping at 3 sigma makes the standard deviation of Gaussian noise read about 1.3 percent low.
 - Report the background and the noise with the image unit.
 
 ## Detection

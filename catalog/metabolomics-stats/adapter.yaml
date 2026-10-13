@@ -139,8 +139,8 @@ decisions:
       - { tool: prepare_metabolite_table, arg: normalization }
     sensitivity:
       options: [none, total_area, pqn]
-      tool: test_features
-      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      tool: prepare_metabolite_table
+      compare: [metrics.factor_min, metrics.factor_max, metrics.n_features_kept]
       max_runs: 3
 
   - key: pqn_reference
@@ -458,7 +458,7 @@ map:
       - { arg: test, label: "Non-parametric test and Equal variance in MetaboAnalyst", ui_default: "t-test with equal variance" }
       - { arg: adjust, label: "FDR in MetaboAnalyst", ui_default: BH }
       - { arg: fdr, label: "p value threshold in MetaboAnalyst", ui_default: 0.05 }
-      - { arg: min_abs_log2fc, label: "Fold change threshold in the volcano plot", ui_default: 2 }
+      - { arg: min_abs_log2fc, label: "Fold change threshold in the volcano plot", ui_default: 1, note: "MetaboAnalyst asks for the fold change (default 2). Its log2 is 1, the value of this argument." }
     fidelity: close
     difference: >
       MetaboAnalyst runs the t test with equal variance by default and the Welch test only if you clear the equal variance box. The tool defaults to the Welch test.
@@ -578,7 +578,7 @@ tests:
     description: >
       Six samples and five features (data/tiny_table.csv, synthetic, written by data/make_fixtures.R). One zero and one empty cell in feature m5 are
       missing values. A NumPy calculation (checks/check_metab.py and checks/check_metab.out) gives the half-minimum fill of 3.0 and the PQN scale
-      factors 0.632611 to 1.518265.
+      factors 0.56935 to 1.518265.
     data: [data/tiny_table.csv]
     calls:
       - tool: prepare_metabolite_table

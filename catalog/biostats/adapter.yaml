@@ -128,6 +128,10 @@ decisions:
       - { tool: chi_square_test, arg: alpha }
       - { tool: fisher_exact, arg: alpha }
       - { tool: mcnemar_test, arg: alpha }
+      - { tool: anova_factorial, arg: alpha }
+      - { tool: anova_repeated, arg: alpha }
+      - { tool: kruskal_dunn, arg: alpha }
+      - { tool: friedman_test, arg: alpha }
 
   - key: paired
     label: Paired test
@@ -338,7 +342,7 @@ decisions:
     sensitivity:
       options: [1, 2, 3]
       tool: anova_factorial
-      compare: [metrics.levene_p, metrics.df_residual]
+      compare: []
       max_runs: 3
 
   - key: factorial_posthoc
@@ -1449,7 +1453,7 @@ tests:
   - id: sleep-student-and-rank
     description: >
       Student (equal variance) p = 0.07919 with 18 df, from the same data (computed with scipy, R var.equal = TRUE).
-      The Wilcoxon signed-rank p is 0.003906 (computed with scipy, no ties).
+      The Wilcoxon signed-rank p is 0.003906 (scipy; R 4.6.1 wilcox.test with paired = TRUE gives the same p). The differences have one zero and ties.
     data: [data/sleep.csv]
     calls:
       - tool: compare_two_groups

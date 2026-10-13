@@ -7,3 +7,4 @@
 6 treated treated_m3             6
 Welch t on animal means: t = -3.674235  df = 4  p = 0.02131164 
 Welch t on cells (not valid): p = 5.240998e-20 
+Welch ANOVA on animal means (3 groups): F = 13.65339282  df = 2 4.775082  p = 0.01058858669 

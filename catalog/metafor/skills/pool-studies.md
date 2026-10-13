@@ -15,4 +15,4 @@ description: Steps to pool studies in a meta-analysis - effect sizes, the model,
 8. Run funnel_and_egger. Report the Egger test with its model and the number of studies. With fewer than 10 studies, say that the test has low power.
 9. Offer the sensitivity table for the model and the tau2 estimator.
 
-For a hazard ratio from each study, use measure GEN with yi the log hazard ratio and sei its standard error. The standard error from a 95% interval is (log(upper) - log(lower)) / 3.92.
+For a hazard ratio from each study, use measure GEN with yi the log hazard ratio and sei its standard error. To get the standard error from a 95% interval, call calculate with (log(upper) - log(lower)) / 3.92. Do not compute it by hand.

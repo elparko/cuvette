@@ -12,4 +12,4 @@ description: Steps to find the genes that differ between two conditions in an RN
 5. Run run_deseq. Read the number of tested genes, the number of significant genes, up and down.
 6. Run top_genes for the table of the best genes. Give the reference level and the test level with the table.
 7. Report the design, the filter, the cutoff and the counts. Say which genes are up in the test level.
-8. Offer to run the test again with another filter or cutoff. Show how the counts change.
+8. Offer to compare another filter or cutoff with compare_options (keys min_count, min_samples or alpha). Show how the counts change.

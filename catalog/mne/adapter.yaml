@@ -78,11 +78,11 @@ decisions:
   - key: bad_channels
     label: Bad channels
     kind: text
-    default: "MEG 2443,EEG 053"
+    default: file
     group: Preprocessing
     help: >
       Channel names, separated by commas, that are noisy or flat. MNE leaves them out of
-      averages, rejection and ICA. The default is the list that the MNE sample file carries. Look at the raw plot for your own data. Write none to keep every channel.
+      averages, rejection and ICA. The default file keeps the list that the file carries. The MNE sample file marks MEG 2443 and EEG 053. Look at the raw plot for your own data. Write none to keep every channel.
     essential: true
     owner: human
     stage: setup
@@ -444,11 +444,11 @@ tools:
 
   - name: set_bad_channels
     title: Mark bad channels
-    description: Set the list of bad channels. The list replaces the list stored in the file. Write none for an empty list.
+    description: Set the list of bad channels. The list replaces the list stored in the file. Write none for an empty list, or file to keep the list of the file.
     function: "ga_mne:set_bad_channels"
     params:
       raw: { type: [object, string], description: A handle or a .fif path. }
-      bads: { type: string, description: "Channel names separated by commas, or none." }
+      bads: { type: string, description: "Channel names separated by commas, none, or file." }
     required: [raw]
 
   - name: filter_raw
@@ -915,6 +915,9 @@ tests:
       - tool: set_bad_channels
         args: { raw: "{adapter_dir}/data/synthetic_raw.fif", bads: EEG 003 }
         save_as: b
+      - tool: set_bad_channels
+        args: { raw: { handle: "{saved.b.data.inst.handle}" }, bads: file }
+        save_as: f
       - tool: make_epochs
         args: { raw: { handle: "{saved.b.data.inst.handle}" }, event_id: "cond_a=1", tmin: -0.2, tmax: 0.5, baseline_end: 0, reject_eeg: 150 }
         save_as: e
@@ -925,6 +928,7 @@ tests:
         args: { evoked: { handle: "{saved.v.data.inst.handle}" }, ch_type: eeg, tmin: 0.08, tmax: 0.12, mode: neg }
     expect:
       - { path: saved.b.metrics.n_bads, equals: 1 }
+      - { path: saved.f.data.bads, equals: [EEG 003] }
       - { path: saved.e.metrics.n_epochs, equals: 18 }
       - { path: metrics.n_channels, equals: 2 }
       - { path: metrics.gfp_amplitude, approx: 4.1231, abs: 0.001 }

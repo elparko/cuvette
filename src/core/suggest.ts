@@ -1,4 +1,4 @@
-import { closeSync, openSync, readdirSync, readSync } from "node:fs";
+import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { matches, type AdapterSummary } from "../adapters/catalog.ts";
 
@@ -55,8 +55,10 @@ function scan(folder: string): Seen[] {
     for (const e of entries) {
       if (out.length >= MAX_FILES) return;
       if (e.name.startsWith(".") || e.name === "node_modules") continue;
-      if (e.isFile()) out.push({ name: e.name.toLowerCase(), header: header(join(dir, e.name)) });
-      else if (e.isDirectory() && depth < MAX_DEPTH) walk(join(dir, e.name), depth + 1);
+      const p = join(dir, e.name);
+      const target = e.isSymbolicLink() ? statSync(p, { throwIfNoEntry: false }) : e;
+      if (target?.isFile()) out.push({ name: e.name.toLowerCase(), header: header(p) });
+      else if (target?.isDirectory() && depth < MAX_DEPTH) walk(p, depth + 1);
     }
   };
   walk(folder, 0);
@@ -80,6 +82,8 @@ export function suggestPrograms(folder: string, list: AdapterSummary[]): Suggest
   const files = scan(folder);
   const capped = files.length >= MAX_FILES;
   const found: (Suggestion & { score: number; rank: number; priority: number; ready: boolean })[] = [];
+  const allTypes = [...new Set([...TABLE_TYPES, ...list.filter((a) => !a.problem).flatMap((a) => a.fileTypes.map((t) => t.toLowerCase()))])];
+  const claimed = new Set(files.filter((f) => allTypes.some((t) => matches(t, f.name))).map((f) => f.name));
   for (const a of list) {
     if (a.problem) continue;
     const types = a.fileTypes.map((t) => t.toLowerCase());
@@ -90,7 +94,7 @@ export function suggestPrograms(folder: string, list: AdapterSummary[]): Suggest
     let count = 0;
     for (const f of files) {
       const i = types.findIndex((t) => !TABLE_TYPES.includes(t) && matches(t, f.name));
-      const magic = a.fileMagic.some((m) => f.header.startsWith(m.toLowerCase()));
+      const magic = (i >= 0 || !claimed.has(f.name)) && a.fileMagic.some((m) => f.header.startsWith(m.toLowerCase()));
       if (i < 0 && !magic) continue;
       count++;
       score += magic && i >= 0 ? 1.5 : 1;

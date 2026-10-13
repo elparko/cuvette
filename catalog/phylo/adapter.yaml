@@ -145,7 +145,7 @@ decisions:
     hi: 10000
     group: Tree
     help: >
-      The number of bootstrap trees. IQ-TREE needs at least 1000 for the ultrafast bootstrap. More
+      The number of bootstrap trees. IQ-TREE needs at least 1000 for the ultrafast bootstrap (ufboot). The standard bootstrap takes 100 or more. More
       replicates make support values more stable and the run longer.
     owner: human
     stage: setup
@@ -178,6 +178,7 @@ decisions:
     changes_conclusion: false
     links:
       - { tool: infer_tree, arg: seed }
+      - { tool: select_model, arg: seed }
 
 tools:
   - name: align_sequences
@@ -556,6 +557,15 @@ tests:
         args: { path: "{adapter_dir}/data/example.phy", model: HKY, bootstrap_type: none, seed: 1 }
     expect:
       - { path: metrics.log_likelihood, approx: -23117.03, abs: 2 }
+
+  - id: ufboot-needs-1000
+    description: The ultrafast bootstrap of IQ-TREE needs 1000 replicates or more (IQ-TREE manual, option -B). The tool stops before IQ-TREE runs.
+    data: [data/example.phy]
+    calls:
+      - { tool: infer_tree, args: { path: "{adapter_dir}/data/example.phy", model: "GTR+G", bootstrap_type: ufboot, replicates: 500 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "needs 1000 or more" }
 
   - id: missing-file
     description: A FASTA file that does not exist fails, and the error names the file.

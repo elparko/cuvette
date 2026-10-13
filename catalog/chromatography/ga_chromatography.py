@@ -95,7 +95,7 @@ def read_trace(path, time_column=None, signal_column=None, delimiter=None, skip_
         os.path.basename(path), len(d), metrics["time_start"], metrics["time_end"], step, "even" if even else "uneven",
         metrics["signal_min"], metrics["signal_max"], metrics["signal_at_start"], metrics["signal_at_end"])
     if abs(metrics["signal_at_end"] - metrics["signal_at_start"]) > 0.02 * (metrics["signal_max"] - metrics["signal_min"]):
-        summary += " The start and the end differ, so the trace drifts. Set baseline to snip in integrate_peaks."
+        summary += " The start and the end differ, so the trace drifts. A baseline correction (the decision baseline, snip) can be needed in integrate_peaks."
     return {"ok": True, "summary": summary, "metrics": metrics, "data": {"even_spacing": even, "path": path},
             "table": _table(d.head(200), "trace_head"), "outputs": _save(fig, "trace")}
 
@@ -230,7 +230,7 @@ def calibration_curve(concentrations, areas, through_origin=None, weighting="non
         dof = int(np.sum(w > 0)) - 2
     resid = y - pred
     ss_res = float(np.sum(w * resid ** 2))
-    ss_tot = float(np.sum(w * (y - np.average(y, weights=w)) ** 2))
+    ss_tot = float(np.sum(w * y ** 2)) if through_origin else float(np.sum(w * (y - np.average(y, weights=w)) ** 2))
     r2 = 1.0 - ss_res / ss_tot if ss_tot else float("nan")
     se_resid = float(np.sqrt(ss_res / dof)) if dof > 0 else float("nan")
     se_area = float(np.sqrt(np.sum(resid[w > 0] ** 2) / dof)) if dof > 0 else float("nan")
@@ -283,5 +283,5 @@ def quantify_areas(areas, slope, intercept, unit="unit", labels=None, lowest_sta
         "; ".join("%s %.6g %s" % (r.sample, r.concentration, unit) for r in frame.itertuples()))
     if outside:
         summary += " Outside the calibration range (%g to %g %s): %s. Dilute the sample and measure again." % (
-            float(lowest_standard), float(highest_standard), unit, ", ".join(outside))
+            lo, hi, unit, ", ".join(outside))
     return {"ok": True, "summary": summary, "metrics": metrics, "data": {"unit": unit}, "table": _table(frame, "concentrations")}
