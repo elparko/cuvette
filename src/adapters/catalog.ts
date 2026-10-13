@@ -112,10 +112,13 @@ function namedFiles(text: string, cwd: string): string[] {
   return [...new Set(out)];
 }
 
-export function fileTypeHint(text: string, list: AdapterSummary[], cwd: string, skip: string[] = []): string {
+export function fileTypeHint(text: string, index: AdapterSummary[] | (() => AdapterSummary[]), cwd: string, skip: string[] = []): string {
+  const files = namedFiles(text, cwd);
+  if (!files.length) return "";
+  const list = typeof index === "function" ? index() : index;
   const parts: string[] = [];
   const seen = new Set<string>();
-  for (const f of namedFiles(text, cwd)) {
+  for (const f of files) {
     const fits = list
       .filter((a) => !a.problem && !skip.includes(a.name))
       .map((a) => ({ a, rank: a.fileTypes.findIndex((t) => matches(t, f)) }))
