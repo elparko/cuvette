@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
-import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, itemHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
 import { WebView } from "../src/server/app-view.ts";
 import { planInit, sheetRows, type Card } from "../src/ui/cards.ts";
@@ -172,6 +172,54 @@ describe("the app server", () => {
     const ok = await c.get(`api/file?p=${encodeURIComponent(s.record.blobPath(sha)!)}&download=1`);
     expect(ok.status).toBe(200);
     expect(ok.headers.get("content-disposition")).toContain("attachment");
+  });
+
+  test("a download of a file with a Unicode name works, and the app keeps running", async () => {
+    const s = new FakeSession();
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    mkdirSync(s.workDir, { recursive: true });
+    const f = join(s.workDir, "结果 é.csv");
+    writeFileSync(f, "a,b\n1,2\n");
+    const r = await c.get(`api/file?p=${encodeURIComponent(f)}&download=1`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-disposition")).toBe(`attachment; filename="__ _.csv"; filename*=UTF-8''%E7%BB%93%E6%9E%9C%20%C3%A9.csv`);
+    expect(await r.text()).toBe("a,b\n1,2\n");
+    expect((await c.get("api/state")).status).toBe(200);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a folder that the user cannot read gives a clear error in the folder list, the suggestion and the open", async () => {
+    let made = 0;
+    app = await startApp({ env, start: home, makeSession: async () => (made++, new FakeSession()) });
+    const c = client(app);
+    const locked = join(home, "locked");
+    mkdirSync(locked, { recursive: true });
+    chmodSync(locked, 0o000);
+    try {
+      for (const r of [await c.get(`api/dirs?p=${encodeURIComponent(locked)}`), await c.get(`api/suggest?p=${encodeURIComponent(locked)}`), await c.post("api/open", { folder: locked })]) {
+        expect(r.status).toBe(403);
+        expect((await r.json()).error).toBe(`Cuvette cannot read the folder ${locked}. Give your user read access to it, or choose another folder.`);
+      }
+      expect(made).toBe(0);
+    } finally {
+      chmodSync(locked, 0o755);
+    }
+  });
+
+  test("an empty folder gives no program suggestion, and /help in the app lists the keys of the app", async () => {
+    const s = new FakeSession();
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    const empty = join(home, "empty");
+    mkdirSync(empty, { recursive: true });
+    expect(await (await c.get(`api/suggest?p=${encodeURIComponent(empty)}`)).json()).toEqual({ scanned: 0, matches: [] });
+    const ev = await events(app);
+    await c.post("api/send", { text: "/help" });
+    await until(() => ev.msgs.some((m) => m.t === "append" && String(m.html).includes("Keys in the message box")));
+    const html = ev.msgs.filter((m) => m.t === "append").map((m) => String(m.html)).join("");
+    expect(html).toContain("Shift+Enter: new line");
+    expect(html).not.toContain("Ctrl+C twice quits");
+    ev.close();
   });
 
   test("with no session the app shows the start page and the folder list", async () => {
@@ -572,6 +620,30 @@ test("the status message names the current model, so the header follows a model 
   const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
   expect(view.statusMsg().model).toBe(s.model.model);
   view.close();
+});
+
+test("a failed script step shows the last line of the traceback, and the full error in a closed box", () => {
+  const ctx = { token: "t", session: new FakeSession() as never };
+  const error = 'the script exited with code 1: Traceback (most recent call last):\n  File "/x/script.py", line 1, in <module>\n    raise ValueError("bad column name")\nValueError: bad column name';
+  const html = itemHtml(ctx, { key: "s", t: "step", ok: false, tool: "run_script", purpose: "Compute the test", summary: "Runs the test.", error, outputs: [{ n: 1, path: "/r/blobs/" + "a".repeat(64) + ".png", kind: "image" }] } as never);
+  expect(html).toContain('<span class="summary">the script exited with code 1: ValueError: bad column name</span>');
+  expect(html).toContain('<details class="errmore"><summary>Error details</summary><pre>  File &quot;/x/script.py&quot;');
+  expect(html).toContain('alt="PNG file"');
+  expect(html).not.toContain('alt="aaaa');
+  const ok = itemHtml(ctx, { key: "o", t: "step", ok: true, tool: "run_script", summary: "Wrote 2 files.", outputs: [] } as never);
+  expect(ok).toContain('<span class="summary">Wrote 2 files.</span>');
+  expect(ok).not.toContain("errmore");
+});
+
+test("the results tab shows the images in the session folder and opens a PDF or an HTML file in a new tab", () => {
+  const s = new FakeSession();
+  const out = mkdtempSync(join(tmpdir(), "cuvette-results-"));
+  for (const f of ["fig.png", "report.pdf", "report.html", "stats.xlsx"]) writeFileSync(join(out, f), "x");
+  const html = resultsHtml({ token: "t", session: s as never }, out, undefined);
+  const files = html.slice(html.indexOf("<h4>Files</h4>"));
+  expect(files).toMatch(/<div class="images"><button type="button" class="thumb"[^>]*title="fig\.png"/);
+  for (const f of ["fig.png", "report.pdf", "report.html"]) expect(files).toContain(`aria-label="Open ${f} in a new tab">Open</a>`);
+  expect(files).not.toContain('aria-label="Open stats.xlsx');
 });
 
 describe("repeated steps", () => {

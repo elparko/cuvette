@@ -99,7 +99,7 @@ test("a model row is locked during a turn", async () => {
   await until(() => /Model\s+fake:\s+This session · locked/.test(h.last()));
   expect(h.last()).toMatch(/Mode\s+watch\s+Default/);
   await key(h, "\r");
-  await until(() => h.last().includes("Model is locked until the turn ends."));
+  await until(() => h.last().includes("Model cannot change until the turn ends."));
   expect(s.record.entries(["setting"])).toHaveLength(0);
 });
 

@@ -5,7 +5,12 @@ export const TOKEN = new URLSearchParams(location.search).get("t") ?? "";
 export const withT = (p: string) => p + (p.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(TOKEN);
 
 export async function call<T = unknown>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(withT(path), body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-token": TOKEN }, body: JSON.stringify(body) });
+  let r: Response;
+  try {
+    r = await fetch(withT(path), body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-token": TOKEN }, body: JSON.stringify(body) });
+  } catch {
+    throw new Error("Cuvette does not answer. Make sure that the app still runs, then reload the page.");
+  }
   const type = r.headers.get("content-type") ?? "";
   const data = type.includes("json") ? await r.json() : await r.text();
   if (!r.ok) throw new Error((data && (data.error || data.text)) || `HTTP ${r.status}`);

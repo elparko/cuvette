@@ -133,6 +133,18 @@ const FIGURES_PY = readFileSync(join(ROOT, "src/adapters/kinds/ga_figures.py"), 
 
 const STYLE_FILE = readFileSync(join(ROOT, "src/adapters/kinds/cuvette.mplstyle"), "utf8");
 
+// A Python traceback starts with the frames of BOOT and runpy. They are the same each time and hide the line of the script.
+export function withoutBootFrames(stderr: string): string {
+  const out: string[] = [];
+  let skip = false;
+  for (const line of stderr.split("\n")) {
+    if (/^\s*File "(<string>|<frozen runpy>)", line \d+/.test(line)) skip = true;
+    else if (/^\s*File "/.test(line) || !/^\s{4}/.test(line)) skip = false;
+    if (!skip) out.push(line);
+  }
+  return out.join("\n");
+}
+
 const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,init_globals={k:getattr(ga_api,k) for k in ('call','save_table','save_figure','ToolError')},run_name='__main__')";
 
 export type SandboxState = "unknown" | "on" | "bwrap" | "unshare" | "off";
@@ -354,7 +366,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       const base = { text, outputs, images: images.length ? images : undefined, fidelity: "code_only" as const, manualRoute: `Run the Python code in ${script}`, data: { script, duration_s: (Date.now() - started) / 1000 } };
       if (aborted) return { ok: false, error: "the script was cancelled", ...base };
       if (timedOut) return { ok: false, error: `the script timed out after ${timeoutS} s`, ...base };
-      if (code !== 0) return { ok: false, error: `the script exited with code ${code}: ${tail(stderr.trim(), 2000)}`, ...base };
+      if (code !== 0) return { ok: false, error: `the script exited with code ${code}: ${tail(withoutBootFrames(stderr).trim(), 2000)}`, ...base };
       return { ok: true, summary: `The script ran in ${project} and wrote ${outputs.length} new file(s) to ${dirs.workDir}.`, ...base };
     },
   };

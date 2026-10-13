@@ -805,8 +805,12 @@
   color: var(--warn);
   background: color-mix(in srgb, var(--warn) 18%, transparent);
 }
-.srv details.callinfo {
+.srv details.callinfo,
+.srv details.errmore {
   margin-top: 2px;
+}
+.srv details.errmore > summary {
+  font-size: 12px;
 }
 .srv details.callinfo > summary {
   font-size: 12px;

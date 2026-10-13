@@ -451,7 +451,7 @@ describe("API key", () => {
       const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
       live = { h, s, done };
       await until(() => h.all().includes("Claude API key"));
-      expect(h.all()).toContain("No Claude API key is set");
+      expect(h.all()).toContain("There is no Claude API key");
       await submit(h, "abc");
       await until(() => h.all().includes("A Claude API key starts with sk-ant-."));
       expect(h.all()).not.toContain("abc");
@@ -466,7 +466,7 @@ describe("API key", () => {
   test("/key opens the card and /key status reports no key", async () => {
     const { h } = start();
     await submit(h, "/key status");
-    await until(() => h.all().includes("No Claude API key is set") || h.all().includes("comes from"));
+    await until(() => h.all().includes("There is no Claude API key") || h.all().includes("comes from"));
     await submit(h, "/key");
     await until(() => h.all().includes("Paste your key"));
   });

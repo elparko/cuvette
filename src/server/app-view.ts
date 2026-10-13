@@ -23,6 +23,15 @@ export interface ViewHost {
 type Fields = Record<string, unknown>;
 const LONG_STEP_MS = 30_000;
 const THINK_KEEP = 4000;
+export const WEB_KEYS = [
+  "Keys in the message box:",
+  "  Enter: send the message. Shift+Enter: new line.",
+  "  Esc: stop the agent. If the command list is open, Esc closes it.",
+  "  Tab, Up, Down: choose a / command in the list.",
+  "  ! at the start: stop the agent and send the message now.",
+  "Keys on a question card:",
+  "  1 to 9: choose an answer. Arrow keys: move between the answers. Enter: confirm. Esc: answer later.",
+].join("\n");
 
 export class WebView {
   readonly session: SessionLike;
@@ -281,7 +290,7 @@ export class WebView {
           const { next, rest } = nextQueued(this.session, this.queue);
           this.queue = rest;
           if (next !== undefined) this.session.send(next).catch((err: Error) => this.line("✗", `The agent stopped: ${err.message}`, "red"));
-          if (was.state !== "idle") this.send({ t: "notify", title: "The agent is done", body: "The agent waits for you." , quiet: true });
+          if (was.state !== "idle") this.send({ t: "notify", title: "The agent finished", body: "The agent waits for you.", quiet: true });
           if (this.stopping) this.leaveQuestions();
           this.stopping = false;
         }
@@ -362,6 +371,7 @@ export class WebView {
       print: (text, title) => this.push({ key: `b${++this.counter}`, t: "block", title, text }),
       notice: (text) => this.line("▸", text),
       error: (text) => this.line("✗", text, "red"),
+      keys: () => WEB_KEYS,
       openCard: (c) => this.openCard(c),
       hasQuestionCard: (qid) => this.slots.some((s) => s.card.t === "question" && s.card.q.qid === qid),
       refresh: () => this.sendStatus(),
@@ -396,7 +406,7 @@ export class WebView {
 
   async act(id: number, body: { act?: string; value?: string; plan?: PlanAction; qid?: string; fid?: string; fields?: Fields }): Promise<{ ok: boolean; error?: string }> {
     const slot = this.slots.find((s) => s.id === id);
-    if (!slot) return { ok: false, error: "This card is closed." };
+    if (!slot) return { ok: false, error: "This card is no longer open." };
     slot.msg = undefined;
     const f = body.fields ?? {};
     const s = this.session;

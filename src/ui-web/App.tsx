@@ -78,7 +78,7 @@ export function App() {
     try {
       s = await call<AppState>("api/state");
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error((e as Error).message, { id: "opening" });
       return;
     }
     if (s.finder) enableFinder();
@@ -86,7 +86,7 @@ export function App() {
     if (s.session || !s.opening) toast.dismiss("opening");
     if (s.error) toast.error(s.error, { id: "opening" });
     const want = wanted.current;
-    const next: Page = s.session ? (OWN_PAGES.includes(want) ? want : "session") : s.setup || want === "setup" ? "setup" : OWN_PAGES.includes(want) ? want : "start";
+    const next: Page = s.session ? (OWN_PAGES.includes(want) || want === "setup" ? want : "session") : s.setup || want === "setup" ? "setup" : OWN_PAGES.includes(want) ? want : "start";
     setPage(next);
     if (!s.session && s.opening) timer.current = setTimeout(boot, 800);
     setBoots((n) => n + 1);

@@ -277,7 +277,7 @@ export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL):
     if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return { ok: false, text: keyApiProblem(e.status, e.message) };
     if (e instanceof Anthropic.NotFoundError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
     if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return { ok: false, text: WORKSPACE_HELP };
-    if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: `${keyApiProblem(undefined)} The key is saved. The first request tests it.` };
-    return { ok: true, text: `Cannot check the key: ${(e as Error).message}. It is saved; the first request will test it.` };
+    if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: "Cannot reach the Claude API to check the key. The first request tests it." };
+    return { ok: true, text: `Cannot check the key: ${(e as Error).message}. The first request tests it.` };
   }
 }

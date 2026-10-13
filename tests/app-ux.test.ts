@@ -313,8 +313,8 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.size(1280, 900);
     await goPage("Sessions");
     await page.eval(`document.querySelector('main button[aria-pressed]')?.click()`);
-    expect(await until(page, `document.querySelectorAll('main ul[aria-label="Sessions"] button').length === 5`)).toBe(true);
-    const stops = `[...document.querySelectorAll('main ul[aria-label="Sessions"] button')].filter((b) => b.tabIndex === 0 && !b.disabled).map((b) => b.dataset.rove)`;
+    expect(await until(page, `document.querySelectorAll('main ul[aria-label="Sessions"] button[data-rove]').length === 5`)).toBe(true);
+    const stops = `[...document.querySelectorAll('main ul[aria-label="Sessions"] button[data-rove]')].filter((b) => b.tabIndex === 0 && !b.disabled).map((b) => b.dataset.rove)`;
     expect(await page.eval(stops)).toEqual(["s1"]);
     const key = (k: string) => page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
     const at = () => page.eval<string>(`document.activeElement.dataset.rove ?? ""`);
@@ -475,5 +475,72 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
     expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
     await page.media([]);
+  });
+
+  test("the model menu lists the Ollama models on this computer and saves the chosen one", async () => {
+    await goPage("Analysis");
+    await page.eval(`window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { ollama: { reachable: true, models: ["qwen3:8b", "llama3.1:8b"] } } }) }); window.__mocks.push({ part: "api/setting", reply: (_u, b) => ({ body: { text: "Saved." } }) }); window.__calls = []`);
+    await page.eval(`document.querySelector('header button[aria-label^="Model:"]').dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }))`);
+    expect(await until(page, `[...document.querySelectorAll('[role="menuitemradio"]')].some((x) => x.textContent === "llama3.1:8b")`)).toBe(true);
+    expect(await page.eval(`document.querySelector('[role="menu"]').textContent.includes("Ollama on this computer")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll('[role="menuitemradio"]')].find((x) => x.textContent === "llama3.1:8b").click()`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/setting") && c.body && JSON.parse(c.body).value === "ollama:llama3.1:8b")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/firststart" && m.part !== "api/setting")`);
+  });
+
+  test("settings: Cancel puts back the value that a text box showed before the change", async () => {
+    await goPage("Settings");
+    await until(page, `document.querySelector('nav[aria-label="Setting sections"]')`);
+    await page.eval(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].find((b) => b.textContent === "Outputs").click()`);
+    expect(await until(page, `document.querySelector('[data-setting="databook_author"] input')`)).toBe(true);
+    await setText('[data-setting="databook_author"] input', "A. Scientist");
+    await page.eval(`document.querySelector('[data-setting="databook_author"] input').blur()`);
+    expect(await until(page, `document.querySelector('[data-setting="databook_author"] [aria-label="Save for"]')`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll('[data-setting="databook_author"] button')].find((b) => b.textContent === "Cancel").click()`);
+    expect(await until(page, `!document.querySelector('[data-setting="databook_author"] [aria-label="Save for"]')`)).toBe(true);
+    expect(await page.eval(`document.querySelector('[data-setting="databook_author"] input').value`)).toBe("");
+  });
+
+  test("the sessions page can remove a moved session from the list", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/sessions.json", reply: () => ({ body: [{ id: "gone-1", title: "Old analysis", text: "", folder: "/nowhere/old", folderName: "old", age: "3 days ago", status: "moved", moved: true, thumb: "" }] }) }); window.__mocks.push({ part: "api/session-remove", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    await goPage("Sessions");
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent.startsWith("Show the moved sessions"))`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent.startsWith("Show the moved sessions")).click()`);
+    expect(await until(page, `document.querySelector('main button[aria-label="Remove Old analysis from the list"]')`)).toBe(true);
+    await page.eval(`document.querySelector('main button[aria-label="Remove Old analysis from the list"]').click()`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/session-remove") && JSON.parse(c.body).id === "gone-1")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json" && m.part !== "api/session-remove")`);
+  });
+
+  test("a folder with no files asks before it opens", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/suggest", reply: () => ({ body: { scanned: 0, matches: [] } }) }); window.__calls = []`);
+    await page.eval(`[...document.querySelectorAll("aside button")].find((b) => b.textContent.includes("Open a folder")).click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"] input[aria-label="Folder"]')`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Analyze this folder").click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"] [aria-label="Empty folder"]')?.textContent.includes("Cuvette found no files")`)).toBe(true);
+    expect(await page.eval(`window.__calls.some((c) => c.url.includes("api/open"))`)).toBe(false);
+    await page.eval(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Back").click()`);
+    expect(await until(page, `!document.querySelector('[role="dialog"] [aria-label="Empty folder"]')`)).toBe(true);
+    await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/suggest")`);
+  });
+
+  test("first start: a saved local model shows the next steps and the new model, also if Ollama does not run", async () => {
+    await page.eval(`(() => {
+      window.__model = "claude";
+      window.__mocks.push({ part: "api/firststart/local", reply: () => { window.__model = "ollama:qwen3:8b"; return { body: { ok: false, text: "Saved the model ollama:qwen3:8b. Ollama does not run on this computer yet.", model: "ollama:qwen3:8b" } }; } });
+      window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { needed: true, hasKey: false, model: "claude", ollama: { reachable: false, models: [] }, choices: [{ id: "claude", label: "Use Claude", help: "" }, { id: "local", label: "Use a local model", help: "" }], recommended: "qwen3:8b", sample: "/tmp/Cuvette sample", keyGuide: { title: "", intro: "", steps: [], notes: [] } } }) });
+      window.__mocks.push({ part: "api/doctor", reply: () => ({ body: { ready: true, counts: { ok: 1, missing: 0, old: 0 }, checks: [] } }) });
+      window.cuvetteApp.show("setup");
+    })()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Use a local model")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Use a local model").click()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Check Ollama again")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Save qwen3:8b").click()`);
+    expect(await until(page, `document.querySelector("main").textContent.includes("Check this computer") && document.querySelector("main").textContent.includes("Run the sample analysis")`)).toBe(true);
+    expect(await page.eval(`document.querySelector("main [role=alert]").textContent`)).toContain("Ollama does not run");
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart") && m.part !== "api/doctor")`);
+    await goPage("Analysis");
   });
 });

@@ -147,9 +147,17 @@ test("reset to default removes the value from its file and goes in the record", 
   expect(c.s.mode).toBe("watch");
 });
 
+test("a reset that leaves a value from a wider scope says that it removed the change, not that it reset to default", async () => {
+  writeJson(join(process.env.CUVETTE_HOME!, "settings.json"), { mode: "follow" });
+  writeJson(join(cwd, ".cuvette", "settings.local.json"), { mode: "teach" });
+  const c = await serve();
+  expect((await c.post("api/setting/reset", { name: "mode" })).body.text).toBe("Removed the change. Mode is now follow. The user value applies.");
+  writeJson(join(process.env.CUVETTE_HOME!, "settings.json"), {});
+});
+
 test("a row locked during a turn says why", () => {
   const html = settingsHtml({ settings: { cwd, env: {} }, busy: true });
-  expect(row(html, "model")).toContain("Model is locked until the turn ends. A change applies to the next message.");
+  expect(row(html, "model")).toContain("Model cannot change until the turn ends. A change applies to the next message.");
   expect(row(html, "model")).toMatch(/data-sv="[^"]+" disabled/);
   expect(row(html, "mode")).not.toContain("locked");
 });

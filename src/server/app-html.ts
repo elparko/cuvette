@@ -43,6 +43,8 @@ export interface Ctx {
 }
 
 const IMG = /\.(png|jpe?g|gif|webp|svg)$/i;
+const SHOWN = process.platform === "darwin" ? /\.(png|jpe?g|gif|webp|svg|tiff?)$/i : IMG;
+const OPENS = /\.(pdf|html?|txt|md|json|png|jpe?g|gif|webp|svg)$/i;
 
 export function fileUrl(c: Ctx, path: string, download = false): string {
   return `api/file?p=${encodeURIComponent(path)}&t=${encodeURIComponent(c.token)}${download ? "&download=1" : ""}`;
@@ -95,26 +97,32 @@ function preText(text: string): string {
 
 // ---------------------------------------------------------------- conversation
 
-function outputsHtml(c: Ctx, outs: { path: string; kind: string }[]): string {
+function outputsHtml(c: Ctx, outs: { path: string; kind: string; name?: string }[]): string {
   if (!outs.length) return "";
   const imgs = outs.filter((o) => o.kind === "image" || IMG.test(o.path));
   const files = outs.filter((o) => !imgs.includes(o));
   return (
-    (imgs.length ? `<div class="images">${imgs.map((o) => imageHtml(c, o.path)).join("")}</div>` : "") +
-    (files.length ? `<ul class="files">${files.map((o) => `<li>${fileLink(c, o.path)}</li>`).join("")}</ul>` : "")
+    (imgs.length ? `<div class="images">${imgs.map((o) => imageHtml(c, o.path, o.name)).join("")}</div>` : "") +
+    (files.length ? `<ul class="files">${files.map((o) => `<li>${fileLink(c, o.path, o.name)}</li>`).join("")}</ul>` : "")
   );
 }
 
-export function imageHtml(c: Ctx, path: string): string {
+const shownName = (path: string, name?: string) => {
+  const base = basename(path);
+  if (name) return name;
+  return /^[0-9a-f]{40,}\./.test(base) ? `${extname(base).slice(1).toUpperCase() || "Output"} file` : base;
+};
+
+export function imageHtml(c: Ctx, path: string, name?: string): string {
   const u = fileUrl(c, path);
-  return `<button type="button" class="thumb" data-full="${esc(u)}" title="${esc(basename(path))}"><img src="${esc(u)}&amp;w=640" alt="${esc(basename(path))}" loading="lazy" decoding="async"></button>`;
+  const label = shownName(path, name);
+  const full = /\.tiff?$/i.test(path) ? `${u}&w=2400` : u;
+  return `<button type="button" class="thumb" data-full="${esc(full)}" title="${esc(label)}"><img src="${esc(u)}&amp;w=640" alt="${esc(label)}" loading="lazy" decoding="async"></button>`;
 }
 
-export function fileLink(c: Ctx, path: string): string {
-  const name = basename(path);
-  const ext = extname(name).slice(1).toUpperCase();
-  const label = /^[0-9a-f]{40,}\./.test(name) ? `${ext || "Output"} file` : name;
-  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
+export function fileLink(c: Ctx, path: string, name?: string): string {
+  const label = shownName(path, name);
+  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name || basename(path))}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
 }
 
 // ---------------------------------------------------------------- repeated steps
@@ -195,8 +203,11 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
       const label = it.n ? `Step ${it.n}` : (it.purpose ?? it.tool.replace(/_/g, " "));
       const detail = [it.route, it.settings].filter(Boolean).join(" · ");
       const fid = fidelityLabel(it.fidelity);
+      const [first, ...rest] = it.ok ? [it.summary] : (it.error ?? it.summary).split("\n");
+      const more = rest.join("\n").replace(/^(\s*\n)+/, "").trimEnd();
+      const head = first!.replace(/Traceback \(most recent call last\):\s*$/, () => more.split("\n").pop()!.trim());
       return `<div class="step ${it.ok ? "ok" : "bad"}${it.n ? "" : " minor"}">
-<div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${shortPaths(esc(it.ok ? it.summary : (it.error ?? it.summary)))}</span></div>
+<div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${shortPaths(esc(head!))}</span></div>${more ? `<details class="errmore"><summary>Error details</summary><pre>${esc(more)}</pre></details>` : ""}
 ${it.why ? `<div class="dim">Purpose: ${esc(it.why)}</div>` : ""}${detail ? `<details class="callinfo"><summary>Settings</summary><div class="dim small">${esc(detail)}</div></details>` : ""}${fid ? `<div class="warn small">${esc(fid)}</div>` : ""}
 ${outputsHtml(c, it.outputs)}${opts.code && it.code ? `<details><summary>Code</summary><pre>${esc(it.code)}</pre></details>` : ""}</div>`;
     }
@@ -533,7 +544,7 @@ export function stepsHtml(c: Ctx): string {
   const changes = new Map(reruns(r).map((d) => [d.node, d]));
   const rewound = r.rewound();
   const main = nodes.filter((n) => steps.has(n.id));
-  if (!main.length) return `<p class="empty">No steps yet.</p>`;
+  if (!main.length) return `<p class="empty">No steps yet. The Record tab also shows the calls that failed.</p>`;
   return `<ol class="steps">${main
     .map((n) => {
       const img = n.outputs.find((o) => o.kind === "image" || IMG.test(o.path));
@@ -600,9 +611,11 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
       parts.push(`<details${s.name.toLowerCase() === "summary" ? " open" : ""}><summary>${esc(s.name)} <span class="dim small">${s.rows.length} ${s.rows.length === 1 ? "row" : "rows"}</span></summary>${wide}<div class="sheet">${table}</div>${s.rows.length > rows.length ? `<p class="dim small">The first ${rows.length} rows. The file has all rows.</p>` : ""}</details>`);
     }
   } else parts.push(`<p class="empty">No results.xlsx yet. It appears after the first analysis step.</p>`);
-  const raster = figures.filter((f) => IMG.test(f) && !(/\.svg$/i.test(f) && figures.some((g) => g !== f && g.replace(/\.[^.]+$/, "") === f.replace(/\.[^.]+$/, ""))));
+  const raster = figures.filter((f) => SHOWN.test(f) && !(/\.svg$/i.test(f) && figures.some((g) => g !== f && g.replace(/\.[^.]+$/, "") === f.replace(/\.[^.]+$/, ""))));
   if (figures.length) parts.push(`<h4>Figures</h4><div class="images">${raster.map((f) => imageHtml(c, f)).join("")}</div><ul class="files">${figures.map((f) => `<li>${fileLink(c, f)}</li>`).join("")}</ul>`);
-  if (files.length) parts.push(`<h4>Files</h4><ul class="files">${files.map((f) => `<li>${fileLink(c, f)} <span class="dim small">${esc(extname(f).slice(1))}</span></li>`).join("")}</ul>`);
+  const pictures = files.filter((f) => SHOWN.test(f));
+  const open = (f: string) => (OPENS.test(f) ? ` <a href="${esc(fileUrl(c, f))}" target="_blank" rel="noopener" aria-label="Open ${esc(basename(f))} in a new tab">Open</a>` : "");
+  if (files.length) parts.push(`<h4>Files</h4>${pictures.length ? `<div class="images">${pictures.map((f) => imageHtml(c, f)).join("")}</div>` : ""}<ul class="files">${files.map((f) => `<li>${fileLink(c, f)}${open(f)} <span class="dim small">${esc(extname(f).slice(1))}</span></li>`).join("")}</ul>`);
   parts.push(citeHtml(c));
   parts.push(`<p class="dim small">Folder: ${midPath(outDir, 40)} <button type="button" class="link" data-reveal="${esc(outDir)}">Show in folder</button></p>`);
   return parts.join("");

@@ -87,7 +87,7 @@ export function startCards(session: SessionLike, env: Record<string, string | un
 
 export const needsSetup = (session: SessionLike) => session.decisions.fields().some((f) => f.essential && !f.set);
 
-export const NO_KEY = "No Claude API key is set. Add one now, or press Esc if you use `ant auth login`.";
+export const NO_KEY = "There is no Claude API key. Add one now, or press Esc if you use `ant auth login`.";
 
 export function planIntro(session: SessionLike): string {
   return session.planFirst ? "The agent asks a few questions, proposes the metrics, and shows them on one sample. You confirm before the batch runs." : "Type /plan to get questions, proposed metrics and a demonstration before any step runs.";
@@ -155,7 +155,7 @@ export function phiView(card: Extract<Card, { t: "phi" }>) {
     lines: card.hits.map((h) => `${h.label}: ${h.masked} (${h.where})`),
     more: card.more ? `${card.more} more not shown.` : "",
     actions,
-    noLocal: card.local ? "" : "No local model is set. To add one, set local_model in /config.",
+    noLocal: card.local ? "" : "There is no local model. To add one, set local_model in /config.",
     note: "This check looks for patterns. It does not find all identifiers, and it can be wrong. Your choice applies to the rest of this session.",
   };
 }
@@ -430,7 +430,7 @@ export function numberProblem(f: DecisionFieldLike, raw: string): string | undef
 }
 
 export function fixedProblem(f: DecisionFieldLike): string | undefined {
-  return f.owner === "fixed" ? `${f.label} is fixed by the lab profile.` : undefined;
+  return f.owner === "fixed" ? `The lab profile fixes ${f.label}.` : undefined;
 }
 
 export function applySetup(session: SessionLike, values: Record<string, unknown>, profile?: string): string | undefined {
@@ -468,7 +468,7 @@ export async function saveKey(session: SessionLike, key: string, env: Record<str
   const path = saveClaudeKey(key);
   recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
   say.ok(`${r.text} Saved to ${path}.`);
-  if (env.ANTHROPIC_API_KEY) say.warn("ANTHROPIC_API_KEY is also set in this shell. The harness uses that one first.");
+  if (env.ANTHROPIC_API_KEY) say.warn("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
   return r;
 }
 

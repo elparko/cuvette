@@ -66,7 +66,7 @@ export function settingEditor(row: SettingRow): Editor {
 }
 
 export function lockText(r: SettingRow): string {
-  return `${r.def.label} is locked until the turn ends. A change applies to the next message.`;
+  return `${r.def.label} cannot change until the turn ends. A change applies to the next message.`;
 }
 
 export function scopeText(s: Scope, cwd: string): string {
@@ -151,7 +151,7 @@ export async function resetRow(ctx: SettingCtx, def: SettingDef): Promise<{ text
     const r = await resetSetting(ctx, def.name);
     const now = describe(ctx).find((x) => x.def.name === def.name);
     const from = now && now.source !== "default" && now.source !== "" ? ` The ${BADGE[now.source]!.toLowerCase()} value applies.` : "";
-    return { text: `Reset to default. ${def.label} is now ${now?.value ?? show(r.value)}.${from}`, color: "green" };
+    return { text: `${from ? "Removed the change." : "Reset to default."} ${def.label} is now ${now?.value ?? show(r.value)}.${from}`, color: "green" };
   } catch (e) {
     return { text: (e as Error).message, color: "red" };
   }
@@ -161,7 +161,7 @@ export function removeSecret(ctx: SettingCtx, def: SettingDef): { text: string; 
   const env = ctx.env ?? process.env;
   if (def.name === "claude_key" && env.ANTHROPIC_API_KEY) return { text: "ANTHROPIC_API_KEY in the shell sets the key. Remove it there.", color: "red" };
   const done = def.name === "claude_key" ? removeClaudeKey() : def.name === "elabftw_key" ? removeElabftw() : false;
-  if (!done) return { text: `${def.label} is not set.`, color: "red" };
+  if (!done) return { text: `${def.label} has no value.`, color: "red" };
   ctx.session?.record.append("setting", { name: def.name, scope: "user", change: "removed" });
   return { text: `Removed the ${def.label}.`, color: "green" };
 }

@@ -133,7 +133,7 @@ export function rerunText(session: SessionLike, states = statusOf(session)): str
   const out = states.filter((s) => !s.current);
   if (!out.length) return undefined;
   const lines = out.map((s) => `- Step ${s.step} (${s.tool}): ${s.reasons.map((r) => r.text).join(" ")}`);
-  return `These steps are out of date. Run each one again, in order, with the current decision values and the same input files:\n${lines.join("\n")}\nThen update the answer.`;
+  return `These steps are out of date. Run each step again in order. Use the current decision values and the same input files:\n${lines.join("\n")}\nThen update the answer.`;
 }
 
 export function decisionRows(session: SessionLike): string[][] {
@@ -325,7 +325,7 @@ export const commands: Command[] = [
       }
       const f = ctx.session.decisions.fields().find((x) => x.key === key);
       if (!f) return ctx.error(`No decision named ${key}. See /decisions.`);
-      if (f.owner === "fixed") return ctx.error(`${f.label} is fixed by the lab profile.`);
+      if (f.owner === "fixed") return ctx.error(`The lab profile fixes ${f.label}.`);
       let value: unknown;
       try {
         value = parseDecision(f, raw);
@@ -388,7 +388,7 @@ export const commands: Command[] = [
   {
     name: "trust",
     args: "[on|once|off]",
-    help: "Show whether this folder is trusted, and what its .ga or .cuvette folder contains. on trusts it, once trusts it for this session, off removes the trust.",
+    help: "Show the trust state of this folder and the contents of its .ga or .cuvette folder. Options: on trusts the folder, once trusts it for this session, off removes the trust.",
     async run([m], ctx) {
       const choice = { on: "trust", once: "once", off: "no" }[m ?? ""] as "trust" | "once" | "no" | undefined;
       if (m && !choice) return ctx.error("Use: /trust, /trust on, /trust once or /trust off");
@@ -545,7 +545,7 @@ export const commands: Command[] = [
   },
   {
     name: "graph",
-    help: "Show the steps as a tree. Out-of-date steps are marked.",
+    help: "Show the steps as a tree, with a mark on each out-of-date step.",
     run(_, ctx) {
       ctx.print(renderGraph(ctx.session), "Analysis graph");
     },
@@ -659,7 +659,7 @@ export const commands: Command[] = [
   {
     name: "save-method",
     args: "<name> [project]",
-    help: "Save the confirmed analysis as a method: the questions and answers, the metrics and settings, the programs and the demonstration rule. project saves it in .cuvette/methods of the project folder.",
+    help: "Save the confirmed analysis as a method. A method keeps the questions and answers, the metrics and settings, the programs and the demonstration rule. The project option saves it in .cuvette/methods of the project folder.",
     run(args, ctx) {
       const s = ctx.session;
       if (!s.saveMethod) return unavailable(ctx);
@@ -698,7 +698,7 @@ export const commands: Command[] = [
   {
     name: "export",
     args: `<${FORMATS.join("|")}> | images [pptx|pdf|both] [figures|qc|pilot|all|<glob>] [step|group|name] [1|2|4|6|9] [16:9|a4|letter]`,
-    help: "Write the record in a file format. images: put the session images in images.pptx or images.pdf, one per slide or 2, 4, 6 or 9 per page.",
+    help: "Write the record in a file format. The images option puts the session images in images.pptx or images.pdf. It puts one image on each slide, or 2, 4, 6 or 9 on each page.",
     async run([fmt, ...rest], ctx) {
       if (fmt === "images") {
         if (!ctx.session.exportImages) return unavailable(ctx);
@@ -724,7 +724,7 @@ export const commands: Command[] = [
   {
     name: "cite",
     args: "[apa|vancouver|bibtex|ris|text|programs]",
-    help: "List the programs and methods to cite for this session. bibtex, ris and text save the list in the output folder. programs shows how to cite each program.",
+    help: "List the programs and methods to cite for this session. The bibtex, ris and text options save the list in the output folder. The programs option shows how to cite each program.",
     async run(args, ctx) {
       try {
         const r = await citeCommand(args, ctx.session);
@@ -794,10 +794,10 @@ export const commands: Command[] = [
         const ws = claudeWorkspace() ? ` Workspace ID: ${claudeWorkspace()}.` : "";
         if (k.from === "env") return ctx.notice(`The key ${maskKey(k.key!)} comes from ANTHROPIC_API_KEY in this shell.${ws}`);
         if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.${ws}`);
-        return ctx.notice("No Claude API key is set. Type /key to add one.");
+        return ctx.notice("There is no Claude API key. Type /key to add one.");
       }
       if (sub === "remove") {
-        if (!removeClaudeKey()) return ctx.notice("No key was saved.");
+        if (!removeClaudeKey()) return ctx.notice("There is no saved key.");
         recordSetting(ctx.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
         return ctx.notice(`Removed the saved key from ${credentialsPath()}.`);
       }
@@ -826,7 +826,7 @@ export const commands: Command[] = [
         return ctx.notice(c ? `eLabFTW: ${c.url}, key ${maskKey(c.key)}, saved in ${credentialsPath()}.` : "eLabFTW is not set up. Type /eln setup.");
       }
       if (sub === "remove") {
-        if (!removeElabftw()) return ctx.notice("No eLabFTW key was saved.");
+        if (!removeElabftw()) return ctx.notice("There is no saved eLabFTW key.");
         recordSetting(ctx.session as unknown as SettingSession, find("elabftw_key")!, undefined, undefined, "user");
         return ctx.notice("Removed the eLabFTW address and key.");
       }
@@ -974,7 +974,7 @@ export const commands: Command[] = [
     name: "details",
     help: "Show or hide the housekeeping steps, such as file reads. Ctrl+O does the same.",
     run(_, ctx) {
-      ctx.notice(ctx.toggleDetails() ? "All steps are shown, with the housekeeping steps." : "Only the analysis steps are shown. Housekeeping steps are in one dim line.");
+      ctx.notice(ctx.toggleDetails() ? "All steps show, with the housekeeping steps." : "Only the analysis steps show. One dim line holds the housekeeping steps.");
     },
   },
   { name: "clear", help: "Clear the screen. The record stays.", run: (_, ctx) => ctx.clear() },
