@@ -245,7 +245,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const refereeCall = captured.at(-1)!;
     expect(refereeCall.url).toBe("/v1/messages");
     expect(refereeCall.body.stream).toBeUndefined();
-    expect(refereeCall.body.thinking).toEqual({ type: "adaptive", display: "summarized" });
+    expect(refereeCall.body.thinking).toEqual({ type: "adaptive", display: "omitted" });
     expect(refereeCall.body.messages[0].content).toMatch(/FINAL ANSWER/);
     const findings = s.record.entries(["finding"]).map((e) => JSON.stringify(e.data));
     expect(findings.join("\n")).toMatch(/One method only/);

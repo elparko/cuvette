@@ -242,7 +242,7 @@ export class ClaudeProvider implements Provider {
       max_tokens: 16000,
       system: [{ type: "text", text: system }],
       messages: [{ role: "user", content: text }],
-      thinking: { type: "adaptive", display: "summarized" },
+      thinking: { type: "adaptive", display: "omitted" },
       output_config: { effort: this.effort },
     };
     try {
