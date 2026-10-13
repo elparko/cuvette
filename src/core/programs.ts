@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Access } from "../adapters/access.ts";
-import { T7_ROOT } from "../adapters/blind.ts";
+import { DRIVE_ROOT } from "../adapters/blind.ts";
 import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
@@ -140,8 +140,8 @@ function installPlaces(all: Manifest[], home: string): string[] {
     for (const p of m.locate.paths) {
       const a = /^~\/\.cuvette\/([^/*]+)\//.exec(p)?.[1];
       if (a && a !== "envs") out.add(join(home, a));
-      const b = new RegExp(`^${T7_ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/tools/([^/*]+)/`).exec(p)?.[1];
-      if (b && b !== "R-library") out.add(join(T7_ROOT, "tools", b));
+      const b = DRIVE_ROOT && new RegExp(`^${DRIVE_ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/tools/([^/*]+)/`).exec(p)?.[1];
+      if (b && b !== "R-library") out.add(join(DRIVE_ROOT, "tools", b));
     }
   return [...out];
 }
@@ -153,7 +153,7 @@ export function ownedFolder(path: string, home: string, places: string[]): strin
 }
 
 export function ownedLibrary(lib: string, home: string): boolean {
-  return [join(home, "R-library"), join(T7_ROOT, "tools", "R-library")].some((d) => real(d) === real(lib));
+  return [join(home, "R-library"), ...(DRIVE_ROOT ? [join(DRIVE_ROOT, "tools", "R-library")] : [])].some((d) => real(d) === real(lib));
 }
 
 async function duSize(paths: string[]): Promise<number | undefined> {

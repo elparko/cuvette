@@ -25,7 +25,7 @@ program:
     - https://qupath.readthedocs.io/en/0.7/docs/reference/commands.html
   install: >
     Download QuPath from https://qupath.github.io and install it. On macOS without admin rights, unpack the .pkg file with pkgutil --expand-full.
-    The adapter reads the QuPath executable from QUPATH, from /Applications/QuPath-*.app, from /Volumes/T7/guided-analysis/tools/qupath/expanded on the T7 drive, or from the PATH:
+    The adapter reads the QuPath executable from QUPATH, from /Applications/QuPath-*.app, from ~/.cuvette/qupath/expanded, or from the PATH:
     export QUPATH=/Applications/QuPath-0.7.0-arm64.app/Contents/MacOS/QuPath-0.7.0-arm64
   citation:
     - text: "Bankhead, P., Loughrey, M. B., Fernández, J. A., Dombrowski, Y., McArt, D. G., Dunne, P. D., McQuaid, S., Gray, R. T., Murray, L. J., Coleman, H. G., James, J. A., Salto-Tellez, M., & Hamilton, P. W. (2017). QuPath: Open source software for digital pathology image analysis. Scientific Reports, 7(1), 16878. https://doi.org/10.1038/s41598-017-17204-5"
@@ -54,7 +54,7 @@ connection:
 locate:
   env: QUPATH
   paths:
-    - /Volumes/T7/guided-analysis/tools/qupath/expanded/QuPath-*-arm64-app.pkg/Payload/QuPath-*-arm64.app/Contents/MacOS/QuPath-*
+    - ~/.cuvette/qupath/expanded/QuPath-*-arm64-app.pkg/Payload/QuPath-*-arm64.app/Contents/MacOS/QuPath-*
     - /Applications/QuPath-*.app/Contents/MacOS/QuPath-*
     - ~/Applications/QuPath-*.app/Contents/MacOS/QuPath-*
     - /Applications/QuPath.app/Contents/MacOS/QuPath

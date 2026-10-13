@@ -23,8 +23,8 @@ program:
     - https://cran.r-project.org/package=lmerTest
   install: >
     Install R (brew install r on macOS). Then install the R packages that the scripts load (lme4, lmerTest,
-    reformulas, lattice and jsonlite) into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER,
-    /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    reformulas, lattice and jsonlite) into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER
+    or ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("lme4", "lmerTest", "reformulas", "lattice", "jsonlite"), repos = "https://cloud.r-project.org")'
   citation:
     - text: Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1–48. https://doi.org/10.18637/jss.v067.i01
@@ -75,7 +75,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER,
   ~/.cuvette/R-library. The program version in this adapter is the version of the R
   package lme4, not of R. The tools fit with lmer from lmerTest. The fixed effects and the
   random effects are the same as with lme4. lmerTest adds the p values. A fit uses no random

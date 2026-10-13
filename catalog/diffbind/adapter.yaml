@@ -24,7 +24,7 @@ program:
     - https://doi.org/10.1093/nar/gkaf018
   install: >
     Install R (brew install r on macOS). Then install the Bioconductor packages DiffBind, DESeq2, edgeR and the CRAN package jsonlite
-    into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER or
     ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("BiocManager", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install(c("DiffBind", "DESeq2", "edgeR"))'
   citation:
@@ -71,7 +71,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER,
   ~/.cuvette/R-library. The program version in this adapter is the version of the R package
   DiffBind, not of R. The count tool runs DiffBind without the blacklist and the greylist, and counts the reads without
   control subtraction. The differential tool runs DESeq2 or edgeR directly on the raw read counts, as DiffBind does.

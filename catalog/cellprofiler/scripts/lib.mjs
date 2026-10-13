@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,9 +63,9 @@ export function renderPipeline(p) {
 }
 
 export function javaHome() {
-  const t7 = "/Volumes/T7/guided-analysis/tools/cellprofiler/jre17x64";
+  const jre = join(homedir(), ".cuvette", "cellprofiler", "jre17x64");
   const found = [process.env.CELLPROFILER_JAVA_HOME, process.env.JAVA_HOME].filter(Boolean);
-  if (existsSync(t7)) for (const d of readdirSync(t7)) found.push(join(t7, d, "Contents", "Home"));
+  if (existsSync(jre)) for (const d of readdirSync(jre)) found.push(join(jre, d, "Contents", "Home"));
   return found.find((h) => existsSync(join(h, "bin", "java")) || existsSync(join(h, "bin", "java.exe")));
 }
 

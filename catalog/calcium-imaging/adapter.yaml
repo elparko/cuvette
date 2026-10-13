@@ -44,7 +44,6 @@ locate:
     - ~/.cuvette/envs/calcium-imaging/bin/python
     - ~/.cuvette/envs/calcium-imaging/Scripts/python.exe
     - ~/.guided-analysis/envs/calcium-imaging/bin/python
-    - /Volumes/ga-envs/calcium-imaging/bin/python
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import scipy, tifffile, roifile; print('calcium-imaging scipy', scipy.__version__)"]
   version_pattern: 'scipy (\S+)'

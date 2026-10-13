@@ -23,7 +23,7 @@ program:
     - https://doi.org/10.1200/JCO.2014.55.2208
   install: >
     Install R (brew install r on macOS). Then install the R packages survRM2 and jsonlite into a library folder that the adapter
-    reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    reads: CUVETTE_R_LIBS, R_LIBS_USER or ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("survRM2", "jsonlite"), repos = "https://cloud.r-project.org")'
   citation:
     - text: "Uno, H., Tian, L., Horiguchi, M., Cronin, A., Battioui, C., & Bell, J. (2022). survRM2: Comparing Restricted Mean Survival Time. R package version 1.0-4. https://doi.org/10.32614/CRAN.package.survRM2"
@@ -61,7 +61,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that exists of these:
-  CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library. The program version in this
+  CUVETTE_R_LIBS, R_LIBS_USER, ~/.cuvette/R-library. The program version in this
   adapter is the version of the R package survRM2, not of R. The tools analyze the rows that they receive. The scientist must decide
   and state the analysis population before the first run.
 

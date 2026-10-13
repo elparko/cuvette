@@ -1,11 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { ROOT } from "../root.ts";
 
 export const PAPERS_DIR = join(ROOT, "bench/papers");
-export const DEFAULT_DATA_ROOT = "/Volumes/T7/guided-analysis/data";
+export const DEFAULT_DATA_ROOT = process.env.CUVETTE_DRIVE_ROOT ? join(process.env.CUVETTE_DRIVE_ROOT, "data") : join(homedir(), ".cuvette", "cache", "bench-data");
 
 const Item = z
   .strictObject({

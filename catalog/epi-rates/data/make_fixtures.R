@@ -10,7 +10,7 @@ rates <- list(
 nchs <- do.call(rbind, lapply(names(rates), function(g) data.frame(group = g, age_group = age11, rate_per_100000 = rates[[g]], std_pop_2000 = std2000)))
 write.csv(nchs, paste0(out, "nchs_2020_age_rates.csv"), row.names = FALSE)
 
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 population <- matrix(c(230061, 329449, 114920, 39487, 14208, 3052, 72202, 326701, 208667, 83228, 28466, 5375, 15050, 175702,
   207081, 117300, 45026, 8660, 2293, 68800, 132424, 98301, 46075, 9834, 327, 30666, 123419, 149919, 104088, 34392), 6, 5)
 count <- matrix(c(107, 141, 60, 40, 39, 25, 25, 150, 110, 84, 82, 39, 3, 71, 114, 103, 108, 75, 1, 26, 64, 89, 137, 96, 0, 8, 63, 112, 262, 295), 6, 5)

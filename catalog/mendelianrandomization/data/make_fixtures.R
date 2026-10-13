@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 suppressMessages(library(MendelianRandomization))
 here <- commandArgs(trailingOnly = TRUE)[1]
 write.csv(data.frame(snp = sprintf("snp_%d", seq_along(ldlc)), beta_exposure = ldlc, se_exposure = ldlcse, beta_outcome = chdlodds, se_outcome = chdloddsse), file.path(here, "ldl_chd.csv"), row.names = FALSE)

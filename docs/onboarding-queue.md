@@ -6,8 +6,9 @@ arm64 (Apple silicon).
 
 ## Storage
 
-- Large things are on the external drive: `/Volumes/T7/guided-analysis/` with `tools/<tool>/` and
-  `data/<paper-id>/`.
+- On the computer of the author, large things are on the external drive of the author:
+  `/Volumes/T7/guided-analysis/` with `tools/<tool>/` and `data/<paper-id>/`. Other users set
+  `CUVETTE_DRIVE_ROOT` to their own folder.
 - The T7 drive uses exFAT. Symlinks work. Some Python wheels fail to install there because of
   `._` files (error: `failed to rename ... ._ttx.1`). The venvs for the tools below are in
   `~/.cuvette/envs/<tool>/`. Other venvs from the paper-preparation runs also exist in

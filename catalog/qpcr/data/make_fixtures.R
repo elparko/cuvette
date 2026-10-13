@@ -2,7 +2,7 @@
 # ct1.csv: c-myc and GAPDH Ct in brain and kidney, 6 samples each (Livak and Schmittgen 2001; Ahmed and Kim 2018, Table 2).
 # ct3.csv: c-myc and GAPDH Ct of a dilution series, 7 amounts in triplicate (Ahmed and Kim 2018, Table 1).
 # Run: Rscript data/make_fixtures.R data
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 out <- if (length(commandArgs(TRUE))) commandArgs(TRUE)[1] else "."
 f <- system.file("extdata", package = "pcr")
 ct1 <- read.csv(file.path(f, "ct1.csv"))

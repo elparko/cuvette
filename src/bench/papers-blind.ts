@@ -1,14 +1,14 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { agentRules, BLIND_REASON, decide, installRoot, T7_ROOT, pathsIn, sandboxDenials, type BlindPolicy } from "../adapters/blind.ts";
+import { agentRules, BLIND_REASON, decide, installRoot, DRIVE_ROOT, pathsIn, sandboxDenials, type BlindPolicy } from "../adapters/blind.ts";
 import { locate } from "../adapters/locate.ts";
 import { adapterDirs, loadAdapter } from "../adapters/manifest.ts";
 import type { Entry, Node } from "../core/types.ts";
 import { finalClaims } from "./papers-score.ts";
 import { dataRoot, fillPrompt, PAPERS_DIR, resolveData, type Paper } from "./papers-spec.ts";
 
-export { T7_ROOT };
+export { DRIVE_ROOT };
 export const REPO_DIR = resolve(PAPERS_DIR, "../..");
 const SYSTEM = ["/usr", "/bin", "/sbin", "/opt", "/Library", "/System", "/Applications", "/etc", "/private/etc", "/dev"];
 
@@ -78,7 +78,7 @@ export function blindPolicyFor(opts: {
 }): { allow: string[]; deny: string[]; hide: string[] } {
   const homes = harnessHomes(opts.home);
   const scratchParent = dirname(opts.scratch);
-  const t7 = existsSync(T7_ROOT) ? [join(T7_ROOT, "tools"), join(T7_ROOT, "reference")] : [];
+  const drive = DRIVE_ROOT && existsSync(DRIVE_ROOT) ? [join(DRIVE_ROOT, "tools"), join(DRIVE_ROOT, "reference")] : [];
   const claudeTmp = join("/private/tmp", `claude-${userInfo().uid}`);
   const allow = [
     ...dataFolders(opts.paper),
@@ -86,7 +86,7 @@ export function blindPolicyFor(opts: {
     ...opts.adapterRoots,
     ...opts.programs,
     ...homes.flatMap((h) => ["envs", "adapters", "R-library"].map((d) => join(h, d))),
-    join(T7_ROOT, "tools", "R-library"),
+    ...(DRIVE_ROOT ? [join(DRIVE_ROOT, "tools", "R-library")] : []),
     join(REPO_DIR, "src", "adapters"),
     join(REPO_DIR, "src", "tools", "inspect_data.py"),
     ...[REPO_DIR, ...mainCheckout(REPO_DIR)].flatMap((r) => ["node_modules", "package.json", "tsconfig.json"].map((f) => join(r, f))),
@@ -99,7 +99,7 @@ export function blindPolicyFor(opts: {
     opts.papersDir ?? PAPERS_DIR,
     ...(opts.resultsDir ? [opts.resultsDir] : []),
     /bench-runs$/.test(scratchParent) ? scratchParent : opts.scratch,
-    ...t7,
+    ...drive,
     referenceRoot(),
     ...homes,
     join(homedir(), ".claude"),

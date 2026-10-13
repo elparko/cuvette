@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 suppressMessages(library(meta))
 cat("meta", as.character(packageVersion("meta")), "\n")
 a <- c(5, 6, 3, 0, 2); n1 <- c(6, 6, 6, 6, 2); c0 <- c(6, 2, 0, 0, 5); n0 <- c(6, 6, 6, 5, 5)

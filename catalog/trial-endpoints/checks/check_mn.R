@@ -1,4 +1,4 @@
-.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+.libPaths(c(Sys.getenv("CUVETTE_R_LIBS", file.path(Sys.getenv("HOME"), ".cuvette", "R-library")), .libPaths()))
 suppressMessages({ library(PropCIs); library(ratesci) })
 cat("PropCIs", as.character(packageVersion("PropCIs")), "ratesci", as.character(packageVersion("ratesci")), "\n")
 for (cc in list(c(56, 70, 48, 80), c(71, 152, 84, 150), c(30, 200, 36, 200))) {

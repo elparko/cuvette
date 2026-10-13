@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { KnownAnswerTest, LoadedAdapter } from "../adapters/manifest.ts";
@@ -120,8 +120,10 @@ function makeContext(workDir: string, sessionDir: string, signal: AbortSignal, b
 
 const OFFLINE_CODES = new Set([6, 7, 28, 35, 56]);
 
+const present = (p: string) => existsSync(p) && (!statSync(p).isDirectory() || readdirSync(p).length > 0);
+
 export function fetchData(test: KnownAnswerTest, root: string, timeoutMs = 1_800_000): Promise<{ skip?: string; error?: string }> {
-  if (test.data.length && test.data.every((d) => existsSync(join(root, d)))) return Promise.resolve({});
+  if (test.data.length && test.data.every((d) => present(join(root, d)))) return Promise.resolve({});
   const script = join(root, test.fetch);
   if (!existsSync(script)) return Promise.resolve({ error: `the fetch script ${test.fetch} does not exist` });
   return new Promise((done) => {
@@ -132,7 +134,7 @@ export function fetchData(test: KnownAnswerTest, root: string, timeoutMs = 1_800
         if (OFFLINE_CODES.has(code)) return done({ skip: `the test data is not in the repository and ${test.fetch} could not download it (no network, exit code ${code}). Connect to the network and run the test again` });
         return done({ error: `${test.fetch} failed with exit code ${code}${last ? `: ${last}` : ""}` });
       }
-      const missing = test.data.filter((d) => !existsSync(join(root, d)));
+      const missing = test.data.filter((d) => !present(join(root, d)));
       done(missing.length ? { error: `${test.fetch} finished but did not make ${missing.join(", ")}` } : {});
     });
   });

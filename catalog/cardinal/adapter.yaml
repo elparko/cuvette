@@ -24,7 +24,7 @@ program:
     - https://doi.org/10.1093/bioinformatics/btv146
   install: >
     Install R (brew install r on macOS). Then install the Bioconductor package Cardinal and jsonlite into a library folder
-    that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER or ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages("BiocManager", repos = "https://cloud.r-project.org"); BiocManager::install(c("Cardinal", "jsonlite"))'
   citation:
     - text: "Bemis, K. A., Föll, M. C., Guo, D., Lakkimsetty, S. S., & Vitek, O. (2023). Cardinal v.3: a versatile open-source software for mass spectrometry imaging analysis. Nature Methods, 20(12), 1883–1886. https://doi.org/10.1038/s41592-023-02070-z"
@@ -75,7 +75,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER,
   ~/.cuvette/R-library. It sets R_LIBS_USER to that folder. The program version in
   this adapter is the version of the R package Cardinal, not of R.
 

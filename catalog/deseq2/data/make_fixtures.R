@@ -3,7 +3,7 @@
 # Needs the R packages DESeq2, tximport, rhdf5 and airway (for the gse subset).
 # The transcript files are synthetic. The gse subset comes from the airway package (LGPL).
 out <- commandArgs(trailingOnly = TRUE)[1]
-libs <- c(Sys.getenv("GA_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-airway", "/Volumes/T7/guided-analysis/tools/R-library")
+libs <- c(Sys.getenv("CUVETTE_R_LIBS"), Sys.getenv("GA_R_LIBS"), Sys.getenv("R_LIBS_USER"), file.path(Sys.getenv("HOME"), ".cuvette", "R-library"))
 .libPaths(c(libs[nzchar(libs) & dir.exists(libs)], .libPaths()))
 suppressPackageStartupMessages({ library(DESeq2); library(tximport); library(airway) })
 

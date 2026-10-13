@@ -23,7 +23,7 @@ program:
     - https://cran.r-project.org/web/packages/pROC/pROC.pdf
   install: >
     Install R (brew install r on macOS). Then install pROC and jsonlite into a library folder that the adapter reads:
-    CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    CUVETTE_R_LIBS, R_LIBS_USER or ~/.cuvette/R-library.
     mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("pROC", "jsonlite"), repos = "https://cloud.r-project.org")'
   citation:
     - text: "Robin X, Turck N, Hainard A, Tiberti N, Lisacek F, Sanchez J-C, Müller M. pROC: an open-source package for R and S+ to analyze and compare ROC curves. BMC Bioinformatics 12, 77 (2011)."
@@ -50,7 +50,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that exists
-  of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library. The
+  of these: CUVETTE_R_LIBS, R_LIBS_USER, ~/.cuvette/R-library. The
   program version in this adapter is the version of the R package pROC, not of R. Each tool states the positive class
   and the direction. A test is positive when the predictor is at or above the threshold (direction higher) or at or
   below it (direction lower).

@@ -25,7 +25,7 @@ program:
     - https://doi.org/10.1038/nmeth.3959
   install: >
     The OpenMS TOPP tools have no Homebrew formula. Install the bioconda package openms with micromamba into
-    /Volumes/T7/guided-analysis/tools/openms/env or ~/.cuvette/openms/env. The adapter finds FileInfo in env/bin
+    ~/.cuvette/openms/env. The adapter finds FileInfo in env/bin
     and runs the other TOPP tools from the same folder. Set OPENMS_FILEINFO to the FileInfo path for another location.
     micromamba create -y -p ~/.cuvette/openms/env -c conda-forge -c bioconda openms
   citation:
@@ -63,7 +63,6 @@ connection:
 locate:
   env: OPENMS_FILEINFO
   paths:
-    - /Volumes/T7/guided-analysis/tools/openms/env/bin/FileInfo
     - ~/.cuvette/openms/env/bin/FileInfo
     - /opt/homebrew/bin/FileInfo
     - /usr/local/bin/FileInfo

@@ -13,7 +13,7 @@ export interface BlindPolicy {
 type Rules = Pick<BlindPolicy, "allow" | "deny">;
 
 export const BLIND_REASON = "blind mode";
-export const T7_ROOT = "/Volumes/T7/guided-analysis";
+export const DRIVE_ROOT = process.env.CUVETTE_DRIVE_ROOT || "";
 
 let active: BlindPolicy | undefined;
 
@@ -29,9 +29,9 @@ export function setBlindPolicy(p: { allow: string[]; deny: string[]; hide?: stri
 }
 
 export function installRoot(path: string): string[] {
-  const tools = join(T7_ROOT, "tools");
+  const tools = DRIVE_ROOT && join(DRIVE_ROOT, "tools");
   return [path, canonical(path)].map((p) => {
-    const rel = relative(tools, p);
+    const rel = tools && relative(tools, p);
     if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return join(tools, rel.split(sep)[0]);
     const env = /^(.*\/envs\/[^/]+)\/bin\//.exec(p);
     if (env) return env[1];

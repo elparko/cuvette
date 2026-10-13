@@ -70,6 +70,7 @@ export function makeSanitizer(run?: { dir?: string }): (s: string) => string {
   const host = hostname();
   rules.push(
     [dataRoot(), "{data}"],
+    // Old run records name the data folder on the drive of the author.
     ["/Volumes/T7/guided-analysis/data", "{data}"],
     [/\/Volumes\/[^/\s"'`]+\/guided-analysis\/tools\/bench-runs/g, "{runs}"],
     [/\/Volumes\/[^/\s"'`]+(\/guided-analysis)?/g, "{other volume}"],

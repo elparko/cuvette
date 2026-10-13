@@ -384,8 +384,9 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 `examples/adapters/` holds three small worked examples (a command-line tool, a Python module,
 pandoc). Every catalog adapter has status `draft`: approve each one with
 `node bin/cuvette.js adapter approve <name>` after you read it. The Python adapters use virtual
-environments in `~/.cuvette/envs/`; large programs and paper data are on the T7 drive
-(`/Volumes/T7/guided-analysis/`). See `docs/onboarding-queue.md`. The `run_script` tool uses
+environments in `~/.cuvette/envs/`. The R adapters read the R library in `CUVETTE_R_LIBS`,
+`R_LIBS_USER` or `~/.cuvette/R-library`. Test data that a `fetch.sh` script downloads goes to
+`~/.cuvette/cache/data/`. See `docs/onboarding-queue.md`. The `run_script` tool uses
 `~/.cuvette/envs/science`. Its packages are in `src/tools/science-requirements.txt`.
 
 New program: `node bin/cuvette.js onboard <program> --model claude`. The agent finds the program,

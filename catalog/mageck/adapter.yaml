@@ -26,8 +26,7 @@ program:
     Make a Python 3.12 environment with numpy 1.26 and scipy 1.13. Download MAGeCK 0.5.9.5 from the project page
     (https://sourceforge.net/projects/mageck/files/0.5/). Build the RRA program with make in the folder rra. Copy the
     folder mageck into the site-packages folder of the environment, and copy bin/RRA and bin/mageck into the bin folder
-    of the environment. The adapter reads CUVETTE_MAGECK_PYTHON, then ~/.cuvette/envs/mageck/bin/python, then
-    /Volumes/T7/guided-analysis/tools/crispr-genetics/mageck-env/bin/python.
+    of the environment. The adapter reads CUVETTE_MAGECK_PYTHON, then ~/.cuvette/envs/mageck/bin/python.
   citation:
     - text: "Li, W., Xu, H., Xiao, T., Cong, L., Love, M. I., Zhang, F., Irizarry, R. A., Liu, J. S., Brown, M., & Liu, X. S. (2014). MAGeCK enables robust identification of essential genes from genome-scale CRISPR/Cas9 knockout screens. Genome Biology, 15(12), 554. https://doi.org/10.1186/s13059-014-0554-4"
       doi: 10.1186/s13059-014-0554-4
@@ -65,7 +64,6 @@ locate:
   env: CUVETTE_MAGECK_PYTHON
   paths:
     - ~/.cuvette/envs/mageck/bin/python
-    - /Volumes/T7/guided-analysis/tools/crispr-genetics/mageck-env/bin/python
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "from mageck.version import __version__; print('mageck', __version__)"]
   version_pattern: 'mageck (\S+)'

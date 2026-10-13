@@ -25,8 +25,8 @@ program:
     - https://bioconductor.org/packages/release/bioc/vignettes/flowCore/inst/doc/HowTo-flowCore.pdf
   install: >
     Install R (brew install r on macOS). Then install FlowSOM, flowCore, diffcyt, SummarizedExperiment, lme4 and
-    jsonlite from CRAN and Bioconductor into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER,
-    /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    jsonlite from CRAN and Bioconductor into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER
+    or ~/.cuvette/R-library.
     Rscript -e 'install.packages("BiocManager"); BiocManager::install(c("FlowSOM", "flowCore", "diffcyt", "SummarizedExperiment"), lib = "~/.cuvette/R-library")'
   citation:
     - text: "Van Gassen, S., Callebaut, B., Van Helden, M. J., Lambrecht, B. N., Demeester, P., Dhaene, T., & Saeys, Y. (2015). FlowSOM: Using self-organizing maps for visualization and interpretation of cytometry data. Cytometry Part A, 87(7), 636-645. https://doi.org/10.1002/cyto.a.22625"
@@ -88,8 +88,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER,
-  /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library. The program version in this
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, ~/.cuvette/R-library. The program version in this
   adapter is the version of the R package FlowSOM, not of R. The arcsinh transform runs inside cluster_cells.
   The tool never changes the FCS files.
 
