@@ -160,7 +160,7 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const r = at >= start && at < end ? at : -1;
   const old = messages.slice(start, end).filter((_, i) => i + start !== r);
   if (!old.length) return null;
-  const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).replace(/\n## Current plan\n[\s\S]*$/, "").trim() : "";
+  const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).replace(/\n## (Current plan|Folders)\n[\s\S]*$/, "").trim() : "";
   const room = Math.max(4000, Math.floor(contextWindow * 3.5 * 0.6) - SUMMARY_SYSTEM.length - prev.length);
   const all = transcriptText(old);
   const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${tailText(all, room)}` : all;

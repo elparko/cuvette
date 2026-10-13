@@ -70,6 +70,17 @@ test("a second summary updates the first one", async () => {
   expect(input).not.toContain("Measure the cells in each file.");
 });
 
+test("a second summary does not get the folders or the plan of the first summary: the session adds them again", async () => {
+  for (const tail of ["\n## Folders\nFolders of this session. The project folder is /p.", "\n## Current plan\n1. [todo] Count\n## Folders\nFolders of this session. The project folder is /p."]) {
+    const h = [summaryMessage(`## Question\nOld question.${tail}`), ...oneLongTurn(6)];
+    let input = "";
+    const provider = new FakeProvider({ steps: [], complete: "new" });
+    (provider as { complete: (s: string, t: string) => Promise<string> }).complete = async (_s, text) => ((input = text), "new");
+    await summarizeOld(h, provider, 10, undefined, h[1]);
+    expect(input).toMatch(/^Previous summary:\n## Question\nOld question\.\n\nOlder messages:\n/);
+  }
+});
+
 test("nothing to summarize when the history is only the request and the recent window", async () => {
   const provider = new FakeProvider({ steps: [], complete: "x" });
   const h = oneLongTurn(2);

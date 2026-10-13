@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, uptime } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Access } from "../adapters/access.ts";
@@ -538,13 +538,15 @@ function runFiles(home: string, plan: Plan): string[] {
 
 export function runningText(home: string, plan: Plan): string | undefined {
   for (const f of runFiles(home, plan)) {
-    let other: { pid?: number; action?: string; name?: string } = {};
+    let other: { pid?: number; action?: string; name?: string; started?: string } = {};
     try {
       other = JSON.parse(readFileSync(f, "utf8"));
     } catch {
       continue;
     }
-    if (other.pid && pidAlive(other.pid)) return `${other.name ?? plan.name}: an ${other.action === "update" ? "update" : "install"} runs now. Wait for it to end, or stop it. Nothing changed.`;
+    // After a restart of the computer, a new process can have the process ID of a lock file from before the restart.
+    const beforeBoot = Date.parse(other.started ?? "") < Date.now() - uptime() * 1000 - 60_000;
+    if (other.pid && !beforeBoot && pidAlive(other.pid)) return `${other.name ?? plan.name}: an ${other.action === "update" ? "update" : "install"} runs now. Wait for it to end, or stop it. Nothing changed.`;
   }
   return undefined;
 }

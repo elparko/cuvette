@@ -288,6 +288,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     done?: { ok: boolean; text: string };
     subs: Set<ServerResponse>;
     abort: AbortController;
+    ended?: Promise<unknown>;
   }
   const jobs = new Map<string, Job>();
   const runningJob = (name: string, command?: string) => [...jobs].find(([, j]) => !j.done && (j.key === name || (!!command && j.command === command)));
@@ -486,7 +487,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         if (job.lines.length > JOB_LINES) job.lines.splice(0, job.lines.length - JOB_LINES);
         jobSend(job, { line });
       };
-      void runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal }).then((d) => {
+      job.ended = runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal }).then((d) => {
         job.done = { ok: d.ok, text: d.text };
         jobSend(job, { done: true, ...job.done });
         for (const x of job.subs) x.end();
@@ -589,6 +590,10 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     token,
     async close() {
       clearInterval(beat);
+      // An install runs in its own process group, so Ctrl+C in the terminal does not stop it. Stop it here, and let it release its lock.
+      const open = [...jobs.values()].filter((j) => !j.done);
+      for (const j of open) j.abort.abort();
+      if (open.length) await Promise.race([Promise.all(open.map((j) => j.ended?.catch(() => {}))), new Promise((r) => setTimeout(r, 6000).unref())]);
       await detach();
       for (const c of idle) c.end();
       server.close();

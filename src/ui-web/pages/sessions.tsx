@@ -81,7 +81,7 @@ const STATUS_TONE: Record<string, "mag" | "info" | "ok" | "default"> = { "waitin
 export function SessionGrid({ list, onOpen, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; compact?: boolean; label?: string }) {
   const rove = useRoving(list.filter((s) => !s.moved).map((s) => s.id));
   return (
-    <ul aria-label={label} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
+    <ul aria-label={label} ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
       {list.map((s) => (
         <li key={s.id}>
           <button

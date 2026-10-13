@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir, uptime } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { accessOf, codeTools, isCodeTool, saveAccess } from "../src/adapters/access.ts";
@@ -463,5 +463,32 @@ describe("a long install: stop, password, and a second action at the same time",
     writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: 999999, action: "update", name: "zeta" }));
     expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: true });
     expect(exec).toHaveBeenCalledTimes(1);
+  });
+
+  test("a lock file from before a restart of the computer does not block, also if a new process has its process ID", async () => {
+    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    mkdirSync(join(home, "programs-running"), { recursive: true });
+    const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();
+    writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: process.ppid, action: "install", name: "zeta", started: before }));
+    const exec = vi.fn(async () => 0);
+    expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: true });
+    writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: process.ppid, action: "install", name: "zeta", started: new Date().toISOString() }));
+    expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: false });
+    expect(exec).toHaveBeenCalledTimes(1);
+  });
+
+  test("closing the app (Ctrl+C in the terminal) stops a running install and removes its lock", async () => {
+    let stopped = false;
+    const { post } = await server(async (_c, line, signal) => {
+      const code = await waitAbort(line, signal);
+      stopped = true;
+      return code;
+    });
+    await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    await vi.waitFor(() => expect(readdirSync(join(home, "programs-running"))).toContain("zeta.json"));
+    await app!.close();
+    app = undefined;
+    expect(stopped).toBe(true);
+    expect(readdirSync(join(home, "programs-running"))).not.toContain("zeta.json");
   });
 });

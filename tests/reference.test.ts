@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -104,6 +104,8 @@ test("a second search reads the folders again only after they change, so a paren
   const proj = join(root, "proj");
   mkdirSync(join(proj, "sub"), { recursive: true });
   writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,count\nwell_a,3\n");
+  const old = new Date(Date.now() - 60_000);
+  for (const d of [root, proj, join(proj, "sub"), join(proj, "sub", "old_counts.csv")]) utimesSync(d, old, old);
   const t0 = performance.now();
   expect(findReferences([proj, root], ["counts"]).map((c) => c.path)).toEqual([join(proj, "sub", "old_counts.csv")]);
   const first = performance.now() - t0;
@@ -115,4 +117,14 @@ test("a second search reads the folders again only after they change, so a paren
   const again = findReferences([proj, root], ["counts", "area"]);
   expect(again.map((c) => c.path).sort()).toEqual([join(proj, "sub", "old_counts.csv"), join(root, "counts_summary.csv")].sort());
   expect(again.find((c) => c.path.endsWith("old_counts.csv"))!.columns).toEqual(["sample", "area", "count"]);
+});
+
+test("a file added in the same step of the modification time is found: a folder that changed in the last seconds is not cached", () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-refracy-"));
+  writeFileSync(join(root, "a_counts.csv"), "sample,count\nwell_a,3\n");
+  const was = statSync(root).mtime;
+  expect(findReferences([root], ["counts"]).map((c) => c.path)).toEqual([join(root, "a_counts.csv")]);
+  writeFileSync(join(root, "b_counts.csv"), "sample,count\nwell_b,4\n");
+  utimesSync(root, was, was);
+  expect(findReferences([root], ["counts"]).map((c) => c.path).sort()).toEqual([join(root, "a_counts.csv"), join(root, "b_counts.csv")]);
 });
