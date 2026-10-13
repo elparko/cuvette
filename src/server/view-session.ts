@@ -64,7 +64,7 @@ const session: WindowSession = {
   busy: false,
   mode: "watch",
   answer: async () => {},
-  send: async () => "This window is read-only.",
+  send: async () => "This window cannot send messages.",
   interrupt: () => {},
   respondPermission: () => {},
   followDone: async () => {},

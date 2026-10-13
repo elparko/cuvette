@@ -523,7 +523,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
           )}
           {status.usage && (
             <Tooltip content={status.usageLong}>
-              <Badge className="min-w-0 truncate tabular-nums max-sm:hidden">{status.usage}</Badge>
+              <Badge className="min-w-0 truncate tabular-nums max-lg:hidden">{status.usage}</Badge>
             </Tooltip>
           )}
           <ModelMenu model={status.model ?? session.model} busy={busy} openSettings={() => ctx.go("settings")} />
@@ -549,8 +549,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             <DropdownMenuContent align="end" className="max-w-80">
               {status.usage && (
                 <>
-                  <DropdownMenuLabel className="font-normal text-muted-foreground sm:hidden">{status.usage}</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="sm:hidden" />
+                  <DropdownMenuLabel className="font-normal text-muted-foreground lg:hidden">{status.usage}</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="lg:hidden" />
                 </>
               )}
               {session.programs.length > 0 && (

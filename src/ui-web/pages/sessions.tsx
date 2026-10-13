@@ -78,12 +78,12 @@ export type Sessions = ReturnType<typeof useSessions>;
 
 const STATUS_TONE: Record<string, "mag" | "info" | "ok" | "default"> = { "waiting for you": "mag", running: "info", answered: "ok" };
 
-export function SessionGrid({ list, onOpen, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; compact?: boolean; label?: string }) {
+export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; onRemove?: (id: string) => void; compact?: boolean; label?: string }) {
   const rove = useRoving(list.filter((s) => !s.moved).map((s) => s.id));
   return (
     <ul aria-label={label} ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
       {list.map((s) => (
-        <li key={s.id}>
+        <li key={s.id} className="flex flex-col gap-1">
           <button
             type="button"
             data-rove={s.id}
@@ -110,6 +110,11 @@ export function SessionGrid({ list, onOpen, compact, label = "Sessions" }: { lis
               </span>
             </div>
           </button>
+          {s.moved && onRemove && (
+            <button type="button" onClick={() => onRemove(s.id)} className="self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={`Remove ${s.title} from the list`}>
+              Remove from the list
+            </button>
+          )}
         </li>
       ))}
     </ul>

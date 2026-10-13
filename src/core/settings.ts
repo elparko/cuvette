@@ -603,7 +603,7 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   if (name === "folder_trust") return changeTrust(ctx, raw);
   if (d.secret || !d.scopes.length) throw new Error(`${d.label} cannot change here. ${d.help}`);
   if (!d.scopes.includes(scope)) throw new Error(`${d.label} can be saved only in: ${d.scopes.map(scopeLabel).join(", ")}.`);
-  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
+  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} cannot change until the turn ends.`);
   if (name === "output_folder" && (typeof raw !== "string" || !raw.trim())) throw new Error(`${d.label} must be a folder: a name in the project folder, such as cuvette, or an absolute path.`);
   const value = parseValue(d, raw);
   const old = name === "details" || d.write ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
@@ -646,7 +646,7 @@ export function canReset(r: { def: SettingDef; source: Source; locked?: boolean 
 export async function resetSetting(ctx: SettingCtx, name: string): Promise<{ old: unknown; value: unknown; from: Scope }> {
   const d = find(name);
   if (!d) throw new Error(`No setting named ${name}.`);
-  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
+  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} cannot change until the turn ends.`);
   const now = resolve(d, ctx);
   if (!canReset({ def: d, source: now.source })) throw new Error(`${d.label} has no saved value to reset.`);
   if (d.name === "details") {

@@ -44,7 +44,7 @@ export function keyApiProblem(status: number | undefined, message = ""): string 
   if (/credit balance|insufficient|purchase credits|billing/i.test(message)) {
     return `The Claude account has no credit left. Add credit at ${BILLING_URL}, then try again. A Claude.ai Pro or Max plan does not pay for the API.`;
   }
-  if (status === 401) return `The Claude API rejected this key (HTTP 401). The key is wrong, or it was deleted. Copy the key again, or create a new key at ${KEYS_URL}.`;
+  if (status === 401) return `The Claude API rejected this key (HTTP 401). The key is wrong, or someone deleted it. Copy the key again, or create a new key at ${KEYS_URL}.`;
   if (status === 402 || status === 403) {
     return `The Claude API refused this key (HTTP ${status}). The account probably has no credit. Add credit at ${BILLING_URL}, then try again. If credit is there, create a new key at ${KEYS_URL}.`;
   }

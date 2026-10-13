@@ -487,9 +487,9 @@ async function main() {
       if (a1 === "status") {
         const k = cred.claudeKey();
         const ws = cred.claudeWorkspace();
-        return console.log((k.from === "none" ? "No Claude API key is set." : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`) + (ws ? `\nWorkspace ID: ${ws}` : ""));
+        return console.log((k.from === "none" ? "There is no Claude API key." : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`) + (ws ? `\nWorkspace ID: ${ws}` : ""));
       }
-      if (a1 === "remove") return console.log(cred.removeClaudeKey() ? `Removed the key from ${cred.credentialsPath()}.` : "No key was saved.");
+      if (a1 === "remove") return console.log(cred.removeClaudeKey() ? `Removed the key from ${cred.credentialsPath()}.` : "There is no saved key.");
       if (a1 === "workspace") {
         cred.saveClaudeWorkspace(a2 ?? "");
         return console.log(a2 ? `Saved the workspace ID ${a2}. Each request now sends it.` : "Removed the workspace ID.");
@@ -517,7 +517,7 @@ async function main() {
         const c = cred.elabftwConfig();
         return console.log(c ? `${c.url}\nKey ${cred.maskKey(c.key)} in ${cred.credentialsPath()}` : "eLabFTW is not set up.");
       }
-      if (a1 === "remove") return console.log(cred.removeElabftw() ? "Removed the eLabFTW address and key." : "No eLabFTW key was saved.");
+      if (a1 === "remove") return console.log(cred.removeElabftw() ? "Removed the eLabFTW address and key." : "There is no saved eLabFTW key.");
       if (a1 === "setup") {
         const url = (str(o.url) ?? (await ask("eLabFTW address (https://...): "))).trim();
         const key = (await readSecret("eLabFTW API key: ")).trim();

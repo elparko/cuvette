@@ -133,7 +133,7 @@ test("bad values, read-only rows, scopes and locked rows are refused", async () 
   await expect(changeSetting(ctx, "output_folder", "out", "session")).rejects.toThrow(/only in: user settings, project settings/);
   await expect(changeSetting(ctx, "budgetUsd", "50", "project")).rejects.toThrow(/only in: user settings/);
   s.busy = true;
-  await expect(changeSetting(ctx, "model", "claude:claude-haiku-5-5", "session")).rejects.toThrow(/locked until the turn ends/);
+  await expect(changeSetting(ctx, "model", "claude:claude-haiku-5-5", "session")).rejects.toThrow(/cannot change until the turn ends/);
   await changeSetting(ctx, "mode", "plan", "session");
   expect(events).toHaveLength(1);
 });

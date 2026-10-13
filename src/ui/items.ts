@@ -201,7 +201,7 @@ export class Mapper {
           ? line("⚠", "Bypass permissions is on. The agent runs commands and writes files without asking.", "yellow")
           : line("▸", "Bypass permissions is off. Tool calls that need permission show a card again.", "cyan");
       case "compaction":
-        return line("▸", "Older messages were summarized to save space.", undefined, true);
+        return line("▸", "Cuvette summarized the older messages to save space.", undefined, true);
       case "rerun":
         return [{ key, t: "block", title: rerunTitle(d as unknown as RerunData), text: rerunBody(d as unknown as RerunData) }];
       case "environment": {

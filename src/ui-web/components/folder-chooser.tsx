@@ -127,6 +127,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
             {d.path !== d.home && row("home", <HomeIcon className="size-4" />, "Home folder", d.home)}
             {d.dirs.slice(0, 300).map((n) => row("d" + n, <FolderIcon className="size-4" />, n, d.path.replace(/\/$/, "") + "/" + n))}
             {!d.dirs.length && <li className="px-2.5 py-2 text-sm text-muted-foreground">No folders here.</li>}
+            {d.dirs.length > 300 && <li className="px-2.5 py-2 text-sm text-muted-foreground">The list shows 300 of {d.dirs.length} folders. Type the path of a folder that is not in the list.</li>}
           </ul>
           {d.recent.length > 0 && (
             <>

@@ -39,8 +39,8 @@ export function useFolderPick(onOpened: () => void) {
     setBusy(true);
     setMsg("");
     try {
-      const r = await call<{ matches: Suggestion[] }>("api/suggest?p=" + encodeURIComponent(folder));
-      if (r.matches.length) {
+      const r = await call<{ scanned: number; matches: Suggestion[] }>("api/suggest?p=" + encodeURIComponent(folder));
+      if (r.matches.length || r.scanned === 0) {
         setPending({ folder, matches: r.matches });
         setBusy(false);
         return;
@@ -57,6 +57,20 @@ export function useFolderPick(onOpened: () => void) {
 export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending; busy: boolean; open: (folder: string, adapter?: string) => void; cancel: () => void }) {
   const [best, ...rest] = pending.matches;
   const name = pending.folder.split("/").filter(Boolean).pop() || pending.folder;
+  if (!best)
+    return (
+      <div className="flex w-full flex-col gap-3 rounded-xl border bg-card p-4" role="group" aria-label="Empty folder">
+        <p className="text-sm">Cuvette found no files in {name}. Choose the folder that holds your data, or open this folder to add files later.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={busy} onClick={cancel}>
+            Back
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={() => open(pending.folder)}>
+            Open the empty folder
+          </Button>
+        </div>
+      </div>
+    );
   return (
     <div className="flex w-full flex-col gap-3 rounded-xl border bg-card p-4" role="group" aria-label="Suggested program">
       <div className="flex items-center gap-2 text-sm font-medium">

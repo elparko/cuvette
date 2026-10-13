@@ -124,13 +124,20 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
   const [confirm, setConfirm] = useState("");
   const [sure, setSure] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [epoch, setEpoch] = useState(0);
   const id = `sl-${r.name}`;
   const dis = r.locked;
   const keyed = useRef(false);
+  const cancel = () => {
+    setPending(null);
+    setOther(false);
+    setDraft(r.value === "not set" ? "" : r.value);
+    setEpoch((n) => n + 1);
+  };
   const onRadioKey = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Escape" && pending !== null) {
       e.preventDefault();
-      return setPending(null);
+      return cancel();
     }
     if (radioKeys(e)) keyed.current = true;
   };
@@ -233,7 +240,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
               </button>
             ))}
           </div>
-          {r.free && <Input placeholder="Other model, for example ollama:qwen3:8b" aria-label={`Other value for ${r.label}`} disabled={dis} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.value.trim() ? ask(e.currentTarget.value.trim()) : undefined)} onBlur={(e) => e.currentTarget.value.trim() && ask(e.currentTarget.value.trim())} />}
+          {r.free && <Input key={epoch} placeholder="Other model, for example ollama:qwen3:8b" aria-label={`Other value for ${r.label}`} disabled={dis} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.value.trim() ? ask(e.currentTarget.value.trim()) : undefined)} onBlur={(e) => e.currentTarget.value.trim() && ask(e.currentTarget.value.trim())} />}
         </div>
       );
       break;
@@ -269,7 +276,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
               step="any"
               min={r.min}
               defaultValue={num}
-              key={num}
+              key={`${num}-${epoch}`}
               placeholder="No limit"
               aria-labelledby={id}
               disabled={env || dis}
@@ -428,7 +435,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
-              setPending(null);
+              cancel();
             }
           }}
         >
@@ -438,7 +445,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
               {s.label}
             </Button>
           ))}
-          <Button size="sm" variant="ghost" onClick={() => setPending(null)}>
+          <Button size="sm" variant="ghost" onClick={cancel}>
             Cancel
           </Button>
         </div>

@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
@@ -128,6 +128,19 @@ function send(res: ServerResponse, status: number, body: unknown, type = "applic
   res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
+
+export const attachment = (name: string) => `attachment; filename="${name.replace(/[^\x20-\x7e]|["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name.replace(/[\ud800-\udfff]/gu, "_")).replace(/['()*]/g, (ch) => "%" + ch.charCodeAt(0).toString(16).toUpperCase())}`;
+
+const readable = (dir: string) => {
+  try {
+    accessSync(dir, constants.R_OK | constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const cannotRead = (dir: string) => `Cuvette cannot read the folder ${dir}. Give your user read access to it, or choose another folder.`;
 
 const inside = (root: string, p: string) => {
   const r = relative(resolve(root), resolve(p));
@@ -371,13 +384,16 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       let dirs: string[] = [];
       try {
         dirs = readdirSync(at, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name).sort((a, b) => a.localeCompare(b));
-      } catch {}
+      } catch {
+        return send(res, 403, { error: cannotRead(at) });
+      }
       const recent = [...new Set(listSessions().map((s) => s.cwd).filter((x) => x && existsSync(x)))].slice(0, 8);
       return send(res, 200, { path: at, parent: dirname(at) === at ? null : dirname(at), dirs, recent, home: homedir() });
     }
     if (get && p === "/api/suggest") {
       const at = resolve((url.searchParams.get("p") || "").replace(/^~(?=\/|$)/, homedir()));
       if (!existsSync(at) || !statSync(at).isDirectory()) return send(res, 404, { error: `No folder ${at}` });
+      if (!readable(at)) return send(res, 403, { error: cannotRead(at) });
       return send(res, 200, suggestPrograms(at, adapterIndex(at)));
     }
     if (get && p === "/api/file") {
@@ -386,7 +402,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const w = Number(url.searchParams.get("w"));
       const thumb = w > 0 && /\.(png|jpe?g|gif|webp|tiff?)$/i.test(f) ? await scaledCopy(f, Math.min(w, 4000), "jpeg") : null;
       const headers: Record<string, string> = { "content-type": thumb ? "image/jpeg" : (TYPES[extname(f).toLowerCase()] ?? "application/octet-stream"), "cache-control": "no-store", ...FILE_HEADERS };
-      if (url.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${basename(f).replace(/["\\\r\n]/g, "_")}"`;
+      if (url.searchParams.get("download")) headers["content-disposition"] = attachment(basename(f));
       return pipeFile(res, thumb ?? f, headers);
     }
     if (get && p === "/api/tab") {
@@ -413,6 +429,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       else if (typeof body.folder === "string" && body.folder.trim()) {
         const f = resolve(body.folder.trim().replace(/^~(?=\/|$)/, homedir()));
         if (!existsSync(f) || !statSync(f).isDirectory()) return send(res, 404, { error: `No folder ${f}` });
+        if (!readable(f)) return send(res, 403, { error: cannotRead(f) });
         const adapter = typeof body.adapter === "string" && body.adapter ? body.adapter : undefined;
         void open({ folder: f, adapter });
       } else return send(res, 400, { error: "Give a folder or a session." });

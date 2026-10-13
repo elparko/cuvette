@@ -113,3 +113,14 @@ test("csv files do not count toward a specific adapter", () => {
   expect(r.matches[0].adapter).toBe("patch-clamp");
   expect(r.matches.every((m) => !m.table)).toBe(true);
 });
+
+test("in a folder with more files than the scan reads, the counts say at least", () => {
+  const d = folder();
+  for (let i = 0; i < 450; i++) put(d, `t${String(i).padStart(3, "0")}.csv`, "a,b\n");
+  const r = suggestPrograms(d, list);
+  expect(r.scanned).toBe(400);
+  expect(r.matches[0]!.reason).toBe("at least 400 .csv files");
+  const few = folder();
+  put(few, "a.csv", "a,b\n");
+  expect(suggestPrograms(few, list).matches[0]!.reason).toBe("1 .csv file");
+});

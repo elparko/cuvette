@@ -329,7 +329,12 @@ export const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-secu
 export function pipeFile(res: ServerResponse, path: string, headers: Record<string, string>, o: { sandbox?: boolean } = {}): void {
   const stream = createReadStream(path);
   stream.once("open", () => {
-    res.writeHead(200, { ...(o.sandbox === false ? { "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } : FILE_HEADERS), ...headers });
+    try {
+      res.writeHead(200, { ...(o.sandbox === false ? { "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } : FILE_HEADERS), ...headers });
+    } catch {
+      stream.destroy();
+      return send(res, 500, '{"error":"cannot send the file"}');
+    }
     stream.pipe(res);
   });
   stream.once("error", () => {

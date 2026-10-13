@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { describeLimits, linuxWrap, runScriptTool, scriptPython } from "../src/tools/run_script.ts";
+import { describeLimits, linuxWrap, runScriptTool, scriptPython, withoutBootFrames } from "../src/tools/run_script.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -279,4 +279,16 @@ test("save_table and save_figure work without an import", async () => {
   const r = await run("save_table('counts', [{'condition': 'LDL', 'n': 2}])");
   expect(r.ok).toBe(true);
   expect(readFileSync(join(dirs.workDir, "counts.csv"), "utf8")).toContain("condition,n");
+});
+
+test("a script error shows the frames of the script, not the frames of the harness start code", async () => {
+  const { run } = setup();
+  const r = await run("def f():\n    raise ValueError('bad column name')\nf()\n");
+  expect(r.ok).toBe(false);
+  expect(r.error).toMatch(/^the script exited with code 1: Traceback \(most recent call last\):\n  File ".*script\.py", line 3, in <module>/);
+  expect(r.error).toContain("ValueError: bad column name");
+  expect(r.error).not.toContain("<frozen runpy>");
+  expect(r.error).not.toContain("import sys,runpy");
+  const trace = 'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\n    import sys,runpy\n    ~~~^^^\n  File "<frozen runpy>", line 88, in _run_code\n  File "/w/script.py", line 1, in <module>\n    1/0\nZeroDivisionError: division by zero';
+  expect(withoutBootFrames(trace)).toBe('Traceback (most recent call last):\n  File "/w/script.py", line 1, in <module>\n    1/0\nZeroDivisionError: division by zero');
 });

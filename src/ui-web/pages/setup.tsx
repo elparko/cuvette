@@ -50,10 +50,13 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   const [folder, setFolder] = useState(ctx.state.folder);
   const [checking, setChecking] = useState(false);
 
-  useEffect(() => {
+  const load = () =>
     call<FirstStart>("api/firststart", {})
       .then(setFs)
       .catch((e: Error) => say(e.message, true));
+
+  useEffect(() => {
+    void load();
   }, []);
 
   const after = async () => {
@@ -61,6 +64,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
     setModel(s.model);
     setFolder(s.folder);
     setDone(true);
+    ctx.go("setup");
+    ctx.boot();
   };
 
   const saveKey = async () => {
@@ -82,7 +87,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
     try {
       const r = await call<{ ok: boolean; text: string }>("api/firststart/local", { model: m });
       say(r.text, !r.ok);
-      if (r.ok) await after();
+      await after();
     } catch (e) {
       say((e as Error).message, true);
     }
@@ -106,6 +111,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               onClick={() => {
                 setChoice(c.id);
                 say("");
+                if (c.id === "local") void load();
               }}
               className={cn("flex flex-col gap-1 rounded-xl border bg-card p-3.5 text-left transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 focus-visible:ring-[3px] focus-visible:ring-ring/40", choice === c.id && "border-accent-brand ring-[3px] ring-ring/20")}
             >
@@ -179,6 +185,11 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               {!o.models.length && (
                 <Button size="sm" onClick={() => useLocal(fs.recommended)}>
                   Save {fs.recommended}
+                </Button>
+              )}
+              {!o.models.length && (
+                <Button size="sm" variant="outline" onClick={() => void load()}>
+                  Check Ollama again
                 </Button>
               )}
             </div>

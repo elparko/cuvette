@@ -65,9 +65,10 @@ function scan(folder: string): Seen[] {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function reasonText(byType: Map<string, number>, byHeader: number): string {
-  const parts = [...byType].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${n} ${t} ${n === 1 ? "file" : "files"}`);
-  if (byHeader) parts.push(`${plural(byHeader, "file")} with a matching header`);
+function reasonText(byType: Map<string, number>, byHeader: number, capped: boolean): string {
+  const least = capped ? "at least " : "";
+  const parts = [...byType].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${least}${n} ${t} ${n === 1 ? "file" : "files"}`);
+  if (byHeader) parts.push(`${least}${plural(byHeader, "file")} with a matching header`);
   return parts.join(", ");
 }
 
@@ -77,6 +78,7 @@ function labelOf(a: AdapterSummary): string {
 
 export function suggestPrograms(folder: string, list: AdapterSummary[]): Suggestions {
   const files = scan(folder);
+  const capped = files.length >= MAX_FILES;
   const found: (Suggestion & { score: number; rank: number; priority: number; ready: boolean })[] = [];
   for (const a of list) {
     if (a.problem) continue;
@@ -99,7 +101,7 @@ export function suggestPrograms(folder: string, list: AdapterSummary[]): Suggest
     }
     if (!count) continue;
     const label = labelOf(a);
-    found.push({ adapter: a.name, program: a.program, label, count, reason: reasonText(byType, byHeader), headline: `These look like ${label}. Use ${a.program}?`, table: false, score, rank: rank / count, priority: a.filePriority, ready: a.found === "yes" });
+    found.push({ adapter: a.name, program: a.program, label, count, reason: reasonText(byType, byHeader, capped), headline: `These look like ${label}. Use ${a.program}?`, table: false, score, rank: rank / count, priority: a.filePriority, ready: a.found === "yes" });
   }
   found.sort((x, y) => y.score - x.score || y.priority - x.priority || Number(y.ready) - Number(x.ready) || x.rank - y.rank || x.adapter.localeCompare(y.adapter));
   const specific: Suggestion[] = found.map(({ score, rank, priority, ready, ...s }) => s);
@@ -116,7 +118,7 @@ export function suggestPrograms(folder: string, list: AdapterSummary[]): Suggest
   const headline = count ? `These look like table files. Use the table route?` : `No program matches these files. Use the table route?`;
   return {
     scanned: files.length,
-    matches: [{ adapter: tables.name, program: tables.program, label: "table files", count, reason: count ? reasonText(byType, 0) : "no program lists these file types", headline, table: true }],
+    matches: [{ adapter: tables.name, program: tables.program, label: "table files", count, reason: count ? reasonText(byType, 0, capped) : "no program lists these file types", headline, table: true }],
   };
 }
 
