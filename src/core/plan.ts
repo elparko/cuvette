@@ -109,18 +109,30 @@ export function readPlan(a: Record<string, unknown>, statusDefault = true): Part
 
 const sameStep = (a: PlanStep, b: PlanStep) => a.step.toLowerCase() === b.step.toLowerCase();
 
+// Each new step updates one old step with the same name, in order. Two steps with one name stay two steps.
 export function mergePlan(prev: AnalysisPlan, next: Partial<AnalysisPlan>): AnalysisPlan {
-  const out: AnalysisPlan = { ...structuredClone(prev), ...next, steps: structuredClone(prev.steps) };
-  for (const s of next.steps ?? []) {
-    const i = out.steps.findIndex((x) => sameStep(x, s));
+  const add = structuredClone(next);
+  const out: AnalysisPlan = { ...structuredClone(prev), ...add, steps: structuredClone(prev.steps) };
+  const used = new Set<number>();
+  for (const s of add.steps ?? []) {
+    const i = out.steps.findIndex((x, j) => j < prev.steps.length && !used.has(j) && sameStep(x, s));
     if (i < 0) out.steps.push({ ...s, status: s.status ?? "todo" });
-    else out.steps[i] = { ...out.steps[i]!, ...Object.fromEntries(Object.entries(s).filter(([k, v]) => k !== "step" && v !== undefined && !(Array.isArray(v) && !v.length))) } as PlanStep;
+    else {
+      used.add(i);
+      out.steps[i] = { ...out.steps[i]!, ...Object.fromEntries(Object.entries(s).filter(([k, v]) => k !== "step" && v !== undefined && !(Array.isArray(v) && !v.length))) } as PlanStep;
+    }
   }
   return out;
 }
 
 export function addedSteps(prev: AnalysisPlan, next: AnalysisPlan): PlanStep[] {
-  return next.steps.filter((s) => !prev.steps.some((p) => sameStep(p, s)));
+  const left = new Map<string, number>();
+  for (const p of prev.steps) left.set(p.step.toLowerCase(), (left.get(p.step.toLowerCase()) ?? 0) + 1);
+  return next.steps.filter((s) => {
+    const n = left.get(s.step.toLowerCase()) ?? 0;
+    left.set(s.step.toLowerCase(), n - 1);
+    return n <= 0;
+  });
 }
 
 const valueText = (d: PlanDecision) => `${str(d.value)}${d.by ? ` (${d.by})` : ""}`;

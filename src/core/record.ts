@@ -29,6 +29,19 @@ function sha256File(path: string): string {
   return h.digest("hex");
 }
 
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+// A damaged line can hold valid JSON that is not an entry. The record skips it, so that no reader gets a wrong shape.
+function intact(e: unknown): e is Entry {
+  if (!isObject(e) || typeof e.kind !== "string" || !Number.isFinite(e.id) || !isObject(e.data)) return false;
+  const d = e.data;
+  if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
+  if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
+  if (e.kind === "stale") return Array.isArray(d.nodes ?? []);
+  if (e.kind === "compaction") return Array.isArray(d.kept ?? []);
+  return true;
+}
+
 export const liveEntries = (r: Pick<AnalysisRecord, "entries"> & { live?: AnalysisRecord["live"] }, kinds?: EntryKind[]): Entry[] => (r.live ? r.live(kinds) : r.entries(kinds));
 
 export class AnalysisRecord {
@@ -49,6 +62,7 @@ export class AnalysisRecord {
   private asideRanges: [number, number][] = [];
   private nextNode = 1;
   private cutTail = false;
+  private lastId = 0;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
@@ -89,7 +103,8 @@ export class AnalysisRecord {
   private load(): void {
     const buf = readFileSync(this.logPath);
     this.cutTail = buf.length > 0 && buf[buf.length - 1] !== 10;
-    for (let at = 0, end = 0; at < buf.length; at = end + 1) {
+    const bom = buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf ? 3 : 0;
+    for (let at = bom, end = 0; at < buf.length; at = end + 1) {
       end = buf.indexOf(10, at);
       if (end < 0) end = buf.length;
       const line = buf.toString("utf8", at, end);
@@ -100,9 +115,10 @@ export class AnalysisRecord {
       } catch {
         continue;
       }
-      if (!e || typeof e !== "object") continue;
+      if (!intact(e)) continue;
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
+      this.lastId = Math.max(this.lastId, e.id);
       this.index(e);
     }
   }
@@ -171,7 +187,7 @@ export class AnalysisRecord {
 
   append(kind: EntryKind, data: Record<string, unknown>, opts: { refs?: number[]; node?: string } = {}): Entry {
     const e: Entry = {
-      id: Math.max(this.log.length, Number(this.log.at(-1)?.id) || 0) + 1,
+      id: Math.max(this.log.length, this.lastId) + 1,
       ts: new Date().toISOString(),
       session: this.sessionId,
       kind,
@@ -182,6 +198,7 @@ export class AnalysisRecord {
     appendFileSync(this.logPath, (this.cutTail ? "\n" : "") + JSON.stringify(portable(e, this.project)) + "\n");
     this.cutTail = false;
     this.log.push(e);
+    this.lastId = e.id;
     this.index(e);
     this.onAppend?.(e);
     return e;

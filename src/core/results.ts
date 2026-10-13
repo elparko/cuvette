@@ -188,28 +188,88 @@ export function decodeText(buf: Buffer): { text: string; encoding: string } {
   }
 }
 
+// The delimiter gives the same count of fields on most of the first 20 records. A delimiter or a line break inside quotes does not count.
+// If two delimiters are equal, the comma comes first, then the tab.
 export function delimiterOf(text: string, path: string): string {
   if (extname(path).toLowerCase() === ".tsv") return "\t";
-  const first = text.split(/\r?\n/, 1)[0] ?? "";
-  const count = (c: string) => first.split(c).length - 1;
-  return (["\t", ";", ","] as const).reduce((best, c) => (count(c) > count(best) ? c : best), ",");
+  const counts: Record<string, number>[] = [];
+  let now: Record<string, number> = { "\t": 0, ";": 0, ",": 0 };
+  let q = false;
+  let filled = false;
+  for (let i = 0; i < text.length && counts.length < 20; i++) {
+    const c = text[i]!;
+    const start = i === 0 || /[\t;,\r\n]/.test(text[i - 1]!);
+    if (c === '"' && (q || start)) q = !q;
+    else if (!q && (c === "\n" || c === "\r")) {
+      if (filled) counts.push(now);
+      now = { "\t": 0, ";": 0, ",": 0 };
+      filled = false;
+    } else {
+      if (!q && c in now) now[c]!++;
+      if (c.trim()) filled = true;
+    }
+  }
+  if (filled && counts.length < 20) counts.push(now);
+  const score = (c: string): [number, number] => {
+    const head = counts[0]?.[c] ?? 0;
+    return head ? [counts.filter((r) => r[c] === head).length, head] : [0, 0];
+  };
+  let best = ",";
+  let top = score(",");
+  for (const c of ["\t", ";"]) {
+    const s = score(c);
+    if (s[0] > top[0] || (s[0] === top[0] && s[1] > top[1])) [best, top] = [c, s];
+  }
+  return best;
 }
 
-export function parseCsv(text: string, sep = ","): string[][] {
+export interface CsvNotes {
+  stray: number[];
+  multiline: number[];
+}
+
+// The parser reads a quote mark with no closing quote as a normal character. Then it does not join the rest of the file into one cell.
+// The notes give the line numbers of such quote marks and of cells that go over more than one line.
+export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let quoted = false;
+  let line = 1;
+  let open = { at: -1, line: 1, rows: 0, cells: 0 };
+  let literal = -1;
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!;
     if (quoted) {
       if (c === '"' && text[i + 1] === '"') {
         field += '"';
         i++;
-      } else if (c === '"') quoted = false;
-      else field += c;
-    } else if (c === '"' && field === "") quoted = true;
-    else if (c === sep) {
+      } else if (c === '"') {
+        quoted = false;
+        if (line > open.line) notes?.multiline.push(open.line);
+      } else {
+        field += c;
+        if (c === "\n" || (c === "\r" && text[i + 1] !== "\n")) line++;
+      }
+      if (quoted && i >= text.length - 1) {
+        notes?.stray.push(open.line);
+        literal = open.at;
+        i = open.at - 1;
+        line = open.line;
+        rows.length = open.rows;
+        row.length = open.cells;
+        field = "";
+        quoted = false;
+      }
+    } else if (c === '"' && field === "" && i !== literal) {
+      quoted = true;
+      open = { at: i, line, rows: rows.length, cells: row.length };
+      if (i === text.length - 1) {
+        notes?.stray.push(line);
+        quoted = false;
+        field += c;
+      }
+    } else if (c === sep) {
       row.push(field);
       field = "";
     } else if (c === "\n" || c === "\r") {
@@ -218,6 +278,7 @@ export function parseCsv(text: string, sep = ","): string[][] {
       rows.push(row);
       row = [];
       field = "";
+      line++;
     } else field += c;
   }
   if (field !== "" || row.length) {
