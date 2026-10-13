@@ -1508,6 +1508,36 @@ test("Stop on the card ends the turn and keeps the finished steps", async () => 
   expect(session.record.entries(["tool_result"])).toHaveLength(1);
 });
 
+test("Answer later on the card ends the wait and closes the card question", async () => {
+  const provider = new FakeProvider([{ text: "never" }]);
+  failOn(provider, new Set([0, 1, 2]));
+  session = await recoverySession(provider);
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answerLater([e.question.qid]), 0);
+  });
+  await session.send("go");
+  expect(session.questions.open()).toHaveLength(0);
+  expect(session.record.entries(["error"])).toHaveLength(1);
+});
+
+test("Stop during a streamed reply keeps the text and marks it as stopped", async () => {
+  const provider = new FakeProvider([]);
+  provider.step = (req) =>
+    new Promise((_done, fail) => {
+      req.onDelta?.({ type: "text", text: "The first part of the reply" });
+      req.signal?.addEventListener("abort", () => fail(new Error("aborted")));
+      setTimeout(() => session!.interrupt(), 5);
+    });
+  session = await recoverySession(provider);
+  const events: string[] = [];
+  session.bus.on((e) => e.type === "delta_reset" && events.push(e.type));
+  await session.send("go");
+  const kept = session.record.entries(["assistant"]).at(-1)!;
+  expect(kept.data).toMatchObject({ text: "The first part of the reply", final: false, stopped: true });
+  expect(session.record.entries(["notice"]).map((e) => e.data.text)).toContain("Stopped. The reply above is not complete.");
+  expect(events).toEqual([]);
+});
+
 test("the card offers the local model if one is set", async () => {
   const provider = new FakeProvider([{ text: "ok" }]);
   failOn(provider, new Set([0]));

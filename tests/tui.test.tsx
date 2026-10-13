@@ -50,6 +50,18 @@ describe("transcript", () => {
     expect(text).toContain("Model: fake-model · Mode: watch · Session: 20261008-101500-ab12");
   });
 
+  test("a resumed session shows its earlier conversation", async () => {
+    const h = makeHarness();
+    const s = new FakeSession({ delayMs: 0 });
+    s.record.append("user", { text: "count the cells from before" });
+    s.record.append("assistant", { text: "There are 42 cells.", final: true });
+    const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+    live = { h, s, done };
+    await until(() => h.all().includes("Type /help for commands."));
+    expect(h.all()).toContain("> count the cells from before");
+    expect(h.all()).toContain("There are 42 cells.");
+  });
+
   test("shows steps with route, settings, fidelity, deviation and failure", async () => {
     const { h } = start();
     await sleep(100);
@@ -664,6 +676,29 @@ describe("pieces", () => {
     app.unmount();
     expect(h.all()).toContain(`${script.purpose}  ${script.does}`);
     expect(h.all()).not.toContain("shutil");
+  });
+
+  test("a long user message wraps inside the terminal width with its prefix kept", async () => {
+    const h = makeHarness(80, 24);
+    const text = "compare endo and epi, and this is a very long message that goes past the end of one line of the terminal at eighty columns wide";
+    const app = render(<ItemView item={{ key: "u1", t: "user", text }} />, { stdout: h.stdout as never, patchConsole: false });
+    await sleep(30);
+    app.unmount();
+    const lines = h.last().split("\n").filter(Boolean);
+    expect(lines[0]!.startsWith("> compare")).toBe(true);
+    expect(lines[1]!.startsWith("  ")).toBe(true);
+    expect(Math.max(...lines.map((l) => l.length))).toBeLessThanOrEqual(80);
+  });
+
+  test("a step detail that wraps keeps its indent", async () => {
+    const h = makeHarness(50, 20);
+    const item: Item = { key: "s1", t: "step", n: 2, ok: true, tool: "normalize", summary: "Normalized", route: "Preprocess > Normalization", settings: "method TIC · log transform false", outputs: [] };
+    const app = render(<ItemView item={item} />, { stdout: h.stdout as never, patchConsole: false });
+    await sleep(30);
+    app.unmount();
+    const lines = h.last().split("\n").filter(Boolean);
+    expect(lines.length).toBeGreaterThan(2);
+    expect(lines.slice(1).every((l) => l.startsWith("  "))).toBe(true);
   });
 
   test("a command step hides the argument list", () => {

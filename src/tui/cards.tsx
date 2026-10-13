@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useRef, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
 import { Box, Text, useInput } from "ink";
@@ -6,7 +6,7 @@ import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
-  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
+  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionHead, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, phiView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
@@ -159,6 +159,7 @@ export function QuestionCard(props: {
   const [need, setNeed] = useState("");
   const recIndex = recommendedIndex(q);
   const missing = questionNeed(q);
+  const head = questionHead(q);
   useInput(
     (input, key) => {
       const n = Number(input);
@@ -176,9 +177,9 @@ export function QuestionCard(props: {
     { isActive: !other },
   );
   return (
-    <Frame title={props.title ?? `Your decision: ${q.title}`} color="magenta">
+    <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta">
       {props.progress ? <Text dimColor>{props.progress}</Text> : null}
-      <Text>{q.text}</Text>
+      {head.text ? <Text>{head.text}</Text> : null}
       {q.evidence ? (
         <Box marginTop={1}>
           <Text>{q.evidence}</Text>
@@ -344,6 +345,7 @@ export function SetupCard(props: {
   const [cursor, setCursor] = useState(0);
   const [profile, setProfile] = useState(-1);
   const [editing, setEditing] = useState<string | undefined>();
+  const before = useRef<unknown>(undefined);
   const [pick, setPick] = useState(0);
   const [error, setError] = useState("");
 
@@ -392,6 +394,7 @@ export function SetupCard(props: {
           if (k === "bool") setValue(f.key, !values[f.key]);
           else {
             if (k === "choice") setPick(Math.max(0, f.choices!.findIndex((c) => Object.is(choiceValue(c), values[f.key]))));
+            before.current = values[f.key];
             setEditing(f.key);
           }
         }
@@ -444,7 +447,7 @@ export function SetupCard(props: {
               {editing === f.key && kind !== "choice" ? (
                 <Box>
                   <Text>{"    "}</Text>
-                  <Field value={String(values[f.key] ?? "")} onChange={(v) => setValue(f.key, v)} onSubmit={finishEdit} onCancel={() => setEditing(undefined)} indent={4} />
+                  <Field value={String(values[f.key] ?? "")} onChange={(v) => setValue(f.key, v)} onSubmit={finishEdit} onCancel={() => (setValue(f.key, before.current), setError(""), setEditing(undefined))} indent={4} />
                 </Box>
               ) : null}
             </Box>
@@ -470,7 +473,7 @@ export function SetupCard(props: {
         );
       })}
       {error ? <Text color="red">{error}</Text> : null}
-      <Text dimColor>Arrows move. Enter edits a field. Esc closes the card.</Text>
+      <Text dimColor>{editing ? (kind === "choice" ? "Arrows choose. Enter saves. Esc cancels the change." : "Enter saves. Esc cancels the change.") : "Arrows move. Enter edits a field. Esc closes the card."}</Text>
     </Frame>
   );
 }

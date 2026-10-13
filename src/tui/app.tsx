@@ -15,7 +15,7 @@ import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
-import { canGoBack, isPlainQuestion, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
+import { canGoBack, isPlainQuestion, questionHead, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
 import { applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
@@ -50,7 +50,13 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const details = useRef(false);
   const idle = useRef(true);
 
-  const [items, setItems] = useState<StaticItem[]>([{ key: "header", t: "header" }]);
+  // A resumed session shows its earlier conversation, the same as the browser app.
+  const [items, setItems] = useState<StaticItem[]>(() => {
+    log.current = session.record.entries().map((e) => ({ e, items: mapper.current.map(e) }));
+    const v = mainView(log.current, true);
+    collapser.current = v.collapser;
+    return [{ key: "header", t: "header" }, ...v.settled];
+  });
   const [epoch, setEpoch] = useState(0);
   if (screen) screen.reprint = () => setEpoch((x) => x + 1);
   const wipe = () => (screen?.wipe ? screen.wipe() : (opts.stdout ?? process.stdout).write(CLEAR_ALL));
@@ -565,7 +571,7 @@ function cardViews(d: CardDeps): CardViews {
           <QuestionCard
             key={`${card.q.qid}${act.kind}`}
             card={card}
-            title={act.kind === "change" ? `Change: ${card.q.title}` : card.q.title}
+            title={act.kind === "change" ? `Change: ${questionHead(card.q).title}` : questionHead(card.q).title}
             current={act.kind === "change" ? act.current : undefined}
             note={act.kind === "change" ? act.note : undefined}
             onAnswer={(value, note) => {

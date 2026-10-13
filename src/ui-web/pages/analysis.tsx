@@ -482,12 +482,17 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     void send(v, now).then((ok) => ok || setText((t) => t || v));
   };
 
+  // An empty box takes the height of its placeholder, so that a long placeholder does not go under the buttons.
+  const placeholder = status.placeholder || "Ask for an analysis, or type / for commands";
   useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.4) + "px";
-  }, [text]);
+    if (!el.value) el.value = placeholder;
+    const h = el.scrollHeight;
+    if (!text) el.value = "";
+    el.style.height = Math.min(h, window.innerHeight * 0.4) + "px";
+  }, [text, placeholder]);
 
   const waitText = (n: number) => `${n} ${n === 1 ? "decision waits" : "decisions wait"} for you`;
   let line = busy ? (status.text ?? "Working") : status.openQuestions ? waitText(status.openQuestions) + "." : "Ready.";
@@ -498,36 +503,38 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/80 px-5 py-2.5 backdrop-blur">
-        <div className="flex min-w-0 basis-full items-center gap-2.5 sm:basis-0 sm:flex-1">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b bg-background/80 px-4 py-2 backdrop-blur sm:px-5 sm:py-2.5">
+        <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5">
           <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
             <div className="truncate font-semibold tracking-tight" title={session.folder}>
               {folderName}
             </div>
-            <div className="truncate text-xs text-muted-foreground" title={status.where ?? session.folderLine}>
+            <div className="truncate text-xs text-muted-foreground max-sm:hidden" title={status.where ?? session.folderLine}>
               {midText(session.folderLine || session.folder, 90)}
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:basis-full">
           {status.bypass && (
             <Badge tone="warn">
-              <ShieldAlertIcon /> bypass permissions
+              <ShieldAlertIcon /> <span className="max-sm:sr-only">bypass permissions</span>
             </Badge>
           )}
           {status.usage && (
             <Tooltip content={status.usageLong}>
-              <Badge className="tabular-nums">{status.usage}</Badge>
+              <Badge className="min-w-0 truncate tabular-nums max-sm:hidden">{status.usage}</Badge>
             </Tooltip>
           )}
+          <ModelMenu model={status.model ?? session.model} busy={busy} openSettings={() => ctx.go("settings")} />
+          <ModeMenu mode={status.mode ?? "watch"} />
+        </div>
+        <div className="flex items-center gap-1">
           <Tooltip content={notes ? "Hide the status notes" : "Show the status notes"}>
             <Button variant="ghost" size="icon-sm" className={cn("text-muted-foreground", notes && "bg-muted text-foreground")} onClick={() => setNotes(!notes)} aria-label={notes ? "Hide the status notes" : "Show the status notes"} aria-pressed={notes}>
               <ScrollTextIcon />
             </Button>
           </Tooltip>
-          <ModelMenu model={status.model ?? session.model} busy={busy} openSettings={() => ctx.go("settings")} />
-          <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
             <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
               {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
@@ -540,6 +547,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="max-w-80">
+              {status.usage && (
+                <>
+                  <DropdownMenuLabel className="font-normal text-muted-foreground sm:hidden">{status.usage}</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="sm:hidden" />
+                </>
+              )}
               {session.programs.length > 0 && (
                 <>
                   <DropdownMenuLabel>Programs in this session</DropdownMenuLabel>
@@ -648,7 +661,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 aria-controls={sugg.length ? "cmd-list" : undefined}
                 aria-activedescendant={sugg.length ? `cmd-${sel}` : undefined}
                 value={text}
-                placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
+                placeholder={placeholder}
                 onChange={(e) => onInput(e.target.value)}
                 onBlur={() => setSugg([])}
                 onKeyDown={(e) => {
@@ -675,7 +688,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 className="block max-h-[40vh] min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] outline-none placeholder:text-muted-foreground"
               />
               <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-                <span className={cn("min-w-0 truncate pl-1.5 text-xs text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
+                <span className={cn("line-clamp-2 min-w-0 pl-1.5 text-xs leading-snug break-words text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
                 <div className="flex shrink-0 gap-1.5">
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">

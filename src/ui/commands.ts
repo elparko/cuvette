@@ -141,12 +141,12 @@ export function decisionRows(session: SessionLike): string[][] {
   for (const e of session.record.entries(["setup", "decision"])) {
     if (e.kind === "setup") {
       const defaults = new Set((e.data.defaultsAccepted as string[] | undefined) ?? []);
-      for (const k of Object.keys((e.data.values as object) ?? {})) by[k] = defaults.has(k) ? "default" : "you (setup)";
+      for (const k of Object.keys((e.data.values as object) ?? {})) by[k] = defaults.has(k) ? "default" : e.data.adapter ? "setup" : "you (setup)";
     } else by[String(e.data.key)] = String(e.data.by ?? "human");
   }
   return session.decisions
     .fields()
-    .map((f) => [f.key, clip(show(f.value)), session.decisions.owner(f.key), f.set ? (by[f.key] ?? "setup") : "not set"]);
+    .map((f) => [f.key, clip(show(f.value)), session.decisions.owner(f.key), f.set && f.value !== "" && f.value !== null && f.value !== undefined ? (by[f.key] ?? "setup") : "not set"]);
 }
 
 function questionLine(q: Question): string {

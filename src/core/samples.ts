@@ -39,6 +39,15 @@ const dateOf = (s: string) => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
+const TABLE_FILE = /\.(csv|tsv|txt|xlsx)$/i;
+const WHOLE_TABLE = /^(data|dataset|all[_ -]?data|samples?|sample[_ -]?(sheet|list|info)|metadata|meta|design|layout|plate[_ -]?map|results?|summary|counts?|table|annotations?|readme|notes?|key|legend)$/i;
+
+// The files that can be samples. A table such as data.csv or metadata.csv holds the whole data set, so it is not one sample.
+export function sampleFiles(rels: string[]): { files: string[]; tables: string[] } {
+  const whole = (r: string) => TABLE_FILE.test(r) && WHOLE_TABLE.test(basename(r).replace(/\.[^.]+$/, ""));
+  return { files: rels.filter((r) => !whole(r)), tables: rels.filter(whole) };
+}
+
 export function sheetFromFiles(rels: string[], source: string): SampleSheet {
   const fields = new Map<string, { dirs: string[]; field: string; files: string[] }>();
   for (const rel of rels) {
