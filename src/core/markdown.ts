@@ -8,27 +8,46 @@ export function tableHtml(columns: string[], rows: string[][], cls = ""): string
     .join("")}</tbody></table>`;
 }
 
-const PATH = /(^|[\s(\[])((?:~|\/)[^\s<>"'`,;()\[\]]*\/[^\s<>"'`,;()\[\]]+?)(?=[.:]?(?:\s|$|[)\],;]))/g;
+const PATH = /(^|[\s(\[])((?:~|\/)(?:&amp;|[^\s<>"'`,;()\[\]&])*\/(?:&amp;|[^\s<>"'`,;()\[\]&])+?)(?=[.:]?(?:\s|$|[)\],;]))/g;
 
 export function shortPaths(html: string, n = 44): string {
   return html.replace(PATH, (_m, pre: string, p: string) => {
-    if (p.length <= n) return pre + p;
+    const raw = p.replace(/&amp;/g, "&");
+    if (raw.length <= n) return pre + p;
     const keep = Math.floor((n - 1) / 2);
-    return `${pre}<span class="path" title="${p}">${p.slice(0, keep)}…${p.slice(p.length - keep)}</span>`;
+    return `${pre}<span class="path" title="${p}">${esc(raw.slice(0, keep))}…${esc(raw.slice(raw.length - keep))}</span>`;
   });
 }
 
-const LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)<"]+)\)/g;
+const LINK = /\[([^[\]\n]+)\]\((https?:\/\/[^\s\x00-\x1f)<"[]+)\)/g;
+const SLOT = /\uE000(\d+)\uE001/g;
+const TAG = /<(\/?)([a-z0-9]+)[^>]*>/g;
 
+function balanced(html: string): boolean {
+  const open: string[] = [];
+  for (const m of html.matchAll(TAG)) {
+    if (m[2] === "br") continue;
+    if (!m[1]) open.push(m[2]!);
+    else if (open.pop() !== m[2]) return false;
+  }
+  return !open.length;
+}
+
+// The content of a mark stops at the next mark of the same kind. This keeps the run time linear in the line length.
+function emphasis(html: string): string {
+  const wrap = (open: string, close: string) => (m: string, x: string) => (balanced(x) ? `${open}${x}${close}` : m);
+  return html
+    .replace(/\*\*\*(?=\S)((?:(?!\*\*\*).)+?)(?<=\S)\*\*\*/g, wrap("<strong><em>", "</em></strong>"))
+    .replace(/\*\*(?=\S)((?:(?!\*\*).)+?)(?<=\S)\*\*/g, wrap("<strong>", "</strong>"))
+    .replace(/(?<![*\w])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![*\w])/g, wrap("<em>", "</em>"))
+    .replace(/~~(?=\S)((?:(?!~~).)+?)(?<=\S)~~/g, wrap("<del>", "</del>"));
+}
+
+// A link becomes a placeholder first, so that no mark can start inside the address or cross the link.
 function marks(html: string): string {
-  return shortPaths(
-    html
-      .replace(LINK, (_m, t: string, u: string) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`)
-      .replace(/\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*/g, "<strong><em>$1</em></strong>")
-      .replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "<strong>$1</strong>")
-      .replace(/(?<![*\w])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![*\w])/g, "<em>$1</em>")
-      .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, "<del>$1</del>"),
-  );
+  const links: string[] = [];
+  const text = html.replace(/[\uE000\uE001]/g, "").replace(LINK, (_m, t: string, u: string) => `\uE000${links.push(`<a href="${u}" target="_blank" rel="noopener noreferrer">${shortPaths(emphasis(t))}</a>`) - 1}\uE001`);
+  return shortPaths(emphasis(text)).replace(SLOT, (_m, i: string) => links[Number(i)]!);
 }
 
 export function inline(text: string): string {
@@ -72,7 +91,9 @@ function listHtml(es: Entry[], at: { i: number }, indent: number): string {
 
 const blockStart = (l: string) => !l.trim() || LI.test(l) || HEAD.test(l) || l.trim().startsWith("```") || ROW.test(l) || RULE.test(l) || QUOTE.test(l);
 
-export function md(src: string, opts: { code?: boolean } = {}): string {
+const MAX_QUOTE_DEPTH = 16;
+
+export function md(src: string, opts: { code?: boolean } = {}, depth = 0): string {
   const lines = String(src).split("\n");
   const out: string[] = [];
   let i = 0;
@@ -95,7 +116,7 @@ export function md(src: string, opts: { code?: boolean } = {}): string {
       while (i < lines.length && ROW.test(lines[i]!)) rows.push(lines[i++]!.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
       const body = rows.filter((r) => !r.every((c) => c.length > 1 && /^:?-+:?$/.test(c)));
       const [head, ...rest] = body;
-      out.push(tableHtml((head ?? []).map(inline), rest.map((r) => r.map(inline))));
+      if (head) out.push(tableHtml(head.map(inline), rest.map((r) => r.map(inline))));
       continue;
     }
     if (RULE.test(line)) {
@@ -111,8 +132,9 @@ export function md(src: string, opts: { code?: boolean } = {}): string {
     }
     if (QUOTE.test(line)) {
       const quoted: string[] = [];
-      while (i < lines.length && QUOTE.test(lines[i]!)) quoted.push(lines[i++]!.replace(/^\s{0,3}>\s?/, ""));
-      out.push(`<blockquote>${md(quoted.join("\n"), opts)}</blockquote>`);
+      const marker = depth < MAX_QUOTE_DEPTH ? /^\s{0,3}>\s?/ : /^(?:\s{0,3}>\s?)+/;
+      while (i < lines.length && QUOTE.test(lines[i]!)) quoted.push(lines[i++]!.replace(marker, ""));
+      out.push(`<blockquote>${md(quoted.join("\n"), opts, depth + 1)}</blockquote>`);
       continue;
     }
     if (LI.test(line)) {

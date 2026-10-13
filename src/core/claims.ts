@@ -37,7 +37,7 @@ const MASKS: RegExp[] = [
   /(?<![\w.])\d+:\d+(?:;O\d*)?(?![\d.])/g,
   /(?<![\w.])v?\d+\.\d+\.\d+(?:[.-][A-Za-z0-9]+)*/g,
   /\b(?:WGS|NAD|ETRS|GDA|SIRGAS)\s?\d+|\bEPSG:?\s?\d+|\bUTM zone \d+[NS]?/gi,
-  /[\w.-]*\.(?:pdb|cif|mmcif|fasta|fa|faa|fna|fcs|tif|tiff|png|jpe?g|gif|csv|tsv|xlsx?|mzml|mzxml|imzml|ibd|vcf|bcf|bed|bam|sam|cram|fastq|fq|fif|edf|fits?|phy|nex|nwk|tree|json|xml|ya?ml|txt|h5ad|h5|zarr|nii|gz|zip|cppipe|ijm|py|r|ipynb)\b/gi,
+  /(?<![\w.-])[\w.-]*\.(?:pdb|cif|mmcif|fasta|fa|faa|fna|fcs|tif|tiff|png|jpe?g|gif|csv|tsv|xlsx?|mzml|mzxml|imzml|ibd|vcf|bcf|bed|bam|sam|cram|fastq|fq|fif|edf|fits?|phy|nex|nwk|tree|json|xml|ya?ml|txt|h5ad|h5|zarr|nii|gz|zip|cppipe|ijm|py|r|ipynb)\b/gi,
   /\b\d[A-Z][A-Z0-9]{2}\b/g,
   /\b[A-Za-z][A-Za-z0-9]*-\d+(?!\d|[.,]\d)/g,
   /\bet al\.?,?\s*\(?(?:19|20)\d\d[a-z]?\)?/g,
@@ -96,13 +96,16 @@ function mask(text: string): string {
   return out;
 }
 
-function inTableCell(text: string, at: number): boolean {
+// The numbers come in text order, so the function keeps the result for the last line.
+function inTableCell(text: string, at: number, last: { from: number; end: number; cell: boolean }): boolean {
+  if (at >= last.from && at < last.end) return last.cell;
+  const from = text.lastIndexOf("\n", at - 1) + 1;
   const end = text.indexOf("\n", at);
-  const line = text.slice(text.lastIndexOf("\n", at - 1) + 1, end < 0 ? text.length : end);
-  if (!/^\s*\|.*\|\s*$/.test(line)) return false;
-  if (end < 0) return true;
-  const after = text.indexOf("\n", end + 1);
-  return !/^\s*\|[\s:|-]+\|\s*$/.test(text.slice(end + 1, after < 0 ? text.length : after));
+  const line = text.slice(from, end < 0 ? text.length : end);
+  const after = end < 0 ? -1 : text.indexOf("\n", end + 1);
+  const cell = /^\s*\|.*\|\s*$/.test(line) && (end < 0 || !/^\s*\|[\s:|-]+\|\s*$/.test(text.slice(end + 1, after < 0 ? text.length : after)));
+  Object.assign(last, { from, end: end < 0 ? text.length + 1 : end, cell });
+  return cell;
 }
 
 export function extractNumbers(text: string, opts: { small?: boolean } = {}): Found[] {
@@ -111,6 +114,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
   const spans = splitSentences(text);
   const out: Found[] = [];
   let si = 0;
+  const line = { from: 0, end: -1, cell: false };
   for (const m of masked.matchAll(NUMBER)) {
     const start = m.index!;
     let end = start + m[0].length;
@@ -133,7 +137,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const plain = dec === 0 && expText === undefined && !percent;
     const attached = /^[A-Za-zµ°]/.test(masked.slice(end));
     const small = plain && Math.abs(value) <= 10 && !attached;
-    if (small && !opts.small && !inTableCell(text, start)) continue;
+    if (small && !opts.small && !inTableCell(text, start, line)) continue;
     if (LABEL_BEFORE.test(before)) continue;
     if (THRESHOLD_BEFORE.test(before)) continue;
     if (percent && /^\s*(?:confidence|CI\b)/i.test(masked.slice(end))) continue;
@@ -309,10 +313,13 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const counts = knownCounts(record);
   const found = extractNumbers(text, { small: true });
   const claims: Claim[] = [];
+  let fi = 0;
   for (const s of splitSentences(text)) {
     const cited = CITATION.test(s.text);
     const hedged = HEDGE.test(s.text);
-    const own = found.filter((f) => f.start >= s.start && f.start < s.end);
+    while (fi < found.length && found[fi]!.start < s.start) fi++;
+    const own: Found[] = [];
+    for (let k = fi; k < found.length && found[k]!.start < s.end; k++) own.push(found[k]!);
     const sentenceText = s.text.length > 300 ? s.text.slice(0, 297) + "..." : s.text;
     const hits = own.map((f) => ({ f, i: matchesAny(f, targets, cued(text, f, DESIGN[0]!) ? (f.small ? new Set([...power].filter((i) => plain.has(i))) : power) : f.small ? plain : undefined, DOWN.test(text.slice(Math.max(s.start, f.start - NEAR), Math.min(s.end, f.end + NEAR)))) }));
     const anyMatched = hits.some((h) => h.i !== undefined && !h.f.small);

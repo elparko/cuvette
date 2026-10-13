@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
-import { decodeText, delimiterOf, parseCsv } from "./results.ts";
+import { decodeText, delimiterOf, parseCsv, type CsvNotes } from "./results.ts";
 
 export interface CheckOption {
   value: string;
@@ -35,6 +35,7 @@ export interface Table {
   rows: string[][];
   encoding?: string;
   ragged?: number[];
+  quotes?: CsvNotes;
 }
 
 const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "?", "."]);
@@ -53,10 +54,11 @@ const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 export function readCsvTable(path: string): Table {
   const { text, encoding } = decodeText(readFileSync(path));
   const delim = delimiterOf(text, path);
-  const grid = parseCsv(text.endsWith("\n") ? text : `${text}\n`, delim).filter((r) => r.some((c) => c.trim() !== ""));
+  const quotes: CsvNotes = { stray: [], multiline: [] };
+  const grid = parseCsv(/[\r\n]$/.test(text) ? text : `${text}\n`, delim, quotes).filter((r) => r.some((c) => c.trim() !== ""));
   const [head = [], ...rows] = grid;
   const ragged = rows.flatMap((r, i) => (r.slice(head.length).some((c) => c.trim() !== "") ? [i] : []));
-  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}) };
+  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}), ...(quotes.stray.length || quotes.multiline.length ? { quotes } : {}) };
 }
 
 type Kind = "num" | "comma" | "astext" | "text" | "missing";
@@ -174,6 +176,14 @@ export function checkTable(t: Table, source: string): DataCheck {
     const rows = t.ragged.map(fileRow);
     const lead = `${plural(rows.length, "row")} ${rows.length === 1 ? "has" : "have"} more cells than the header (${rows.length === 1 ? "row" : "rows"} ${listOf(rows.map(String), 6)})`;
     items.push({ id: "ragged_rows", check: "ragged_rows", level: "ask", rows, text: `${lead}. The harness does not read the extra cells. A decimal comma in a comma-separated file can cause this.`, question: `${lead}. A decimal comma in a comma-separated file can cause this. Continue without the extra cells, or stop?`, options: [{ value: "continue", label: "Continue without the extra cells" }, { value: "stop", label: "Stop. I correct the file" }], recommendation: "stop" });
+  }
+  if (t.quotes?.stray.length) {
+    const lines = t.quotes.stray;
+    items.push({ id: "stray_quote", check: "quotes", level: "note", text: `${plural(lines.length, "quote mark")} on ${lines.length === 1 ? "line" : "lines"} ${listOf(lines.map(String), 6)} ${lines.length === 1 ? "has" : "have"} no closing quote mark. The harness reads ${lines.length === 1 ? "it" : "them"} as a normal letter.` });
+  }
+  if (t.quotes?.multiline.length) {
+    const lines = t.quotes.multiline;
+    items.push({ id: "multiline_cells", check: "quotes", level: "note", text: `${plural(lines.length, "cell")} that ${lines.length === 1 ? "starts" : "start"} on ${lines.length === 1 ? "line" : "lines"} ${listOf(lines.map(String), 6)} ${lines.length === 1 ? "goes" : "go"} over more than one line. If the file has no such cells, a quote mark with no partner joins rows. Then the table has fewer rows than the file.` });
   }
   const dupNames = [...nameCount].filter(([, k]) => k > 1).map(([c]) => c);
   if (dupNames.length) items.push({ id: "duplicate_columns", check: "duplicate_columns", level: "note", text: `${dupNames.length === 1 ? "The column name" : "The column names"} ${dupNames.map((c) => quote(c || "(no name)")).join(", ")} ${dupNames.length === 1 ? "is" : "are"} on more than one column. A step that finds a column by its name can read the wrong column.` });
