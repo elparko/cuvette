@@ -1,9 +1,9 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
-import { approveAdapter, checkAdapter } from "../src/onboarding/checker.ts";
+import { approveAdapter, checkAdapter, installHint, missingDependencies, missingDependency } from "../src/onboarding/checker.ts";
 import { runTests, substitute } from "../src/onboarding/kat.ts";
 import { onboardCommand } from "../src/onboarding/agent.ts";
 import type { Tool, ToolOutput } from "../src/core/types.ts";
@@ -264,5 +264,74 @@ describe("the onboarding adapter uses the lint", () => {
     const m = loadAdapter("catalog/onboarding").manifest;
     expect(m.checks.find((c) => c.id === "draft_lint")?.severity).toBe("error");
     expect(m.module).toBe("adapter.ts");
+  });
+});
+
+describe("tests that cannot run because a package or program is missing", () => {
+  const outcome = (id: string, failure?: string) => ({ id, ok: !failure, failures: failure ? [failure] : [], durationMs: 1, outputs: [] });
+
+  test("missingDependency reads the name from R, Python, Julia and shell messages", () => {
+    expect(missingDependency("x failed. R says: there is no package called ‘AMR’", "R")).toBe("AMR");
+    expect(missingDependency("Error in loadNamespace(x) : there is no package called 'DESeq2'", "R")).toBe("DESeq2");
+    expect(missingDependency("ModuleNotFoundError: No module named 'scanpy.pp'", "python")).toBe("scanpy");
+    expect(missingDependency("ArgumentError: Package CSV not found in current path", "julia")).toBe("CSV");
+    expect(missingDependency("spawn /usr/local/bin/mageck ENOENT", "MAGeCK")).toBe("mageck");
+    expect(missingDependency("bash: samtools: command not found", "samtools")).toBe("samtools");
+    expect(missingDependency("the tool failed: the program was not found. Set locate.env", "bfconvert")).toBe("bfconvert");
+    expect(missingDependency("the tool failed: CellProfiler was not found. Set CELLPROFILER_PATH to the cp executable.", "CellProfiler")).toBe("CellProfiler");
+    expect(missingDependency("the tool failed: SMILE MSI was not found. Set SMILE_MSI_PYTHON to its Python.", "SMILE")).toBe("SMILE MSI");
+    expect(missingDependency("the tool failed: suite2p is not installed.", "suite2p")).toBe("suite2p");
+    expect(missingDependency("file not found: /data/a.csv", "R")).toBeUndefined();
+    expect(missingDependency('the column "dose" was not found. Columns: a, b', "R")).toBeUndefined();
+    expect(missingDependency('expected to contain "EUCAST 2025", got "guideline is not known"', "R")).toBeUndefined();
+  });
+
+  test("missingDependencies groups the tests by the missing name and leaves other failures out", () => {
+    const tests = [
+      outcome("a", "R says: there is no package called ‘AMR’"),
+      outcome("b", 'expected to contain "x", got "R says: there is no package called ‘AMR’"'),
+      outcome("c", "metrics.n: expected 2, got 3"),
+      outcome("d"),
+      outcome("e", "R says: there is no package called ‘svglite’"),
+    ];
+    expect(missingDependencies(tests, "AMR")).toEqual([
+      { name: "AMR", ids: ["a", "b"] },
+      { name: "svglite", ids: ["e"] },
+    ]);
+  });
+
+  test("installHint names cuvette doctor --fix only if the doctor can install the adapter", () => {
+    expect(installHint("lme4", loadAdapter("catalog/lme4").manifest)).toBe("Run cuvette doctor --fix");
+    expect(installHint("meanstat", loadAdapter(GOOD).manifest)).toBe("Install it with the steps in program.install of adapter.yaml");
+  });
+
+  test("the check gives one line at the top for the tests that could not run, and no FAIL line for each", async () => {
+    const dir = join(tmp, "missing-pkg");
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      join(dir, "scripts", "run.sh"),
+      `case "$1$(cat "$1" 2>/dev/null)" in *bad*) echo '{"ok": false, "error": "run failed. R says: the value is wrong"}' ;; *) echo '{"ok": false, "error": "run failed. R says: there is no package called Fakepkg"}' ;; esac\n`,
+    );
+    writeFileSync(
+      join(dir, "adapter.yaml"),
+      [
+        "adapter: { name: missingpkg, title: Missing package, version: 0.1.0, description: A test adapter with a missing package., field: statistics, file_types: ['.csv'] }",
+        "program: { name: Fakepkg, version: '1.0', install: Install Fakepkg. }",
+        "connection: { kind: script, interpreter: ['{program_path}'] }",
+        "locate: { which: [sh] }",
+        "tests:",
+        "  - { id: one, calls: [{ tool: run, args: { x: good } }], expect: [{ path: metrics.n, equals: 1 }] }",
+        "  - { id: two, calls: [{ tool: run, args: { x: good } }], expect: [{ path: ok, equals: false }, { path: error, contains: 'Fakepkg says no' }] }",
+        "  - { id: three, calls: [{ tool: run, args: { x: bad } }], expect: [{ path: metrics.n, equals: 1 }] }",
+        "tools:",
+        "  - { name: run, title: Run, description: Runs the step., params: { x: { type: string, description: The input. } }, script: scripts/run.sh, parse: json }",
+      ].join("\n"),
+    );
+    const r = await checkAdapter(dir, { runTests: true });
+    expect(r.errors[0]).toBe("2 of 3 tests could not run: Fakepkg is not installed. Install it with the steps in program.install of adapter.yaml");
+    expect(r.notInstalled).toEqual([{ name: "Fakepkg", ids: ["one", "two"] }]);
+    expect(r.tests?.map((t) => t.id)).toEqual(["three"]);
+    expect(r.errors.some((e) => /test "(one|two)"/.test(e))).toBe(false);
+    expect(r.errors.join("\n")).toMatch(/test "three" failed: .*the value is wrong/);
   });
 });

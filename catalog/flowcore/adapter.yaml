@@ -24,9 +24,9 @@ program:
     - https://doi.org/10.1002/cyto.a.22171
   install: >
     Install R (brew install r on macOS). Then install flowCore from Bioconductor, and jsonlite and svglite from CRAN, into a
-    library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
-    ~/.guided-analysis/R-library.
-    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "jsonlite", "svglite"), repos = "https://cloud.r-project.org"); BiocManager::install("flowCore")'
+    library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.cuvette/R-library.
+    mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("BiocManager", "jsonlite", "svglite"), repos = "https://cloud.r-project.org"); BiocManager::install("flowCore")'
   citation:
     - text: "Ellis B, Haaland P, Hahne F, Le Meur N, Gopalakrishnan N, Spidlen J, Jiang M, Finak G. flowCore: Basic structures for flow cytometry data. Bioconductor R package version 2.24.0."
       doi: 10.18129/B9.bioc.flowCore
@@ -54,8 +54,8 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that exists
-  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
-  /Volumes/T7/guided-analysis/tools/R-library-microcyto, ~/.guided-analysis/R-library. The program version in this adapter is the
+  of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  /Volumes/T7/guided-analysis/tools/R-library-microcyto, ~/.cuvette/R-library. The program version in this adapter is the
   version of the R package flowCore, not of R. The spillover method is the median method (Roederer). For each control, take the
   median of the positive events minus the median of the unstained control. Divide it by the same difference in the primary
   channel.

@@ -32,7 +32,7 @@ run_tool <- function(body) {
   step <- if (length(script)) sub("\\.R$", "", basename(sub("^--file=", "", script[1]))) else "the R step"
   tryCatch(body(), error = function(e) {
     p <- tryCatch(read_params(), error = function(e2) list())
-    where <- if (!is.null(p$data)) paste0(" on ", p$data) else ""
+    where <- if (!is.null(p$data)) paste0(" on ", paste(p$data, collapse = ", ")) else ""
     fail(paste0(step, " failed", where, ". R says: ", conditionMessage(e)))
   })
 }
