@@ -25,6 +25,7 @@ interface Captured {
   url: string;
   headers: IncomingMessage["headers"];
   body: any;
+  port?: number;
 }
 
 let server: Server;
@@ -78,7 +79,7 @@ beforeAll(async () => {
     req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
       const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
-      captured.push({ url: req.url ?? "", headers: req.headers, body });
+      captured.push({ url: req.url ?? "", headers: req.headers, body, port: req.socket.remotePort });
       const r = replies.shift();
       if (!r) {
         res.writeHead(500, { "content-type": "application/json" });
@@ -208,6 +209,28 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const nodes = s.record.nodes().filter((n) => !n.sensitivityOf);
     expect(nodes.map((n) => n.tool)).toEqual(["count"]);
     expect(nodes[0].decisions.method).toBe("Triangle");
+  });
+
+  test("Haiku: one streamed request before the first token, effort high from the default settings, one connection for each step", async () => {
+    replies = [
+      { blocks: [{ type: "text", text: "Counting now." }, { type: "tool_use", id: "toolu_01", name: "count", input: { input: "/data/a.tif", method: "Otsu", min_size: 10 } }], stop: "tool_use" },
+      { blocks: [{ type: "text", text: "There are 66 particles." }], stop: "end_turn" },
+    ];
+    const s = await labSession({ model: "claude:claude-haiku-5-5" });
+    let atFirstToken = -1;
+    s.bus.on((e: any) => {
+      if (e.type === "delta" && e.kind === "text" && atFirstToken < 0) atFirstToken = captured.length;
+    });
+    await s.send("Count the particles in a.tif");
+    expect(atFirstToken).toBe(1);
+    expect(captured[0].url).toBe("/v1/messages?beta=true");
+    expect(captured[0].body.stream).toBe(true);
+    expect(captured[0].body.model).toBe("claude-haiku-5-5");
+    expect(captured[0].body.output_config.effort).toBe("high");
+    const steps = captured.filter((c) => c.url.startsWith("/v1/messages"));
+    expect(steps.length).toBeGreaterThanOrEqual(2);
+    expect(steps[1].headers.connection).toBe("keep-alive");
+    expect(new Set(steps.map((c) => c.port)).size).toBe(1);
   });
 
   test("the referee runs on the mock through complete()", async () => {
