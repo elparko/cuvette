@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/ui/fake-session.ts";
-import { animationsOn, footerHints, liveLayout, statusRows } from "../src/tui/view.tsx";
+import { animationsOn, footerHints, hangWrap, liveLayout, statusRows } from "../src/tui/view.tsx";
 import { makeHarness, plain, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 let live: { h: Harness; done: Promise<void> } | undefined;
@@ -74,6 +74,12 @@ test("the live region leaves two rows of the terminal free", () => {
     const box = l.inputBox ? 3 : 0;
     expect(2 + 1 + box + l.live + l.pending + l.card).toBeLessThanOrEqual(Math.max(rows - 2, 2 + 1 + 4));
   }
+});
+
+test("at 80 by 24 a card gets the rows before the message box and the streamed text", () => {
+  const l = liveLayout({ rows: 24, columns: 80, card: true, running: true, input: 0, queue: 0, suggestions: 0, text: true, pending: true, status: 2 });
+  expect(l.inputBox).toBe(false);
+  expect(l.card).toBeGreaterThanOrEqual(18);
 });
 
 const bottom = (h: Harness) => h.term.view().trimEnd().split("\n").slice(-4).join("\n");
@@ -163,4 +169,12 @@ test("footer rows for the layout", () => {
   expect(statusRows({ hints: "off", state: "idle" })).toBe(0);
   expect(statusRows({ hints: "off", state: "running", bypass: true })).toBe(2);
   expect(statusRows({ hints: "off", state: "idle", hint: "Press Ctrl+C again to quit." })).toBe(1);
+});
+
+test("a wide table row wraps its last column under the start of that column", () => {
+  const row = "Esc                             Stop the agent. If the agent is idle, Esc clears the input.";
+  const out = hangWrap(row, 79).split("\n");
+  expect(out).toEqual(["Esc                             Stop the agent. If the agent is idle, Esc", "                                clears the input."]);
+  expect(hangWrap("short line", 79)).toBe("short line");
+  expect(hangWrap("x".repeat(100), 40).split("\n").every((l) => l.length <= 40)).toBe(true);
 });

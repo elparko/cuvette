@@ -131,6 +131,38 @@ describe("the app server", () => {
     ev.close();
   });
 
+  test("Stop keeps the streamed text and removes the open question card from the conversation", async () => {
+    const s = new FakeSession({ delayMs: 100 });
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    const ev = await events(app);
+    await c.post("api/send", { text: "go" });
+    await until(() => ev.msgs.some((m) => m.t === "live" && m.text));
+    await c.post("api/stop", {});
+    await until(() => ev.msgs.some((m) => m.t === "status" && m.state === "idle"));
+    await until(() => ev.msgs.some((m) => m.t === "append" && m.html.includes("not complete")));
+    const all = ev.msgs.filter((m) => m.t === "append").map((m) => m.html).join("");
+    expect(all).toMatch(/<div class="msg agent">.*I will/s);
+    expect(all).toContain("Stopped. The reply above is not complete.");
+
+    const q = new FakeSession({ delayMs: 1 });
+    await app.close();
+    app = await startApp({ session: q, env });
+    const c2 = client(app);
+    const ev2 = await events(app);
+    await c2.post("api/send", { text: "go" });
+    await until(() => ev2.msgs.some((m) => m.t === "cards" && m.html.includes("Permission needed")));
+    const perm = ev2.msgs.filter((m) => m.t === "cards").at(-1)!.html as string;
+    await c2.post("api/act", { id: Number(/data-card="(\d+)" data-type="permission"/.exec(perm)![1]), act: "allow", fields: {} });
+    await until(() => ev2.msgs.some((m) => m.t === "cards" && m.html.includes('data-type="question"')));
+    await c2.post("api/stop", {});
+    await until(() => ev2.msgs.some((m) => m.t === "status" && m.state === "idle"));
+    await until(() => !(ev2.msgs.filter((m) => m.t === "cards").at(-1)!.html as string).includes('data-type="question"'));
+    expect(q.questions.open().length).toBe(1);
+    ev.close();
+    ev2.close();
+  });
+
   test("files outside the session are not served", async () => {
     const s = new FakeSession();
     app = await startApp({ session: s, env });
@@ -341,6 +373,21 @@ describe("card rendering", () => {
   const q: Question = { qid: "q1", session: s.id, decisionKey: "min_auc", title: "Which cutoff?", text: "Choose.", options: [{ value: 0.7, label: "0.7" }, { value: 0.8, label: "0.8" }], recommendation: { value: 0.8, reason: "Lab rule." }, evidence: "", status: "open", created: "" };
   const slot = (card: Card): Slot => ({ id: 7, card, plan: card.t === "plan" ? planInit(card) : undefined });
 
+  test("a long question with a clipped title shows the full question once", () => {
+    const long = "Which statistical test do you want to use to compare the endocardium with the epicardium samples in this study?";
+    const html = cardHtml(ctx, slot({ t: "question", q: { ...q, title: long.slice(0, 77) + "...", text: long } }));
+    expect(html).toContain(`<h3>Your decision: ${long}</h3>`);
+    expect(html).not.toContain(`<p>${long}</p>`);
+    expect(cardHtml(ctx, slot({ t: "question", q })).match(/Choose\./g)).toHaveLength(1);
+  });
+
+  test("the Decisions tab shows an empty value as not set", () => {
+    const html = decisionsHtml(ctx, [["alpha", "", "human", "not set"], ["min_auc", "0.7", "human", "human"]]);
+    expect(html).toContain("Not set");
+    expect(html).toContain("Set by: you");
+    expect(html).not.toContain("Set by: not set");
+  });
+
   test("the proposed metrics: numbered metrics and settings, details, demonstration, programs and actions", () => {
     const card: Card = { t: "plan", stage: "plan", version: 2, text: "You want: count cells\n\nMetrics\n[1] positive cell: 1 red pixel\n\nSteps\n1. Count\n   [2] Threshold: 40 (default)", details: "Data\n- 36 fields", settings: [{ index: 0, step: 1, label: "Threshold", value: 40, by: "default", options: ["30", "40", "50"] }], update: false, qids: [], programs: [{ part: "Stats", adapter: "biostats", alternatives: ["lme4"] }], mode: "watch", restatement: "count cells", definitions: [{ measure: "positive cell", definition: "1 red pixel" }], pilot: "Set 1" };
     const sl = slot(card);
@@ -516,7 +563,8 @@ test("a question card with the question as its title does not repeat the questio
   expect(html).toContain("<h3>Your decision: Which test?</h3>");
   expect(html).not.toContain("<p>Which test?</p>");
   const long = cardHtml({ token: "t", session: s }, { id: 2, card: { t: "question", q: { ...q, title: "Which...", text: "Which test do you want?" } } });
-  expect(long).toContain("<p>Which test do you want?</p>");
+  expect(long).toContain("<h3>Your decision: Which test do you want?</h3>");
+  expect(long).not.toContain("<p>Which test do you want?</p>");
 });
 
 test("the status message names the current model, so the header follows a model change", () => {

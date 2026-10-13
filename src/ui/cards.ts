@@ -186,12 +186,13 @@ export function questionEnter(q: Question, cursor: number): { value: unknown } |
   if (q.options.length) return { value: q.options[Math.max(0, Math.min(cursor, q.options.length - 1))]!.value };
   if (q.recommendation) return { value: q.recommendation.value };
   if (q.default !== undefined) return { value: q.default };
-  return { type: `${q.title} needs your answer. Type it here.` };
+  return { type: `${/(\?|\.\.\.|…)$/.test(q.title.trim()) ? "This question" : q.title} needs your answer. Type it here.` };
 }
 
 export function questionNeed(q: Question): string | undefined {
   if (q.recommendation || q.default !== undefined) return undefined;
-  return q.options.length ? `There is no recommendation for ${q.title}. Choose one of the options.` : `There is no recommendation for ${q.title}. Type your answer.`;
+  const what = /(\?|\.\.\.|…)$/.test(q.title.trim()) ? "There is no recommendation." : `There is no recommendation for ${q.title}.`;
+  return q.options.length ? `${what} Choose one of the options.` : `${what} Type your answer.`;
 }
 
 export function questionStartText(q: Question, current?: unknown): string {
@@ -263,6 +264,16 @@ export function seqLeave(cards: Card[]): Card[] {
   return cards.filter((c) => !isPlainQuestion(c));
 }
 
+// A long question has a clipped title. The card then shows the full question as the title and does not repeat it below.
+export function questionHead(q: Pick<Question, "title" | "text">): { title: string; text: string } {
+  const title = q.title.trim();
+  const text = q.text.trim();
+  if (text === title) return { title, text: "" };
+  const cut = title.replace(/(\.\.\.|…)$/, "").trimEnd();
+  if (cut !== title && text.startsWith(cut)) return { title: text, text: "" };
+  return { title: q.title, text: q.text };
+}
+
 export function reopenQuestions(cards: Card[], open: Question[]): Card[] {
   let list = cards;
   for (const q of open) list = pushCard(list, { t: "question", q });
@@ -277,7 +288,8 @@ export function optionLabel(q: Pick<Question, "options">, value: unknown): strin
 }
 
 export function answerLine(q: Pick<Question, "qid" | "title" | "options">, value: unknown): string {
-  return `${q.title}${q.title.endsWith("?") ? "" : ":"} ${optionLabel(q, value)} · /change ${q.qid}`;
+  const title = q.title.replace(/\.\.\.$/, "…");
+  return `${title}${title.endsWith("?") ? "" : ":"} ${optionLabel(q, value)} · /change ${q.qid}`;
 }
 
 // ---------------------------------------------------------------- change an answer or a decision

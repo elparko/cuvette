@@ -9,7 +9,7 @@ import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import {
   choiceLabel, choiceValue, CLARIFY_TITLE, DATA_CHECK_TITLE, DESIGN_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, phiView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
-  recommendedIndex, questionCursor, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
+  recommendedIndex, questionCursor, questionHead, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
   type Card, type CardType, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
 import { settingsHtml } from "./app-settings.ts";
@@ -217,7 +217,8 @@ function questionBody(q: Question, answer: (i: number, value: unknown) => string
   const rec = recommendedIndex(q);
   const pre = opts.current !== undefined ? questionCursor(q, opts.current) : rec;
   const take = rec < 0 && q.recommendation && recommend ? btn(`${show(q.recommendation.value)} (recommended)`, recommend, "primary") : "";
-  return `${opts.titled && q.text.trim() === q.title.trim() ? "" : `<p>${esc(q.text)}</p>`}${q.evidence ? `<p class="evidence">${esc(q.evidence)}</p>` : ""}
+  const text = opts.titled ? questionHead(q).text : q.text;
+  return `${text ? `<p>${esc(text)}</p>` : ""}${q.evidence ? `<p class="evidence">${esc(q.evidence)}</p>` : ""}
 <div class="opts">${q.options.map((o, i) => btn(`${o.label}${i === rec ? " (recommended)" : ""}`, answer(i, o.value), i === pre ? "primary" : "")).join("")}${take}</div>
 ${q.recommendation?.reason ? `<p class="dim small">Recommended: ${esc(q.recommendation.reason)}</p>` : ""}
 ${other ? `<div class="row"><input type="text" name="other" placeholder="Other: type your own answer" aria-label="Your own answer">${btn("Answer", other)}</div>` : ""}
@@ -274,13 +275,14 @@ function questionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "question" }
   if (qa) {
     const change = qa.kind === "change";
     const note = change && qa.note ? `<p class="dim small">${esc(qa.note)}</p>` : "";
-    const title = change ? `Change: ${card.q.title}` : card.q.title;
-    return frame(slot, title, "magenta", note + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: change ? qa.current : undefined, laterLabel: "Cancel" }));
+    const head = questionHead(card.q).title;
+    const title = change ? `Change: ${head}` : head;
+    return frame(slot, title, "magenta", note + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: change ? qa.current : undefined, laterLabel: "Cancel", titled: true }));
   }
   const sq = slot.seq;
   const nav = sq && (sq.back || sq.next) ? `<div class="row">${sq.back ? btn("Back", act("back"), "quiet") : ""}${sq.next ? btn("Next", act("next"), "quiet") : ""}</div>` : "";
   const progress = sq?.progress ? `<p class="dim small progress">${esc(sq.progress)}</p>` : "";
-  return frame(slot, `Your decision: ${card.q.title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current, titled: true }) + nav);
+  return frame(slot, `Your decision: ${questionHead(card.q).title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current, titled: true }) + nav);
 }
 
 function instructionCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "instruction" }>): string {
@@ -518,7 +520,7 @@ export function decisionsHtml(c: Ctx, rows: string[][], states: StepState[] = st
               : `<input type="${k === "number" ? "number" : "text"}" step="any" name="value" aria-label="Value of ${esc(f.label)}" value="${esc(v === undefined || v === null ? "" : typeof v === "string" ? v : JSON.stringify(v))}">`;
       return `<div class="decision" data-decision="${esc(key)}"><div class="dhead"><strong>${esc(f.label)}</strong> <span class="dim small">${esc(key)}</span></div>
 <div class="row">${input}${owner === "fixed" ? "" : btn("Save", `data-decision-save="${esc(key)}" aria-label="Save ${esc(f.label)}"`)}${owner === "fixed" ? "" : btn("Change", `data-change="${esc(key)}" aria-label="Change ${esc(f.label)}"`, "quiet")}<label class="inline small">Owner <select name="owner" data-owner="${esc(key)}">${["human", "agent", "fixed"].map((o) => `<option value="${o}"${o === owner ? " selected" : ""}>${o === "human" ? "you" : o}</option>`).join("")}</select></label></div>
-<div class="dim small">Set by: ${esc(by)}</div></div>`;
+<div class="dim small">${by === "not set" ? "Not set" : `Set by: ${esc(by === "human" ? "you" : by)}`}</div></div>`;
     })
     .join("")}</div>`;
 }

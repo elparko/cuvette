@@ -283,6 +283,8 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     const r = await page.eval<{ bottom: number; clamp: string }>(`({ bottom: document.querySelector("#msg").closest("form").getBoundingClientRect().bottom, clamp: getComputedStyle(document.querySelector('[role="status"] span.flex-1')).webkitLineClamp })`);
     expect(r.bottom).toBeLessThanOrEqual(844);
     expect(r.clamp).toBe("2");
+    const head = await page.eval<number>(`document.querySelector("#msg").closest("main, body").querySelector("header:has([aria-label='More'])").getBoundingClientRect().height`);
+    expect(head).toBeLessThanOrEqual(100);
     await page.size(1280, 900);
   });
 });

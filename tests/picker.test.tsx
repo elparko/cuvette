@@ -30,3 +30,15 @@ test("Esc opens nothing", async () => {
   h.type("\x1b");
   expect(await done).toBeUndefined();
 });
+
+test("a long folder and a status fit on one line at 80 columns", async () => {
+  const h = makeHarness(80, 24);
+  const long: SessionInfo[] = [{ id: "20261008-100000-dddd", cwd: "/Users/someone/Code/guided-analysis/projects/a/very/long/folder/name/for/the/data", used: Date.now(), ask: "Count", status: "waiting for you" }];
+  const done = pickSession(long, 0, undefined, { stdin: h.stdin, stdout: h.stdout });
+  await until(() => h.all().includes("Enter opens"));
+  const line = h.term.view().split("\n").find((l) => l.includes("just now"))!;
+  expect(line).toContain("waiting for you");
+  expect(line.length).toBeLessThanOrEqual(80);
+  h.type("\x1b");
+  await done;
+});

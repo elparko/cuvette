@@ -160,3 +160,13 @@ describe("sample sheet edge cases", () => {
     expect(readSheet(p)[0]).toMatchObject({ sample: "S1", group: "Ctrl" });
   });
 });
+
+describe("sample files in a folder", () => {
+  test("a whole-data table is not a sample", async () => {
+    const { sampleFiles } = await import("../src/core/samples.ts");
+    expect(sampleFiles(["data.csv", "a.tif", "b.tif"])).toEqual({ files: ["a.tif", "b.tif"], tables: ["data.csv"] });
+    expect(sampleFiles(["data.csv", "README.txt"])).toEqual({ files: [], tables: ["data.csv", "README.txt"] });
+    expect(sampleFiles(["s1.csv", "s2.csv", "metadata.csv"])).toEqual({ files: ["s1.csv", "s2.csv"], tables: ["metadata.csv"] });
+    expect(sampleFiles(["s1.csv", "s2.csv", "a.tif"])).toEqual({ files: ["s1.csv", "s2.csv", "a.tif"], tables: [] });
+  });
+});

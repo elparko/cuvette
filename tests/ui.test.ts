@@ -161,7 +161,7 @@ describe("the program choice", () => {
   });
 
   test("Enter accepts the recommendation or the default; with neither, the card says what is needed and the cursor stays on the first option", async () => {
-    const { questionCursor, questionEnter, questionNeed, setupValues } = await import("../src/ui/cards.ts");
+    const { answerLine, questionCursor, questionEnter, questionNeed, setupValues } = await import("../src/ui/cards.ts");
     const opts = [{ value: "a", label: "A" }, { value: "b", label: "B" }];
     const base = { ...q("q1"), options: opts };
     expect(questionCursor({ ...base, recommendation: { value: "b", reason: "" } })).toBe(1);
@@ -174,6 +174,9 @@ describe("the program choice", () => {
     expect(questionCursor(base)).toBe(0);
     expect(questionNeed({ ...base, title: "Color" })).toBe("There is no recommendation for Color. Choose one of the options.");
     expect(questionNeed({ ...base, recommendation: { value: "a", reason: "" } })).toBeUndefined();
+    expect(questionNeed({ ...base, title: "Which test do you want to use to compare the endocardium with the epi..." })).toBe("There is no recommendation. Choose one of the options.");
+    expect(questionEnter({ ...base, options: [], title: "Which dose?" }, 0)).toEqual({ type: "This question needs your answer. Type it here." });
+    expect(answerLine({ qid: "q1", title: "Which test do you want to use...", options: [{ value: "t", label: "t test" }] }, "t")).toBe("Which test do you want to use…: t test · /change q1");
     const fields = [{ key: "adapter", label: "Program (adapter)", kind: "text", owner: "agent" as const, value: undefined, set: false }, { key: "alpha", label: "Alpha", kind: "float", owner: "human" as const, value: undefined, set: false, default: 0.05 }];
     expect(setupValues(fields, { t: "setup", profiles: [] })).toEqual({ alpha: 0.05 });
   });
@@ -237,5 +240,25 @@ describe("the setup card question", () => {
     expect(setupRequest(s, { question: "" })).toBeUndefined();
     s.record.append("user", { text: "Count the cells." });
     expect(setupRequest(s, { question: "Is drug 2 better?" })).toBeUndefined();
+  });
+});
+
+describe("decision rows and question titles", () => {
+  test("an empty value is not set, and a value from the scientist is set by you", async () => {
+    const { decisionRows } = await import("../src/ui/commands.ts");
+    const s = new FakeSession();
+    s.decisions.applySetup({ question: "", alpha: 0.01 });
+    const rows = Object.fromEntries(decisionRows(s).map((r) => [r[0], r[3]]));
+    expect(rows.question).toBe("not set");
+    expect(rows.alpha).toBe("you (setup)");
+    expect(rows.min_auc).toBe("default");
+  });
+
+  test("a clipped title gives the full question as the title and no repeated text", async () => {
+    const { questionHead } = await import("../src/ui/cards.ts");
+    const long = "x".repeat(90) + "?";
+    expect(questionHead({ title: long.slice(0, 77) + "...", text: long })).toEqual({ title: long, text: "" });
+    expect(questionHead({ title: "Which test?", text: "Which test?" })).toEqual({ title: "Which test?", text: "" });
+    expect(questionHead({ title: "Which test?", text: "Choose one." })).toEqual({ title: "Which test?", text: "Choose one." });
   });
 });

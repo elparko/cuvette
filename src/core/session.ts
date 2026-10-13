@@ -50,7 +50,7 @@ import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./hou
 import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
-import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
+import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
@@ -1196,7 +1196,7 @@ export class Session {
       this.endedBy = "max_steps";
       return "";
     } catch (e) {
-      const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
+      const msg = signal.aborted && this.cutReply ? "Stopped. The reply above is not complete." : e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg, warn: true } : { message: msg });
       if (!signal.aborted) this.endedBy = "error";
       this.closeOpenCalls(results);
@@ -1216,6 +1216,7 @@ export class Session {
       this.draft = undefined;
       this.stopTurn = false;
       this.endTurn = undefined;
+      this.cutReply = false;
       this.saveResults(turnStart);
       this.busy = false;
       this.bus.emit({ type: "status", state: "idle" });
@@ -1228,6 +1229,7 @@ export class Session {
   // How the last turn ended: "answer", "max_steps" (the step limit), "error" or "stopped" (Esc, a card or a cancel).
   endedBy: "answer" | "max_steps" | "error" | "stopped" = "stopped";
 
+  private cutReply = false;
   recoveryWaitMs = 60_000;
   recoveryRounds = 3;
 
@@ -1238,9 +1240,11 @@ export class Session {
       let retried = false;
       let tries = 1;
       let streamed = false;
+      let partial = "";
       const dropStreamed = () => {
         if (streamed) this.bus.emit({ type: "delta_reset" });
         streamed = false;
+        partial = "";
       };
       try {
         const res = await this.provider.step({
@@ -1251,6 +1255,7 @@ export class Session {
           signal,
           onDelta: (d) => {
             streamed = true;
+            if (d.type === "text") partial += d.text;
             this.bus.emit({ type: "delta", kind: d.type, text: d.text });
           },
           onRetry: (r) => {
@@ -1279,6 +1284,11 @@ export class Session {
             this.record.append("notice", { text: `${e.message} The summary could not make the context shorter, so the harness keeps this reply.` });
             return e.result;
           }
+        }
+        if (signal.aborted && partial.trim()) {
+          this.record.append("assistant", { text: partial.trim(), final: false, stopped: true });
+          this.cutReply = true;
+          streamed = false;
         }
         dropStreamed();
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
@@ -1316,12 +1326,12 @@ export class Session {
     });
     this.bus.emit({ type: "question", question: q });
     this.bus.emit({ type: "status", state: "waiting" });
-    this.waitedQids.add(q.qid);
     try {
-      const done = await abortable(this.questions.wait(q.qid), signal);
+      const done = await this.waitFor(q.qid, signal);
       const answer = String(done.answer);
       return answer === "resume" || answer === "local" ? answer : "stop";
     } catch {
+      this.questions.withdraw(q.qid, "The turn stopped before an answer.");
       return "stop";
     }
   }
@@ -3870,7 +3880,15 @@ export class Session {
           if (rels.length < 2) continue;
           check = checkFiles(await fileInfos(f.path, rels), f.path);
           const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
-          if (!this.sheet) sheet = sheetFromFiles(rels.map((r) => inside(join(f.path, r))), f.path);
+          if (!this.sheet) {
+            const { files, tables } = sampleFiles(rels);
+            if (files.length >= 2) sheet = sheetFromFiles(files.map((r) => inside(join(f.path, r))), f.path);
+            for (const t of files.length >= 2 ? [] : tables.filter((r) => /\.(csv|tsv)$/i.test(r))) {
+              const p = join(f.path, t);
+              sheet = existsTable(p) ? sheetFromTable(readCsvTable(p), p) : undefined;
+              if (sheet) break;
+            }
+          }
         } else {
           const t = readCsvTable(f.path);
           if (!t.rows.length) continue;

@@ -138,9 +138,17 @@ export class FakeSession implements SessionLike {
     this.bus.emit({ type: "status", state, tool, purpose: state === "running" && tool ? activity(tool, args) : undefined, since: Date.now() });
   }
 
+  private cut = false;
+
   private async stream(text: string) {
+    let said = "";
     for (const w of text.split(/(?<= )/)) {
-      if (this.aborted) return;
+      if (this.aborted) {
+        if (said.trim()) this.record.append("assistant", { text: said.trim(), final: false, stopped: true });
+        this.cut = !!said.trim();
+        return;
+      }
+      said += w;
       this.bus.emit({ type: "delta", kind: "text", text: w });
       await this.sleep(this.delay / 5);
     }
@@ -308,13 +316,15 @@ export class FakeSession implements SessionLike {
     await this.runTool("export_table", { path: "missing.csv" }, { summary: "", route: "File > Save as", error: "Folder is read-only", fidelity: "code_only" });
     const finalText = `14 features differ between endo and epi at AUC ${String(ans.value)}.`;
     await this.stream(finalText);
+    if (this.aborted) return this.stopped();
     this.record.append("assistant", { text: finalText, final: true });
     this.status("idle");
     return finalText;
   }
 
   private stopped(): string {
-    this.record.append("notice", { text: "Stopped." });
+    this.record.append("notice", { text: this.cut ? "Stopped. The reply above is not complete." : "Stopped.", warn: true });
+    this.cut = false;
     this.status("idle");
     return "";
   }

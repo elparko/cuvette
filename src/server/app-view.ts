@@ -3,7 +3,7 @@ import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
-  applyRewind, applySetup, setupRequest, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
+  applyRewind, applySetup, isPlainQuestion, setupRequest, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, respondPhi, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
@@ -42,6 +42,7 @@ export class WebView {
   private thinking = "";
   queue: string[] = [];
   details = false;
+  private stopping = false;
   private clients = new Set<ServerResponse>();
   private off: () => void;
   private changed?: ReturnType<typeof setTimeout>;
@@ -281,6 +282,8 @@ export class WebView {
           this.queue = rest;
           if (next !== undefined) this.session.send(next).catch((err: Error) => this.line("✗", `The agent stopped: ${err.message}`, "red"));
           if (was.state !== "idle") this.send({ t: "notify", title: "The agent is done", body: "The agent waits for you." , quiet: true });
+          if (this.stopping) this.leaveQuestions();
+          this.stopping = false;
         }
         this.sendStatus();
         break;
@@ -336,7 +339,18 @@ export class WebView {
     }
   }
 
+  // After a stop, the open question cards leave the conversation. The questions stay open in /questions.
+  private leaveQuestions(): void {
+    const before = this.slots.length;
+    this.slots = this.slots.filter((sl) => !isPlainQuestion(sl.card));
+    if (this.slots.length === before) return;
+    this.seq = SEQ_START;
+    this.sendCards();
+    this.line("▸", "The questions stay open. They come back with /questions.", undefined, true);
+  }
+
   stop(): void {
+    this.stopping = this.busy;
     this.queue = [];
     stopTurn(this.session);
     this.sendStatus();

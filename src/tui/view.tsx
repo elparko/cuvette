@@ -19,11 +19,12 @@ export function liveLayout(o: { rows: number; columns: number; card: boolean; ru
   const budget = o.rows - 2;
   const footer = 1 + (o.status ?? 2) + (o.keys ? 1 : 0) + o.queue + o.suggestions;
   const box = 2 + (o.inputRows ?? Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4))));
-  const inputBox = !o.card || budget - footer - box >= 16;
+  // A card gets the rows first. The empty message box, the streamed text and the open steps take only the rows that are left.
+  const inputBox = !o.card || budget - footer - box >= 22;
   const avail = Math.max(0, budget - footer - (inputBox ? box : 0));
   if (o.card) {
-    const live = o.text ? Math.min(3, Math.max(0, avail - 12)) : 0;
-    const pending = o.pending ? Math.min(2, Math.max(0, avail - live - 12)) : 0;
+    const live = o.text ? Math.min(3, Math.max(0, avail - 18)) : 0;
+    const pending = o.pending ? Math.min(2, Math.max(0, avail - live - 18)) : 0;
     return { inputBox, live, pending, card: Math.max(4, avail - live - pending) };
   }
   const pending = o.pending ? Math.floor(avail / (o.text ? 3 : 1)) : 0;
@@ -52,7 +53,9 @@ export function ItemView({ item }: { item: StaticItem }) {
     case "user":
       return (
         <Box marginTop={1}>
-          <Text color="cyan">{"> "}</Text>
+          <Box flexShrink={0} paddingRight={1}>
+            <Text color="cyan">{">"}</Text>
+          </Box>
           <Text bold>{item.text}</Text>
         </Box>
       );
@@ -67,15 +70,46 @@ export function ItemView({ item }: { item: StaticItem }) {
         </Box>
       );
     case "block":
-      return (
-        <Box flexDirection="column" marginY={1}>
-          {item.title ? <Text bold>{item.title}</Text> : null}
-          <Text>{item.text}</Text>
-        </Box>
-      );
+      return <BlockView title={item.title} text={item.text} />;
     case "step":
       return <StepView item={item} />;
   }
+}
+
+// A table row that is wider than the terminal wraps its last column under the start of that column.
+export function hangWrap(text: string, width: number): string {
+  return text
+    .split("\n")
+    .flatMap((line) => {
+      if (line.length <= width) return [line];
+      const gap = /^(.*\S) {2,}(?=\S)/.exec(line.slice(0, width));
+      const indent = gap && gap[0].length <= width * 0.6 ? gap[0].length : 0;
+      const out: string[] = [];
+      let rest = indent ? line.slice(indent).trim() : line.trimEnd();
+      let first = line.slice(0, indent);
+      const room = width - indent;
+      while (rest.length > room) {
+        const cut = rest.lastIndexOf(" ", room);
+        const at = cut > room / 3 ? cut : room;
+        out.push(first + rest.slice(0, at).trimEnd());
+        rest = rest.slice(at).trimStart();
+        first = " ".repeat(indent);
+      }
+      out.push(first + rest);
+      return out;
+    })
+    .join("\n");
+}
+
+function BlockView({ title, text }: { title?: string; text: string }) {
+  const { stdout } = useStdout();
+  const width = ((stdout as unknown as { columns?: number })?.columns ?? 80) - 1;
+  return (
+    <Box flexDirection="column" marginY={1}>
+      {title ? <Text bold>{title}</Text> : null}
+      <Text>{hangWrap(text, width)}</Text>
+    </Box>
+  );
 }
 
 function AssistantView({ text }: { text: string }) {
@@ -102,15 +136,16 @@ function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
           <Text color="red">✗</Text> <Text bold>{label}</Text>  <Text color="red">{item.error ?? item.summary}</Text>
         </Text>
       )}
-      {item.why ? <Text dimColor>  Purpose: {item.why}</Text> : null}
-      {detail ? <Text dimColor>  ▸ {detail}</Text> : null}
-      {fid ? <Text color="yellow">  ◇ {fid}</Text> : null}
-      {item.outputs.map((o) => (
-        <Text key={o.n} dimColor>
-          {"  "}
-          {o.kind}: {o.path} (open with /open {o.n})
-        </Text>
-      ))}
+      <Box flexDirection="column" paddingLeft={2}>
+        {item.why ? <Text dimColor>Purpose: {item.why}</Text> : null}
+        {detail ? <Text dimColor>▸ {detail}</Text> : null}
+        {fid ? <Text color="yellow">◇ {fid}</Text> : null}
+        {item.outputs.map((o) => (
+          <Text key={o.n} dimColor>
+            {o.kind}: {o.path} (open with /open {o.n})
+          </Text>
+        ))}
+      </Box>
     </Box>
   );
 }

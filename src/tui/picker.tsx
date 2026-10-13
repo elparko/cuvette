@@ -28,7 +28,7 @@ export function SessionPicker(props: { list: SessionInfo[]; initial: number; not
           <Box key={s.id} flexDirection="column">
             <Text color={i === sel ? "cyan" : undefined} bold={i === sel}>
               {i === sel ? "▸ " : "  "}
-              {age} · {clipStart(folderText(s.cwd), width - age.length - 3)}
+              {age} · {clipStart(folderText(s.cwd), Math.max(10, width - age.length - 3 - (s.status ? s.status.length + 3 : 0)))}
               {s.status ? <Text dimColor> · {s.status}</Text> : null}
             </Text>
             {s.name ? <Text>    {clip(s.name, width - 2)}</Text> : null}

@@ -20,9 +20,9 @@ export function ModelMenu({ model, busy, openSettings }: { model: string; busy: 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-full" aria-label={`Model: ${current?.name ?? model}`}>
+        <Button variant="outline" size="sm" className="min-w-0 shrink rounded-full" aria-label={`Model: ${current?.name ?? model}`}>
           <span className="text-muted-foreground">Model</span>
-          <span className="font-semibold">{current?.name ?? model}</span>
+          <span className="min-w-0 truncate font-semibold">{current?.name ?? model}</span>
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
