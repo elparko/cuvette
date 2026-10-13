@@ -482,6 +482,17 @@ describe("a long install: stop, password, and a second action at the same time",
     expect(exec).toHaveBeenCalledTimes(1);
   });
 
+  test("a damaged or empty lock file does not block and does not stop the install", async () => {
+    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    mkdirSync(join(home, "programs-running"), { recursive: true });
+    const exec = vi.fn(async () => 0);
+    for (const body of ["", "null", "{bad", "7"]) {
+      writeFileSync(join(home, "programs-running", "zeta.json"), body);
+      expect(await runAction(plan, { ...fakes(), via: "terminal", confirmed: true, exec })).toMatchObject({ ok: true });
+    }
+    expect(exec).toHaveBeenCalledTimes(4);
+  });
+
   test("a lock file from before a restart of the computer does not block, also if a new process has its process ID", async () => {
     const plan = (await planFor("zeta", "install", fakes())).plan!;
     mkdirSync(join(home, "programs-running"), { recursive: true });

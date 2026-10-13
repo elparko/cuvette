@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
@@ -30,6 +30,16 @@ let rec: FakeRecord;
 beforeEach(() => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-"));
   rec = new FakeRecord(join(process.env.CUVETTE_HOME, "sessions", "s1"));
+});
+
+test("a damaged questions file gives no open questions, and the next question replaces it", async () => {
+  for (const body of ["", "null", "{}", '[1, null, {"status": "open"}]']) {
+    writeFileSync(join(process.env.CUVETTE_HOME!, "questions.json"), body);
+    expect(allOpenQuestions()).toEqual([]);
+  }
+  const q = new QuestionQueue(rec as any);
+  await q.ask(spec());
+  expect(allOpenQuestions().map((x) => x.qid)).toEqual(["q1"]);
 });
 
 test("ask, answer by label, closed throws, restore", async () => {

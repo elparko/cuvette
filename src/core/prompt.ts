@@ -80,7 +80,8 @@ export function foldersText(f: Folders): string {
 }
 
 // A folder name with a line break can start a line that looks like a note from the harness. Such a path goes in JSON quotes.
-const pathText = (p: string) => (/[\x00-\x1f\x7f\u2028\u2029]/.test(p) ? JSON.stringify(p) : p);
+// The note puts a path in quotes if the path has a character that can change how the note reads: a code mark, a markdown mark or ". ".
+const pathText = (p: string) => (/[^\p{L}\p{N}\p{M}_\-./\\ ~+@,:()'%&=]|\.\s/u.test(p) ? JSON.stringify(p) : p);
 
 export function foldersNote(f: { project: string; work: string; output?: string }): string {
   const out = f.output ?? f.work;

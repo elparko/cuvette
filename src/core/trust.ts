@@ -62,7 +62,9 @@ const sha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex")
 
 function parse(path: string): Record<string, unknown> {
   try {
-    const s = JSON.parse(readFileSync(path, "utf8"));
+    const text = readFileSync(path, "utf8");
+    if (!text.trim()) return {};
+    const s = JSON.parse(text);
     if (!s || typeof s !== "object" || Array.isArray(s)) return {};
     if (typeof s.permissions === "string") {
       const { permissions, ...rest } = s;
@@ -158,7 +160,8 @@ function userFile(): string {
 
 function readUser(): Record<string, unknown> {
   try {
-    return JSON.parse(readFileSync(userFile(), "utf8"));
+    const v = JSON.parse(readFileSync(userFile(), "utf8"));
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   } catch {
     return {};
   }

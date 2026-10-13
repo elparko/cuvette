@@ -346,6 +346,27 @@ describe("checkAnswer inputs and small counts", () => {
     expect(labels("The interval ended at 250 mg.", [{ node: "n1", path: "metrics.ci_l", value: 0.25 }])).toEqual(["unsourced"]);
   });
 
+  test("a number in another unit of the same kind does not match the bare logged value", () => {
+    expect(labels("The run took 150 hours.", [{ node: "n1", path: "metrics.duration_min", value: 150 }])).toEqual(["unsourced"]);
+    expect(labels("The decay time was 21 ms.", [{ node: "n1", path: "metrics.decay_s", value: 21 }])).toEqual(["unsourced"]);
+    expect(labels("The mean was 12.5 mm.", [{ node: "n1", path: "metrics.mean_um", value: 12.5 }])).toEqual(["unsourced"]);
+    expect(labels("The mean was 12.5 um.", [{ node: "n1", path: "metrics.mean_um", value: 12.5 }])).toEqual(["measured"]);
+  });
+
+  test("a percent does not match the same bare value in a fraction key", () => {
+    expect(labels("Only 0.42% of cells were positive.", [{ node: "n1", path: "metrics.frac_pos", value: 0.42 }])).toEqual(["unsourced"]);
+    expect(labels("Only 42% of cells were positive.", [{ node: "n1", path: "metrics.frac_pos", value: 0.42 }])).toEqual(["measured"]);
+    expect(labels("Only 42% of cells were positive.", [{ node: "n1", path: "metrics.pos", value: 42 }])).toEqual(["measured"]);
+  });
+
+  test("a number in a name with a hyphen, and a year, are not claims", () => {
+    expect(labels("IL-17 rose 2.1-fold in COVID-19 patients.", [{ node: "n1", path: "metrics.fold_change", value: 2.1 }])).toEqual(["measured"]);
+    expect(labels("Samples were collected in 2019 and 2020; 412 cells passed QC.", [{ node: "n1", path: "metrics.n", value: 412 }])).toEqual(["measured"]);
+    expect(labels("The window was 20-30 bases and 2019 cells passed.", [{ node: "n1", path: "metrics.n", value: 412 }])).toEqual(["unsourced", "unsourced", "unsourced"]);
+    expect(labels("The filter kept reads in 2000 cells from 1999 wells.", [{ node: "n1", path: "metrics.n", value: 412 }])).toEqual(["unsourced", "unsourced"]);
+    expect(labels("Only 45% were positive.", [{ node: "n1", path: "metrics.frac_pos", value: 45 }])).toEqual(["measured"]);
+  });
+
   test("a unit converts for a value in a list", () => {
     expect(labels("The second pellet weighed 250 mg.", [{ node: "n1", path: "metrics.mass_g[1]", value: 0.25 }])).toEqual(["measured"]);
   });

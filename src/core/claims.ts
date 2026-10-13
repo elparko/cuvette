@@ -39,6 +39,7 @@ const MASKS: RegExp[] = [
   /\b(?:WGS|NAD|ETRS|GDA|SIRGAS)\s?\d+|\bEPSG:?\s?\d+|\bUTM zone \d+[NS]?/gi,
   /[\w.-]*\.(?:pdb|cif|mmcif|fasta|fa|faa|fna|fcs|tif|tiff|png|jpe?g|gif|csv|tsv|xlsx?|mzml|mzxml|imzml|ibd|vcf|bcf|bed|bam|sam|cram|fastq|fq|fif|edf|fits?|phy|nex|nwk|tree|json|xml|ya?ml|txt|h5ad|h5|zarr|nii|gz|zip|cppipe|ijm|py|r|ipynb)\b/gi,
   /\b\d[A-Z][A-Z0-9]{2}\b/g,
+  /\b[A-Za-z][A-Za-z0-9]*-\d+(?!\d|[.,]\d)/g,
   /\bet al\.?,?\s*\(?(?:19|20)\d\d[a-z]?\)?/g,
   /\([A-Z][A-Za-z'-]+(?:\s+et al\.?|\s+(?:and|&)\s+[A-Z][A-Za-z'-]+)?,?\s+(?:19|20)\d\d[a-z]?(?:[;,][^)]*)?\)/g,
 ];
@@ -54,6 +55,11 @@ const LABEL_BEFORE =
 
 const THRESHOLD_BEFORE =
   /(?:\b[pq]\s*(?:<|≤|<=)|\b(?:alpha|threshold|cut-?off|FDR|significance level)\s*(?:of|at|=|<|≤)?|α\s*(?:=|<|≤)?)\s*$/i;
+
+const YEAR_BEFORE =
+  /(?:\b(?:in|since|from|until|during|between|through|years?|Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)|\b(?:19|20)\d\d\s*(?:,|and|or|to|–|-))\s*$/i;
+
+const YEAR_AFTER = /^(?:\s*$|\s*[,.;:)–-]|\s+(?:and|or|to|through|until)\b|\s+[A-Z])/;
 
 const UNITS: Record<string, [string, number]> = {
   ng: ["mass", 1e-9], ug: ["mass", 1e-6], mg: ["mass", 1e-3], g: ["mass", 1], kg: ["mass", 1e3],
@@ -91,11 +97,12 @@ function mask(text: string): string {
 }
 
 function inTableCell(text: string, at: number): boolean {
-  const line = text.slice(text.lastIndexOf("\n", at - 1) + 1, (text.indexOf("\n", at) + 1 || text.length + 1) - 1);
+  const end = text.indexOf("\n", at);
+  const line = text.slice(text.lastIndexOf("\n", at - 1) + 1, end < 0 ? text.length : end);
   if (!/^\s*\|.*\|\s*$/.test(line)) return false;
-  const lines = text.split("\n");
-  const i = text.slice(0, at).split("\n").length - 1;
-  return !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "");
+  if (end < 0) return true;
+  const after = text.indexOf("\n", end + 1);
+  return !/^\s*\|[\s:|-]+\|\s*$/.test(text.slice(end + 1, after < 0 ? text.length : after));
 }
 
 export function extractNumbers(text: string, opts: { small?: boolean } = {}): Found[] {
@@ -103,6 +110,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
   const hasCitation = (s: Span) => CITATION.test(s.text);
   const spans = splitSentences(text);
   const out: Found[] = [];
+  let si = 0;
   for (const m of masked.matchAll(NUMBER)) {
     const start = m.index!;
     let end = start + m[0].length;
@@ -114,7 +122,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     if (!Number.isFinite(value)) continue;
     const step = Number(`1e${exp - dec}`);
     const percent = Boolean(m[6]);
-    const before = masked.slice(0, start);
+    const before = masked.slice(Math.max(0, start - 80), start);
     const sign = before.match(/(^|[\s(=<>≤≥*_`~[:|])([-−+])$/);
     let from = start;
     const signed = !!sign;
@@ -129,8 +137,9 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     if (LABEL_BEFORE.test(before)) continue;
     if (THRESHOLD_BEFORE.test(before)) continue;
     if (percent && /^\s*(?:confidence|CI\b)/i.test(masked.slice(end))) continue;
-    const sentence = spans.find((s) => start >= s.start && start < s.end);
-    if (plain && value >= 1900 && value <= 2100 && sentence && hasCitation(sentence)) continue;
+    while (si < spans.length && spans[si]!.end <= start) si++;
+    const sentence = spans[si] && start >= spans[si]!.start ? spans[si] : undefined;
+    if (plain && value >= 1900 && value <= 2100 && ((sentence && hasCitation(sentence)) || (YEAR_BEFORE.test(before) && YEAR_AFTER.test(masked.slice(end, end + 40))))) continue;
     if (percent) end = start + m[0].length;
     const after = masked.slice(end);
     const unit = percent ? undefined : UNIT_AFTER.exec(after)?.[1];
@@ -161,22 +170,24 @@ interface Target {
   unit?: string;
   log?: boolean;
   ratio?: boolean;
+  fraction?: boolean;
 }
 
 export function target(path: string, value: number): Target {
   const key = (path.split(".").pop() ?? "").replace(/(\[\d+\])+$/, "");
-  return { value, unit: keyUnit(path), log: /log/i.test(key), ratio: /ratio|fold|(^|_)fc($|_)/i.test(key) && !/log/i.test(key) };
+  return { value, unit: keyUnit(path), log: /log/i.test(key), ratio: /ratio|fold|(^|_)fc($|_)/i.test(key) && !/log/i.test(key), fraction: /(^|_)(frac|fraction|proportion)(_|$)/i.test(key) && Math.abs(value) <= 1 };
 }
 
 // A logged number matches in its own unit: mg against a key that ends in _g, a fraction against a key in _pct.
 // A number with no sign near a word such as lower or decrease also matches the negative logged value.
 // N-fold also matches log2(N) in a key with "log" in its name. Near a decrease word it matches -log2(N) there, and 1/N in a ratio or fold key.
 function variants(f: Found, t: Target, down: boolean): { value: number; step: number }[] {
-  const base = [{ value: f.value, step: f.step }];
-  if (f.percent) base.push({ value: f.value / 100, step: f.step / 100 });
   const from = f.unit ? UNITS[f.unit] : undefined;
   const to = t.unit ? UNITS[t.unit] : undefined;
-  if (from && to && from[0] === to[0] && f.unit !== t.unit) base.push({ value: (f.value * from[1]) / to[1], step: (f.step * from[1]) / to[1] });
+  const otherUnit = !!from && !!to && from[0] === to[0] && f.unit !== t.unit;
+  const base = otherUnit || (f.percent && t.fraction) ? [] : [{ value: f.value, step: f.step }];
+  if (f.percent) base.push({ value: f.value / 100, step: f.step / 100 });
+  if (otherUnit) base.push({ value: (f.value * from![1]) / to![1], step: (f.step * from![1]) / to![1] });
   if (t.unit === "pct" && !f.percent && !f.unit && Math.abs(f.value) <= 1) base.push({ value: f.value * 100, step: f.step * 100 });
   if (f.fold && f.value > 0) {
     const log = { value: Math.log2(f.value), step: f.step / (f.value * Math.LN2) };

@@ -491,11 +491,16 @@ export function settingsPath(scope: "user" | "project", cwd: string): string {
 
 function readJson(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
+  const text = readFileSync(path, "utf8");
+  if (!text.trim()) return {};
+  let v: unknown;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    v = JSON.parse(text);
   } catch (e) {
     throw new Error(`settings file ${path} is not valid JSON: ${(e as Error).message}`);
   }
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error(`settings file ${path} must hold one JSON object, in braces { }`);
+  return v as Record<string, unknown>;
 }
 
 function layers(cwd: string): [Source, Record<string, unknown>, string][] {

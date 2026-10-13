@@ -19,7 +19,7 @@ function home(settings?: Record<string, unknown>): string {
 }
 
 function cli(h: string, args: string[], cwd = project) {
-  const r = spawnSync("node", [CUVETTE, ...args], { cwd, env: { ...process.env, CUVETTE_HOME: h, CUVETTE_NO_OPEN: "1", ANTHROPIC_API_KEY: "" }, encoding: "utf8", timeout: 60_000 });
+  const r = spawnSync("node", [CUVETTE, ...args], { cwd, env: { ...process.env, CUVETTE_HOME: h, CUVETTE_NO_OPEN: "1", ANTHROPIC_API_KEY: "", TMPDIR: root }, encoding: "utf8", timeout: 60_000 });
   return { code: r.status, out: r.stdout, err: r.stderr };
 }
 
@@ -50,7 +50,7 @@ test("a run with an answer exits 0, and its script, flow and replay give the sam
   expect(out.stop).toBe("answer");
   const script = cli(h, ["export", out.session, "--format", "script"]).out.trim();
   expect(script).toMatch(/replay\.mts$/);
-  const ran = spawnSync("node", [TSX_CLI, script], { cwd: tmpdir(), env: { ...process.env, CUVETTE_HOME: h }, encoding: "utf8" });
+  const ran = spawnSync("node", [TSX_CLI, script], { cwd: tmpdir(), env: { ...process.env, CUVETTE_HOME: h, TMPDIR: root }, encoding: "utf8" });
   expect(ran.status, ran.stderr).toBe(0);
   expect(ran.stdout).toBe('Step 1 mean_of: {"mean":2.5}\nStep 2 count_rows: {"n_rows":4}\n');
   const flow = cli(h, ["export", out.session, "--format", "flow"]).out.trim();
@@ -77,7 +77,7 @@ test("a script stops with exit code 1 at a failed step", () => {
   const out = JSON.parse(headless(h, model).out);
   const script = cli(h, ["export", out.session, "--format", "script"]).out.trim();
   writeFileSync(script, readFileSync(script, "utf8").replace(`"column": "x"`, `"column": "nope"`));
-  const ran = spawnSync("node", [TSX_CLI, script], { cwd: tmpdir(), env: { ...process.env, CUVETTE_HOME: h }, encoding: "utf8" });
+  const ran = spawnSync("node", [TSX_CLI, script], { cwd: tmpdir(), env: { ...process.env, CUVETTE_HOME: h, TMPDIR: root }, encoding: "utf8" });
   expect(ran.status).toBe(1);
   expect(ran.stdout).toContain("Step 1 mean_of: failed: no column nope");
 });

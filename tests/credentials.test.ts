@@ -1,4 +1,4 @@
-import { mkdtempSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -14,6 +14,16 @@ afterEach(() => {
 });
 
 const KEY = "sk-ant-api03-abcdefghijklmnop-WXYZ";
+
+test("a damaged credentials file gives no key, and a new key replaces it", () => {
+  for (const body of ["", "null", "[1]", '{"anthropic_api_key": 5}']) {
+    mkdirSync(process.env.CUVETTE_HOME!, { recursive: true });
+    writeFileSync(credentialsPath(), body);
+    expect(claudeKey({})).toEqual({ from: "none" });
+  }
+  saveClaudeKey(KEY);
+  expect(savedClaudeKey()).toBe(KEY);
+});
 
 test("save, read and remove the key", () => {
   expect(claudeKey({})).toEqual({ from: "none" });

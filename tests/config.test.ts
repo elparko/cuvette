@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -18,4 +18,19 @@ test("loadSettings reads .ga/ settings and lets .cuvette/ settings win", () => {
   writeFileSync(join(cwd, ".cuvette", "settings.json"), JSON.stringify({ model: "new-model" }));
   trustFolder(cwd);
   expect(loadSettings(cwd)).toMatchObject({ model: "new-model", maxSteps: 7 });
+});
+
+test("an empty settings file gives the defaults, a file that is not an object stops with a clear message, and a value of the wrong type is left out", () => {
+  const home = (process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-config-home-")));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-config-"));
+  writeFileSync(join(home, "settings.json"), "");
+  expect(loadSettings(cwd).output_folder).toBe("cuvette");
+  for (const body of ["null", "[1]", "7"]) {
+    writeFileSync(join(home, "settings.json"), body);
+    expect(() => loadSettings(cwd)).toThrow(/must hold one JSON object/);
+  }
+  writeFileSync(join(home, "settings.json"), JSON.stringify({ output_folder: 5, defaultAdapters: "tables", permissions: [1], maxSteps: "a", model: "m2", export_xlsx: false }));
+  expect(loadSettings(cwd)).toMatchObject({ output_folder: "cuvette", defaultAdapters: ["tables"], permissions: {}, maxSteps: 40, model: "m2", export_xlsx: false });
+  rmSync(home, { recursive: true, force: true });
+  rmSync(cwd, { recursive: true, force: true });
 });
