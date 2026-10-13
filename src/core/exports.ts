@@ -219,6 +219,9 @@ function toCode(v: unknown, refs: Map<string, string>): string {
   return JSON.stringify(v) ?? "null";
 }
 
+// A line break ends a // comment or a ! line of a notebook, so record text there must stay on one line.
+const oneLine = (s: string) => s.replace(/[\r\n\u2028\u2029]+/g, " ");
+
 export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const nodes = liveNodes(record);
   const names = [...new Set(nodes.map((n) => n.adapter).filter(Boolean))];
@@ -239,7 +242,7 @@ export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], 
   const seen = new Map<string, string>();
   nodes.forEach((n, k) => {
     if (!n.adapter) {
-      lines.push(`// Step ${k + 1} (${n.tool}) is a step of the harness, not of an adapter. This script runs adapter steps only.`);
+      lines.push(`// Step ${k + 1} (${oneLine(n.tool)}) is a step of the harness, not of an adapter. This script runs adapter steps only.`);
       return;
     }
     const route = stepRoute(adapters, n)?.route ?? n.manualRoute;
@@ -286,7 +289,7 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
       execution_count: null,
       metadata: {},
       outputs: [],
-      source: cellSource(`!cuvette run-step ${shellWord(n.adapter)} ${shellWord(n.tool)} ${shellWord(JSON.stringify(n.args))}`),
+      source: cellSource(`!cuvette run-step ${shellWord(oneLine(n.adapter))} ${shellWord(oneLine(n.tool))} ${shellWord(JSON.stringify(n.args).replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`))}`),
     });
   });
   const nb = {

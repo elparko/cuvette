@@ -98,7 +98,7 @@ function node(r: Rng, rec: AnalysisRecord): NodeIn {
     adapter: r.bool(0.9) ? "fz" : "",
     adapterVersion: "0.1.0",
     programVersion: r.bool() ? "1.0" : text(r),
-    tool: r.bool(0.8) ? r.pick(["blur", "fit", "measure", "run_script"]) : r.pick(["a b", "x; INJECTED", "$(INJECTED)", "`INJECTED`", "it's", "{x}", "$HOME", "a\nb"]),
+    tool: r.bool(0.8) ? r.pick(["blur", "fit", "measure", "run_script"]) : r.pick(["a b", "x; INJECTED", "$(INJECTED)", "`INJECTED`", "it's", "{x}", "$HOME", "a\nb", "a\nINJECTED()", "a\u2028INJECTED()"]),
     args,
     decisions: r.bool() ? { sigma: value(r) } : {},
     codeHash: "c",
@@ -266,10 +266,11 @@ describe("fuzz: HTML report and exports", () => {
       const lines = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code").map((c: { source: string[] }) => c.source.join(""));
       expect(lines.length).toBeLessThanOrEqual(steps.length);
       for (const line of lines) {
+        expect(line.split("\n").length, line).toBe(1);
         const words = shellWords(line);
         expect(words, line).toBeDefined();
         expect(words!.length, line).toBe(5);
-        expect(steps.some((n) => n.tool === words![3] && JSON.stringify(n.args) === words![4]), line).toBe(true);
+        expect(steps.some((n) => n.tool.replace(/[\r\n\u2028\u2029]+/g, " ") === words![3] && JSON.stringify(n.args) === JSON.stringify(JSON.parse(words![4]!))), line).toBe(true);
       }
       const flow = JSON.parse(readFileSync(exportFlow(rec, [adapter], join(rec.dir, "f.json")), "utf8"));
       expect(Array.isArray(flow.steps)).toBe(true);

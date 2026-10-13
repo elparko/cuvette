@@ -195,9 +195,9 @@ export function scanTable(columns: string[], rows: unknown[][], where: string, f
   columns.forEach((col, j) => {
     const kind = columnKind(String(col ?? ""));
     if (!kind || (kind === "zip" && !hasDate)) return;
-    const vals = rows.map((r, i) => ({ v: cell(r, j), i })).filter((x) => x.v && !MASKED.test(x.v));
+    const vals = rows.map((r, i) => ({ v: cell(r, j), i })).filter((x) => x.v);
     if (!vals.length) return;
-    const fit = vals.filter((x) => valueFits(kind, String(col), x.v));
+    const fit = vals.filter((x) => !MASKED.test(x.v) && valueFits(kind, String(col), x.v));
     if (fit.length * 2 < vals.length) return;
     const seen = new Set<string>();
     for (const x of fit) {
