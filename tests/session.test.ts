@@ -218,6 +218,23 @@ test("compare_options reruns the last step with other values as comparison runs 
   expect(results.at(-1)!.text).toMatch(/of the last step, count \(.*input=\/data\/a\.tif.*\)\. Only that step was repeated/);
 });
 
+test("compare_options does not run comparison runs of a step tool in plan mode", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { text: "done" },
+    { calls: [{ name: "compare_options", args: { key: "method", values: ["Otsu", "Triangle"] } }] },
+    { text: "done" },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count");
+  session.setMode("plan");
+  await session.send("Check other methods");
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results.at(-1)!.text).toMatch(/Plan mode: the agent runs only read-only tools, so no comparison runs of count\./);
+  expect(session.record.nodes().filter((n) => n.sensitivityOf)).toHaveLength(0);
+});
+
 test("a step that uses the output of a comparison run is also a comparison run", async () => {
   let step = 0;
   const provider = new FakeProvider(() => {
@@ -2331,4 +2348,104 @@ test("full session: plan first from the request to the results, a continue after
   answerCards(r, () => ({ action: "approve" }));
   await r.send("Count again");
   expect(r.record.nodes().filter((n) => !n.sensitivityOf).map((n) => n.tool)).toEqual(["count", "count"]);
+});
+
+const OPEN_Q = { decisionKey: "", title: "Which file?", text: "Which file?", options: [], evidence: "" };
+
+test("headless: a decision question with no answer in the file and no recommendation closes, so the run does not wait for ever", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, guidance: false } });
+  const s = session;
+  attachHeadless(s, { answers: {}, allow: new Set() });
+  const q = await s.questions.ask({ decisionKey: "threshold", title: "Threshold", text: "Which threshold?", options: [], evidence: "" });
+  const wait = s.questions.wait(q.qid);
+  s.bus.emit({ type: "question", question: q });
+  expect((await wait).status).toBe("withdrawn");
+  expect(s.record.entries(["notice"]).some((e) => /The answers file has no value for threshold/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a call from the MCP server gets absolute paths and drops empty optional values, like a call from the model", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "a.txt"), "hello");
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false } });
+  const s = session;
+  const tool = s.allTools().find((t) => t.name === "read_file")!;
+  const spy = vi.spyOn(s, "pipeline");
+  const r = await s.runTool(tool, { path: "a.txt", purpose: "" }, "mcp1", new AbortController().signal);
+  expect(spy.mock.calls[0]![1]).toEqual({ path: join(cwd, "a.txt") });
+  expect(r.isError).toBe(false);
+});
+
+test("export with an unknown format fails with the list of formats", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  await expect(session.exportAs("docx" as never)).rejects.toThrow(/^No export format docx\. Use html/);
+});
+
+test("two waits on one question: Answer later ends both waits", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, autoResume: false } });
+  const s = session as any;
+  const q = await s.questions.ask(OPEN_Q);
+  s.busy = true;
+  const a = s.waitFor(q.qid).then(() => "answered", () => "stopped");
+  const b = s.waitFor(q.qid).then(() => "answered", () => "stopped");
+  s.answerLater([q.qid]);
+  expect(await Promise.all([a, b])).toEqual(["stopped", "stopped"]);
+  s.busy = false;
+});
+
+test("two waits on one question: one stopped wait does not turn the answer to the other wait into a note", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, autoResume: false } });
+  const s = session as any;
+  const q = await s.questions.ask(OPEN_Q);
+  const ctl = new AbortController();
+  const a = s.waitFor(q.qid, ctl.signal).catch(() => "stopped");
+  const b = s.waitFor(q.qid);
+  ctl.abort();
+  expect(await a).toBe("stopped");
+  await s.answer(q.qid, "a.csv");
+  expect((await b).answer).toBe("a.csv");
+  expect(s.notes.join("\n")).not.toContain(`The scientist answered ${q.qid}`);
+});
+
+test("Answer later applies to the turn only: the next turn can wait on the same question again", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "Done." }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, autoResume: false } });
+  const s = session as any;
+  const q = await s.questions.ask(OPEN_Q);
+  s.answerLater([q.qid]);
+  expect(s.laterQids.size).toBe(0);
+  s.busy = true;
+  s.answerLater([q.qid]);
+  s.busy = false;
+  await s.send("Hello.");
+  expect(s.laterQids.size).toBe(0);
+  const w = s.waitFor(q.qid);
+  await s.answer(q.qid, "b.csv");
+  expect((await w).status).toBe("answered");
+});
+
+test("the plan tool schema stays the same after the first approval", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none", pilot: "off" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  const schema = () => JSON.stringify(s.allTools().find((t) => t.name === "plan")!.inputSchema);
+  const before = schema();
+  answerCards(s, () => ({ action: "approve" }));
+  await s.send(`Count the red-positive cells in ${images}`);
+  expect(s["approvedEntry"]).toBeGreaterThan(0);
+  expect(schema()).toBe(before);
+});
+
+test("resume restores a pilot that a pilot card change started from the approved plan, with the plan that was current", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd, settings: { referee: "none" } });
+  const id = session.id;
+  session.record.append("plan", { action: "proposed", version: 1, plan: { steps: [{ step: "Old step", status: "todo" }] } });
+  session.record.append("plan_approved", { version: 1, plan: { steps: [{ step: "Approved step", status: "todo" }] }, mode: "watch" });
+  session.record.append("plan", { action: "updated", version: 2, plan: { steps: [{ step: "Approved step", status: "done" }, { step: "Added step", status: "todo" }] } });
+  session.record.append("plan", { action: "pilot_requested", version: 2, sample: "Set 1", target: "watch", answers: [] });
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.pilotStage).toBe(true);
+  expect(session["pilotPlan"]!.plan.steps.map((x: { step: string }) => x.step)).toEqual(["Approved step", "Added step"]);
 });

@@ -37,7 +37,13 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
       const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
       const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted) : wanted) : wanted ?? fallback;
-      if (v === undefined) return;
+      if (v === undefined) {
+        const why = `The answers file has no value for ${q.decisionKey || q.title}, and the question has no recommendation. No one can answer it in a headless run.`;
+        setTimeout(() => {
+          if (s.questions.withdraw(q.qid, why)) s.record.append("notice", { text: why });
+        }, 0);
+        return;
+      }
       const note = wanted === undefined ? "no answer in the answers file; the harness used the recommendation or the first option" : "answered from the answers file";
       setTimeout(() => void answerHeadless(s, q, v, note), 0);
     }

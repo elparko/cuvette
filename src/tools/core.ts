@@ -13,7 +13,6 @@ export interface CoreDeps {
   log: (kind: "note", data: Record<string, unknown>) => void;
   plan?: (args: Args) => Promise<ToolOutput>;
   fullPlan?: () => boolean;
-  partialPlan?: () => boolean;
 }
 
 const PLAN_STEPS_SHORT = {
@@ -87,7 +86,7 @@ const PLAN_FULL = {
     out_of_scope: { type: "array", items: { type: "string" }, description: "What this analysis does not do." },
     reason: { type: "string", description: "Why the plan changes. Give it when you add, remove or skip a step after the scientist approved the plan." },
   },
-  required: ["steps"],
+  required: [],
 };
 
 function tool(name: string, description: string, properties: Record<string, unknown>, required: string[], execute: (a: Args) => Promise<ToolOutput> | ToolOutput): Tool {
@@ -211,7 +210,7 @@ export function coreTools(d: CoreDeps): Tool[] {
       },
       get inputSchema() {
         if (!d.fullPlan?.()) return { type: "object", properties: { steps: PLAN_STEPS_SHORT }, required: ["steps"] };
-        return d.partialPlan?.() ? { ...PLAN_FULL, required: [] } : PLAN_FULL;
+        return PLAN_FULL;
       },
     },
     tool(

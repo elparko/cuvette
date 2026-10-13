@@ -8,7 +8,7 @@ import { userInfo } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { DecisionField } from "../core/decisions.ts";
-import { exportProtocol, mainNodes, setupValues, stepLines } from "../core/exports.ts";
+import { exportProtocol, liveNodes, setupValues, stepLines } from "../core/exports.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import { hideKeys, isCredentialsFile } from "../core/credentials.ts";
 import { exportHtml, show } from "../core/trail.ts";
@@ -162,7 +162,7 @@ export function collect(src: ElnSource): ElnContent {
     ...(record.nodes().some((n) => n.adapter) ? [file("references.bib", toBibtex(refs), "BibTeX references for the programs and methods that ran")] : []),
     logFile,
   ];
-  const steps: ElnStep[] = mainNodes(record).map((n, i) => {
+  const steps: ElnStep[] = liveNodes(record).map((n, i) => {
     const folder = `steps/${String(i + 1).padStart(2, "0")}-${slug(n.tool)}`;
     const md = [
       `# Step ${i + 1}: ${n.summary || n.tool}`,
@@ -194,7 +194,7 @@ export function collect(src: ElnSource): ElnContent {
     `<h2>Question</h2><p>${esc(question)}</p>`,
     `<h2>Final answer</h2><p>${esc(answer).replace(/\n/g, "<br>")}</p>`,
     `<h2>Decisions</h2>${decisionRows.length ? table(["Decision", "Value", "Owner", "Set by"], decisionRows.map((r) => [r.label, r.value, r.owner, r.setBy])) : "<p>No setup values were recorded.</p>"}`,
-    `<h2>Steps</h2>${steps.length ? `<ol>${mainNodes(record).map((n, i) => `<li><b>${esc(n.summary || n.tool)}</b><br>${esc(stepLines(adapters, n).join(" "))}</li>`).join("")}</ol>` : "<p>No steps were recorded.</p>"}`,
+    `<h2>Steps</h2>${steps.length ? `<ol>${liveNodes(record).map((n, i) => `<li><b>${esc(n.summary || n.tool)}</b><br>${esc(stepLines(adapters, n).join(" "))}</li>`).join("")}</ol>` : "<p>No steps were recorded.</p>"}`,
     ...(checklist ? [checklistHtml(checklist, esc)] : []),
     `<h2>Review findings</h2>${findings.length ? `<ul>${findings.map((f) => `<li>[${esc(f.severity)}] ${esc(f.message)} (${esc(f.status)})</li>`).join("")}</ul>` : "<p>No findings.</p>"}`,
     `<p>Log SHA-256: <code>${sha(logBuf)}</code></p>`,

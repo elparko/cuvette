@@ -17,6 +17,12 @@ export function mainNodes(record: AnalysisRecord): Node[] {
   return record.nodes().filter((n) => !n.sensitivityOf);
 }
 
+// A step that a rewind set aside is not part of the analysis, so the protocol and the replay exports leave it out.
+export function liveNodes(record: AnalysisRecord): Node[] {
+  const rewound = record.rewound();
+  return mainNodes(record).filter((n) => !rewound.has(n.id));
+}
+
 function adapterOf(adapters: LoadedAdapter[], n: Node): LoadedAdapter | undefined {
   return adapters.find((a) => a.name === n.adapter);
 }
@@ -61,7 +67,8 @@ function group(nodes: Node[]): Group[] {
 export function setupValues(record: AnalysisRecord): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const e of record.entries(["setup", "decision"])) {
-    if (e.kind === "decision") out[String(e.data.key)] = e.data.new;
+    if (e.kind === "decision" && e.data.unset) delete out[String(e.data.key)];
+    else if (e.kind === "decision") out[String(e.data.key)] = e.data.new;
     else if (e.data.values && typeof e.data.values === "object") Object.assign(out, e.data.values);
   }
   return out;
@@ -141,7 +148,7 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     return marks.cite(refs);
   };
   const info = sessionInfo(record);
-  const nodes = mainNodes(record);
+  const nodes = liveNodes(record);
   const prog = programNames(adapters, nodes, (a) => cite(programCitations(a)));
   const cuvette = cite([cuvetteRef()]);
   const lines = ["# Protocol", "", `Session ${info.id}, ${info.date}.`, "", ...planMarkdown(record)];
@@ -213,7 +220,7 @@ function toCode(v: unknown, refs: Map<string, string>): string {
 }
 
 export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
-  const nodes = mainNodes(record);
+  const nodes = liveNodes(record);
   const names = [...new Set(nodes.map((n) => n.adapter))];
   const lines = [
     `import { ToolRunner } from ${JSON.stringify(REPLAY_PATH)};`,
@@ -249,7 +256,7 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
   const cells: unknown[] = [
     { cell_type: "markdown", metadata: {}, source: cellSource(`# Analysis ${info.id}\n\nEach step has a manual route and a code cell that runs the step.`) },
   ];
-  mainNodes(record).forEach((n, k) => {
+  liveNodes(record).forEach((n, k) => {
     const r = stepRoute(adapters, n);
     const md = [`## Step ${k + 1}: ${n.summary || n.tool}`, ""];
     if (r) md.push(`Route: ${r.route}`, ...r.steps.map((s) => `- ${s}`), ...r.params.map((p) => `- ${p}`), ...r.warnings.map((w) => `- ${w}`));
@@ -285,7 +292,7 @@ function isExistingFile(v: unknown): v is string {
 }
 
 export function exportFlow(record: AnalysisRecord, _adapters: LoadedAdapter[], path: string): string {
-  const nodes = mainNodes(record);
+  const nodes = liveNodes(record);
   const inputs: Record<string, string> = {};
   const byPath = new Map<string, string>();
   const produced = new Map<string, string>();

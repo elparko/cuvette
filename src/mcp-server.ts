@@ -37,7 +37,7 @@ export async function runMcpServer(opts: { adapters: string[]; trustFolder?: boo
         annotations: { readOnlyHint: !!tool.readOnly, title: tool.title },
         run: async (a) => {
           const before = session.adapters.length;
-          const r = await session.pipeline(tool, a, `mcp${++n}`, new AbortController().signal);
+          const r = await session.runTool(tool, a, `mcp${++n}`, new AbortController().signal);
           if (session.adapters.length > before) {
             addSessionTools();
             await server?.sendToolListChanged().catch(() => {});
