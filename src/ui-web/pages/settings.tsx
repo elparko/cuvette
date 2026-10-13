@@ -226,8 +226,10 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
                 className={cn("flex items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors outline-none last:border-b-0 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", c.value === shown && "bg-muted")}
               >
                 <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", c.value === shown && "border-accent-brand")}>{c.value === shown && <span className="size-2 rounded-full bg-accent-brand" />}</span>
-                <span className={cn("flex-1", c.value === shown && "font-medium")}>{c.label}</span>
-                {c.note && <span className="text-xs text-muted-foreground tabular-nums">{c.note}</span>}
+                <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                  <span className={cn("min-w-0 flex-1 [overflow-wrap:anywhere]", c.value === shown && "font-medium")}>{c.label}</span>
+                  {c.note && <span className="text-xs text-muted-foreground tabular-nums">{c.note}</span>}
+                </span>
               </button>
             ))}
           </div>

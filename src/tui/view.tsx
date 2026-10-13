@@ -53,10 +53,7 @@ export function ItemView({ item }: { item: StaticItem }) {
     case "user":
       return (
         <Box marginTop={1}>
-          <Box flexShrink={0} paddingRight={1}>
-            <Text color="cyan">{">"}</Text>
-          </Box>
-          <Text bold>{item.text}</Text>
+          <HangText head={<Text color="cyan">{">"}</Text>} lead={2} text={item.text} bold />
         </Box>
       );
     case "assistant":
@@ -64,9 +61,7 @@ export function ItemView({ item }: { item: StaticItem }) {
     case "line":
       return (
         <Box>
-          <Text color={item.color} dimColor={item.dim}>
-            {item.sym} {item.text}
-          </Text>
+          <HangText head={item.sym} lead={item.sym.length + 1} text={item.text} color={item.color} dim={item.dim} />
         </Box>
       );
     case "block":
@@ -74,6 +69,41 @@ export function ItemView({ item }: { item: StaticItem }) {
     case "step":
       return <StepView item={item} />;
   }
+}
+
+// Wraps each line of the text in the room. The caller puts the indent before each next line.
+export function hangLines(text: string, room: number): string[] {
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    let rest = line.trimEnd();
+    while (rest.length > room) {
+      const cut = rest.lastIndexOf(" ", room);
+      const at = cut > room / 3 ? cut : room;
+      out.push(rest.slice(0, at).trimEnd());
+      rest = rest.slice(at).trimStart();
+    }
+    out.push(rest);
+  }
+  return out;
+}
+
+function useWidth(): number {
+  const { stdout } = useStdout();
+  return ((stdout as unknown as { columns?: number })?.columns ?? 80) - 1;
+}
+
+// A symbol, then the text. A long text continues under the text, not under the symbol.
+// This code wraps the text, because in the transcript Ink wraps a text box beside another box at the wrong width.
+function HangText({ head, lead, text, color, dim, bold }: { head: React.ReactNode; lead: number; text: string; color?: string; dim?: boolean; bold?: boolean }) {
+  const width = useWidth();
+  const body = hangLines(text, Math.max(10, width - lead)).join("\n" + " ".repeat(lead));
+  return (
+    <Text color={color} dimColor={dim}>
+      {head}
+      {" "}
+      <Text bold={bold}>{body}</Text>
+    </Text>
+  );
 }
 
 // A table row that is wider than the terminal wraps its last column under the start of that column.
@@ -121,21 +151,26 @@ function AssistantView({ text }: { text: string }) {
   );
 }
 
+function StepHead({ ok, label, text }: { ok: boolean; label: string; text: string }) {
+  const width = useWidth();
+  const head = hangLines(`${label}  ${text}`, Math.max(10, width - 2)).join("\n  ");
+  const mark = <Text color={ok ? "green" : "red"}>{ok ? "●" : "✗"}</Text>;
+  if (head !== label && !head.startsWith(label + " ")) return <Text>{mark} {head}</Text>;
+  return (
+    <Text>
+      {mark} <Text bold>{label}</Text>
+      <Text color={ok ? undefined : "red"}>{head.slice(label.length)}</Text>
+    </Text>
+  );
+}
+
 function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
   const label = item.n ? `Step ${item.n}` : (item.purpose ?? item.tool);
   const detail = [item.route, item.settings].filter(Boolean).join(" · ");
   const fid = fidelityLabel(item.fidelity);
   return (
     <Box flexDirection="column">
-      {item.ok ? (
-        <Text>
-          <Text color="green">●</Text> <Text bold>{label}</Text>  {item.summary}
-        </Text>
-      ) : (
-        <Text>
-          <Text color="red">✗</Text> <Text bold>{label}</Text>  <Text color="red">{item.error ?? item.summary}</Text>
-        </Text>
-      )}
+      <StepHead ok={item.ok} label={label} text={item.ok ? (item.summary ?? "") : (item.error ?? item.summary ?? "")} />
       <Box flexDirection="column" paddingLeft={2}>
         {item.why ? <Text dimColor>Purpose: {item.why}</Text> : null}
         {detail ? <Text dimColor>▸ {detail}</Text> : null}

@@ -92,6 +92,27 @@ test("a session shows its title, its sentence and its status", () => {
   expect(listSessions(h)[0]!.status).toBe("waiting for you");
 });
 
+test("the list reads a log again only after it changes, and the running status stays current", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-cache-"));
+  const dir = join(h, "sessions", "20261012-100000-dddd");
+  mkdirSync(dir, { recursive: true });
+  const log = join(dir, "log.jsonl");
+  const body = [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l)).join("\n") + "\n";
+  writeFileSync(log, body);
+  const t = new Date(Date.now() - 60000);
+  utimesSync(log, t, t);
+  expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", status: "waiting for you" });
+  writeFileSync(log, body.replace("Count the cells", "Xxxxx xxx xxxxx"));
+  utimesSync(log, t, t);
+  expect(listSessions(h)[0]!.ask).toBe("Count the cells");
+  writeFileSync(log, body + JSON.stringify({ id: 3, kind: "assistant", data: { text: "12 cells.", final: true } }) + "\n");
+  expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", status: "answered" });
+  writeFileSync(log, body + JSON.stringify({ id: 3, kind: "tool", data: {} }) + "\n");
+  expect(listSessions(h)[0]!.status).toBe("waiting for you");
+  writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.pid }));
+  expect(listSessions(h)[0]!.status).toBe("running");
+});
+
 test("a custom name wins over the automatic title, and a removed session leaves the list", () => {
   const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-rename-"));
   const folder = join(h, "proj", "cuvette", "2026-10-08-count");

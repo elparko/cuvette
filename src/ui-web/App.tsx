@@ -7,6 +7,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog.tsx";
 import { Input } from "./components/ui/input.tsx";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip.tsx";
+import { dropZones, hasFiles } from "./lib/drop.ts";
 import { useStored } from "./lib/stored.ts";
 import { call, copyText, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
@@ -113,6 +114,52 @@ export function App() {
 
   const stream = useStream(boot, !!state?.session);
   const sessions = useSessions(page, boots, stream.status.state === "idle");
+
+  // A file or folder dragged over a page with no drop zone opens the folder dialog, which has one.
+  // The browser must not open the dropped file in place of the app.
+  const dragOpened = useRef(false);
+  useEffect(() => {
+    const show = () => {
+      if (dropZones.n > 0) return;
+      dragOpened.current = true;
+      setFolderOpen(true);
+    };
+    const desktopDrag = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === "enter") show();
+      else if (dragOpened.current) {
+        dragOpened.current = false;
+        setFolderOpen(false);
+      }
+    };
+    const desktopDrop = () => (dragOpened.current = false);
+    const enter = (e: DragEvent) => hasFiles(e) && show();
+    const over = (e: DragEvent) => hasFiles(e) && e.preventDefault();
+    const leave = (e: DragEvent) => {
+      const out = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= innerWidth || e.clientY >= innerHeight;
+      if (!out || !dragOpened.current) return;
+      dragOpened.current = false;
+      setFolderOpen(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragOpened.current = false;
+    };
+    window.addEventListener("cuvette-drag", desktopDrag);
+    window.addEventListener("cuvette-drop", desktopDrop);
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("cuvette-drag", desktopDrag);
+      window.removeEventListener("cuvette-drop", desktopDrop);
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
 
   useEffect(() => {
     const w = window as unknown as { cuvetteApp?: unknown; toast?: (t: string) => void };
@@ -326,7 +373,15 @@ export function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <FolderDialog open={folderOpen} onOpenChange={setFolderOpen} start={state.folder || state.start} onOpened={opened} />
+      <FolderDialog
+        open={folderOpen}
+        onOpenChange={(o) => {
+          dragOpened.current = false;
+          setFolderOpen(o);
+        }}
+        start={state.folder || state.start}
+        onOpened={opened}
+      />
       <Toaster position="bottom-center" toastOptions={{ className: "!rounded-xl !border !bg-popover !text-popover-foreground !shadow-xl" }} />
     </TooltipProvider>
   );

@@ -287,4 +287,77 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(head).toBeLessThanOrEqual(100);
     await page.size(1280, 900);
   });
+  test("settings on a phone: a long model name in the model list wraps in its row", async () => {
+    await page.size(390, 844);
+    await goPage("Settings");
+    expect(await until(page, `document.querySelector('[data-setting="model"] [role="radio"]')`)).toBe(true);
+    expect(await overflow(page)).toEqual({ page: 390, wide: [] });
+    await page.size(1280, 900);
+  });
+
+  test("a results sheet scrolls in its own box, and a thumb is as wide as its image", async () => {
+    await page.eval(MOCK);
+    await goPage("Analysis");
+    const cols = Array.from({ length: 20 }, (_, i) => `column_${i}`);
+    const head = cols.map((c) => `<th>${c}</th>`).join("");
+    const body = Array.from({ length: 200 }, (_, r) => `<tr>${cols.map((c) => `<td data-label="${c}">${r}.123456</td>`).join("")}</tr>`).join("");
+    const img = (w: number, h: number) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#c33"/></svg>`)}`;
+    const html = `<details open><summary>Summary</summary><div class="sheet"><table class="stack wide"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></details><div class="images">${[img(300, 120), img(4000, 100), img(200, 200)].map((u) => `<button type="button" class="thumb" data-full="${u}"><img src="${u}" alt=""></button>`).join("")}</div>`;
+    await page.eval(`window.__mocks.push({ part: "api/tab?name=results", reply: () => ({ body: ${JSON.stringify(html)} }) })`);
+    await page.size(390, 844);
+    await page.eval(`[...document.querySelectorAll('[role="tab"]')].find((x) => x.textContent === "Results").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+    expect(await until(page, `document.querySelector('[role="tabpanel"] div.sheet')`)).toBe(true);
+    await wait(300);
+    const r = await page.eval<{ box: number; scroll: number; head: string; thumbs: number[][] }>(`(() => {
+      const box = document.querySelector('[role="tabpanel"] div.sheet');
+      return { box: box.getBoundingClientRect().height, scroll: box.scrollWidth - box.clientWidth, head: getComputedStyle(box.querySelector("thead")).display, thumbs: [...document.querySelectorAll('[role="tabpanel"] .thumb')].map((b) => [b.getBoundingClientRect().width - b.querySelector("img").getBoundingClientRect().width, b.getBoundingClientRect().height - b.querySelector("img").getBoundingClientRect().height]) };
+    })()`);
+    expect(r.box).toBeLessThanOrEqual(520);
+    expect(r.scroll).toBeGreaterThan(0);
+    expect(r.head).toBe("table-header-group");
+    for (const [dw, dh] of r.thumbs) expect([dw, dh]).toEqual([2, 2]);
+    expect(await overflow(page)).toEqual({ page: 390, wide: [] });
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/tab"))`);
+    await page.eval(`[...document.querySelectorAll('[role="tab"]')].find((x) => x.textContent === "Analysis").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+    await page.size(1280, 900);
+  });
+
+  test("a file dragged over the conversation opens the folder dialog, and a drop does not leave the app", async () => {
+    await goPage("Analysis");
+    const ev = (type: string) => `(() => { const dt = new DataTransfer(); dt.items.add(new File(["x"], "a.csv")); const e = new DragEvent(${JSON.stringify(type)}, { bubbles: true, cancelable: true, dataTransfer: dt }); document.querySelector('[role="log"]').dispatchEvent(e); return e.defaultPrevented; })()`;
+    await page.eval(ev("dragenter"));
+    expect(await until(page, `document.querySelector('[role="dialog"]')?.textContent.includes("Open a folder")`)).toBe(true);
+    expect(await page.eval(ev("dragover"))).toBe(true);
+    expect(await page.eval(ev("drop"))).toBe(true);
+    await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.eval(ev("dragenter"));
+    expect(await until(page, `!!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.eval(`(() => { const dt = new DataTransfer(); dt.items.add(new File(["x"], "a.csv")); document.body.dispatchEvent(new DragEvent("dragleave", { bubbles: true, dataTransfer: dt, clientX: 0, clientY: 0 })); })()`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.eval(`window.dispatchEvent(new CustomEvent("cuvette-drag", { detail: "enter" }))`);
+    expect(await until(page, `!!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.eval(`window.dispatchEvent(new CustomEvent("cuvette-drag", { detail: "leave" }))`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
+  });
+
+  test("with reduced motion, a dialog opens with no animation and a spinner turns slowly", async () => {
+    await page.media([{ name: "prefers-reduced-motion", value: "reduce" }]);
+    await page.eval(`[...document.querySelectorAll("aside button")].find((b) => b.textContent.includes("Open a folder")).click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"]')`)).toBe(true);
+    const r = await page.eval<{ anim: string; trans: string; spin: string }>(`(() => {
+      const s = document.createElement("span");
+      s.className = "animate-spin";
+      document.body.appendChild(s);
+      const out = { anim: getComputedStyle(document.querySelector('[role="dialog"]')).animationDuration, trans: getComputedStyle(document.querySelector("aside nav button")).transitionDuration, spin: getComputedStyle(s).animationDuration };
+      s.remove();
+      return out;
+    })()`);
+    expect(parseFloat(r.anim)).toBeLessThanOrEqual(0.001);
+    expect(parseFloat(r.trans)).toBeLessThanOrEqual(0.001);
+    expect(r.spin).toBe("3s");
+    await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    expect(await until(page, `!document.querySelector('[role="dialog"]')`)).toBe(true);
+    await page.media([]);
+  });
 });

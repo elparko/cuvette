@@ -1,10 +1,17 @@
 import { FolderInputIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { dropFolder } from "../lib/drop.ts";
+import { dropFolder, dropZones, hasFiles } from "../lib/drop.ts";
 
 export function DropZone({ choose, disabled, browserHint, children }: { choose: (folder: string) => void; disabled?: boolean; browserHint: string; children: ReactNode }) {
   const [over, setOver] = useState(false);
   const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    dropZones.n++;
+    return () => {
+      dropZones.n--;
+    };
+  }, []);
 
   useEffect(() => {
     const drag = (e: Event) => setOver((e as CustomEvent<string>).detail === "enter");
@@ -22,8 +29,6 @@ export function DropZone({ choose, disabled, browserHint, children }: { choose: 
       window.removeEventListener("cuvette-drop", drop);
     };
   }, [choose, disabled]);
-
-  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
   return (
     <div

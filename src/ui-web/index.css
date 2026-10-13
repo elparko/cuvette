@@ -272,6 +272,22 @@
   .caret.working {
     animation: none;
   }
+  /* Menus, dialogs, tooltips and hover zoom: no movement. A spinner turns slowly. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-spin {
+    animation-duration: 3s !important;
+    animation-iteration-count: infinite !important;
+  }
+  .group:hover .group-hover\:scale-\[1\.02\] {
+    scale: none;
+  }
 }
 
 /* Server HTML: the conversation, the cards and the side panel. The classes come from src/server/app-html.ts. */
@@ -366,34 +382,54 @@
 .stacked-wrap {
   container-type: inline-size;
 }
+/* A results sheet keeps its rows and columns and scrolls in its own box. */
+.srv div.sheet {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.srv div.sheet table.wide {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+}
+.srv div.sheet table.wide td {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+.srv div.sheet table.wide th {
+  position: sticky;
+  top: 0;
+  background: var(--background);
+}
 @container (max-width: 560px) {
-  .srv table.stack thead {
+  .srv table.stack:not(.wide) thead {
     display: none;
   }
-  .srv table.stack,
-  .srv table.stack tbody,
-  .srv table.stack tr,
-  .srv table.stack td {
+  .srv table.stack:not(.wide),
+  .srv table.stack:not(.wide) tbody,
+  .srv table.stack:not(.wide) tr,
+  .srv table.stack:not(.wide) td {
     display: block;
     width: 100%;
   }
-  .srv table.stack tr {
+  .srv table.stack:not(.wide) tr {
     border: 1px solid var(--border);
     border-radius: 10px;
     margin: 0 0 8px;
     padding: 4px 10px;
   }
-  .srv table.stack td {
+  .srv table.stack:not(.wide) td {
     border: 0;
     padding: 2px 0;
     display: grid;
     grid-template-columns: minmax(80px, 38%) 1fr;
     gap: 8px;
   }
-  .srv table.stack td:empty {
+  .srv table.stack:not(.wide) td:empty {
     display: none;
   }
-  .srv table.stack td::before {
+  .srv table.stack:not(.wide) td::before {
     content: attr(data-label);
     color: var(--muted-foreground);
     font-weight: 600;
@@ -708,7 +744,7 @@
   text-align: center;
   font-family: var(--font-sans);
   font-size: 12px;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 .srv details.house > summary {
   list-style: none;
@@ -881,10 +917,12 @@
 .srv .images {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   margin: 10px 0;
 }
 .srv .thumb {
+  max-width: min(262px, 100%);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -896,10 +934,14 @@
 .srv .thumb:hover {
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
 }
+/* The button is as wide as the image. A very thin or very narrow image keeps a size that a click can hit. */
 .srv .thumb img {
   display: block;
-  max-width: min(260px, 100%);
+  max-width: 100%;
   max-height: 200px;
+  min-width: 48px;
+  min-height: 48px;
+  object-fit: contain;
 }
 .srv ul.files {
   margin: 6px 0;

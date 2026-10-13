@@ -11,6 +11,7 @@ export interface Page {
   size(width: number, height: number): Promise<void>;
   go(url: string): Promise<void>;
   shot(): Promise<Buffer>;
+  media(features: { name: string; value: string }[]): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -64,6 +65,9 @@ export async function openChrome(): Promise<Page> {
       const loaded = new Promise<void>((r) => loads.push(r));
       await send("Page.navigate", { url });
       await loaded;
+    },
+    async media(features) {
+      await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "light" }, ...features] });
     },
     async shot() {
       const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });

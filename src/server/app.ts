@@ -279,7 +279,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     return "";
   };
 
-  const jobs = new Map<string, { lines: string[]; done?: { ok: boolean; text: string }; subs: Set<ServerResponse> }>();
+  const jobs = new Map<string, { key: string; lines: string[]; done?: { ok: boolean; text: string }; subs: Set<ServerResponse> }>();
   const progHooks = (): ProgramHooks => ({ cwd: settingCtx().cwd, env, ...opts.programs });
   const jobSend = (j: { subs: Set<ServerResponse> }, msg: unknown) => {
     for (const r of j.subs) r.write(`data: ${JSON.stringify(msg)}\n\n`);
@@ -460,14 +460,19 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const run = { ...hooks, confirmed: body.confirmed === true, record: current?.session.record as ProgramHooks["record"] };
       const long = (action === "install" || action === "update") && r.plan.runs && !r.plan.refused && run.confirmed;
       if (!long) return send(res, 200, await runFor(r.plan, "app", run));
+      // A second install of the same program while the first runs shows the first one.
+      const key = r.plan.name || name;
+      const running = [...jobs].find(([, j]) => j.key === key && !j.done);
+      if (running) return send(res, 200, { job: running[0] });
       const id = randomBytes(8).toString("hex");
-      const job = { lines: [] as string[], done: undefined as { ok: boolean; text: string } | undefined, subs: new Set<ServerResponse>() };
+      const job = { key, lines: [] as string[], done: undefined as { ok: boolean; text: string } | undefined, subs: new Set<ServerResponse>() };
       jobs.set(id, job);
       void runFor(r.plan, "app", { ...run, onLine: (line) => (job.lines.push(line), jobSend(job, { line })) }).then((d) => {
         job.done = { ok: d.ok, text: d.text };
         jobSend(job, { done: true, ...job.done });
         for (const x of job.subs) x.end();
         job.subs.clear();
+        setTimeout(() => jobs.delete(id), 600_000).unref();
       });
       return send(res, 200, { job: id });
     }
