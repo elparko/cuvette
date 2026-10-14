@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import type { Check } from "../core/doctor.ts";
 import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
 import { cutText } from "../core/places.ts";
+import { noBidi } from "../core/markdown.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import { canReset, type SettingCtx } from "../core/settings.ts";
 import { TRUST_NAME } from "../adapters/source.ts";
@@ -13,11 +14,11 @@ const clip = (s: string, n: number) => (s.length > n ? cutText(s, n - 1).trimEnd
 export function sessionsJson(list: SessionInfo[], token: string, now = Date.now()) {
   return list.map((s) => ({
     id: s.id,
-    title: s.name || (s.ask ? clip(s.ask, 80) : basename(s.cwd) || "No request yet"),
-    text: s.name || s.ask ? clip(s.description || (s.name ? s.ask : ""), 220) : "No request yet.",
+    title: noBidi(s.name || (s.ask ? clip(s.ask, 80) : basename(s.cwd) || "No request yet")),
+    text: noBidi(s.name || s.ask ? clip(s.description || (s.name ? s.ask : ""), 220) : "No request yet."),
     hasRequest: !!s.ask,
-    folder: s.cwd,
-    folderName: basename(s.cwd) || s.cwd || "unknown folder",
+    folder: noBidi(s.cwd),
+    folderName: noBidi(basename(s.cwd) || s.cwd || "unknown folder"),
     age: ageText(now - s.used),
     status: s.moved ? "moved" : (s.status ?? ""),
     moved: !!s.moved,

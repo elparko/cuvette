@@ -714,7 +714,7 @@ document.addEventListener("click", async (e) => {
   const thumb = t.closest(".thumb");
   if (thumb) { $("lightimg").src = thumb.dataset.full; $("lightimg").alt = thumb.title; $("lightbox").showModal(); return; }
   const rev = t.closest("[data-reveal]");
-  if (rev) { try { await bridge.reveal(rev.dataset.reveal); } catch (err) { toast(err.message); } return; }
+  if (rev) { try { await bridge.reveal(decodeURIComponent(rev.dataset.reveal)); } catch (err) { toast(err.message); } return; }
   const dl = t.closest("a[download]");
   if (dl && bridge.saveFile) { e.preventDefault(); bridge.saveFile(dl.getAttribute("href"), dl.getAttribute("download")); return; }
   const tb = t.closest("[data-tab]");

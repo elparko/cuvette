@@ -399,7 +399,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const rev = t.closest<HTMLElement>("[data-reveal]");
     if (rev) {
       try {
-        await bridge.reveal(rev.dataset.reveal!);
+        await bridge.reveal(decodeURIComponent(rev.dataset.reveal!));
       } catch (err) {
         toast.error((err as Error).message);
       }

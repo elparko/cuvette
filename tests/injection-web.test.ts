@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, expect, test } from "vitest";
 import { cardHtml, decisionsHtml, doctorHtml, fileLink, programsHtml, imageHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
+import { sessionsJson } from "../src/server/app-json.ts";
 import type { Item } from "../src/ui/items.ts";
 import type { Question } from "../src/core/types.ts";
 
@@ -154,4 +155,18 @@ test("the web app shows hostile program names and program messages as escaped da
   const programs = programsHtml([row(EVIL)]);
   expect(programs).toContain("&lt;script&gt;");
   same(programs, programsHtml([row(BENIGN)]));
+});
+
+test("the Show in folder button keeps a path that holds a text direction control, and the session list drops the control", () => {
+  const path = "/data/run‮1/plot⁦.png";
+  const html = fileLink(ctxFor(BENIGN), path);
+  const attr = /data-reveal="([^"]*)"/.exec(html)![1]!;
+  expect(attr).not.toMatch(/[‪-‮⁦-⁩]/);
+  expect(decodeURIComponent(attr)).toBe(path);
+  const out = mkdtempSync(join(tmpdir(), "cuvette-inject-web-"));
+  dirs.push(out);
+  const results = resultsHtml(ctxFor(BENIGN), out, undefined);
+  expect(decodeURIComponent(/data-reveal="([^"]*)"/.exec(results)![1]!)).toBe(out);
+  const list = sessionsJson([{ id: "s1", cwd: "/data/a‮b", used: Date.now(), ask: "x‮y", name: "n⁧m", description: "d‮e" } as never], "tok");
+  expect(JSON.stringify(list)).not.toMatch(/[‪-‮⁦-⁩]/);
 });
