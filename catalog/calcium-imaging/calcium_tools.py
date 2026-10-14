@@ -821,7 +821,7 @@ def _welch_anova(groups):
     k = len(g)
     n = np.array([len(x) for x in g], float)
     if (n < 2).any() or any(x.var(ddof=1) == 0 for x in g):
-        _fail("Welch ANOVA needs at least 2 values with a spread in each group. A group has fewer than 2 values or all its values are equal. Set test to rank")
+        _fail("The Welch analysis of variance (ANOVA) needs at least 2 values with a spread in each group. A group has fewer than 2 values, or all its values are equal. Set test to rank.")
     m = np.array([x.mean() for x in g])
     w = n / np.array([x.var(ddof=1) for x in g])
     mw = (w * m).sum() / w.sum()
