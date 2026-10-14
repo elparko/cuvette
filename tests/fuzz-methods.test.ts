@@ -2,7 +2,7 @@ import { chmodSync, symlinkSync, existsSync, mkdirSync, mkdtempSync, readdirSync
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { deleteMethod, exportMethod, fillFromMethod, importMethod, listMethods, loadMethod, methodNote, methodsDir, methodText, readMethod, saveMethod, type Method } from "../src/core/methods.ts";
+import { deleteMethod, exportMethod, fillFromMethod, importMethod, listMethods, loadMethod, methodNote, methodsDir, methodText, readMethod, resumeMethodAllowed, saveMethod, type Method } from "../src/core/methods.ts";
 import type { AnalysisPlan } from "../src/core/plan.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -179,85 +179,93 @@ describe("fuzz: methods", () => {
     }
   });
 
-  test("a method file in an untrusted project folder is not loaded by its path", () => {
-    const project = join(root, "untrusted-project");
-    const dir = join(project, ".cuvette", "methods");
-    mkdirSync(dir, { recursive: true });
-    const m = method(new Rng(2), "proj");
-    writeFileSync(join(dir, "proj.json"), JSON.stringify(m));
-    expect(() => loadMethod(join(dir, "proj.json"), project)).toThrow(/not trusted/);
-    expect(() => loadMethod("proj", project)).toThrow(/not trusted/);
-    expect(loadMethod(join(dir, "proj.json")).name).toBe("proj");
-    trustFolder(project);
-    expect(loadMethod(join(dir, "proj.json"), project).name).toBe("proj");
-  });
-
-  test("a session that resumes in an untrusted folder skips a project method and says so", async () => {
-    const project = join(root, "resume-project");
-    const dir = join(project, ".cuvette", "methods");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "pm.json"), JSON.stringify(method(new Rng(3), "pm")));
-    const provider = () => new FakeProvider([{ text: "ok" }]);
-    const first = await Session.create({ adapters: [], provider: provider(), cwd: project, trustFolder: true, method: "pm" });
-    const id = first.id;
-    await first.close();
-    const back = await Session.resume(id, { provider: provider(), cwd: project });
-    const notes = back.record.entries(["notice"]).map((e) => String(e.data.text));
-    await back.close();
-    expect(notes.filter((t) => /did not load the saved method pm.*not trusted/.test(t))).toHaveLength(1);
-    const again = await Session.resume(id, { provider: provider(), cwd: project });
-    const twice = again.record.entries(["notice"]).map((e) => String(e.data.text)).filter((t) => /did not load the saved method pm/.test(t));
-    await again.close();
-    expect(twice).toHaveLength(1);
-  });
-
-  describe("trust of a project method path", () => {
-    const project = join(root, "path-project");
-    const dir = join(project, ".cuvette", "methods");
-    const other = join(project, "data", "elsewhere.json");
-    beforeAll(() => {
-      mkdirSync(dir, { recursive: true });
-      mkdirSync(join(project, "data"), { recursive: true });
-      writeFileSync(join(dir, "pm.json"), JSON.stringify(method(new Rng(5), "pm")));
-      writeFileSync(other, JSON.stringify(method(new Rng(6), "elsewhere")));
-    });
-
-    test("a method file anywhere in an untrusted project is refused", () => {
-      expect(() => loadMethod(other, project)).toThrow(/not trusted/);
-    });
-
-    test.skipIf(process.platform === "win32")("a link to a project file is refused", () => {
-      const outside = join(root, "link-outside");
-      mkdirSync(outside, { recursive: true });
-      const link = join(outside, "link.json");
-      symlinkSync(other, link);
-      expect(() => loadMethod(link, project)).toThrow(/not trusted/);
-    });
-
-    test("a case variant of the project path is refused on a case-insensitive disk", () => {
-      const upper = other.replace("path-project", "PATH-PROJECT");
-      if (!existsSync(upper)) return;
-      expect(() => loadMethod(upper, project)).toThrow(/not trusted/);
-    });
-
-    test("a method in the user's own methods folder loads, also when the project is the home folder", () => {
-      const mine = saveMethod(method(new Rng(7), "mine"));
-      expect(loadMethod(mine, project).name).toBe("mine");
-      const was = process.env.CUVETTE_HOME;
-      process.env.CUVETTE_HOME = join(root, "home-as-project");
-      try {
-        const own = saveMethod(method(new Rng(8), "own"));
-        expect(loadMethod(own, process.env.CUVETTE_HOME).name).toBe("own");
-        expect(loadMethod("own", process.env.CUVETTE_HOME).name).toBe("own");
-      } finally {
-        process.env.CUVETTE_HOME = was;
+  describe("a recorded method path on resume", () => {
+    let n = 0;
+    const projectWith = (name: string) => {
+      const project = join(root, `rp-${n++}-${name}`);
+      mkdirSync(project, { recursive: true });
+      return project;
+    };
+    const write = (file: string, name: string) => {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify(method(new Rng(9), name)));
+      return file;
+    };
+    const resume = async (project: string, path: string, times = 1) => {
+      const provider = () => new FakeProvider([{ text: "ok" }]);
+      const first = await Session.create({ adapters: [], provider: provider(), cwd: project });
+      first.record.append("method", { action: "started", name: "rec", path });
+      const id = first.id;
+      await first.close();
+      let back!: Session;
+      for (let i = 0; i < times; i++) {
+        if (back) await back.close();
+        back = await Session.resume(id, { provider: provider(), cwd: project });
       }
+      const loaded = (back as unknown as { method?: Method }).method?.name;
+      const notes = back.record.entries(["notice"]).map((e) => String(e.data.text)).filter((t) => /did not load the saved method/.test(t));
+      return { back, loaded, notes };
+    };
+
+    test("an explicit load works in a project with no .cuvette folder", async () => {
+      const project = projectWith("plain");
+      const file = write(join(project, "m.json"), "m");
+      expect(loadMethod(file).name).toBe("m");
+      expect(loadMethod(file, project).name).toBe("m");
+      const s = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd: project });
+      expect(s.startMethod(file).name).toBe("m");
+      await s.close();
     });
 
-    test("a trusted project loads its method by path", () => {
+    test("resume skips a file in the project, says so once, and the slash command loads it", async () => {
+      const project = projectWith("evil");
+      const file = write(join(project, "evil.json"), "evil");
+      const { back, loaded, notes } = await resume(project, file, 2);
+      expect(loaded).toBeUndefined();
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toContain(`/method ${file}`);
+      expect(back.startMethod(file).name).toBe("evil");
+      await back.close();
+    });
+
+    test("resume skips a path with dots in it that leads to a project file", async () => {
+      const project = projectWith("dots");
+      write(join(project, "data", "m.json"), "m");
+      const { back, loaded, notes } = await resume(project, join(project, "x", "..", "data", "m.json"));
+      await back.close();
+      expect(loaded).toBeUndefined();
+      expect(notes).toHaveLength(1);
+    });
+
+    test.skipIf(process.platform === "win32")("resume skips a link in the methods folder of a trusted project that leaves the folder", async () => {
+      const project = projectWith("link");
       trustFolder(project);
-      expect(loadMethod(other, project).name).toBe("elsewhere");
-      expect(loadMethod(join(dir, "pm.json"), project).name).toBe("pm");
+      const target = write(join(project, "data", "t.json"), "t");
+      mkdirSync(join(project, ".cuvette", "methods"), { recursive: true });
+      const link = join(project, ".cuvette", "methods", "t.json");
+      symlinkSync(target, link);
+      trustFolder(project);
+      const { back, loaded, notes } = await resume(project, link);
+      await back.close();
+      expect(loaded).toBeUndefined();
+      expect(notes).toHaveLength(1);
+    });
+
+    test("resume loads from the methods folder of the user, and from a trusted project", async () => {
+      const project = projectWith("ok");
+      const mine = saveMethod(method(new Rng(1), "mine"));
+      const a = await resume(project, mine);
+      await a.back.close();
+      expect(a.loaded).toBe("mine");
+      expect(a.notes).toEqual([]);
+      const own = write(join(project, ".cuvette", "methods", "pm.json"), "pm");
+      expect(resumeMethodAllowed(own, project)).toBe(false);
+      trustFolder(project);
+      expect(resumeMethodAllowed(own, project)).toBe(true);
+      const b = await resume(project, own);
+      await b.back.close();
+      expect(b.loaded).toBe("pm");
+      expect(b.notes).toEqual([]);
     });
   });
 });

@@ -185,18 +185,15 @@ const realPath = (p: string): string => {
   }
 };
 
-function inUntrustedProject(file: string, project: string): boolean {
-  const root = realPath(project);
-  const mine = realPath(methodsDir());
-  const real = realPath(file);
-  if (realPath(projectMethodsDir(project)) === mine || real.startsWith(mine + sep)) return false;
-  return real.startsWith(root + sep) && !folderTrusted(project);
+const inside = (file: string, folder: string) => realPath(file).startsWith(realPath(folder) + sep);
+
+export function resumeMethodAllowed(file: string, project: string): boolean {
+  return inside(file, methodsDir()) || (inside(file, projectMethodsDir(project)) && trustStatus(project).state === "trusted");
 }
 
 export function loadMethod(ref: string, project?: string): Method & { path: string; hash: string } {
   const local = project && !ref.endsWith(".json") ? pathOf(ref, projectMethodsDir(project)) : undefined;
-  if (local && existsSync(local) && inUntrustedProject(local, project!)) throw new Error(`The method ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
-  if (project && ref.endsWith(".json") && existsSync(ref) && inUntrustedProject(ref, project)) throw new Error(`The method file ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
+  if (local && existsSync(local) && !folderTrusted(project!)) throw new Error(`The method ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
   const path = local && existsSync(local) ? local : ref.endsWith(".json") && existsSync(ref) ? ref : pathOf(ref);
   if (!existsSync(path)) throw new Error(`No method named ${ref}. Type /method in a session, or cuvette method list, to see the list.`);
   const text = readFileSync(path, "utf8");

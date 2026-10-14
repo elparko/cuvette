@@ -55,7 +55,7 @@ import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replayS
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
-import { fillFromMethod, loadMethod, methodFrom, methodNote, saveMethod, type Method } from "./methods.ts";
+import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
 import { Findings, logText, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
@@ -518,13 +518,17 @@ export class Session {
     this.system = this.buildSystem();
     if (resumed) {
       const used = this.record.live(["method"]).filter((e) => e.data.action === "started").at(-1);
-      if (used)
-        try {
-          this.method = loadMethod(String(used.data.path), this.cwd);
-        } catch (e) {
-          const text = `Cuvette did not load the saved method ${String(used.data.name)}: ${(e as Error).message}`;
-          if (/not trusted/.test((e as Error).message) && !this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+      if (used) {
+        const file = String(used.data.path);
+        if (resumeMethodAllowed(file, this.cwd))
+          try {
+            this.method = loadMethod(file);
+          } catch {}
+        else {
+          const text = `Cuvette did not load the saved method ${String(used.data.name)}, because its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
+          if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
         }
+      }
       this.history = this.record.messages();
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;

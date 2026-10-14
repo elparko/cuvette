@@ -77,12 +77,13 @@ async function trailLines(session: WindowSession): Promise<unknown[]> {
   try {
     return trail(session.record, 2);
   } catch {
+    const stale = session.record.stale();
     return session.record.entries(["tool_result"]).map((e, i) => ({
       n: i + 1,
       entry: e.id,
       icon: "step",
       line: String(e.data.summary || e.data.tool),
-      stale: Boolean(e.node && session.record.stale().has(e.node)),
+      stale: Boolean(e.node && stale.has(e.node)),
       group: 0,
       badges: [],
       details: e.data.manualRoute ? { "Manual route": e.data.manualRoute } : undefined,
