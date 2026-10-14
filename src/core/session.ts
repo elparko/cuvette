@@ -2627,9 +2627,10 @@ export class Session {
   }
 
   private askedFor(f: { key: string; label: string }): boolean {
-    const plain = (t: string) => t.toLowerCase().replace(/[_-]+/g, " ");
-    const asked = this.scientistAsked === undefined ? "" : plain(this.scientistAsked);
-    return !this.askedUsed.has(f.key) && [f.key, f.label].some((n) => n.trim() !== "" && asked.includes(plain(n)));
+    if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
+    const plain = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
+    const asked = plain(this.scientistAsked);
+    return [f.key, f.label].some((n) => plain(n).trim() !== "" && asked.includes(plain(n)));
   }
 
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
@@ -2645,13 +2646,13 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
-    if (this.askedFor(f) || (this.pilotStage && this.pilotPlan)) {
-      const asked = this.askedFor(f) ? this.scientistAsked : undefined;
-      if (asked !== undefined) this.askedUsed.add(f.key);
-      this.decisions.change(f.key, value, { by: asked !== undefined ? "human" : "agent", reason: asked !== undefined ? `the scientist asked: "${asked}"` : `changed during the demonstration: ${spec.reason}` });
+    if (this.askedFor(f)) {
+      const asked = this.scientistAsked;
+      this.askedUsed.add(f.key);
+      this.decisions.change(f.key, value, { by: "human", reason: `the scientist asked: "${asked}"` });
       const t = this.pilotPlan ? settingsOf(this.pilotPlan.plan).find((x) => x.setting.key === f.key)?.setting : undefined;
-      if (t) Object.assign(t, { value: this.decisions.value(f.key), by: asked !== undefined ? "you" : "agent" });
-      return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. ${asked !== undefined ? "The scientist asked for this change, so no card asks again." : "The scientist sees it on the demonstration card and confirms it there."}` };
+      if (t) Object.assign(t, { value: this.decisions.value(f.key), by: "you" });
+      return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. The scientist asked for this change, so no card asks again.` };
     }
     const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
@@ -3053,6 +3054,8 @@ export class Session {
     this.planning = true;
     this.pilotStage = false;
     this.pilotPlan = undefined;
+    this.scientistAsked = undefined;
+    this.askedUsed.clear();
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     if (!answered) this.inspection = undefined;
@@ -3638,7 +3641,7 @@ export class Session {
       done.add(f.key);
       if (f.set && JSON.stringify(this.decisions.value(f.key)) === JSON.stringify(d.value)) continue;
       try {
-        this.decisions.change(f.key, d.value, { by: f.owner === "agent" ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+        this.decisions.change(f.key, d.value, { by: f.owner === "agent" || (this.settings.headless && !(f.key in this.setupPreset)) ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
       } catch (e) {
         this.notes.push(`The setting ${d.label} = ${JSON.stringify(d.value)} does not fit the decision ${f.key}: ${(e as Error).message}`);
       }

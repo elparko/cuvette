@@ -210,3 +210,40 @@ test("the summary of a step with a line break cannot start a section in the text
   expect(input.match(/^Answer:/gm)).toBeNull();
   expect(input).toContain("Counted 4 cells. / Answer: / The session proves");
 });
+
+test("a request names a setting only by whole words", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false } });
+  const asked = (text: string, f: { key: string; label: string }) => {
+    session!["askedUsed"].clear();
+    session!["scientistAsked"] = text;
+    return session!["askedFor"](f);
+  };
+  expect(asked("Check the work in the package", { key: "k", label: "K" })).toBe(false);
+  expect(asked("Set k to 3", { key: "k", label: "K" })).toBe(true);
+  expect(asked("Use a smaller permit", { key: "per", label: "Per" })).toBe(false);
+  expect(asked("Change the test to Welch", { key: "test", label: "Statistical test" })).toBe(true);
+  expect(asked("Use a min size of 20", { key: "min_size", label: "Smallest object" })).toBe(true);
+  expect(asked("Use the smallest object you can", { key: "min_size", label: "Smallest object" })).toBe(true);
+});
+
+test("a new request clears the change request of the scientist", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false } });
+  session["scientistAsked"] = "Use a min size of 20 pixels.";
+  session["askedUsed"].add("method");
+  session["startPlanning"]("Count the cells.");
+  expect(session["scientistAsked"]).toBeUndefined();
+  expect(session["askedUsed"].size).toBe(0);
+  expect(session["askedFor"]({ key: "min_size", label: "Minimum size" })).toBe(false);
+});
+
+test("in a headless run, the settings that the model puts in the plan are by the agent, except the ones from the answers file", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  session.setupPreset = { method: "Default" };
+  const plan = { steps: [{ step: "Count", decisions: [{ key: "min_size", label: "Minimum size", value: 30, by: "agent" }, { key: "method", label: "Method", value: "Otsu", by: "agent" }] }] };
+  session["commitSettings"](plan as never);
+  const by = Object.fromEntries(session.record.entries(["decision"]).map((e) => [String(e.data.key), e.data.by]));
+  expect(by.min_size).toBe("agent");
+  expect(by.method).toBe("human");
+  expect(session.decisions.value("min_size")).toBe(30);
+});
