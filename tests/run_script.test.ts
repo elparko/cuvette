@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
-import { noteHarnessWrite } from "../src/core/harness-writes.ts";
+import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -362,27 +362,35 @@ test("an output folder next to the work folder opens, and one inside a record, t
   expect(opens({ ...own, outputDir: flat })).toBe(false);
 });
 
-test("the check ignores a change of the settings if the harness wrote a settings file or an index during the script, and ignores temp files of the index", () => {
+test("the check skips a changed settings file only if it has the content that the harness wrote, and does not check the global index", () => {
   const l = layout();
   const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-home-")));
   const oldHome = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = home;
   try {
-  const quiet = fingerprint(l.dirs, true);
-  writeFileSync(join(home, `sessions-index.json.${process.pid}.tmp`), "[]");
-  expect(quiet.changed()).toEqual([]);
-  rmSync(join(home, `sessions-index.json.${process.pid}.tmp`));
-  const overlap = fingerprint(l.dirs, true);
-  writeFileSync(l.settings, '{"effort":"high"}');
-  noteHarnessWrite();
-  expect(overlap.changed()).toEqual([]);
-  const alone = fingerprint(l.dirs, true);
-  writeFileSync(l.settings, '{"effort":"low"}');
-  expect(alone.changed()).toEqual([l.settings]);
-  const log = fingerprint(l.dirs, true);
-  noteHarnessWrite();
-  writeFileSync(l.ownLog, '{"id":9}\n');
-  expect(log.changed()).toEqual([l.ownLog]);
+    const index = join(home, "sessions-index.json");
+    writeFileSync(index, "[]");
+    writeFileSync(join(home, "settings.json"), "{}");
+    const quiet = fingerprint(l.dirs, true);
+    writeFileSync(join(home, `sessions-index.json.${process.pid}.tmp`), "[]");
+    writeFileSync(index, '[{"from":"a second Cuvette session"}]');
+    expect(quiet.changed()).toEqual([]);
+
+    const indexOnly = fingerprint(l.dirs, true);
+    harnessWrite(index, () => writeFileSync(index, '[{"n":2}]'));
+    writeFileSync(l.settings, '{"permissions":"bypass"}');
+    expect(indexOnly.changed()).toEqual([l.settings]);
+    writeFileSync(l.settings, '{"permissions":"ask"}');
+
+    const own = fingerprint(l.dirs, true);
+    harnessWrite(l.settings, () => writeFileSync(l.settings, '{"effort":"high"}'));
+    expect(own.changed()).toEqual([]);
+    writeFileSync(l.settings, '{"effort":"low"}');
+    expect(own.changed()).toEqual([l.settings]);
+
+    const log = fingerprint(l.dirs, true);
+    writeFileSync(l.ownLog, '{"id":9}\n');
+    expect(log.changed()).toEqual([l.ownLog]);
   } finally {
     if (oldHome === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = oldHome;
