@@ -30,7 +30,7 @@ build (`npm run desktop:build`).
 
 ## Start
 
-Cuvette needs Node 22 or later. Only ImageJ, FastQC and Bio-Formats need Java.
+Cuvette needs Node 22 or later. Only ImageJ, FastQC, Bio-Formats and CellProfiler need Java.
 
 ```bash
 npm install
@@ -380,11 +380,34 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `flowcore` | flowCore | R scripts | flow cytometry: spillover from single-stain controls, percent positive and MFI, group tests |
 | `amr` | AMR | R scripts | MIC tables: EUCAST and CLSI S, I, R, MIC50 and MIC90 |
 | `openbabel` | Open Babel | command line | chemistry |
+| `astropy` | astropy and photutils | Python library | astronomy |
+| `bcftools` | bcftools | command line | genomics |
+| `bedtools` | bedtools | command line | genomics |
+| `biostats` | statsmodels, pingouin, lifelines | Python library | statistics |
+| `cardinal` | Cardinal | R scripts | mass spectrometry imaging |
+| `deseq2` | DESeq2 | R scripts | transcriptomics |
+| `drc` | drc | R scripts | plate assays |
+| `flowkit` | FlowKit | Python library | flow cytometry |
+| `gdal` | GDAL | command line | geospatial |
+| `growthcurver` | growthcurver | R scripts | microbial growth curves |
+| `lme4` | lme4 | R scripts | statistics |
+| `mdanalysis` | MDAnalysis | Python library | structural biology |
+| `metafor` | metafor | R scripts | statistics |
+| `mne` | MNE-Python | Python library | neurophysiology |
+| `openms` | OpenMS TOPP tools | command line | proteomics |
+| `phylo` | IQ-TREE | command line | phylogenetics |
+| `proc` | pROC | R scripts | statistics |
+| `pwr` | pwr | R scripts | statistics |
+| `qgis` | QGIS | command line | geospatial |
+| `qpcr` | NormqPCR | R scripts | qPCR gene expression |
+| `sage` | Sage | command line | proteomics |
+| `tables` | pandas, openpyxl, matplotlib | Python library | tables and figures |
+| `vegan` | vegan | R scripts | ecology |
 | `onboarding` | the onboarding tools | MCP; used by `cuvette onboard` | any |
 
 `examples/adapters/` holds three small worked examples (a command-line tool, a Python module,
-pandoc). Every catalog adapter has status `draft`: approve each one with
-`node bin/cuvette.js adapter approve <name>` after you read it. The Python adapters use virtual
+pandoc). Each catalog adapter starts as `draft`, the default status. Read an adapter, then
+approve it with `node bin/cuvette.js adapter approve <name>`. The Python adapters use virtual
 environments in `~/.cuvette/envs/`. The R adapters read the R library in `CUVETTE_R_LIBS`,
 `R_LIBS_USER` or `~/.cuvette/R-library`. Test data that a `fetch.sh` script downloads goes to
 `~/.cuvette/cache/data/`. See `docs/onboarding-queue.md`. The `run_script` tool uses

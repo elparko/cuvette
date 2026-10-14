@@ -671,7 +671,7 @@ bench show short summaries. Thus a new setting `show_thinking` keeps `on` as the
 - `show_thinking` (`src/core/config.ts`, `src/core/settings.ts`, `src/providers/claude.ts`):
   `on` (the default) sends `display: "summarized"` in each session step, as before. `off` sends
   `display: "omitted"`. The bill is the same. With `off`, the record has no `thinking` entries.
-  The setting is in the "Model" group of `/settings`. A change during a session makes a new
+  The setting is in the "Model" group of `/config`. A change during a session makes a new
   provider, and a referee with `same` uses it.
 - Folder list in the first message (`src/core/session.ts`, `src/core/prompt.ts`). The first
   message of a new session gives the list of the project folder, in the format of `list_dir`.

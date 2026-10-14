@@ -14,6 +14,8 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 - Your choice applies to the rest of the session. The record logs each decision as a `phi` entry, with masked values only.
 - A local model (Ollama, or an OpenAI-style server on this computer) gets no card. The record logs a notice.
 - A headless run has no one to answer the card. It masks the values and logs the decision.
+- The harness masks a result that goes to an MCP client.
+- A helper agent of the `task` tool follows your choice. If you have not chosen, the harness stops the helper. A local model gets no check.
 - After "Mask", the harness does not send the record to a cloud referee or to the title model, because the record holds the values.
 - The `search_literature` tool sends only its query to api.sciencemadereadable.com. It sends no data file. It refuses a query that has a likely patient identifier. It asks you before each search, also in bypass mode.
 
@@ -31,11 +33,11 @@ The reference is the list of 18 identifiers in the HIPAA Privacy Rule, 45 CFR 16
 
 | # | Identifier | Checked |
 | --- | --- | --- |
-| 1 | Names | Partly: a name after "Patient:" or "Name:", after Mr, Mrs or Ms, before an age ("a 67-year-old"), or before a clinical verb ("was admitted"). Also columns such as patient_name, first name and last name. |
+| 1 | Names | Partly: a name after "Patient:", "Pt:", "Name:" or "Full name:", after Mr, Mrs, Ms or Miss, before an age ("a 67-year-old"), or before a clinical verb ("was admitted"). Also columns such as patient_name, first name and last name. |
 | 2 | Geographic subdivisions smaller than a state | Partly: street addresses with a street word, "City, ST 12345", and ZIP codes in a ZIP column or after "ZIP", if the same line or table has a date. |
 | 3 | Dates (except year) for an individual, and ages over 89 | Partly: dates of birth only. Admission, discharge and death dates, and ages over 89, are not checked. |
 | 4 | Telephone numbers | Yes, US numbers with separators, and phone columns. |
-| 5 | Fax numbers | Yes, with the same pattern, and fax columns. |
+| 5 | Fax numbers | Partly: phone-shaped numbers in text, and fax columns. |
 | 6 | Email addresses | Yes, except near words such as contact, author or investigator. |
 | 7 | Social Security numbers | Yes, with dashes in text, and SSN columns. |
 | 8 | Medical record numbers | Yes, after "MRN" or "medical record number", and MRN columns. |
@@ -47,12 +49,12 @@ The reference is the list of 18 identifiers in the HIPAA Privacy Rule, 45 CFR 16
 | 14 | Web addresses (URLs) | No |
 | 15 | IP addresses | No |
 | 16 | Biometric identifiers | No |
-| 17 | Full-face photographs | No. The check does not read images. |
+| 17 | Full-face photographs | No. The check does not read pixels. It checks image file names. |
 | 18 | Other unique identifying numbers | No |
 
 ## Limits
 
-- The check does not read the system prompt, the images, or the messages of the helper agent of the `task` tool.
+- The check does not read the system prompt or the pixels of an image.
 - The check reads text. It does not open binary files.
 - A study code (for example `P001`) is not an identifier under Safe Harbor, so the check ignores it.
 - We ran the check on each text file of 1 MB or less in the benchmark data (`tests/phi.test.ts`). No file triggers it. Synthetic clinical tables and notes trigger it.

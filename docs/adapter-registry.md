@@ -27,7 +27,7 @@ Cuvette installs an adapter in the user adapter folder (`adapters/` in the Cuvet
 
 Cuvette writes the source, the version, the commit and a SHA-256 of the installed files in `installed-adapters.json` in the Cuvette home folder. The SHA-256 covers the path and the content of every file. `cuvette adapter list --installed` marks an adapter whose files changed after the install.
 
-Cuvette does not install a symbolic link. The staging folder is on the T7 drive in `tools/adapter-staging` if that drive is present. Otherwise it is in the Cuvette home folder.
+Cuvette does not install a symbolic link. The staging folder is the path in `CUVETTE_STAGING`, if you set it. Otherwise it is a folder named `cuvette-staging-<user id>` in the system temporary folder.
 
 ## The check and the card
 

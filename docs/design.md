@@ -201,7 +201,7 @@ schema from the adapter, not from code in the harness.
 
 ## Ways to work
 
-The same map and the same record support three modes. The scientist can change the mode at any
+The same map and the same record support four modes: watch, follow, teach and plan. The scientist can change the mode at any
 step.
 
 | Mode | Who does the steps | What the agent does | Use it for |
