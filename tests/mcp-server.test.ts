@@ -14,7 +14,6 @@ const live = process.env.CUVETTE_LIVE ? test : test.skip;
 
 let client: Client | undefined;
 let home = "";
-let project = "";
 const transportErrors: Error[] = [];
 const stderr: string[] = [];
 
@@ -23,7 +22,7 @@ async function connect(adapter?: string) {
     command: "node",
     args: [cuvette, "mcp", ...(adapter ? ["--adapter", adapter] : [])],
     env: { ...(process.env as Record<string, string>), CUVETTE_HOME: home },
-    cwd: project,
+    cwd: home,
     stderr: "pipe",
   });
   transport.onerror = (e) => transportErrors.push(e);
@@ -40,7 +39,6 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "cuvette-mcp-"));
-  project = mkdtempSync(join(tmpdir(), "cuvette-mcp-project-"));
   transportErrors.length = 0;
   stderr.length = 0;
 });
@@ -92,9 +90,9 @@ test("with no adapter, the client lists the adapters, use_adapter loads the agen
 });
 
 test("a tool result with patient identifiers goes to the client masked, with a notice", async () => {
-  writeFileSync(join(project, "visits.csv"), "patient_name,mrn,troponin_ng_l\nJohn Doe,00123456,54\nMary Smith,00123457,12\n");
+  writeFileSync(join(home, "visits.csv"), "patient_name,mrn,troponin_ng_l\nJohn Doe,00123456,54\nMary Smith,00123457,12\n");
   await connect(lab);
-  const r = await call("read_file", { path: join(project, "visits.csv") });
+  const r = await call("read_file", { path: join(home, "visits.csv") });
   expect(r.text).not.toContain("John Doe");
   expect(r.text).toContain("[NAME 1],[MRN 1],54");
   expect(r.text).toMatch(/Cuvette masked 4 possible patient identifiers in this result before it went to the MCP client/);

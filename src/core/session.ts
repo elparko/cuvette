@@ -16,7 +16,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { COPY_LIMIT_BYTES, findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { COPY_LIMIT_BYTES, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -2208,8 +2208,8 @@ export class Session {
       this.record.append("blocked", { callId, tool: tool.name, path: held, reason: "reference held back for the blind test" });
       return error(`${basename(held)} is held back for the blind test. The harness compares it with your results after the batch. Do not read it.`);
     }
-    if (tool.source === "generic") {
-      const place = this.pathPlace(args);
+    if (tool.source === "generic" || tool.name === "inspect_data") {
+      const place = this.pathPlace(args, tool.source !== "generic");
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
       if (place === "private") return error("This path is in the Cuvette home folder or in the record of another session. The agent cannot read it. Ask the scientist to name the folder in the request.");
       if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
@@ -2503,8 +2503,8 @@ export class Session {
 
   // ------------------------------------------------------------- decisions owned by the scientist
 
-  private pathPlace(args: Args): "ok" | "outside" | "link" | "private" {
-    const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v));
+  private pathPlace(args: Args, onlyPrivate = false): "ok" | "outside" | "link" | "private" {
+    const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v.replace(/^~(?=[\\/]|$)/, homedir())));
     if (!paths.length || paths.every(isCredentialsFile)) return "ok";
     const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
     const mine = [this.dir, this.workDir, this.place.outDir, ...this.adapters.map((a) => a.root)];
@@ -2514,15 +2514,24 @@ export class Session {
       return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
     });
     const home = [cuvetteHome(), realPath(cuvetteHome())];
-    const ownRecord = realPath(this.dir);
+    const private_ = home.flatMap((h) => [join(h, "sessions"), join(h, "projects")]);
+    const indexed = (p: string) => home.some((h) => dirname(p) === h && basename(p).startsWith("sessions-index.json"));
+    const ownRecord = realPath(this.dir).toLowerCase();
     const recordOf = (p: string) => {
-      for (let at = p; dirname(at) !== at; at = dirname(at)) if (basename(at) === ".record" && realPath(at) !== ownRecord && (existsSync(join(at, "log.jsonl")) || existsSync(join(at, "meta.json")))) return true;
+      for (let at = p; dirname(at) !== at; at = dirname(at)) if (isRecordName(basename(at)) && realPath(at).toLowerCase() !== ownRecord && (existsSync(join(at, "log.jsonl")) || existsSync(join(at, "meta.json")))) return true;
       return false;
     };
-    const closed = (p: string) => [p, realPath(p)].some((x) => within(home, x) || recordOf(x));
-    const asked = [...named.filter(closed), ...named.map((n) => join(n, "..")).filter((n) => closed(n) && !home.includes(n))];
+    const hard = (p: string) => [p, realPath(p)].some((x) => within(private_, x) || indexed(x) || recordOf(x));
+    const soft = (p: string) => [p, realPath(p)].some((x) => within(home, x));
+    const asked = [...named.filter((n) => hard(n) || soft(n)), ...named.map((n) => join(n, "..")).filter((n) => (hard(n) || soft(n)) && !home.includes(n))];
     const open = [...mine, ...nodeFiles, ...asked];
-    if (paths.some((p) => closed(p) && !(within(open, p) && within(open, realPath(p))))) return "private";
+    const shut = (p: string) => {
+      const free = (list: string[]) => within(list, p) && within(list, realPath(p));
+      if (hard(p)) return !free(open);
+      return soft(p) && !free([...open, this.cwd]);
+    };
+    if (paths.some(shut)) return "private";
+    if (onlyPrivate) return "ok";
     const roots = [this.cwd, ...mine, ...named, ...named.map((n) => join(n, ".."))];
     roots.push(...nodeFiles);
     if (!paths.every((p) => within(roots, p))) return "outside";
@@ -4606,7 +4615,7 @@ function realPath(p: string): string {
   const rest: string[] = [];
   for (;;) {
     try {
-      return join(realpathSync(at), ...rest);
+      return join(realpathSync.native(at), ...rest);
     } catch {
       const up = dirname(at);
       if (up === at) return p;

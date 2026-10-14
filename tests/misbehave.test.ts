@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { saveAccess } from "../src/adapters/access.ts";
 import { applyInstall, prepareAdd } from "../src/adapters/install.ts";
 import { CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
+import { isRecordName } from "../src/core/places.ts";
 import { Session, cleanText } from "../src/core/session.ts";
 import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
@@ -601,6 +602,54 @@ test("a skill of an adapter in the Cuvette home folder is read through load_skil
   const t = texts(provider);
   expect(t[0]).toContain(readFileSync(skill.path, "utf8").slice(0, 40));
   expect(t[1]).toMatch(HOME_TEXT);
+});
+
+test("the name of a record folder is compared in lower case", () => {
+  expect([".record", ".RECORD", ".Record"].every(isRecordName)).toBe(true);
+  expect([".records", "record", ".recor"].some(isRecordName)).toBe(false);
+});
+
+test("a case variant of .record does not open the record of another session", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const record = otherSessions(cwd);
+  const variant = join(record, "..", ".RECORD");
+  const sensitive = !existsSync(join(variant, "log.jsonl"));
+  const { provider, session: s } = await start([call("read_file", { path: join(variant, "log.jsonl") }), call("list_dir", { path: variant }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  if (sensitive) return;
+  for (const x of texts(provider)) expect(x).toMatch(HOME_TEXT);
+});
+
+test("inspect_data refuses the session index, the output of another project and the record of another session", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const record = otherSessions(cwd);
+  writeFileSync(join(cwd, "data.csv"), "id,value\n1,5\n");
+  const { provider, session: s } = await start([call("inspect_data", { path: join(home, "sessions-index.json") }), call("inspect_data", { path: join(home, "projects", "other") }), call("inspect_data", { path: record }), call("inspect_data", { path: "data.csv" }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  const t = texts(provider);
+  for (const x of t.slice(0, 3)) expect(x).toMatch(HOME_TEXT);
+  expect(t[3]).not.toMatch(HOME_TEXT);
+  expect(t[3]).toContain("value");
+});
+
+test("a project that is the Cuvette home folder, or inside it, stays readable, and the private parts stay refused", async () => {
+  for (const inside of [false, true]) {
+    const cwd = inside ? join(home, "work", "proj") : home;
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "data.csv"), "id,value\n1,5\n");
+    mkdirSync(join(home, "sessions", "old-1"), { recursive: true });
+    writeFileSync(join(home, "sessions", "old-1", "log.jsonl"), '{"id":1}\n');
+    writeFileSync(join(home, "sessions-index.json"), "[]");
+    const { provider, session: s } = await start([call("read_file", { path: "data.csv" }), call("list_dir", { path: "." }), call("read_file", { path: join(home, "sessions-index.json") }), call("read_file", { path: join(home, "sessions", "old-1", "log.jsonl") }), { text: "ok" }], {}, cwd);
+    await s.send("go");
+    const t = texts(provider);
+    expect(t[0]).toContain("1,5");
+    expect(t[1]).toContain("data.csv");
+    expect(t[2]).toMatch(HOME_TEXT);
+    expect(t[3]).toMatch(HOME_TEXT);
+    await s.close();
+    session = undefined;
+  }
 });
 
 test("the model cannot write to the record folder or to the settings folder of the project", async () => {

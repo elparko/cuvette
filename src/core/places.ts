@@ -40,6 +40,8 @@ export interface IndexRow {
 
 const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"cuvette open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
 
+export const isRecordName = (name: string) => name.toLowerCase() === ".record";
+
 export function indexPath(): string {
   return join(cuvetteHome(), "sessions-index.json");
 }
