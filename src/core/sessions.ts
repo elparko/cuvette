@@ -136,7 +136,7 @@ function parseLog(log: string): Parsed {
   const asked = new Set<string>();
   let planOpen = false;
   let lastFinal = false;
-  for (const l of readFileSync(log, "utf8").split("\n")) {
+  for (const l of readFileSync(log, "utf8").replace(/^\uFEFF/, "").split("\n")) {
     if (!l) continue;
     let e: any;
     try {

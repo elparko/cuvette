@@ -11,7 +11,7 @@ import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
 import { testsMarkdown, testsTable } from "./testcount.ts";
 import { referencesHtml, referencesMarkdown, sessionCitations, type CitationStyle } from "./citations.ts";
 import { roleInRecord, stepNumbers } from "./housekeeping.ts";
-import type { AnalysisRecord } from "./record.ts";
+import { ownerOf, type AnalysisRecord } from "./record.ts";
 import type { Entry, Node } from "./types.ts";
 
 export type TrailIcon = "setup" | "step" | "decision" | "question" | "deviation" | "finding" | "note";
@@ -402,7 +402,7 @@ function meta(record: AnalysisRecord): Meta {
   const list = [...((s?.data.adapters as { name: string; version?: string; programVersion?: string }[] | undefined) ?? []), ...record.entries(["adapter"]).map((e) => e.data as { name: string; version?: string; programVersion?: string })];
   const setups = record.entries(["setup"]);
   return {
-    id: all[0]?.session ?? "",
+    id: ownerOf(all),
     adapters: list.map((a) => `${a.name}${a.version ? " " + a.version : ""}${a.programVersion ? " (program " + a.programVersion + ")" : ""}`).join(", ") || "none",
     model: show(s?.data.model ?? "unknown"),
     date: (all[0]?.ts ?? new Date().toISOString()).slice(0, 10),

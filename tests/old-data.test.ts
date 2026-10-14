@@ -13,6 +13,7 @@ import { readSpend, recordSpend, totalSpend } from "../src/core/spend.ts";
 import { moveOldHome } from "../src/core/old-names.ts";
 import { readInstalled, saveInstalled, type InstalledEntry } from "../src/adapters/source.ts";
 import { trustFolder } from "../src/core/trust.ts";
+import { openRecord as openBookRecord, projectSessions as bookSessions } from "../src/core/databook.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { Mapper } from "../src/ui/items.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -631,5 +632,40 @@ describe.each([...HOME_FORMATS, ...PROJECT_FORMATS])("the model history of %s", 
     for (const m of openai) if (m.role === "tool") expect(ids.has(m.tool_call_id!)).toBe(true);
     expect(openai.filter((m) => m.role === "tool").length).toBe(ids.size);
     expect((new OllamaProvider("m", { capabilities: [] } as never).toNative("SYS", s.history) as unknown[]).length).toBeGreaterThan(2);
+  });
+});
+
+describe("the data book of a project with a branch", () => {
+  test.each(["v5-rewind-branch-method", "v7-agent-loop"])("%s: the parent and the branch are two sessions, each with its own id", (format) => {
+    install(format);
+    const project = join(root, "project");
+    const found = bookSessions(project);
+    expect(found.length).toBe(2);
+    const ids = found.map((f) => openBookRecord(f).sessionId).sort();
+    expect(ids).toEqual(readIndex().map((r) => r.id).sort());
+    const branch = readIndex().find((r) => r.name === "triangle branch")!;
+    const only = bookSessions(project, [branch.id]);
+    expect(only.length).toBe(1);
+    expect(openBookRecord(only[0]!).sessionId).toBe(branch.id);
+  });
+});
+
+describe("the exports of a branch", () => {
+  test.each(["v5-rewind-branch-method", "v7-agent-loop"])("%s: they name the branch, not the parent", async (format) => {
+    install(format);
+    const rows = readIndex();
+    const branch = rows.find((r) => r.name === "triangle branch")!;
+    const parent = rows.find((r) => r.id !== branch.id)!;
+    const s = await resume(branch.id);
+    expect(s.record.entries()[0]!.session).toBe(parent.id);
+    for (const fmt of ["protocol", "md", "html"] as const) {
+      const text = readFileSync(await s.exportAs(fmt), "utf8");
+      expect(text).toContain(branch.id);
+      if (fmt === "md") expect(/- Session: (\S+)/.exec(text)?.[1]).toBe(branch.id);
+    }
+    expect(readFileSync(join(s.workDir, "protocol.md"), "utf8")).not.toContain(`Session ${parent.id}`);
+    s.saveResults(0, true);
+    const bib = join(s.workDir, "references.bib");
+    if (existsSync(bib)) expect(readFileSync(bib, "utf8")).toContain(branch.id);
   });
 });

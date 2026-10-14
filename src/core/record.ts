@@ -42,6 +42,8 @@ function intact(e: unknown): e is Entry {
   return true;
 }
 
+export const ownerOf = (entries: Pick<Entry, "kind" | "session">[]): string => entries.findLast((e) => e.kind === "fork")?.session ?? entries[0]?.session ?? "";
+
 export const liveEntries = (r: Pick<AnalysisRecord, "entries"> & { live?: AnalysisRecord["live"] }, kinds?: EntryKind[]): Entry[] => (r.live ? r.live(kinds) : r.entries(kinds));
 
 export class AnalysisRecord {

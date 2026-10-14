@@ -10,7 +10,7 @@ import { scriptPython } from "../tools/run_script.ts";
 import { CUVETTE_VERSION, errorBars, pdfPages, printPdf, sizes } from "./databook.ts";
 import { mainNodes, methodsSentence, programNames } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
-import type { AnalysisRecord } from "./record.ts";
+import { ownerOf, type AnalysisRecord } from "./record.ts";
 import { copyFigures } from "./results.ts";
 import { esc, fillTemplate, show } from "./trail.ts";
 import type { Node } from "./types.ts";
@@ -400,7 +400,7 @@ export function deckInfo(record: AnalysisRecord, adapters: LoadedAdapter[], dir:
   return {
     question,
     date: localDate(first?.ts ?? new Date().toISOString()),
-    session: first?.session ?? "",
+    session: ownerOf(record.entries()),
     analysis: analysisParagraph(record),
     methods: shown,
     record: rel.startsWith("..") || isAbsolute(rel) ? record.logPath : rel,
