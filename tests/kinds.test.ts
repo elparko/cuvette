@@ -488,6 +488,25 @@ test("python: a call to a fast module does not wait for a slow module that the p
   expect((await run("slow")).ok).toBe(true);
 }, 60000);
 
+test("python: a call that hits an import race with the preload thread runs again after the thread ends", async () => {
+  const dir = adapter(
+    `${head("python")}tools:
+  - { name: racy, description: d, function: "racymod:racy" }
+  - { name: slow, description: d, function: "slowmod:slow" }
+`,
+    {
+      "racymod.py": "calls = []\ndef racy():\n    calls.append(1)\n    if len(calls) == 1:\n        raise ImportError('cannot import name x (most likely due to a circular import)')\n    return {'ok': True, 'metrics': {'calls': len(calls)}}\n",
+      "slowmod.py": "import time\ntime.sleep(3)\ndef slow(): return {'ok': True}\n",
+    },
+  );
+  const { rt, run } = await start(dir);
+  rt.warm!(true);
+  await new Promise((r) => setTimeout(r, 500));
+  const r = await run("racy");
+  expect(r.ok).toBe(true);
+  expect(r.metrics).toMatchObject({ calls: 2 });
+}, 60000);
+
 test.skipIf(process.platform === "win32")("runProcess returns after the program exits, also if a child keeps the output open", async () => {
   const code = "const c=require('child_process').spawn('sleep',['30'],{stdio:'inherit',detached:true});console.log(c.pid);c.unref();";
   const t0 = Date.now();
