@@ -224,15 +224,14 @@ test("claimLock takes a free or dead lock, and refuses a live lock of another pr
 
 test("of many processes that claim one lock at the same time, exactly one gets it", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-race-"));
-  const code = `import { claimLock } from ${JSON.stringify(join(__dirname, "../src/core/sessions.ts"))}; const at = Number(process.env.AT); while (Date.now() < at) {} const held = claimLock(${JSON.stringify(dir)}); setTimeout(() => { console.log(held ? "lost" : "won"); }, 1500);`;
+  const code = `import { claimLock } from ${JSON.stringify(join(__dirname, "../src/core/sessions.ts"))}; const at = Number(process.env.AT); while (Date.now() < at) {} const held = claimLock(${JSON.stringify(dir)}); console.log(held ? "lost" : "won"); process.stdin.resume();`;
   const at = Date.now() + 2500;
-  const runs = Array.from({ length: 6 }, () => new Promise<string>((done) => {
-    const c = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, AT: String(at) }, stdio: ["ignore", "pipe", "inherit"] });
-    let out = "";
-    c.stdout.on("data", (d) => (out += d));
-    c.on("close", () => done(out.trim()));
+  const children = Array.from({ length: 6 }, () => spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, AT: String(at) }, stdio: ["pipe", "pipe", "inherit"] }));
+  const runs = children.map((c) => new Promise<string>((done) => {
+    c.stdout.once("data", (d) => done(String(d).trim()));
   }));
   const results = await Promise.all(runs);
+  for (const c of children) c.stdin.end();
   expect(results.filter((r) => r === "won").length).toBe(1);
   expect(results.filter((r) => r === "lost").length).toBe(5);
 }, 30_000);

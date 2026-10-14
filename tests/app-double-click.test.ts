@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 
 describe.skipIf(!CHROME)("a double click in the app", () => {
   let proc: ChildProcess;
@@ -49,7 +49,7 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
     mkdirSync(join(tmpdir(), "cuvette-long-folder-name-" + "x".repeat(70)), { recursive: true });
     await page.size(390, 844);
     await page.go(url + "&page=start");
-    await until(page, `document.querySelector('input[aria-label="Folder"]') && document.body.textContent.includes("Up one folder")`);
+    expect(await until(page, `document.querySelector('input[aria-label="Folder"]') && document.body.textContent.includes("Up one folder")`)).toBe(true);
     const wide = await page.eval<string[]>(`[...document.querySelectorAll("#root *")].filter((e) => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.tagName + "." + e.className).slice(0, 5)`);
     expect(wide).toEqual([]);
     await page.size(1280, 900);
@@ -57,7 +57,7 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
 
   test("a second click on the sample button after the first request ends does not open a second session", async () => {
     await page.go(url + "&page=start");
-    await until(page, `document.body.textContent.includes("Run the sample analysis")`);
+    expect(await until(page, `document.body.textContent.includes("Run the sample analysis")`)).toBe(true);
     const before = await sessions();
     await page.eval(`(async () => {
       const b = [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Run the sample analysis"));

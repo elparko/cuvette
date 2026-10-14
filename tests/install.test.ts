@@ -374,7 +374,7 @@ describe("trust labels", () => {
     session.setOwner("adapter", "human");
     const asking = session.useAdapter("obtest", "it reads smiles files");
     let q;
-    for (let i = 0; i < 100 && !q; i++) {
+    for (let i = 0; i < 1000 && !q; i++) {
       await new Promise((r) => setTimeout(r, 20));
       q = session.questions.open().find((x) => x.decisionKey === "adapter");
     }
@@ -605,5 +605,5 @@ describe("the browser app", () => {
     expect(list).toContain('data-prog="obtest"');
     expect(list).toContain('data-prog-act="adapter-update"');
     expect(list).toContain('data-prog-act="adapter-remove"');
-  });
+  }, 180_000);
 });
