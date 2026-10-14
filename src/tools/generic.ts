@@ -37,6 +37,21 @@ export function insideWorkDir(workDir: string, name: string): string | undefined
   return target;
 }
 
+const GUARDED_NAMES = new Set([".record", ".cuvette", ".ga"]);
+
+function guarded(target: string, dirs: Dirs): boolean {
+  const real = (p: string) => realpathSync.native(existingAncestor(p));
+  const inside = (root: string, p: string) => p === root || below(root, p);
+  const record = real(dirs.sessionDir);
+  const realTarget = real(target);
+  const legacy = below(record, real(dirs.workDir));
+  if (inside(record, realTarget) && !(legacy && inside(real(dirs.workDir), realTarget))) return true;
+  const named = (root: string) => relative(root, target).split(/[\\/]/).some((part) => GUARDED_NAMES.has(part.toLowerCase()));
+  const work = resolve(dirs.workDir);
+  if (below(work, resolve(target))) return named(work);
+  return !!dirs.projectDir && below(resolve(dirs.projectDir), resolve(target)) && named(resolve(dirs.projectDir));
+}
+
 export function projectPath(projectDir: string, p: string): string {
   return resolve(projectDir, p.replace(/^~(?=[\\/]|$)/, homedir()));
 }
@@ -148,6 +163,8 @@ export function genericTools(dirs: Dirs): Tool[] {
       },
       run(a) {
         const name = String(a.name);
+        const asked = resolve(dirs.workDir, name);
+        if (guarded(asked, dirs)) return { ok: false, error: `the path ${asked} belongs to the record or to the settings of Cuvette. The agent cannot write there. Write the file in the session folder ${dirs.workDir}.` };
         const target = insideWorkDir(dirs.workDir, name) ?? (dirs.projectDir && isAbsolute(name) ? insideWorkDir(dirs.projectDir, name) : undefined);
         if (!target) return { ok: false, error: `the path is outside the session folder ${dirs.workDir} and the project folder ${project}` };
         writeFileSync(target, String(a.text));
