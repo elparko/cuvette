@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { KnownAnswerTest, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter, Manifest } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
-import { trustStatus } from "./trust.ts";
+import { labDisplayText, trustStatus } from "./trust.ts";
 
 export interface LabChange {
   pid: string;
@@ -140,5 +140,5 @@ export function applyOverlay(adapter: LoadedAdapter): LoadedAdapter {
 export function labText(cwd: string): string {
   const home = join(cuvetteHome(), "LAB.md");
   const t = trustStatus(cwd);
-  return [existsSync(home) ? readFileSync(home, "utf8").trim() : "", t.state === "trusted" || t.state === "once" ? (t.scan.lab ?? "") : ""].filter(Boolean).join("\n\n");
+  return [existsSync(home) ? labDisplayText(readFileSync(home, "utf8").replace(/\r\n?/g, "\n").trim()) : "", t.state === "trusted" || t.state === "once" ? (t.scan.lab ?? "") : ""].filter(Boolean).join("\n\n");
 }
