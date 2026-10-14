@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -446,4 +446,30 @@ test("a long column name is cut on a code point boundary, so no lone surrogate i
   }
   const edge = dataCheckText(checkTable({ columns: ["id", `${"a".repeat(199)}😀bb`], rows }, "data.csv"));
   expect(edge).toContain(`'${"a".repeat(199)}'`);
+});
+
+async function boolChange(request: string, proposed: string) {
+  const dir = mkdtempSync(join(__dirname, "fixtures", "lab-bool-"));
+  cpSync(join(__dirname, "fixtures/lab"), dir, { recursive: true });
+  const yaml = readFileSync(join(dir, "adapter.yaml"), "utf8").replace("  - key: sigma", "  - key: remove_outliers\n    label: Outlier removal\n    kind: bool\n    default: true\n    owner: human\n    links: [{ tool: count, arg: remove_outliers }]\n  - key: sigma");
+  writeFileSync(join(dir, "adapter.yaml"), yaml);
+  const provider = new FakeProvider([{ calls: [{ name: "propose_change", args: { key: "remove_outliers", value: proposed, reason: "A file says so.", wait: false } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [dir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false, autoResume: false } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5, remove_outliers: true });
+  await session.send(request);
+  rmSync(dir, { recursive: true, force: true });
+  return { value: session.decisions.value("remove_outliers"), by: session.record.entries(["decision"]).filter((e) => e.data.key === "remove_outliers").map((e) => `${e.data.new}:${e.data.by}`), open: session.questions.open().map((q) => q.decisionKey) };
+}
+
+test("a boolean setting changes with no card only for a form tied to its name, also if the model writes the value as n or no", async () => {
+  for (const proposed of ["n", "no", "false"]) {
+    const bad = await boolChange("Turn on outlier removal, n=3", proposed);
+    expect(bad.value, proposed).toBe(true);
+    expect(bad.by).toEqual([]);
+    expect(bad.open).toContain("remove_outliers");
+    await session!.close();
+  }
+  const good = await boolChange("Turn remove_outliers off", "n");
+  expect(good.value).toBe(false);
+  expect(good.by).toEqual(["false:human"]);
 });

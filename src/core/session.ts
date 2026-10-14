@@ -2701,7 +2701,14 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
-    if (this.askedFor(f, value)) {
+    const typed = (() => {
+      try {
+        return this.decisions.validate(f.key, value);
+      } catch {
+        return value;
+      }
+    })();
+    if (this.askedFor(f, typed)) {
       const asked = this.scientistAsked;
       this.askedUsed.add(f.key);
       this.decisions.change(f.key, value, { by: "human", reason: `the scientist asked: "${asked}"` });
