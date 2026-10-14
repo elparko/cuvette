@@ -120,6 +120,8 @@ export class AnalysisRecord {
         continue;
       }
       if (!intact(e)) {
+        const bad: unknown = e;
+        if (isObject(bad) && Number.isFinite(bad.id)) this.lastId = Math.max(this.lastId, bad.id as number);
         this.skipped++;
         continue;
       }

@@ -1032,3 +1032,19 @@ describe.skipIf(process.platform === "win32")("a project adapter on resume", () 
     expect(s.record.entries(["notice"]).filter((n) => String(n.data.text).includes("not installed here")).length).toBe(1);
   });
 });
+
+test("an unreadable last line with an id still holds its id, so a new entry gets a larger one", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  const top = idsOf(first!.folder).at(-1)!;
+  appendFileSync(file, JSON.stringify({ id: top + 5, ts: "2027-01-01T00:00:00.000Z", session: first!.id, kind: "future", data: "not an object" }) + "\n");
+  const s = await resume(first!.id);
+  const ids = s.record.entries().map((e) => e.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(Math.min(...s.record.entries(["notice"]).filter((n) => String(n.data.text).includes("cannot read")).map((n) => n.id))).toBeGreaterThan(top + 5);
+  const b = s.branch("after the bad line");
+  expect(b.upTo).toBeGreaterThan(top + 5);
+  const points = rewindPoints(s.record);
+  expect(s.rewind(points[0]!.n).point.n).toBe(points[0]!.n);
+});
