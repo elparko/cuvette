@@ -911,6 +911,8 @@ export class Session {
     try {
       a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
     } catch (e) {
+      const shown = name.length > 40 ? `${name.slice(0, 39)}…` : name;
+      if (/^no adapter named/.test((e as Error).message)) return { ok: false, text: `No adapter named ${shown}. Type /programs to see the adapters.` };
       return { ok: false, text: `${(e as Error).message}. /adapters lists the loaded programs.` };
     }
     if (this.decisions.has(ADAPTER_DECISION.key)) this.decisions.change(ADAPTER_DECISION.key, a.name, { by: "human", reason: PROGRAM_REASON });
@@ -4307,7 +4309,8 @@ export class Session {
         this.saveSheet(rows, "reloaded", "read samples.csv again");
         return { done: false, said: `Read samples.csv again: ${rows.length} rows.` };
       } catch (e) {
-        return { done: false, said: `Could not read samples.csv: ${(e as Error).message}` };
+        const missing = (e as NodeJS.ErrnoException).code === "ENOENT";
+        return { done: false, said: missing ? `The file ${join(this.outputDir, "samples.csv")} is not there. Type /samples to see the sheet. Change one cell to write the file again.` : `Could not read samples.csv: ${(e as Error).message}` };
       }
     }
     const r = applyEdit(this.sheet!.rows, text);
@@ -4361,7 +4364,7 @@ export class Session {
   }
 
   startMethod(ref: string): Method {
-    if (this.record.live(["user"]).some((e) => !e.data.internal)) throw new Error(`This session has a request already. Start a new session with the method: cuvette --method ${ref} <folder>`);
+    if (this.record.live(["user"]).some((e) => !e.data.internal)) throw new Error(`This session has a request already. Start a new session with the method: cuvette --method ${ref.length > 60 ? `${ref.slice(0, 59)}…` : ref} <folder>`);
     const m = loadMethod(ref, this.cwd);
     this.method = m;
     this.record.append("method", { action: "started", name: m.name, path: m.path, hash: m.hash, saved: m.saved, from: m.from ?? null, questions: m.questions.length });
@@ -4400,7 +4403,10 @@ export class Session {
   compareBranches(a: string, b: string): { a: BranchInfo; b: BranchInfo; rows: string[][]; differ: number } {
     const src = { id: this.id, place: this.place, record: this.record };
     const [x, y] = [findBranch(src, a), findBranch(src, b)];
-    if (!x || !y) throw new Error(`No branch named ${!x ? a : b}. Type /branches to see the list.`);
+    if (!x || !y) {
+      const miss = !x ? a : b;
+      throw new Error(`No branch named ${miss.length > 40 ? `${miss.slice(0, 39)}…` : miss}. Type /branches to see the list.`);
+    }
     const rec = (i: BranchInfo) => {
       if (i.role === "this") return this.record;
       const p = placeAt(join(i.folder, ".record"));
@@ -4543,7 +4549,7 @@ export class Session {
   async elnPush(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW has no saved address or key. Run `cuvette eln setup` or /eln setup.");
     const { elabftw } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const plan = sync.planPush(this, cfg.url);
@@ -4568,7 +4574,7 @@ export class Session {
   async elnLink(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW has no saved address or key. Run `cuvette eln setup` or /eln setup.");
     const { elabftw, baseUrl } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const client = elabftw(cfg);

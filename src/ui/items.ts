@@ -217,7 +217,7 @@ export class Mapper {
       case "method":
         return line("▸", d.action === "saved" ? `Saved the method ${String(d.name)}: ${String(d.path ?? "")}` : `Started from the method ${String(d.name)}. The questions come with the saved answers.`, "cyan");
       case "stale":
-        return line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow");
+        return ((d.nodes as string[]) ?? []).length ? line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow") : [];
       case "note":
         return line("▸", String(d.text ?? ""), undefined, true);
       case "phi": {
@@ -235,6 +235,7 @@ export class Mapper {
       case "program":
         return line("⚙", `Programs: ${String(d.text ?? d.action)}`, d.ok === false ? "red" : "cyan");
       case "error":
+        if (d.stack) return [];
         return line("✗", String(d.message ?? d.text ?? "Error"), "red");
       case "usage":
         this.tokens.input += Number(d.inputTokens ?? 0);
