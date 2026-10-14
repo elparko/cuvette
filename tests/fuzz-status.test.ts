@@ -257,6 +257,68 @@ describe("rewind and the marks from the disk", () => {
   });
 });
 
+describe("stale marks through the live view", () => {
+  const rewindTo = (rec: AnalysisRecord, label: string) => {
+    const p = rewindPoints(rec).find((x) => x.label.endsWith(label))!;
+    rec.append("rewind", { upTo: p.upTo, entry: p.entry, kind: p.kind, point: p.label, nodes: [] });
+  };
+  const stale = (rec: AnalysisRecord) => {
+    const a = [...rec.stale()].sort();
+    expect([...rec.liveView().stale()].sort()).toEqual(a);
+    return a;
+  };
+
+  test("two rewinds in a row keep the mark of a changed input file and drop the marks of decisions", () => {
+    const rec = new AnalysisRecord(freshDir(), "s");
+    rec.append("user", { text: "one" });
+    const a = rec.addNode(nodeIn(rec, [], ["method"]));
+    const b = rec.addNode(nodeIn(rec, [], []));
+    rec.append("user", { text: "two" });
+    rec.append("stale", { kind: "input", reason: "The input file x changed after this step ran.", nodes: [b.id], direct: [b.id] });
+    rec.append("user", { text: "three" });
+    rec.markStale("method", "changed");
+    expect(stale(rec)).toEqual([a.id, b.id]);
+    rewindTo(rec, "three");
+    expect(stale(rec)).toEqual([b.id]);
+    rewindTo(rec, "two");
+    expect(stale(rec)).toEqual([b.id]);
+    rec.append("user", { text: "four" });
+    rec.append("stale", { kind: "program", reason: "The program changed after this step ran.", nodes: [a.id], direct: [a.id] });
+    rewindTo(rec, "four");
+    expect(stale(rec)).toEqual([a.id, b.id]);
+    expect(stepStatus(rec).map((x) => x.current)).toEqual([false, false]);
+  });
+
+  test("a rewind past a rerun of a step whose input changed leaves that step stale", () => {
+    const rec = new AnalysisRecord(freshDir(), "s");
+    rec.append("user", { text: "one" });
+    const a = rec.addNode(nodeIn(rec, [], []));
+    rec.append("stale", { kind: "input", reason: "The input file x changed after this step ran.", nodes: [a.id], direct: [a.id] });
+    rec.append("user", { text: "two" });
+    const a2 = rec.addNode(nodeIn(rec, [], []));
+    rec.append("rerun", { old: a.id, node: a2.id }, { node: a2.id });
+    expect(stepStatus(rec).map((x) => [x.node, x.current])).toEqual([[a2.id, true]]);
+    rewindTo(rec, "two");
+    expect(stale(rec)).toEqual([a.id]);
+    expect(stepStatus(rec).map((x) => [x.node, x.current])).toEqual([[a.id, false]]);
+  });
+
+  test("a decision change, a rewind past it, and the same change again give the right marks", () => {
+    const rec = new AnalysisRecord(freshDir(), "s");
+    rec.append("user", { text: "one" });
+    const a = rec.addNode(nodeIn(rec, [], ["method"]));
+    rec.append("user", { text: "two" });
+    rec.markStale("method", "changed");
+    expect(stale(rec)).toEqual([a.id]);
+    rewindTo(rec, "two");
+    expect(stale(rec)).toEqual([]);
+    expect(stepStatus(rec.liveView()).map((x) => x.current)).toEqual([true]);
+    rec.markStale("method", "changed again");
+    expect(stale(rec)).toEqual([a.id]);
+    expect(stepStatus(rec.liveView()).map((x) => x.current)).toEqual([false]);
+  });
+});
+
 describe("fuzz: branch", () => {
   test("a branch has the history, the steps and the parents up to the branch point", async () => {
     for (let seed = 1; seed <= runs(3); seed++) {

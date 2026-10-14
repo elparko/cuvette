@@ -522,7 +522,8 @@ export class Session {
         try {
           this.method = loadMethod(String(used.data.path), this.cwd);
         } catch (e) {
-          if (/not trusted/.test((e as Error).message)) this.record.append("notice", { text: `Cuvette did not load the saved method ${String(used.data.name)}: ${(e as Error).message}`, warn: true });
+          const text = `Cuvette did not load the saved method ${String(used.data.name)}: ${(e as Error).message}`;
+          if (/not trusted/.test((e as Error).message) && !this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
         }
       this.history = this.record.messages();
       this.closeOpenCalls(this.recordedResults());

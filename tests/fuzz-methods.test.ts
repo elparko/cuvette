@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, symlinkSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -204,6 +204,60 @@ describe("fuzz: methods", () => {
     const back = await Session.resume(id, { provider: provider(), cwd: project });
     const notes = back.record.entries(["notice"]).map((e) => String(e.data.text));
     await back.close();
-    expect(notes.some((t) => /did not load the saved method pm.*not trusted/.test(t))).toBe(true);
+    expect(notes.filter((t) => /did not load the saved method pm.*not trusted/.test(t))).toHaveLength(1);
+    const again = await Session.resume(id, { provider: provider(), cwd: project });
+    const twice = again.record.entries(["notice"]).map((e) => String(e.data.text)).filter((t) => /did not load the saved method pm/.test(t));
+    await again.close();
+    expect(twice).toHaveLength(1);
+  });
+
+  describe("trust of a project method path", () => {
+    const project = join(root, "path-project");
+    const dir = join(project, ".cuvette", "methods");
+    const other = join(project, "data", "elsewhere.json");
+    beforeAll(() => {
+      mkdirSync(dir, { recursive: true });
+      mkdirSync(join(project, "data"), { recursive: true });
+      writeFileSync(join(dir, "pm.json"), JSON.stringify(method(new Rng(5), "pm")));
+      writeFileSync(other, JSON.stringify(method(new Rng(6), "elsewhere")));
+    });
+
+    test("a method file anywhere in an untrusted project is refused", () => {
+      expect(() => loadMethod(other, project)).toThrow(/not trusted/);
+    });
+
+    test.skipIf(process.platform === "win32")("a link to a project file is refused", () => {
+      const outside = join(root, "link-outside");
+      mkdirSync(outside, { recursive: true });
+      const link = join(outside, "link.json");
+      symlinkSync(other, link);
+      expect(() => loadMethod(link, project)).toThrow(/not trusted/);
+    });
+
+    test("a case variant of the project path is refused on a case-insensitive disk", () => {
+      const upper = other.replace("path-project", "PATH-PROJECT");
+      if (!existsSync(upper)) return;
+      expect(() => loadMethod(upper, project)).toThrow(/not trusted/);
+    });
+
+    test("a method in the user's own methods folder loads, also when the project is the home folder", () => {
+      const mine = saveMethod(method(new Rng(7), "mine"));
+      expect(loadMethod(mine, project).name).toBe("mine");
+      const was = process.env.CUVETTE_HOME;
+      process.env.CUVETTE_HOME = join(root, "home-as-project");
+      try {
+        const own = saveMethod(method(new Rng(8), "own"));
+        expect(loadMethod(own, process.env.CUVETTE_HOME).name).toBe("own");
+        expect(loadMethod("own", process.env.CUVETTE_HOME).name).toBe("own");
+      } finally {
+        process.env.CUVETTE_HOME = was;
+      }
+    });
+
+    test("a trusted project loads its method by path", () => {
+      trustFolder(project);
+      expect(loadMethod(other, project).name).toBe("elsewhere");
+      expect(loadMethod(join(dir, "pm.json"), project).name).toBe("pm");
+    });
   });
 });

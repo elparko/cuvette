@@ -113,8 +113,7 @@ export function recordReasons(record: AnalysisRecord, labels: Record<string, str
     if (!list.some((x) => x.text === r.text)) list.push(r);
     out.set(id, list);
   };
-  for (const e of record.entries(["stale"])) {
-    if (!e.data.kind && record.setAside(e.id)) continue;
+  for (const e of record.staleMarks()) {
     const nodes = (e.data.nodes as string[] | undefined) ?? [];
     if (e.data.kind) {
       for (const id of (e.data.direct as string[] | undefined) ?? nodes) add(id, { kind: e.data.kind as ReasonKind, text: String(e.data.reason) });

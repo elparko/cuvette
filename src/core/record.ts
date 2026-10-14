@@ -325,9 +325,13 @@ export class AnalysisRecord {
     return fresh;
   }
 
+  staleMarks(): Entry[] {
+    return this.log.filter((e) => e.kind === "stale" && (e.data.kind || !this.setAside(e.id)));
+  }
+
   stale(): Set<string> {
     if (!this.asideRanges.length) return new Set(this.staleIds);
-    return new Set(this.entries(["stale"]).filter((e) => e.data.kind || !this.setAside(e.id)).flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
+    return new Set(this.staleMarks().flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
   }
 
   addEnvironment(lock: EnvLock, name: string): string {
