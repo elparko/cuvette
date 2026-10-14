@@ -6,7 +6,7 @@ import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { RETRIES, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
+import { RETRIES, noRetry, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
@@ -31,14 +31,14 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
   if (e instanceof Anthropic.RateLimitError) {
     const wait = retryAfterMs(e);
-    return new ProviderError(`The Claude API refused the request because of a rate limit (HTTP 429).${wait ? ` It asks for a wait of ${Math.ceil(wait / 1000)} s.` : ""}`, true);
+    return new ProviderError(`The Claude API refused the request because of a rate limit (HTTP 429).${wait ? ` It asks for a wait of ${Math.ceil(wait / 1000)} s.` : ""}`, !noRetry(e));
   }
   if (e instanceof Anthropic.APIError && e.status === 413) return new ProviderError(`The request is too large for the Claude API: ${e.message}`, false, true);
   if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`, false, CONTEXT_OVERFLOW.test(e.message));
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
-    return new ProviderError(`The Claude API had a server error (${e.status}).`, true);
+    return new ProviderError(`The Claude API had a server error (${e.status}).`, !noRetry(e));
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);

@@ -100,3 +100,11 @@ test("a hook that hangs stops at once when the turn stops, and the call does not
   expect(await h.stop({ session: "s" }, ctl2.signal)).toBeUndefined();
   expect(Date.now() - t0).toBeLessThan(5000);
 });
+
+test("a command hook keeps a multi-byte character that spans two output chunks", async () => {
+  const text = "€".repeat(40000);
+  const body = `const b=Buffer.from(JSON.stringify({additionalContext:${JSON.stringify(text)}}));const cut=b.indexOf(0xe2)+1;process.stdout.write(b.subarray(0,cut));setTimeout(()=>process.stdout.write(b.subarray(cut)),100)`;
+  const split = script("split.js", body);
+  const r = await new HookRunner([], { PostToolUse: [{ command: split }] }).post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
+  expect(r.additionalContext).toBe(text);
+});

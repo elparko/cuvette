@@ -91,3 +91,12 @@ test("a number column with many rows does not overflow the stack", () => {
   const s = summarizeTable({ columns: ["value"], rows }, "big.csv");
   expect(s.columns[0]).toMatchObject({ min: 0, max: 199999 });
 });
+
+test("a second column with the same name does not hide a column named like its key", () => {
+  const sheet = (rows: string[][]): Table => ({ columns: ["a", "a", "a #2"], rows });
+  const rowsA = Array.from({ length: 24 }, (_, i) => [String(i + 1), String(i + 1), String(i + 1)]);
+  const rowsB = Array.from({ length: 24 }, (_, i) => [String(i + 1), String((i + 1) * 1000), String((i + 1) * 1000)]);
+  const found = compareChecks(summarizeTable(sheet(rowsA), "old.csv"), summarizeTable(sheet(rowsB), "new.csv"));
+  expect(found.map((d) => d.kind)).toEqual(["unit", "unit"]);
+  expect(new Set(found.map((d) => d.id)).size).toBe(2);
+});

@@ -4,7 +4,7 @@ import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { hideKeys } from "../core/credentials.ts";
-import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
@@ -137,7 +137,7 @@ export class OpenAIProvider implements Provider {
     if (e instanceof ProviderError) return e;
     if (timedOut(signal)) return new ProviderError(`The model server sent no data for ${TIMEOUT_MS / 1000} s.`, true);
     if (signal.aborted) return e;
-    if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, true);
+    if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, !noRetry(e));
     if ((e as any).partial) return new ProviderError(`The model server stopped during the reply: ${(e as Error).message}.`, true);
     return new ProviderError(`Cannot reach the model server at ${this.base.replace(/\/\/[^@/]*@/, "//")}. Check that it is running.`, true);
   }

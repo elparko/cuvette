@@ -156,14 +156,14 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
   lines.push("## Decision record", "");
   if (setup.length) {
     lines.push("| Decision | Value |", "| --- | --- |");
-    for (const [k, v] of setup) lines.push(`| ${labelOf(adapters, k).replace(/\|/g, "\\|")} | ${show(v).replace(/\|/g, "\\|")} |`);
+    for (const [k, v] of setup) lines.push(`| ${oneLine(labelOf(adapters, k)).replace(/\|/g, "\\|")} | ${oneLine(show(v)).replace(/\|/g, "\\|")} |`);
   } else lines.push("No setup values were recorded.");
   const tests = testsMarkdown(record);
   if (tests.length) lines.push("", ...tests);
   const loads = record.entries(["adapter"]);
   if (loads.length) {
     lines.push("", "## Programs", "");
-    for (const e of loads) lines.push(`- ${show(e.data.name)} adapter ${show(e.data.version)}, program ${show(e.data.programVersion) || "version unknown"}: ${show(e.data.reason)}`);
+    for (const e of loads) lines.push(`- ${oneLine(show(e.data.name))} adapter ${oneLine(show(e.data.version))}, program ${oneLine(show(e.data.programVersion)) || "version unknown"}: ${oneLine(show(e.data.reason))}`);
   }
   lines.push("", "## Steps", "");
   const groups = group(nodes);
@@ -177,14 +177,14 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     if (g.rest.length && g.key) {
       const here = num;
       num += g.rest.length;
-      const paths = g.rest.map((n) => `\`${show(n.args[g.key!])}\``).join(", ");
+      const paths = g.rest.map((n) => `\`${oneLine(show(n.args[g.key!]))}\``).join(", ");
       const range = g.rest.length > 1 ? ` (steps ${here + 1} to ${num})` : "";
       lines.push(`${here + 1}. Repeat step ${here} for ${paths}${range}.`);
       sentences.push(`The same step was repeated for ${g.rest.length} more input${g.rest.length === 1 ? "" : "s"}.`);
     }
   }
   if (!groups.length) lines.push("No steps were recorded.");
-  const chosen = setup.map(([k, v]) => `${labelOf(adapters, k)} = ${show(v)}`).join("; ");
+  const chosen = setup.map(([k, v]) => `${oneLine(labelOf(adapters, k))} = ${oneLine(show(v))}`).join("; ");
   lines.push("", "## Draft methods paragraph", "", "Draft. Check each sentence before you use it.", "");
   lines.push(
     [
@@ -220,7 +220,7 @@ function toCode(v: unknown, refs: Map<string, string>): string {
 }
 
 // A line break ends a // comment or a ! line of a notebook, so record text there must stay on one line.
-const oneLine = (s: string) => s.replace(/[\r\n\u2028\u2029]+/g, " ");
+const oneLine = (s: string) => s.replace(/[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]+/g, " ");
 
 export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const nodes = liveNodes(record);
@@ -246,7 +246,7 @@ export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], 
       return;
     }
     const route = stepRoute(adapters, n)?.route ?? n.manualRoute;
-    if (route) lines.push(`// Step ${k + 1}: ${route.split(/[\r\n\u2028\u2029]/)[0]}`);
+    if (route) lines.push(`// Step ${k + 1}: ${route.split(/[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]/)[0]}`);
     const refs = new Map(seen);
     lines.push(`const s${k + 1} = await step(${k + 1}, ${JSON.stringify(n.adapter)}, ${JSON.stringify(n.tool)}, ${toCode(n.args, refs)});`);
     n.outputs.forEach((o, i) => { if (!seen.has(o.path)) seen.set(o.path, `s${k + 1}.outputs[${i}].path`); });
@@ -289,7 +289,7 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
       execution_count: null,
       metadata: {},
       outputs: [],
-      source: cellSource(`!cuvette run-step ${shellWord(oneLine(n.adapter))} ${shellWord(oneLine(n.tool))} ${shellWord(JSON.stringify(n.args).replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`))}`),
+      source: cellSource(`!cuvette run-step ${shellWord(oneLine(n.adapter))} ${shellWord(oneLine(n.tool))} ${shellWord(JSON.stringify(n.args).replace(/[\u0085\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`))}`),
     });
   });
   const nb = {

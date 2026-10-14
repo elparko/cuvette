@@ -857,6 +857,15 @@ tests:
       - { path: metrics.p_animal_level, approx: 0.01058858669, abs: 0.00000001 }
       - { path: metrics.n_animals, equals: 12 }
 
+  - id: groups_three_welch_no_spread
+    description: Welch ANOVA on 3 groups where one group has all values equal fails and tells the user to use the rank test.
+    data: [data/synthetic_groups3_flat.csv]
+    calls:
+      - { tool: compare_groups, args: { table: "{adapter_dir}/data/synthetic_groups3_flat.csv", group_column: group, animal_column: animal, value_column: event_rate_hz, test: welch } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Set test to rank" }
+
   - id: allen_threshold
     description: >
       Allen Institute neuron 101084 (GCaMP6s, mouse V1, dF/F with neuropil subtracted) with cell-attached spikes from the Cascade

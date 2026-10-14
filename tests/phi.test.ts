@@ -555,3 +555,82 @@ test.skipIf(!existsSync(DATA))("no benchmark data file triggers the check", () =
   const hit = files.map((f) => ({ f, hits: scanContent(readFileSync(f, "utf8"), f) })).filter((x) => x.hits.length);
   expect(hit.map((x) => `${x.f}: ${x.hits.map((h) => `${h.kind} ${h.value}`).join("; ")}`)).toEqual([]);
 }, 300_000);
+
+test("a long line in parts: the text before a part decides a match at the part start", () => {
+  const line = `${"a".repeat(2999)}9123-45-6789 ${"b ".repeat(200)}`;
+  expect(line.indexOf("123-45")).toBe(3000);
+  expect(scanText(line, "f").filter((h) => h.kind === "ssn")).toEqual([]);
+  const at = `${"a ".repeat(1499)}x 123-45-6789 ${"b ".repeat(600)}`;
+  expect(scanText(at, "f").map((h) => h.value)).toEqual(["123-45-6789"]);
+});
+
+test("a long line in parts: the ZIP check reads the full line", () => {
+  const line = `ZIP 70112 ${"a ".repeat(2200)} DOB 01/02/1990`;
+  expect(scanText(line, "f").map((h) => h.kind)).toEqual(["zip", "birth_date"]);
+});
+
+test("a long line in parts: a hit that runs past the end of a part keeps its full value", () => {
+  for (const at of [2990, 3790, 3900, 3999]) {
+    const email = `${"a".repeat(200)}@example.com`;
+    const line = `${"x".repeat(at - 1)} ${email} ${"x".repeat(500)}`;
+    expect(scanText(line, "f").map((h) => h.value)).toEqual([email]);
+  }
+  const date = `${"x ".repeat(1997)}xx DOB 01/02/1990 ${"y ".repeat(700)}`;
+  expect(scanText(date, "f").map((h) => h.value)).toEqual(["01/02/1990"]);
+});
+
+test("a long line in parts: a hit longer than the overlap that reaches the part end is read in the full line", () => {
+  const email = `${"a".repeat(1000)}@e.example.com`;
+  const line = `${"x".repeat(2994)} ${email} ${"x".repeat(2000)}`;
+  expect(line.indexOf("@e.ex") + 5).toBe(4000);
+  expect(scanText(line, "f").map((h) => h.value)).toEqual([email]);
+});
+
+test("a CSV cell with a line break does not stop the scan of the rows after it", () => {
+  const csv = 'id,patient name,dob,notes\n1,Jane Doe,1980-01-02,"first\nsecond\nthird"\n2,John Smith,1975-03-04,ok\n3,Mary Jones,1990-05-06,ok\n';
+  const hits = scanContent(csv, "t.csv").filter((h) => h.column);
+  expect(hits.map((h) => h.value).sort()).toEqual(["1975-03-04", "1980-01-02", "1990-05-06", "Jane Doe", "John Smith", "Mary Jones"]);
+  expect(hits.find((h) => h.value === "John Smith")!.line).toBe(5);
+});
+
+test("a long line with many ZIP codes and no date is scanned in linear time", () => {
+  const line = "ZIP 70112 ".repeat(30000);
+  const t0 = Date.now();
+  expect(scanText(line, "f")).toEqual([]);
+  expect(Date.now() - t0).toBeLessThan(5000);
+});
+
+test("the Masker masks 20000 values, and two calls give the same text", () => {
+  const m = new Masker();
+  const names = Array.from({ length: 20000 }, (_, i) => `Pat${String.fromCharCode(97 + (i % 26))}${i.toString(36)} Doe`);
+  m.add(names.map((value) => ({ kind: "name" as const, value, where: "t" })));
+  const text = `${names[0]} met ${names[19999]} and ${names[5000]}x.`;
+  const out = m.text(text);
+  expect(out).toBe(`[NAME 1] met [NAME 20000] and ${names[5000]}x.`);
+  expect(m.text(text)).toBe(out);
+});
+
+test("groupHits of 50000 hits in one group is fast", () => {
+  const hits = Array.from({ length: 50000 }, (_, i) => ({ kind: "name" as const, value: `N${i}`, where: "t", line: i + 1 }));
+  const t0 = Date.now();
+  const g = groupHits(hits);
+  expect(Date.now() - t0).toBeLessThan(1000);
+  expect(g).toHaveLength(1);
+});
+
+test("a stray quote in a CSV cell, such as 5\" for inches, does not join the rows after it", () => {
+  const csv = 'id,patient name,dob,notes\n1,Jane Doe,1980-01-02,5" pipe\n2,John Smith,1975-03-04,ok\n3,Mary Jones,1990-05-06,ok\n';
+  const names = scanContent(csv, "t.csv").filter((h) => h.column === "patient name");
+  expect(names.map((h) => [h.value, h.line])).toEqual([["Jane Doe", 2], ["John Smith", 3], ["Mary Jones", 4]]);
+});
+
+test("the Masker with more than 1000 values gives the same text as with few values", () => {
+  const hits = (names: string[]) => names.map((value) => ({ kind: "name" as const, value, where: "t" }));
+  const few = new Masker();
+  few.add(hits(["Ann Lee", "Lee Roe Kim", "Roe Kim Xu"]));
+  const many = new Masker();
+  many.add(hits([...Array.from({ length: 998 }, (_, i) => `Fill${i.toString(36)} Zed`), "Ann Lee", "Lee Roe Kim", "Roe Kim Xu"]));
+  const text = "Ann Lee Roe Kim Xu, and Lee Roe Kim.";
+  expect(few.text(text)).toBe("[NAME 1] [NAME 3], and [NAME 2].");
+  expect(many.text(text)).toBe("[NAME 999] [NAME 1001], and [NAME 1000].");
+});

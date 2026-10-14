@@ -273,3 +273,21 @@ test("the methods sentence fills a name from the result as well as a name from t
   const node = { ...nodeIn({ tool: "count", args: { path: "a.txt" }, result: { ok: true, metrics: { lines: 12 } } }), id: "n1" } as never;
   expect(methodsSentence([summarized], node)).toBe("a.txt has 12 lines.");
 });
+
+test("the notebook run-step line has no character that Python splitlines splits on", () => {
+  const r = new AnalysisRecord(join(dir, "nel"), "20260101-000000-nel0");
+  r.addNode(nodeIn({ tool: "open", args: { path: "a\u0085b\u000bc\u001cd" } }));
+  const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "nel.ipynb")), "utf8"));
+  const code = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code").map((c: { source: string[] }) => c.source.join(""));
+  expect(code).toHaveLength(1);
+  expect(code[0]).not.toMatch(new RegExp("[\\n\\r\\v\\f\\x1c-\\x1e\\x85\\u2028\\u2029]"));
+  expect(code[0]).toContain("\\u0085");
+});
+
+test("a decision value with a line break stays in one row of the protocol table", () => {
+  const r = new AnalysisRecord(join(dir, "nl"), "20260101-000000-nl00");
+  r.append("setup", { values: { question: "line one\nline two" } });
+  const md = readFileSync(exportProtocol(r, [], join(dir, "nl.md")), "utf8");
+  expect(md).toContain("| line one line two |");
+  expect(md).not.toContain("line one\nline two");
+});

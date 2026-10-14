@@ -1597,6 +1597,25 @@ test("a failure in the middle of a turn shows a card and Resume does not repeat 
   expect(sent[1]).toBe(sent[0]! + 2);
 });
 
+test("after Resume, the status is thinking while the model step runs again", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  failOn(provider, new Set([0]));
+  session = await recoverySession(provider);
+  let last = "";
+  session.bus.on((e) => {
+    if (e.type === "status") last = e.state;
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+  });
+  const step = provider.step;
+  let during = "";
+  provider.step = async (req) => {
+    during = last;
+    return step(req);
+  };
+  expect(await session.send("go")).toBe("All done.");
+  expect(during).toBe("thinking");
+});
+
 test("Stop on the card ends the turn and keeps the finished steps", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "never" }]);
   failOn(provider, new Set([1, 2, 3]));
@@ -1688,6 +1707,53 @@ test("Stop during a streamed reply keeps the text and marks it as stopped", asyn
   expect(kept.data).toMatchObject({ text: "The first part of the reply", final: false, stopped: true });
   expect(session.record.entries(["notice"]).map((e) => e.data.text)).toContain("Stopped. The reply above is not complete.");
   expect(events).toEqual([]);
+});
+
+test("Esc on the Resume card writes Stopped, not the provider message", async () => {
+  const provider = new FakeProvider([{ text: "never" }]);
+  failOn(provider, new Set([0, 1, 2]));
+  session = await recoverySession(provider);
+  session.bus.on((e) => e.type === "question" && setTimeout(() => session!.interrupt(), 0));
+  await session.send("go");
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices).toContain("Stopped.");
+  expect(session.record.entries(["error"])).toHaveLength(0);
+  expect(session.endedBy).toBe("stopped");
+});
+
+test("the tries count in the notice includes the tries before a compaction", async () => {
+  const provider = new FakeProvider([{ text: "never" }]);
+  let n = 0;
+  provider.step = async (req) => {
+    req.onRetry?.({ attempt: 1, of: 3, waitMs: 0, reason: "network error" });
+    if (n++ === 0) throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+    throw new ProviderError("Cannot reach the Claude API. Check the network.", true);
+  };
+  session = await recoverySession(provider, { guidance: false, headless: true });
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => force;
+  session.recoveryRounds = 0;
+  await session.send("go");
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices.some((t) => t.startsWith("The model did not answer after four tries"))).toBe(true);
+});
+
+test("a switch to the local model allows a new compaction", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    const i = n++;
+    if (i === 0 || i === 2) throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+    if (i === 1) throw new ProviderError("Cannot reach the Claude API. Check the network.", true);
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false, local_model: "ollama:qwen3:8b" });
+  const forced: boolean[] = [];
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => (forced.push(force), force);
+  session["useLocalModel"] = async () => undefined;
+  session.bus.on((e) => e.type === "question" && setTimeout(() => session!.answer(e.question.qid, "local"), 0));
+  expect(await session.send("go")).toBe("All done.");
+  expect(forced.filter(Boolean)).toHaveLength(2);
 });
 
 test("the card offers the local model if one is set", async () => {

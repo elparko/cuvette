@@ -949,6 +949,27 @@ describe("agent loop fixes, round three", () => {
     expect(out[1].content[0].name).toBe("functions_read_file");
   });
 
+  test("a 429 or 503 with x-should-retry false is not marked transient", async () => {
+    const h = new Headers({ "x-should-retry": "false" });
+    const flags: boolean[] = [];
+    for (const e of [new Anthropic.RateLimitError(429, {} as any, "slow", h), new Anthropic.InternalServerError(503, {} as any, "down", h), new Anthropic.InternalServerError(503, {} as any, "down", new Headers())]) {
+      const { client } = fakeClient([e]);
+      await new ClaudeProvider("claude-opus-5-5", { client, retries: 0 }).step(req([user("x")])).catch((err) => flags.push(err.transient));
+    }
+    expect(flags).toEqual([false, false, true]);
+  });
+
+  test("an Ollama or OpenAI reply with x-should-retry false is not marked transient", async () => {
+    const reply = () => new Response(JSON.stringify({ error: "busy" }), { status: 503, headers: { "x-should-retry": "false" } });
+    stubOllama(reply);
+    const a = await (await makeProvider("ollama:x", { sleep: async () => {} })).step(req([user("x")])).catch((e) => e);
+    expect(a.transient).toBe(false);
+    vi.stubGlobal("fetch", async () => reply());
+    const b = await (await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} })).step(req([user("x")])).catch((e) => e);
+    expect(b).toBeInstanceOf(ProviderError);
+    expect(b.transient).toBe(false);
+  });
+
   test("retry: 408 is tried again; x-should-retry false is not; a ProviderError is not", () => {
     expect(retryReason({ status: 408 })).toBe("server error (408)");
     expect(retryReason({ status: 503, headers: { "x-should-retry": "false" } })).toBeUndefined();
