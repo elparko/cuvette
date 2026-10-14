@@ -291,7 +291,7 @@ export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): Wri
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
   if (opts.adapterRoot) {
     const own = both([opts.adapterRoot]);
-    if (own.some((r) => both(scope.open.filter((o) => basename(o) === "adapters")).some((o) => within(r, o) && r !== o))) steps.push(...own.map((path) => ({ path, allow: true })));
+    if (own.some((r) => both(scope.open.filter((o) => basename(o) === "adapters")).some((o) => within(r, o) && relative(o, r) !== ""))) steps.push(...own.map((path) => ({ path, allow: true })));
   }
   const top = dirs.projectDir ? both([dirs.projectDir]) : [];
   const fixed = new Set([...keep, ...both(scope.open)]);
