@@ -9,7 +9,7 @@ import { basename, extname, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { DecisionField } from "../core/decisions.ts";
 import { exportProtocol, liveNodes, setupValues, stepLines } from "../core/exports.ts";
-import type { AnalysisRecord } from "../core/record.ts";
+import { ownerOf, type AnalysisRecord } from "../core/record.ts";
 import { hideKeys, isCredentialsFile } from "../core/credentials.ts";
 import { exportHtml, show } from "../core/trail.ts";
 import { allRefs, sessionCitations, toBibtex, type CitationStyle } from "../core/citations.ts";
@@ -124,7 +124,7 @@ export function collect(src: ElnSource): ElnContent {
   const exp = join(src.dir, "exports");
   mkdirSync(exp, { recursive: true });
   const entries = record.entries();
-  const id = entries[0]?.session ?? "session";
+  const id = ownerOf(entries) || "session";
   const values = setupValues(record);
   const question = show(values.question ?? record.entries(["user"])[0]?.data.text ?? "");
   const finals = record.entries(["assistant"]).filter((e) => e.data.final);

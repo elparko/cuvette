@@ -121,6 +121,7 @@ export function readMethod(raw: string, source = "the file"): Method {
   } catch {
     throw new Error(`${source} is not a method file.`);
   }
+  if (isObject(m) && typeof m.cuvette_method === "number" && m.cuvette_method > METHOD_FORMAT) throw new Error(`${source} is a Cuvette method file of format ${m.cuvette_method}. This version of Cuvette reads format ${METHOD_FORMAT}. Update Cuvette to use it.`);
   if (!isObject(m) || m.cuvette_method !== METHOD_FORMAT || typeof m.name !== "string" || !m.name || !isObject(m.analysis) || !Array.isArray(m.analysis.steps)) throw new Error(`${source} is not a Cuvette method file (format ${METHOD_FORMAT}).`);
   const bad = damage(m as unknown as Record<string, unknown>);
   if (bad) throw new Error(`${source} is damaged: the part "${bad}" has a wrong form.`);

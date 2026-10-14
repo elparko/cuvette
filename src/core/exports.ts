@@ -5,7 +5,7 @@ import { isAbsolute, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
-import type { AnalysisRecord } from "./record.ts";
+import { ownerOf, type AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
 import { describeRoute, fillTemplate, show, writeOut } from "./trail.ts";
 import type { RouteText } from "./trail.ts";
@@ -76,7 +76,7 @@ export function setupValues(record: AnalysisRecord): Record<string, unknown> {
 
 function sessionInfo(record: AnalysisRecord) {
   const first = record.entries()[0];
-  return { id: first?.session ?? "", date: (first?.ts ?? new Date().toISOString()).slice(0, 10) };
+  return { id: ownerOf(record.entries()), date: (first?.ts ?? new Date().toISOString()).slice(0, 10) };
 }
 
 function labelOf(adapters: LoadedAdapter[], key: string): string {

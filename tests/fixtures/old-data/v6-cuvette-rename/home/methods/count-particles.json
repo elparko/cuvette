@@ -1,0 +1,77 @@
+{
+  "cuvette_method": 1,
+  "name": "count-particles",
+  "saved": "2026-10-14T18:35:27.470Z",
+  "from": {
+    "session": "20261014-133527-db3a",
+    "folder": "@@ROOT@@/project/cuvette/2026-10-14-count-particles-tif",
+    "title": "Count the particles in a.tif"
+  },
+  "request": "Count the particles in a.tif",
+  "questions": [
+    {
+      "question": "What counts as one particle: one dark spot, or one cluster?",
+      "answer": "One cluster"
+    }
+  ],
+  "analysis": {
+    "steps": [
+      {
+        "step": "Count the particles",
+        "tool": "count",
+        "decisions": [
+          {
+            "label": "Threshold method",
+            "key": "method",
+            "value": "Otsu",
+            "by": "agent"
+          },
+          {
+            "label": "Smallest particle",
+            "key": "min_size",
+            "value": 8,
+            "by": "agent"
+          }
+        ],
+        "status": "todo"
+      }
+    ],
+    "restatement": "You want: the number of particles in a.tif.",
+    "definitions": [
+      {
+        "measure": "particle",
+        "definition": "One cluster above the threshold, at least 8 px."
+      }
+    ],
+    "exclusions": [
+      {
+        "what": "Clusters that touch the edge.",
+        "effect": "The count is a little lower."
+      }
+    ],
+    "pilot": {
+      "sample": "a.tif",
+      "shows": [
+        "the outlines of the counted clusters"
+      ]
+    }
+  },
+  "programs": [
+    {
+      "adapter": "lab",
+      "version": "0.2.0",
+      "programVersion": "1.0"
+    }
+  ],
+  "decisions": {
+    "method": "Otsu",
+    "min_size": 8,
+    "sigma": 2
+  },
+  "pilot": {
+    "required": true,
+    "shows": [
+      "the outlines of the counted clusters"
+    ]
+  }
+}

@@ -37,6 +37,7 @@ export function branchSession(s: BranchSource, name: string, upTo?: number): { p
   const id = branchId();
   const child = branchPlace(s.place, clean, id);
   const lines = readFileSync(s.record.logPath, "utf8")
+    .replace(/^\uFEFF/, "")
     .split("\n")
     .filter((l) => {
       if (!l.trim()) return false;
