@@ -12,6 +12,7 @@ import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } fr
 import type { SessionLike } from "../ui/types.ts";
 import { cardHtml, itemHtml, runHtml, splitRuns, type Ctx, type Slot } from "./app-html.ts";
 import { usageFields } from "../ui/messages.ts";
+import { push } from "./window.ts";
 
 export interface ViewHost {
   token: string;
@@ -99,12 +100,12 @@ export class WebView {
   }
 
   beat(): void {
-    for (const c of this.clients) c.write(": keep-alive\n\n");
+    for (const c of this.clients) push(c, ": keep-alive\n\n");
   }
 
   private send(msg: Record<string, unknown>): void {
     const data = `data: ${JSON.stringify(msg)}\n\n`;
-    for (const c of this.clients) c.write(data);
+    for (const c of this.clients) push(c, data);
   }
 
   private sub = (ids: number[]) => ids.flatMap((id) => this.byEntry.get(id) ?? []);

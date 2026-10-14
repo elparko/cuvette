@@ -31,7 +31,7 @@ import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/pro
 import { appPageHtml } from "./app-page.ts";
 import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json.ts";
 import { WebView } from "./app-view.ts";
-import { FILE_HEADERS, hostAllowed, pipeFile, tokenOk, windowRoutes, type WindowSession } from "./window.ts";
+import { FILE_HEADERS, hostAllowed, pipeFile, push, tokenOk, windowRoutes, type WindowSession } from "./window.ts";
 import { ROOT } from "../root.ts";
 
 export interface AppOptions {
@@ -101,6 +101,12 @@ function sendAsset(res: ServerResponse, p: string): boolean {
   return true;
 }
 
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((done, fail) => {
     let size = 0;
@@ -108,19 +114,21 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY) {
-        fail(new Error("body too large"));
-        req.destroy();
+        fail(new HttpError(413, "The request body is too large."));
+        parts.length = 0;
       } else parts.push(c);
     });
     req.on("end", () => {
       try {
         const text = Buffer.concat(parts).toString("utf8");
-        done(text ? JSON.parse(text) : {});
-      } catch (e) {
-        fail(e);
+        const body = text ? JSON.parse(text) : {};
+        if (body === null || typeof body !== "object" || Array.isArray(body)) return fail(new HttpError(400, "The request body must be a JSON object."));
+        done(body);
+      } catch {
+        fail(new HttpError(400, "The request body is not valid JSON."));
       }
     });
-    req.on("error", fail);
+    req.on("error", () => fail(new HttpError(400, "The request body did not arrive.")));
   });
 }
 
@@ -129,8 +137,8 @@ export const WRONG_LINK = `<!doctype html><html lang="en"><meta charset="utf-8">
 <p>The link is old or not complete. Cuvette makes a new link each time the app starts.</p>
 <p>Use the link that <code>cuvette app</code> shows in the terminal. If the app does not run, start it again with <code>cuvette app</code>.</p></body></html>`;
 
-function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
+function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8", extra: Record<string, string> = {}) {
+  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", ...extra });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 
@@ -202,7 +210,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     });
 
   const broadcastIdle = (msg: unknown) => {
-    for (const c of idle) c.write(`data: ${JSON.stringify(msg)}\n\n`);
+    for (const c of idle) push(c, `data: ${JSON.stringify(msg)}\n\n`);
   };
 
   const detach = async () => {
@@ -229,13 +237,13 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     opts.onQuit?.();
   };
 
+  const TERMINAL_SESSION = "This session belongs to the terminal. Open another session there.";
+
   const open = (o: { folder?: string; resume?: string; first?: string; adapter?: string }) => {
     opening = (async () => {
       lastError = "";
-      const old = current;
-      if (old && !old.owned) throw new Error("This session belongs to the terminal. Open another session there.");
-      await detach();
       try {
+        await detach();
         const s = await makeSession({ folder: o.folder, resume: o.resume, model: opts.model, adapter: o.adapter });
         attach(s, true);
         if (o.first) s.send(o.first).catch(() => {});
@@ -313,7 +321,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const JOB_LINES = 500;
   const progHooks = (): ProgramHooks => ({ cwd: settingCtx().cwd, env, ...opts.programs });
   const jobSend = (j: { subs: Set<ServerResponse> }, msg: unknown) => {
-    for (const r of j.subs) r.write(`data: ${JSON.stringify(msg)}\n\n`);
+    for (const r of j.subs) push(r, `data: ${JSON.stringify(msg)}\n\n`);
   };
 
   const fsCtx = () => ({ cwd: current?.session.cwd ?? opts.folder ?? process.cwd(), env, fetch: opts.fetch });
@@ -418,6 +426,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const body = await readBody(req);
     const text = typeof body.text === "string" ? body.text : "";
     if (p === "/api/open") {
+      if (c && !c.owned) return send(res, 409, { error: TERMINAL_SESSION });
       const key = body.sample ? "sample" : typeof body.id === "string" ? "id:" + body.id : typeof body.folder === "string" ? "folder:" + resolve(body.folder.trim().replace(/^~(?=\/|$)/, homedir())) + "\n" + String(body.adapter ?? "") : "";
       if (key && key === lastOpen.key && (current || opening) && Date.now() - lastOpen.at < 5000) return send(res, 200, { ok: true });
       if (opening) return send(res, 409, { error: "A session is opening." });
@@ -579,14 +588,20 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (!hostAllowed(host, port)) return send(res, 403, { error: "bad host" });
     const origin = req.headers.origin;
     if (origin && origin !== `http://${host}`) return send(res, 403, { error: "bad origin" });
-    const url = new URL(req.url ?? "/", `http://${host}`);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", `http://${host}`);
+    } catch {
+      return send(res, 400, { error: "bad request" });
+    }
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
     if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
     if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return req.method === "GET" && url.pathname === "/" ? send(res, 401, WRONG_LINK, "text/html; charset=utf-8") : send(res, 401, { error: "missing or wrong token" });
     try {
       await route(req, res, url);
     } catch (e) {
-      if (!res.headersSent) send(res, 400, { error: (e as Error).message });
+      if (!res.headersSent) send(res, e instanceof HttpError ? e.status : 400, { error: (e as Error).message }, undefined, e instanceof HttpError && e.status === 413 ? { connection: "close" } : {});
+      else res.destroy();
     }
   });
 
@@ -597,8 +612,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   port = (server.address() as AddressInfo).port;
   const beat = setInterval(() => {
     current?.view.beat();
-    for (const c of idle) c.write(": keep-alive\n\n");
-    for (const j of jobs.values()) for (const r of j.subs) r.write(": keep-alive\n\n");
+    for (const c of idle) push(c, ": keep-alive\n\n");
+    for (const j of jobs.values()) for (const r of j.subs) push(r, ": keep-alive\n\n");
   }, 20000);
   beat.unref();
 
