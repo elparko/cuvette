@@ -1131,3 +1131,16 @@ test("a write to the record, the settings or LAB.md tells the scientist which fi
   ]);
   expect(existsSync(join(cwd, "LAB.md"))).toBe(false);
 });
+
+test("the notice names the path that Cuvette refused, also when the allowed path comes first", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const secret = join(home, "sessions");
+  mkdirSync(secret, { recursive: true });
+  const { session: s } = await start([call("run_command", { purpose: "p", does: "d", argv: ["ls"], path: cwd, cwd: secret }), call("list_dir", { path: cwd }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  const entries = s.record.entries(["blocked"]).filter((e) => e.data.by === "path rule");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.data.path).toBe(secret);
+  expect(String(entries[0]!.data.reason)).toContain(`The agent tried to use ${secret}.`);
+  expect(String(entries[0]!.data.reason)).not.toContain(cwd);
+});

@@ -2269,11 +2269,10 @@ export class Session {
       return error(`${basename(held)} is held back for the blind test. The harness compares it with your results after the batch. Do not read it.`);
     }
     if (tool.source === "generic" || tool.name === "inspect_data") {
-      const place = this.pathPlace(args, tool.source !== "generic");
+      const { place, path: refused } = this.pathPlace(args, tool.source !== "generic");
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
       if (place === "private" || place === "link") {
-        const asked = ["path", "folder", "cwd"].map((k) => args[k]).find((v): v is string => typeof v === "string" && v.length > 0) ?? "";
-        this.record.append("blocked", { callId, tool: tool.name, path: asked, reason: pathRefusalReason(place, asked), by: "path rule" });
+        this.record.append("blocked", { callId, tool: tool.name, path: refused, reason: pathRefusalReason(place, refused), by: "path rule" });
       }
       if (place === "private") return error("This path is in the Cuvette home folder or in the record of another session. The agent cannot read it. Ask the scientist to name the folder in the request.");
       if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
@@ -2573,9 +2572,10 @@ export class Session {
 
   // ------------------------------------------------------------- decisions owned by the scientist
 
-  private pathPlace(args: Args, onlyPrivate = false): "ok" | "outside" | "link" | "private" {
+  private pathPlace(args: Args, onlyPrivate = false): { place: "ok" | "outside" | "link" | "private"; path: string } {
     const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v.replace(/^~(?=[\\/]|$)/, homedir())));
-    if (!paths.length || paths.every(isCredentialsFile)) return "ok";
+    const ok = { place: "ok" as const, path: "" };
+    if (!paths.length || paths.every(isCredentialsFile)) return ok;
     const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
     const mine = [this.dir, this.workDir, this.place.outDir, ...this.adapters.map((a) => a.root)];
     const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
@@ -2600,13 +2600,16 @@ export class Session {
       if (hard(p)) return !free(open);
       return soft(p) && !free([...open, this.cwd]);
     };
-    if (paths.some(shut)) return "private";
-    if (onlyPrivate) return "ok";
+    const shutPath = paths.find(shut);
+    if (shutPath !== undefined) return { place: "private", path: shutPath };
+    if (onlyPrivate) return ok;
     const roots = [this.cwd, ...mine, ...named, ...named.map((n) => join(n, ".."))];
     roots.push(...nodeFiles);
-    if (!paths.every((p) => within(roots, p))) return "outside";
+    const outsidePath = paths.find((p) => !within(roots, p));
+    if (outsidePath !== undefined) return { place: "outside", path: outsidePath };
     const real = roots.map(realPath);
-    return paths.every((p) => within(real, realPath(p))) ? "ok" : "link";
+    const linkPath = paths.find((p) => !within(real, realPath(p)));
+    return linkPath === undefined ? ok : { place: "link", path: linkPath };
   }
 
   private decisionOf(key: string) {
