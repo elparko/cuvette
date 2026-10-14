@@ -363,6 +363,15 @@ export class Session {
   static async create(opts: SessionOptions, record?: AnalysisRecord): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
+    try {
+      return await Session.build(opts, cwd, record);
+    } catch (e) {
+      if (opts.trustFolder) endTrustOnce(cwd);
+      throw e;
+    }
+  }
+
+  private static async build(opts: SessionOptions, cwd: string, record?: AnalysisRecord): Promise<Session> {
     const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
     const notes: string[] = [];
     const settings = loadSettings(cwd, overrides, notes);

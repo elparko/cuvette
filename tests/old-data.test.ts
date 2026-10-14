@@ -1118,3 +1118,18 @@ test("a failed write of the credentials file leaves no temporary file", () => {
   expect(() => saveClaudeKey("sk-ant-new-key-0000000000")).toThrow();
   expect(readdirSync(join(root, "home")).filter((n) => n.endsWith(".tmp"))).toEqual([]);
 });
+
+test("a create that fails after the trust window opened closes the window", async () => {
+  const project = join(root, "project");
+  mkdirSync(join(project, ".cuvette"), { recursive: true });
+  writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ effort: "low" }));
+  expect(trustStatus(project).state).not.toBe("once");
+  await expect(Session.create({ adapters: ["not-an-adapter"], provider: new FakeProvider([]), cwd: project, trustFolder: true })).rejects.toThrow();
+  expect(trustStatus(project).state).not.toBe("once");
+  const ok = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: project, trustFolder: true });
+  open.push(ok);
+  expect(trustStatus(project).state).toBe("once");
+  await ok.close();
+  open.splice(open.indexOf(ok), 1);
+  expect(trustStatus(project).state).not.toBe("once");
+});
