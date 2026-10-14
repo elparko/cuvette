@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseYaml } from "../core/yaml.ts";
 import { z } from "zod";
@@ -342,6 +342,10 @@ export function loadAdapter(path: string): LoadedAdapter {
   const file = statSync(path).isDirectory() ? join(path, "adapter.yaml") : path;
   const root = dirname(resolve(file));
   const manifest = readManifest(file);
+  if (manifest.module) {
+    const rel = relative(root, resolve(root, manifest.module));
+    if (rel.startsWith("..") || isAbsolute(rel)) throw new Error(`The adapter ${manifest.adapter.name} names the module ${manifest.module}, which is outside the folder of the adapter. Cuvette does not load it. Put the module in the folder of the adapter.`);
+  }
   let mod: Promise<AdapterModule> | undefined;
   return {
     manifest,

@@ -75,3 +75,14 @@ test("a skill file with bad frontmatter or a name that is not text does not stop
   const skills = loadAdapter(dir).skills().sort((a, b) => a.name.localeCompare(b.name));
   expect(skills.map((k) => [k.name, k.description])).toEqual([["bad", ""], ["num", ""]]);
 });
+
+test("an adapter that names a module outside its folder is refused with a clear text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-module-"));
+  const base = "adapter: { name: m1 }\nprogram: { name: t }\nconnection: { kind: cli }\n";
+  for (const module of ["../evil.ts", "/tmp/evil.ts", "sub/../../evil.ts"]) {
+    writeFileSync(join(dir, "adapter.yaml"), `${base}module: ${module}\n`);
+    expect(() => loadAdapter(dir)).toThrow(/outside the folder of the adapter/);
+  }
+  writeFileSync(join(dir, "adapter.yaml"), `${base}module: sub/adapter.ts\n`);
+  expect(loadAdapter(dir).manifest.module).toBe("sub/adapter.ts");
+});

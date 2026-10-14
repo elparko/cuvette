@@ -697,3 +697,23 @@ test.skipIf(!sandboxWorks)("an adapter program through guardCommand writes in it
   expect(existsSync(own)).toBe(true);
   expect(existsSync(join(l.project, "moved"))).toBe(false);
 });
+
+test("a settings file over 5 MB is checked by its size and its first and last megabyte", () => {
+  const l = layout();
+  const big = Buffer.alloc(6_000_000, 97);
+  writeFileSync(l.settings, big);
+  const first = fingerprint(l.dirs, true);
+  expect(first.changed()).toEqual([]);
+  big[100] = 98;
+  writeFileSync(l.settings, big);
+  expect(first.changed()).toEqual([l.settings]);
+  big[100] = 97;
+  writeFileSync(l.settings, big);
+  const second = fingerprint(l.dirs, true);
+  big[5_999_000] = 98;
+  writeFileSync(l.settings, big);
+  expect(second.changed()).toEqual([l.settings]);
+  writeFileSync(l.settings, Buffer.concat([big, Buffer.from("x")]));
+  expect(second.changed()).toEqual([l.settings]);
+  rmSync(l.settings);
+});
