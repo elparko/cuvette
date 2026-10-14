@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { cpSync, symlinkSync } from "node:fs";
+import { chmodSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
@@ -1063,4 +1064,19 @@ describe("the index fallback of cuvette open", () => {
     expect(findPlace(".", { cwd: root, outputFolder: "results" })).toBeUndefined();
     expect(findPlace(join(root, "project"), { cwd: root, outputFolder: "results" })).toBeUndefined();
   });
+});
+
+test.skipIf(process.platform === "win32")("the credentials file has mode 0600 after a save, after a remove, and when it keeps entries that are not text", () => {
+  mkdirSync(join(root, "home"), { recursive: true });
+  const file = credentialsPath();
+  const mode = () => statSync(file).mode & 0o777;
+  writeFileSync(file, JSON.stringify({ from_a_newer_version: { a: 1 } }));
+  chmodSync(file, 0o644);
+  saveClaudeKey("sk-ant-new-key-0000000000");
+  expect(mode()).toBe(0o600);
+  chmodSync(file, 0o644);
+  expect(removeClaudeKey()).toBe(true);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ from_a_newer_version: { a: 1 } });
+  expect(mode()).toBe(0o600);
+  expect(readdirSync(join(root, "home")).filter((n) => n.endsWith(".tmp"))).toEqual([]);
 });

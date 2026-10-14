@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
@@ -85,8 +85,10 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
 function write(values: Record<string, unknown>): string {
   mkdirSync(cuvetteHome(), { recursive: true });
   const path = credentialsPath();
-  writeFileSync(path, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
-  chmodSync(path, 0o600);
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
+  chmodSync(tmp, 0o600);
+  renameSync(tmp, path);
   version++;
   return path;
 }
@@ -114,9 +116,11 @@ export function removeClaudeKey(): boolean {
   if (!existsSync(path)) return false;
   const rest = readAll();
   delete rest.anthropic_api_key;
-  if (Object.keys(rest).length) writeFileSync(path, JSON.stringify(rest, null, 1) + "\n", { mode: 0o600 });
-  else rmSync(path);
-  version++;
+  if (Object.keys(rest).length) write(rest);
+  else {
+    rmSync(path);
+    version++;
+  }
   return true;
 }
 
