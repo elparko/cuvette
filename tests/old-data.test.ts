@@ -7,13 +7,14 @@ import { Session } from "../src/core/session.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { findPlace, listPlaces, placeAt, readIndex, saveIndexRow } from "../src/core/places.ts";
 import { claimLock, listSessions, lockAlive, openLock } from "../src/core/sessions.ts";
-import { listMethods, loadMethod, methodText } from "../src/core/methods.ts";
+import { exportMethod, importMethod, listMethods, loadMethod, methodText } from "../src/core/methods.ts";
 import { loadSettings } from "../src/core/config.ts";
 import { changeSetting } from "../src/core/settings.ts";
 import { readSpend, recordSpend, totalSpend } from "../src/core/spend.ts";
 import { moveOldHome } from "../src/core/old-names.ts";
 import { readInstalled, saveInstalled, type InstalledEntry } from "../src/adapters/source.ts";
 import { trustFolder } from "../src/core/trust.ts";
+import { credentialsPath, removeClaudeKey, saveClaudeKey, saveClaudeWorkspace, saveElabftw, removeElabftw, claudeKey } from "../src/core/credentials.ts";
 import { openRecord as openBookRecord, projectSessions as bookSessions } from "../src/core/databook.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { Mapper } from "../src/ui/items.ts";
@@ -751,5 +752,44 @@ describe("a session whose adapter is not on this computer", () => {
     install("v7-agent-loop");
     const [first] = projectSessions();
     await expect(Session.resume(first!.id, { provider: new FakeProvider([]), adapters: ["not-an-adapter"] })).rejects.toThrow('no adapter named "not-an-adapter"');
+  });
+});
+
+describe("the credentials file", () => {
+  test("a save and a remove keep the entries that this version does not know", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const file = credentialsPath();
+    writeFileSync(file, JSON.stringify({ anthropic_api_key: "sk-ant-old-key-0000000000", from_a_newer_version: { token: { a: [1, 2] } }, retries: 3 }));
+    saveElabftw("https://elab.example.org", "elab-key-0000000000000");
+    saveClaudeWorkspace("wrkspc_1");
+    const kept = { from_a_newer_version: { token: { a: [1, 2] } }, retries: 3 };
+    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({ ...kept, anthropic_api_key: "sk-ant-old-key-0000000000", elabftw_url: "https://elab.example.org", anthropic_workspace_id: "wrkspc_1" });
+    saveClaudeKey("sk-ant-new-key-0000000000");
+    expect(claudeKey({}).key).toBe("sk-ant-new-key-0000000000");
+    expect(removeElabftw()).toBe(true);
+    expect(removeClaudeKey()).toBe(true);
+    const after = JSON.parse(readFileSync(file, "utf8"));
+    expect(after).toMatchObject(kept);
+    expect(after.anthropic_api_key).toBeUndefined();
+    expect(after.elabftw_url).toBeUndefined();
+  });
+});
+
+describe("a method file from a newer version", () => {
+  test("it keeps unknown fields through an export and an import, and a newer format gives a plain message", () => {
+    install("v7-agent-loop");
+    const file = join(root, "home", "methods", "count-particles.json");
+    const m = JSON.parse(readFileSync(file, "utf8"));
+    m.lab_extra = { signed: true, steps: [1, 2] };
+    m.analysis.steps[0].new_field = "kept";
+    writeFileSync(file, JSON.stringify(m));
+    const out = exportMethod("count-particles", root);
+    expect(JSON.parse(readFileSync(out, "utf8"))).toMatchObject({ lab_extra: { signed: true, steps: [1, 2] } });
+    const copy = importMethod(out, "copy");
+    const saved = JSON.parse(readFileSync(copy, "utf8"));
+    expect(saved.lab_extra).toEqual({ signed: true, steps: [1, 2] });
+    expect(saved.analysis.steps[0].new_field).toBe("kept");
+    writeFileSync(join(root, "home", "methods", "later.json"), JSON.stringify({ ...m, name: "later", cuvette_method: 2 }));
+    expect(() => loadMethod("later")).toThrow("format 2. This version of Cuvette reads format 1. Update Cuvette to use it.");
   });
 });
