@@ -668,7 +668,9 @@ map:
   - tool: rmsd_trajectory
     match: { fit: false }
     route: |
-      R = rms.RMSD(u, u, select="backbone", superposition=False, ref_frame=0).run(step=1)
+      ag = u.select_atoms("backbone")
+      u.trajectory[0]; ref = ag.positions.copy()
+      [rms.rmsd(ag.positions, ref, center=False, superposition=False) for ts in u.trajectory]
     params:
       - { arg: select, label: select }
       - { arg: reference_frame, label: ref_frame, ui_default: 0 }
@@ -830,8 +832,8 @@ tests:
 
   - id: adk-rmsd-nofit
     description: >
-      The AdK frames are already aligned, so the RMSD without a fit equals the RMSD with a fit
-      (6.8203 A). The stride of 5 uses frames 0, 5, 10, 15 and 20 of the small file.
+      Without a fit, the RMSD of the last frame is 6.8528 A. With a fit it is 6.8203 A. The difference
+      is the small rotation and translation of the frames. The stride of 5 uses frames 0, 5, 10, 15 and 20 of the small file.
     data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
     calls:
       - tool: rmsd_trajectory
@@ -839,7 +841,7 @@ tests:
     expect:
       - { path: metrics.n_frames_used, equals: 5 }
       - { path: metrics.last_frame_index, equals: 20 }
-      - { path: metrics.rmsd_last, approx: 6.820322, abs: 0.0005 }
+      - { path: metrics.rmsd_last, approx: 6.852775, abs: 0.0005 }
 
   - id: adk-rg
     description: A numpy mass-weighted calculation of the backbone radius of gyration in the last frame gives 19.469877 A.

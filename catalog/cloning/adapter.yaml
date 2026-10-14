@@ -235,7 +235,7 @@ decisions:
     default: true
     group: Sanger reads
     help: >
-      true removes the noisy start and end of the read. It uses Mott's method with an error limit of 0.05, as Biopython abi-trim does.
+      true removes the noisy start and end of the read. It uses Mott's method with an error limit of 0.05. For an .ab1 file the tool uses Biopython abi-trim, which keeps one base fewer at the 3' end than the classic rule.
       false keeps every base, so the ends show many false mismatches.
     owner: human
     stage: when_needed
