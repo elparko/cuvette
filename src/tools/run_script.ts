@@ -283,8 +283,9 @@ export function settingsScope(dirs: Dirs): SettingsScope {
 
 export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
-  const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both([dirs.workDir]).includes(p));
-  const keep = both([dirs.workDir]);
+  const own = [dirs.workDir, ...(dirs.outputDir ? [dirs.outputDir] : [])];
+  const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both(own).includes(p));
+  const keep = both(own);
   const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));

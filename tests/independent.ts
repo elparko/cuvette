@@ -20,7 +20,7 @@ export async function programOf(name: string): Promise<string | undefined> {
 export type Result = Omit<ToolOutput, "data" | "metrics" | "table" | "outputs"> & {
   data: Record<string, any>;
   metrics: Record<string, any>;
-  table: { path: string };
+  table: { path: string; columns: string[]; rows: any[][] };
   outputs: { path: string }[];
 };
 

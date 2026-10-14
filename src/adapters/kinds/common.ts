@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { blindArgv } from "../blind.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { basename, extname, isAbsolute, join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { basename, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 import { addOldEnv } from "../../core/old-names.ts";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
@@ -71,6 +72,23 @@ export function placeholders(adapter: LoadedAdapter, dirs: Dirs, programPath: st
   };
 }
 
+const real = (p: string) => {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    return resolve(p);
+  }
+};
+
+const under = (p: string, base: string) => p === base || p.startsWith(base + sep);
+
+function inProjectFolder(root: string): boolean {
+  const at = real(root);
+  if (!/[\\/]\.(?:cuvette|ga)[\\/]adapters(?:[\\/]|$)/.test(at)) return false;
+  const homes = [cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")];
+  return !homes.some((h) => under(at, join(real(h), "adapters")));
+}
+
 export function childEnv(c: KindContext, extra: Record<string, string> = {}): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
@@ -81,15 +99,7 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   env.CUVETTE_PROGRAM_PATH = c.programPath ?? "";
   if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
   if (c.dirs.outputDir) env.CUVETTE_OUTPUT_DIR = c.dirs.outputDir;
-  if (!env.PYTHONPYCACHEPREFIX && !env.PYTHONDONTWRITEBYTECODE) {
-    const prefix = join(cuvetteHome(), "pycache");
-    try {
-      mkdirSync(prefix, { recursive: true, mode: 0o700 });
-      env.PYTHONPYCACHEPREFIX = prefix;
-    } catch {
-      env.PYTHONDONTWRITEBYTECODE = "1";
-    }
-  }
+  if (inProjectFolder(c.adapter.root)) env.PYTHONDONTWRITEBYTECODE = "1";
   return addOldEnv({ ...env, ...extra });
 }
 

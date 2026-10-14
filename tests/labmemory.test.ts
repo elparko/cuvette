@@ -80,6 +80,12 @@ describe("lab memory", () => {
     expect(labText(cwd)).toBe("Home rule.");
   });
 
+  test("labText shows the text-direction and hidden characters of the home LAB.md as escapes", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+    writeFileSync(join(home, "LAB.md"), "Rule \u202eevil\u200b\r\nSecond \u{e0041}.\n");
+    expect(labText(cwd)).toBe("Rule \\u202eevil\\u200b\nSecond \\u{E0041}.");
+  });
+
   test.skipIf(process.platform === "win32")("a LAB.md that is a link is not read, also in a trusted folder", () => {
     const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
     mkdirSync(join(cwd, ".cuvette"));
