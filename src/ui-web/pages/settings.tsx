@@ -105,7 +105,7 @@ function PathDialog({ start, onDone }: { start: string; onDone: (p: string) => v
             </li>
           ))}
         </ul>
-        {msg && <p className="text-sm text-bad">{msg}</p>}
+        {msg && <p className="text-sm text-bad" role="alert">{msg}</p>}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onDone("")}>
             Cancel
@@ -483,7 +483,7 @@ export function SettingsPanel({ ctx }: { ctx: AppCtx }) {
     if (v) setTimeout(() => setSavedMap((m) => (m[name] === v ? { ...m, [name]: undefined } : m)), 8000);
   }, []);
 
-  if (err) return <p className="text-sm text-bad">{err}</p>;
+  if (err) return <p className="text-sm text-bad" role="alert">{err}</p>;
   if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const current = data.sections.includes(sec) ? sec : data.sections[0]!;

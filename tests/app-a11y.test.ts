@@ -672,6 +672,18 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     expect(out).toEqual([]);
   }, LONG);
 
+  test("a page that cannot load shows its error as an alert", async () => {
+    await openSession();
+    await page.eval(`(() => {
+      const real = window.fetch;
+      window.fetch = (u, o) => /api\\/(programs|settings)\\.json/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ error: "The list is not ready." }), { status: 500, headers: { "content-type": "application/json" } })) : real(u, o);
+    })()`);
+    for (const name of ["Programs", "Settings"]) {
+      await goPage(name);
+      expect(await until(page, `[...document.querySelectorAll('main [role="alert"]')].some((e) => e.textContent.includes("not ready"))`)).toBe(true);
+    }
+  });
+
   test("a streamed reply sits in a region that is off for the screen reader, and the finished message goes in the log", async () => {
     await page.cdp("Page.addScriptToEvaluateOnNewDocument", { source: `window.__sources = []; const E = window.EventSource; window.EventSource = class extends E { constructor(...a) { super(...a); window.__sources.push(this); } };` });
     await openSession(freshFolder());

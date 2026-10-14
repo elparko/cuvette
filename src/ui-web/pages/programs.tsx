@@ -463,7 +463,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
         </div>
       </div>
       <p className="mb-6 max-w-3xl text-sm text-muted-foreground">The programs that the adapters use, grouped by field. The same list as /programs in the terminal and cuvette programs. Each change asks first and shows what it does. It goes in the programs log and in the session record.</p>
-      {err && <p className="text-sm text-bad">{err}</p>}
+      {err && <p className="text-sm text-bad" role="alert">{err}</p>}
       {!data && !err && <p className="text-muted-foreground">Looking for the programs…</p>}
       {data && (
         <>
