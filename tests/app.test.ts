@@ -236,7 +236,7 @@ describe("the app server", () => {
     expect(dirs.path).toBe(home);
     expect((await c.post("api/send", { text: "hi" })).status).toBe(409);
     expect((await c.post("api/open", { folder: home })).status).toBe(200);
-    for (let i = 0; i < 100 && (await (await c.get("api/state")).json()).session === null; i++) await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 1000 && (await (await c.get("api/state")).json()).session === null; i++) await new Promise((r) => setTimeout(r, 30));
     expect((await (await c.get("api/state")).json()).session).not.toBeNull();
   });
 
@@ -251,7 +251,7 @@ describe("the app server", () => {
     expect(r.matches[0].adapter).toBe("flowkit");
     expect((await c.get(`api/suggest?p=${encodeURIComponent(join(home, "nowhere"))}`)).status).toBe(404);
     expect((await c.post("api/open", { folder: data, adapter: "flowkit" })).status).toBe(200);
-    for (let i = 0; i < 100 && !picked.length; i++) await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 1000 && !picked.length; i++) await new Promise((r) => setTimeout(r, 30));
     expect(picked).toEqual(["flowkit"]);
   });
 

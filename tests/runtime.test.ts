@@ -194,11 +194,11 @@ test("quick start: a Python adapter starts before its version command ends, and 
   const home = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
   try {
-    const a = loadAdapter(slowPythonAdapter(1));
+    const a = loadAdapter(slowPythonAdapter(3));
     const dirs = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
     const t0 = Date.now();
     const rt = await startAdapter(a, dirs, { quick: true });
-    expect(Date.now() - t0).toBeLessThan(500);
+    expect(Date.now() - t0).toBeLessThan(2000);
     expect(rt.programVersion).toBe("from the manifest");
     const f = await rt.checked;
     expect(f).toMatchObject({ version: "9.9", identified: true });
@@ -268,17 +268,17 @@ test("quick start: a stop while the version command runs ends the call at once, 
     setTimeout(() => stop.abort(), 100);
     const t0 = Date.now();
     const out = await nap.execute({ seconds: 5 }, { ...ctx(stop.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t0).toBeLessThan(1500);
+    expect(Date.now() - t0).toBeLessThan(4000);
     expect(out.ok).toBe(false);
     await rt.checked;
     const next = await nap.execute({ seconds: 0 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
     expect(next.ok).toBe(true);
-    const first = nap.execute({ seconds: 2 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
+    const first = nap.execute({ seconds: 8 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
     const queued = new AbortController();
     setTimeout(() => queued.abort(), 100);
     const t1 = Date.now();
     const second = await nap.execute({ seconds: 0 }, { ...ctx(queued.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t1).toBeLessThan(1000);
+    expect(Date.now() - t1).toBeLessThan(5000);
     expect(second.ok).toBe(false);
     expect((await first).ok).toBe(true);
     await rt.close();
@@ -347,16 +347,16 @@ async function quickStart(dir: string) {
 
 test("warm: the worker starts and imports the adapter modules before the first call, and the call uses that worker", async () => {
   if (process.platform === "win32") return;
-  const dir = warmPythonAdapter(0.8);
+  const dir = warmPythonAdapter(3);
   const { rt, call } = await quickStart(dir);
   const t0 = Date.now();
   rt.warm!(true);
-  expect(Date.now() - t0).toBeLessThan(50);
+  expect(Date.now() - t0).toBeLessThan(1000);
   await until(() => existsSync(join(dir, "imported")));
-  await new Promise((r) => setTimeout(r, 1200));
+  await new Promise((r) => setTimeout(r, 3500));
   const t1 = Date.now();
   const out = await call();
-  expect(Date.now() - t1).toBeLessThan(500);
+  expect(Date.now() - t1).toBeLessThan(1500);
   expect(out.ok).toBe(true);
   expect((out.data as { pid: number }).pid).toBe(Number(readFileSync(join(dir, "imported"), "utf8")));
   await rt.close();

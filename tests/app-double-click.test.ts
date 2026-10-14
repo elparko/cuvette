@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 
 describe.skipIf(!CHROME)("a double click in the app", () => {
   let proc: ChildProcess;

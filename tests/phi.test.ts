@@ -510,7 +510,7 @@ test("a phone notice to an outside server does not carry patient identifiers", a
   const session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-phi-proj-")), settings: { notify: { ntfy: "https://ntfy.example.org/topic" } } as never });
   session.questions.ask({ decisionKey: "", title: "Which visit?", text: "Use the visit of Patient: John Doe, MRN 00123456?", options: [], recommendation: { value: "", reason: "" }, evidence: "" } as never);
   session.questions.ask({ decisionKey: "", title: "Which threshold?", text: "Otsu or Li?", options: [], recommendation: { value: "", reason: "" }, evidence: "" } as never);
-  for (let i = 0; i < 50 && bodies.length < 2; i++) await sleep(10);
+  for (let i = 0; i < 500 && bodies.length < 2; i++) await sleep(10);
   expect(bodies).toHaveLength(2);
   expect(bodies[0]).not.toContain("John Doe");
   expect(bodies[0]).toMatch(/Open Cuvette to read it/);

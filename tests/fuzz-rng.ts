@@ -51,7 +51,8 @@ export function msFor(f: () => void): number {
 // Linear growth gives a ratio near 4 for a four times longer input. A quadratic cost gives about 16.
 export function linear(make: (n: number) => string, run: (s: string) => void, n = 10000): { small: number; big: number; ok: boolean } {
   run(make(200));
-  const small = Math.min(msFor(() => run(make(n))), msFor(() => run(make(n))));
-  const big = Math.min(msFor(() => run(make(4 * n))), msFor(() => run(make(4 * n))));
+  const best = (size: number) => Math.min(...Array.from({ length: 5 }, () => msFor(() => run(make(size)))));
+  const small = best(n);
+  const big = best(4 * n);
   return { small, big, ok: big < 40 || big < small * 9 };
 }

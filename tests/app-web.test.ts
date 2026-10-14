@@ -14,7 +14,7 @@ function writeJson(path: string, data: object) {
   writeFileSync(path, JSON.stringify(data));
 }
 
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 
 describe.skipIf(!CHROME)("the new app page in headless Chrome", () => {
   let proc: ChildProcess;

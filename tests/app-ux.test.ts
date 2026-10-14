@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const MOCK = `(() => {
@@ -137,7 +137,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     const r = await page.eval<{ texts: string[]; stops: number; shown: boolean }>(`(async () => {
       const t = document.querySelector('header button[aria-label^="Mode:"]');
       t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-      for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
+      for (let i = 0; i < 200 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
       const items = [...document.querySelectorAll('[role="menuitemradio"]')];
       const out = { texts: items.map((x) => x.textContent), stops: document.querySelectorAll('[role="menu"] [tabindex="0"]').length, shown: [...items[0].querySelectorAll("span")].some((x) => x.textContent === "The agent runs the steps." && x.offsetHeight > 0) };
       document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

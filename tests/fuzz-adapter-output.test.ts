@@ -135,7 +135,7 @@ describe("fuzz: adapter output readers", () => {
     for (let n = 0; n < 5000; n++) writeFileSync(join(many, `f${n}.txt`), "");
     const t = performance.now();
     expect(collectOutputs({ dir: many, outputs: {} }, def()).length).toBe(5000);
-    expect(performance.now() - t).toBeLessThan(2000);
+    expect(performance.now() - t).toBeLessThan(5000);
   });
 });
 

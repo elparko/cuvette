@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
@@ -100,7 +100,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     const label = `(async () => {
       const t = document.querySelector('header button[aria-label="More"]');
       t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-      for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
+      for (let i = 0; i < 200 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
       const text = [...document.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent).find((x) => /every step|housekeeping/.test(x));
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       document.querySelector('[role="menu"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

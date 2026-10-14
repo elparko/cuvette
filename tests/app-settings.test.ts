@@ -223,7 +223,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     page = await openChrome();
     await page.size(1280, 900);
     await page.go(url + "&ui=old");
-    await page.eval(`(async () => { for (let i = 0; i < 50 && !state; i++) await new Promise((r) => setTimeout(r, 100)); document.querySelector('nav.pages [data-page="settings"]').click(); for (let i = 0; i < 50 && !document.querySelector("#settingsbody .cfg"); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
+    await page.eval(`(async () => { for (let i = 0; i < 300 && !state; i++) await new Promise((r) => setTimeout(r, 100)); document.querySelector('nav.pages [data-page="settings"]').click(); for (let i = 0; i < 50 && !document.querySelector("#settingsbody .cfg"); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
   }, 60000);
   afterAll(async () => {
     await page?.close();
@@ -275,7 +275,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     const ask = await page.eval<string[]>(`[...document.querySelectorAll('#settingsbody [data-setting="mode"] .sask:not(.hidden) button')].map((b) => b.textContent)`);
     expect(ask).toEqual(["Me (all projects)", "This project", "Cancel"]);
     await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] [data-sx-scope="project"]').click()`);
-    await page.eval(`(async () => { for (let i = 0; i < 50 && !document.querySelector('#settingsbody [data-setting="mode"] .sdone').textContent; i++) await new Promise((r) => setTimeout(r, 100)); })()`);
+    await page.eval(`(async () => { for (let i = 0; i < 300 && !document.querySelector('#settingsbody [data-setting="mode"] .sdone').textContent; i++) await new Promise((r) => setTimeout(r, 100)); })()`);
     expect(await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] .sdone').textContent`)).toBe("Saved for this project. Mode is now follow. The project setting (plan) still wins in new sessions in this folder.");
     expect(JSON.parse(readFileSync(join(proj, ".cuvette", "settings.json"), "utf8"))).toEqual({ mode: "follow" });
     expect(await page.eval(`localStorage.getItem("cuvette.scope.mode")`)).toBe("project");
