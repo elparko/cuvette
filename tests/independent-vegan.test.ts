@@ -38,10 +38,10 @@ describe.skipIf(!rscript)("vegan against hand computations in base R", () => {
     expect(Math.abs(out.metrics!.f - hand.f)).toBeLessThan(0.001);
     expect(Math.abs(out.metrics!.r2 - hand.r2)).toBeLessThan(0.0005);
     expect(hand.f).toBeCloseTo(2.1738, 3);
-  }, slow);
+  });
 
   // Own permutation test: shuffle the Management labels inside each Use block. The p value has a standard error of about 0.003.
-  test("PERMANOVA with permutations inside blocks gives a p value that agrees with a hand permutation test", async () => {
+  test("PERMANOVA with permutations inside blocks gives a p value that agrees with a hand permutation test", { timeout: slow }, async () => {
     const hand = await rJson<{ f: number; p: number; p_free: number }>(
       rscript!,
       `${baseR}
@@ -58,7 +58,7 @@ describe.skipIf(!rscript)("vegan against hand computations in base R", () => {
     expect(Math.abs(strata.metrics!.p - hand.p)).toBeLessThan(0.01);
     const free = await vegan.run("run_permanova", { community, environment, formula: "Management", distance: "bray", permutations: 999, seed: 1 });
     expect(Math.abs(free.metrics!.p - hand.p_free)).toBeLessThan(0.006);
-  }, slow);
+  });
 
   // Anderson (2006): principal coordinates of the Bray-Curtis matrix, then one-way ANOVA on the distances to the group centre.
   // Positive axes add to the squared distance and negative axes subtract from it. The spatial median uses the Weiszfeld iteration.

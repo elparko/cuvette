@@ -9,13 +9,23 @@ import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 
 export const CATALOG = resolve(import.meta.dirname, "../catalog");
 
+export const live = !!process.env.CUVETTE_LIVE;
+
 export async function programOf(name: string): Promise<string | undefined> {
+  if (!live) return undefined;
   const found = await locate(loadAdapter(join(CATALOG, name)).manifest);
   return found.path && existsSync(found.path) ? found.path : undefined;
 }
 
+export type Result = Omit<ToolOutput, "data" | "metrics" | "table" | "outputs"> & {
+  data: Record<string, any>;
+  metrics: Record<string, any>;
+  table: { path: string };
+  outputs: { path: string }[];
+};
+
 export interface OpenAdapter {
-  run(tool: string, args?: Args): Promise<ToolOutput>;
+  run(tool: string, args?: Args): Promise<Result>;
   close(): Promise<void>;
 }
 
@@ -39,7 +49,7 @@ export async function openAdapter(name: string): Promise<OpenAdapter> {
     run: async (tool, args = {}) => {
       const out = await tools[tool].execute(args, ctx());
       if (!out.ok) throw new Error(`${tool} failed: ${out.error}`);
-      return out;
+      return out as Result;
     },
     close: async () => {
       await rt.close();
