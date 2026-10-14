@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, expect, test } from "vitest";
-import { cardHtml, decisionsHtml, fileLink, imageHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, doctorHtml, fileLink, programsHtml, imageHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
 import type { Item } from "../src/ui/items.ts";
 import type { Question } from "../src/core/types.ts";
@@ -89,6 +89,7 @@ test.each(cardsFor(BENIGN).map(([name]) => name))("the web app shows the hostile
   const evil = cardHtml(ctxFor(EVIL), slot(cardsFor(EVIL).find(([n]) => n === name)![1]));
   const benign = cardHtml(ctxFor(BENIGN), slot(cardsFor(BENIGN).find(([n]) => n === name)![1]));
   expect(evil.length).toBeGreaterThan(50);
+  if (name !== "eln") expect(evil).toContain("&lt;script&gt;");
   same(evil, benign);
 });
 
@@ -142,4 +143,15 @@ test("the web app removes text direction controls that reorder the code in a car
   const html = cardHtml(ctxFor(BENIGN), slot({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "p", does: "d", code }, code, touches: "t" }));
   expect(html).toContain("print(&#39;safe&#39;) ; import os; os.remove(&#39;x&#39;)");
   expect(html).not.toMatch(/[\u202a-\u202e\u2066-\u2069]/);
+});
+
+test("the web app shows hostile program names and program messages as escaped data", () => {
+  const checks = (t: string) => [{ id: "a", group: "Programs", name: t, status: "warn", detail: t, fix: { label: t, command: t } }, { id: "b", group: "Programs", name: t, status: "ok", detail: t }] as never;
+  const doctor = doctorHtml(checks(EVIL), false, checks(EVIL));
+  expect(doctor).toContain("&lt;script&gt;");
+  same(doctor, doctorHtml(checks(BENIGN), false, checks(BENIGN)));
+  const row = (t: string) => ({ name: t, program: t, field: t, root: t, adapterStatus: t, state: "installed", version: t, tested: [t], path: t, how: t, detail: t, access: { off: false }, codeTools: [t], trust: "checked", trustDetail: t, codePending: false, codeFiles: [t] }) as never;
+  const programs = programsHtml([row(EVIL)]);
+  expect(programs).toContain("&lt;script&gt;");
+  same(programs, programsHtml([row(BENIGN)]));
 });
