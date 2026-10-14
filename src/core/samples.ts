@@ -93,6 +93,7 @@ export function sheetFromFiles(rels: string[], source: string): SampleSheet {
   const unique = (f: (r: SampleRow) => string) => new Set(rows.map(f)).size === rows.length;
   const name = [(r: SampleRow) => r.sample, (r: SampleRow) => [r.group, r.sample].filter(Boolean).join(" "), (r: SampleRow) => [r.group, r.sample.includes(r.unit) ? "" : r.unit, r.sample].filter(Boolean).join(" ")].find(unique);
   if (name) for (const r of rows) r.sample = name(r);
+  else rows.forEach((r, i) => (r.sample = [...list[i]!.dirs, list[i]!.field].join("/")));
   const how = [group >= 0 ? `group from folder level ${group + 1}` : useStemGroup ? "group from the first part of the file name" : "", unit >= 0 ? `unit from folder level ${unit + 1}` : rows.some((r) => r.unit) ? "unit from the start of the file name" : "", batch >= 0 ? `batch from folder level ${batch + 1}` : rows.some((r) => r.batch) ? "batch from a date in the name" : ""].filter(Boolean);
   return { source, rows, from: `the folder and file names${how.length ? ` (${how.join("; ")})` : ""}`, same };
 }
@@ -118,8 +119,15 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
     const span = idx.length === 1 ? `row ${idx[0]! + 2}` : `rows ${idx.map((i) => i + 2).join(", ")}`;
     return { sample: k, group: group >= 0 ? (r[group] ?? "").trim() : "", unit: unit >= 0 ? (r[unit] ?? "").trim() : k, batch: batch >= 0 ? (r[batch] ?? "").trim() : "", path: `${basename(source)} ${span}` };
   });
+  const conflicts: string[] = [];
+  for (const [k, idx] of by)
+    for (const col of [group, unit, batch]) {
+      if (col < 0 || col === key) continue;
+      const values = [...new Set(idx.map((i) => (t.rows[i]![col] ?? "").trim()).filter((v) => v && !isMissing(v)))];
+      if (values.length > 1) conflicts.push(`${k} has more than one value in '${t.columns[col]}' (${values.slice(0, 4).join(", ")}). The sheet uses ${(t.rows[idx[0]!]![col] ?? "").trim() || values[0]}.`);
+    }
   const used = [id >= 0 ? `sample from '${t.columns[id]}'` : "", group >= 0 ? `group from '${t.columns[group]}'` : "", unit >= 0 ? `unit from '${t.columns[unit]}'` : "", batch >= 0 ? `batch from '${t.columns[batch]}'` : ""].filter(Boolean);
-  return { source, rows, from: `the table columns (${used.join("; ")})` };
+  return { source, rows, from: `the table columns (${used.join("; ")})${conflicts.length ? `. ${conflicts.slice(0, 3).join(" ")}${conflicts.length > 3 ? ` ${conflicts.length - 3} more samples have the same problem.` : ""}` : ""}` };
 }
 
 // ---------------------------------------------------------------- csv and edits
