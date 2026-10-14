@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { decodeKey, emptyEd, footerKeys, splitKeys,inputKeys, keyRows, layout, press, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
+import { decodeKey, emptyEd, footerKeys, splitKeys,inputKeys, keyRows, layout, press, step, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
 
 function feed(style: InputKeys, keys: string[], start: string | Ed = "", width = 80) {
   let st = typeof start === "string" ? emptyEd(start) : start;
@@ -302,5 +302,14 @@ describe("splitKeys and one-line fields", () => {
     expect(press(emptyEd("a"), decodeKey("\x1b[13;2u"), "mac", 80, true).st.text).toBe("a");
     expect(press(emptyEd("a"), { key: "text", text: "b\nc" }, "mac", 80, true).st.text).toBe("ab c");
     expect(press({ ...emptyEd("x"), vim: "normal", cur: 0 }, decodeKey("o"), "vim", 80, true).st.text).toBe("x");
+  });
+});
+
+describe("paste in vim normal mode", () => {
+  test("the cursor stays on the last pasted character", () => {
+    const st = feed("vim", ["\x1b"], "ab").st;
+    const r = step(st, { insert: "xyz" }, 80);
+    expect(r.st.text).toBe("axyzb");
+    expect(r.st.cur).toBeLessThan(r.st.text.length);
   });
 });

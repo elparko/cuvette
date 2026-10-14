@@ -401,7 +401,7 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
     const text = cleanPaste(a.insert);
     if (!text) return { st };
     const done = insertAt(snapshot(st, "insert", text), text);
-    return { st: { ...done, cur: snap(done.text, done.cur), last: "insert", goal: undefined } };
+    return { st: clampNormal({ ...done, cur: snap(done.text, done.cur), last: "insert", goal: undefined }) };
   }
   if (st.pending === "d") {
     if (a === "pendDelete") a = "deleteLine";

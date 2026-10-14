@@ -24,6 +24,7 @@ export function keyStream(real: Tty, logPath?: string, waitMs = ESC_WAIT_MS, pas
   let timer: NodeJS.Timeout | undefined;
   let pasteTimer: NodeJS.Timeout | undefined;
   let inPaste = false;
+  let sent = "";
   const out = new Readable({ read() {} }) as unknown as NodeJS.ReadStream & { setRawMode(on: boolean): unknown };
   const log = (tag: string, s: string) => {
     if (!logPath) return;
@@ -43,11 +44,14 @@ export function keyStream(real: Tty, logPath?: string, waitMs = ESC_WAIT_MS, pas
   const endPaste = () => {
     pasteTimer = undefined;
     inPaste = false;
+    sent = "";
     out.push(PASTE_END);
   };
   const track = (s: string) => {
-    const start = s.lastIndexOf(PASTE_START);
-    const end = s.lastIndexOf(PASTE_END);
+    const all = sent + s;
+    sent = all.slice(-(PASTE_START.length - 1));
+    const start = all.lastIndexOf(PASTE_START);
+    const end = all.lastIndexOf(PASTE_END);
     if (start > end) inPaste = true;
     else if (end > start) inPaste = false;
   };
@@ -57,6 +61,7 @@ export function keyStream(real: Tty, logPath?: string, waitMs = ESC_WAIT_MS, pas
     clearTimeout(timer);
     clearTimeout(pasteTimer);
     pasteTimer = undefined;
+    if (inPaste && chunk === "\x03") endPaste();
     const s = held + chunk;
     const n = partialTail(s);
     held = s.slice(s.length - n);

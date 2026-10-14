@@ -107,6 +107,13 @@ describe("fuzz: key stream", () => {
     }
   });
 
+  test("a Ctrl+C chunk during an open paste closes the paste first", () => {
+    const { feed, got } = rig();
+    feed("\x1b[200~abc");
+    feed("\x03");
+    expect(got.join("")).toBe(`\x1b[200~abc${PASTE_END}\x03`);
+  });
+
   test("a paste that ends in time gets no extra end mark", () => {
     const { feed, wait, got } = rig();
     feed("\x1b[200~abc");
@@ -160,13 +167,13 @@ describe("fuzz: key stream", () => {
     }
   });
 
-  test("partialTail holds only the end of the text", () => {
+  test("partialTail holds only the end of the text, from an escape", () => {
     const r = new Rng(32006);
     for (let i = 0; i < runs(500); i++) {
       const s = r.string(["a", "\x1b", "[", "1", ";", "O", "M", "u", "~", "é"], 0, 12);
       const n = partialTail(s);
       expect(n >= 0 && n <= s.length, JSON.stringify(s)).toBe(true);
-      expect(s.slice(0, s.length - n).endsWith("\x1b")).toBe(false);
+      if (n > 0) expect(s.slice(s.length - n).startsWith("\x1b"), JSON.stringify(s)).toBe(true);
     }
   });
 });

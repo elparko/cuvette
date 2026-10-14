@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
+import { Box, Static, Text, render, useApp, useInput, usePaste, useStdout, useWindowSize } from "ink";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
@@ -160,15 +160,25 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     return () => void process.off("SIGUSR2", onSignal);
   }, [serveApp]);
 
+  const quitting = useRef(false);
   const quit = useCallback(async () => {
-    windowHandle.current?.close();
-    await appHandle.current?.close();
+    if (quitting.current) return exit();
+    quitting.current = true;
+    let failure: Error | undefined;
+    try {
+      windowHandle.current?.close();
+      await appHandle.current?.close();
+    } catch (e) {
+      failure = e as Error;
+    }
     try {
       await session.close();
-    } finally {
-      opts.onQuit?.();
-      exit();
+    } catch (e) {
+      failure ??= e as Error;
     }
+    opts.onQuit?.();
+    exit();
+    if (failure) process.stderr.write(`The session did not close cleanly: ${failure.message}\n`);
   }, [session, exit, opts]);
 
   const say: Say = useMemo(
@@ -368,6 +378,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       }
     }
   };
+
+  usePaste(() => {});
 
   useInput((ch, key) => {
     if (key.ctrl && ch === "c") {
