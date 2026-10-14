@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpat
 import { opendir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { refangDeep } from "../providers/text.ts";
 import { hideKeys, isCredentialsFile, isSecretFile } from "./credentials.ts";
 import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
@@ -2191,6 +2192,7 @@ export class Session {
   }
 
   private callArgs(tool: Tool, raw: unknown): Args {
+    raw = refangDeep(raw);
     const args = coerceArgs(dropNulls((raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Args, tool.inputSchema), tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     return absolutePaths(args, this.cwd) as Args;

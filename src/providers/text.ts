@@ -5,6 +5,24 @@ export function defang(text: string): string {
   return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
 }
 
+const MARKER_AT = new RegExp(SPECIAL_TOKENS.source, "iy");
+
+// The model copies a marker with its zero-width space into a tool call. The tool must get the marker as it is in the file.
+export function refang(text: string): string {
+  return text.replace(/([<[])\u200b/g, (m, c: string, at: number, whole: string) => {
+    MARKER_AT.lastIndex = 0;
+    const rest = c + whole.slice(at + 2, at + 80);
+    return MARKER_AT.test(rest) ? c : m;
+  });
+}
+
+export function refangDeep<T>(v: T): T {
+  if (typeof v === "string") return refang(v) as T;
+  if (Array.isArray(v)) return v.map(refangDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, refangDeep(x)])) as T;
+  return v;
+}
+
 export function defangDeep<T>(v: T): T {
   if (typeof v === "string") return defang(v) as T;
   if (Array.isArray(v)) return v.map(defangDeep) as T;

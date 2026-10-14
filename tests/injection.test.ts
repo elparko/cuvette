@@ -572,3 +572,12 @@ test.skipIf(windows)("write_file refuses a path through a link that leads to the
   expect(r.ok).toBe(false);
   expect(readdirSync(join(project, ".cuvette"))).toEqual([]);
 });
+
+test("a marker that the model copies with its zero-width space reaches the tool as the real marker, and other zero-width spaces stay", async () => {
+  const got: unknown[] = [];
+  const x = await start({ reads: () => [{ name: "echo_tool", args: { pattern: "<​s>|[​INST]|<​|im_start|>", other: "a​b <​div>", list: ["<​/s>", "x"] } }], finalText: "done" });
+  (x.s["tools"] as Map<string, unknown>).set("echo_tool", { name: "echo_tool", description: "Test.", inputSchema: { type: "object", properties: { pattern: { type: "string" }, other: { type: "string" }, list: { type: "array" } } }, source: "adapter", adapter: "lab", readOnly: true, permission: "allow", execute: async (a: unknown) => (got.push(a), { ok: true, text: "ok" }) });
+  x.s["useTools"](["echo_tool"]);
+  await ask(x);
+  expect(got).toEqual([{ pattern: "<s>|[INST]|<|im_start|>", other: "a​b <​div>", list: ["</s>", "x"] }]);
+});
