@@ -626,7 +626,7 @@ async function main() {
         if (!list.length) return console.log("No folder is trusted. cuvette trust add <folder> trusts one.");
         for (const e of list) {
           const t = existsSync(e.path) ? tr.trustStatus(e.path) : undefined;
-          console.log(`${e.path}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
+          console.log(`${e.path}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" && !tr.cannotTrust(t.scan) ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
         }
         return;
       }

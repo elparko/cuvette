@@ -301,7 +301,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "deviation", line: `Deviation in ${show(d.tool)}: ${clip(what || "values differ from the setup")}`, details: { deviations: devs }, technical: tech({ callId: d.callId }) };
     }
     case "blocked":
-      return { icon: "deviation", line: `Blocked ${show(d.tool)}: ${clip(show(d.reason))}`, details: { reason: d.reason, qid: d.qid }, technical: tech({ callId: d.callId }) };
+      return { icon: "deviation", line: `Blocked ${show(d.tool)}: ${clip(show(d.reason), 500)}`, details: { reason: d.reason, qid: d.qid }, technical: tech({ callId: d.callId }) };
     case "finding":
       return { icon: "finding", line: `Finding (${show(d.severity)}): ${clip(show(d.message))}`, details: { check: d.check, nodes: d.nodes, entries: d.entries }, technical: tech({ fid: d.fid, source: d.source }) };
     case "finding_resolution":

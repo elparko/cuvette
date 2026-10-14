@@ -543,6 +543,36 @@ describe("quiet view", () => {
     expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch · /change q1", "✓ Alpha: 0.05 · /change q2"]);
   });
 
+  test("a call that Cuvette blocks shows one warning with the reason, not a wait for a decision, and no second line for the failed call", () => {
+    const { log } = feed((s) => {
+      s.record.append("user", { text: "read my files" });
+      s.record.append("tool_call", { callId: "a", tool: "read_file", args: { path: "/home/.cuvette/settings.json" } });
+      s.record.append("blocked", { callId: "a", tool: "read_file", path: "/home/.cuvette/settings.json", reason: "The agent tried to use /home/.cuvette/settings.json. Cuvette blocked it.", by: "path rule" });
+      s.record.append("tool_result", { callId: "a", tool: "read_file", ok: false, error: "This path is in the Cuvette home folder. Ask the scientist to name the folder in the request." });
+      s.record.append("tool_call", { callId: "b", tool: "run_script", args: { code: "x" } });
+      s.record.append("blocked", { callId: "b", tool: "run_script", path: "/home/.cuvette/settings.json", reason: "The script changed /home/.cuvette/settings.json. Cuvette did not undo the change.", by: "integrity check" });
+      s.record.append("tool_result", { callId: "b", tool: "run_script", ok: false, error: "The script changed the record or the settings of Cuvette: x." });
+      s.record.append("assistant", { text: "I could not read it.", final: true });
+    });
+    const out = texts(mainView(log, true).settled);
+    expect(out).toEqual([
+      "user",
+      "⚠ Blocked read file: The agent tried to use /home/.cuvette/settings.json. Cuvette blocked it.",
+      "⚠ Blocked run script: The script changed /home/.cuvette/settings.json. Cuvette did not undo the change.",
+      "assistant",
+    ]);
+    expect(out.join("\n")).not.toContain("Waiting for your decision");
+  });
+
+  test("a blocked call that waits for an answer keeps the wait text without the internal prefix", () => {
+    const { log } = feed((s) => {
+      s.record.append("blocked", { tool: "compare_two_groups", reason: "waiting for the scientist: test", qid: "q1" });
+      s.record.append("question", { qid: "q1", title: "Which test?" });
+    });
+    const out = texts(mainView(log, true).settled);
+    expect(out[0]).toBe("⏸ Waiting for your decision: test");
+  });
+
   test("several questions at once stay one line for each answer, and the decision lines go to the details view", () => {
     const { log } = feed((s) => {
       s.record.append("question", { qid: "q1", title: "Paired test" });

@@ -7,7 +7,7 @@ import type { AdapterModule, LoadedAdapter, ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import {
   cap, childEnv, samePath, defTool, expand, fileKind, fmtNumber, inflight, lookup, makeRuntime, makeSummary, numberOrString,
-  placeholders, processFailure, runProcess, scalar, tablePreview, type CallDir, type Dirs, type KindContext,
+  integrityError, placeholders, processFailure, runProcess, scalar, tablePreview, type CallDir, type Dirs, type KindContext,
 } from "./common.ts";
 
 const TOKEN = /\{(raw:|include:)?([A-Za-z_][\w.:-]*)\}/g;
@@ -130,7 +130,7 @@ async function runMacroTool(c: KindContext, def: ToolDef, args: Args, call: Call
   const guarded = await guardCommand(argv, c.dirs, { cwd: call.dir, env, adapterRoot: c.adapter.root });
   const r = await runProcess(guarded.argv, { cwd: call.dir, env, signal, timeoutMs: conn.call_timeout_s * 1000 });
   const changed = guarded.changed();
-  if (changed.length) return { ok: false, error: `the program changed the record or the settings of Cuvette: ${changed.join(", ")}. A program must not write there. Check these files.`, manualRoute: manual };
+  if (changed.length) return { ok: false, error: integrityError("program", changed), manualRoute: manual };
   const failure = processFailure(r, basename(argv[0] ?? "the program"), conn.call_timeout_s);
   const base = { manualRoute: manual, data: { macro } as Record<string, unknown> };
   if (failure) {

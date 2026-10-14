@@ -48,7 +48,7 @@ export function Fit(props: { max: number; head: React.ReactNode; tail?: React.Re
       </Box>
       {fits ? null : (
         <Text dimColor wrap="truncate-end">
-          {`${keys} · lines ${at + 1}–${Math.min(body.height, at + view)} of ${body.height || "?"}`}
+          {`lines ${at + 1}–${Math.min(body.height, at + view)} of ${body.height || "?"} · ${keys}`}
         </Text>
       )}
       {props.tail ? (

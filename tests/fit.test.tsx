@@ -63,7 +63,7 @@ describe("a card taller than the terminal", () => {
     expect(count(text, "Proposed metrics, version 1")).toBe(1);
     expect(h.all()).not.toContain("Plan line 040 ");
     expect(h.term.view()).toContain("approve and start");
-    expect(h.term.view()).toMatch(/scroll · lines 1–\d+ of 201/);
+    expect(h.term.view()).toMatch(/lines 1–\d+ of 201 · .*scroll/);
     expect(h.term.view()).toContain("Waiting for your answer");
     expect(h.all()).not.toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
     const quiet = h.frames.length;
@@ -285,7 +285,7 @@ describe("the proposed metrics card in a 40-row terminal", () => {
     const view = h.term.view();
     const rows = view.split("\n");
     expect(rows.length).toBeLessThanOrEqual(40);
-    expect(view).not.toMatch(/scroll · lines/);
+    expect(view).not.toMatch(/lines \d+–\d+ of/);
     for (const part of ["Proposed metrics, version 1", "[1] n: one Set", "[4] efferocytosis index", "1. Outline the cells in CH1: [5] Cell model: cyto3 (default)", "[6] Cell size (px): 300 to 15,000", "[12] Statistics: SciPy through biostats (agent)", "r run the demonstration on control/Set 1/field 1"])
       expect(view).toContain(part);
     expect(view).not.toContain("What I will leave out");
@@ -308,7 +308,23 @@ describe("a short or narrow terminal", () => {
     await sleep(200);
     const view = h.term.view();
     for (const part of ["The cutoff changes how many features pass.", "1 0.7 (14 features)", "2 0.8 (6 features)", "o other", "Enter accepts"]) expect(view).toContain(part);
-    expect(view).not.toContain("scroll · lines");
+    expect(view).not.toMatch(/lines \d+–\d+ of/);
+  });
+
+  test("at 40 columns the card for a command of 2000 characters shows its length first, and PgDn reaches the end of the command", async () => {
+    const { h, s } = start(40, 24);
+    await until(() => h.all().includes("Type /plan"));
+    const argv = ["sh", "-c", `${"abcdefghij".repeat(200)}; rm -rf /tmp/last-word`];
+    s.bus.emit({ type: "permission", rid: "rx", tool: "run_command", args: { purpose: "Run", does: "Runs it.", argv }, touches: "Runs on this computer with your user permissions." });
+    await until(() => h.term.view().includes("Permission needed: run_command"));
+    expect(h.term.view()).toMatch(/lines 1–\d+ of \d+ · /);
+    for (let i = 0; i < 40 && !h.term.view().includes("last-word"); i++) {
+      h.type("\x1b[6~");
+      await sleep(40);
+    }
+    expect(h.term.view()).toContain("last-word");
+    for (const l of h.term.lines()) expect(l.length).toBeLessThanOrEqual(40);
+    expect(h.term.wraps).toBe(0);
   });
 
   test("at 40 columns a long option and a long setup field continue under their text", async () => {

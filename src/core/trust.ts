@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
-import { plainText } from "./plain.ts";
+import { plainText, visibleText } from "./plain.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
 export const LAB_FILE = "LAB.md";
@@ -225,15 +225,8 @@ function safeNames(dir: string): string[] {
   }
 }
 
-const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
-
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
-export function labDisplayText(text: string): string {
-  return text.replace(LAB_CONTROL, (c) => {
-    const n = c.codePointAt(0)!;
-    return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
-  });
-}
+export const labDisplayText = visibleText;
 
 export const LAB_MAX_BYTES = 64 * 1024;
 export const LAB_CARD_LINES = 60;
@@ -404,6 +397,14 @@ export function trustStatus(folder: string): TrustStatus {
   return { state: "changed", scan, changes: changesSince(e, scan) };
 }
 
+export const cannotTrust = (s: FolderScan) => s.linked.length > 0 || s.incomplete.length > 0;
+
+function blockers(s: FolderScan): { why: string; fix: string } {
+  const why = [...s.linked.map((p) => `a linked folder (${p})`), ...s.incomplete].join("; ");
+  const fix = [s.linked.length ? "Replace each link with a copy of the folder." : "", s.incomplete.length ? "Remove the extra files." : ""].filter(Boolean).join(" ");
+  return { why, fix };
+}
+
 export function untrustable(scan: FolderScan): string | undefined {
   const reasons = [...scan.linked.map((p) => `the linked folder ${p}`), ...scan.incomplete];
   return reasons.length ? `Cuvette cannot trust this folder: ${reasons.join("; ")}. Remove the link or the extra files, then try again.` : undefined;
@@ -442,12 +443,16 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   const labPath = join(s.folder, LAB_FILE);
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
   if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}`}`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}. In the app, type /trust on instead.`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
 
 export function trustText(t: TrustStatus): string {
+  if (cannotTrust(t.scan)) {
+    const { why, fix } = blockers(t.scan);
+    return `Cuvette cannot trust the folder ${t.scan.folder}: it has ${why}. Cuvette ignores the Cuvette files in this folder. ${fix} Then start the session again.`;
+  }
   return t.state === "changed"
     ? `The Cuvette files in ${t.scan.folder} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
     : `The folder ${t.scan.folder} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
@@ -455,15 +460,20 @@ export function trustText(t: TrustStatus): string {
 
 export function trustEvidence(t: TrustStatus): string {
   const lines = folderLines(t.scan);
-  if (t.changes.length) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`));
+  if (t.changes.length && !cannotTrust(t.scan)) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`));
   return lines.join("\n");
 }
 
 export function untrustedNotice(t: TrustStatus): string {
+  if (cannotTrust(t.scan)) {
+    const { why, fix } = blockers(t.scan);
+    return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder has ${why}, so Cuvette cannot trust it. ${fix} Then start the session again.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
+  }
   return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${shellQuote(t.scan.folder)}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {
+  if (cannotTrust(t.scan)) return "cannot be trusted";
   return t.state === "none" ? "no folder settings" : t.state === "trusted" ? "trusted" : t.state === "once" ? "trust once" : t.state === "changed" ? "not trusted (files changed)" : "not trusted";
 }
 

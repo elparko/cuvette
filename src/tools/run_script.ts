@@ -11,7 +11,7 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
-import { cap, EXIT_GRACE_MS, fileKind, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
 export function scriptPython(): string {
@@ -559,11 +559,11 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
         if (/\.(png|jpe?g)$/i.test(p)) images.push(p);
       }
       const changed = guard.changed();
-      for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: "The script changed the record or the settings of Cuvette.", by: "integrity check" });
+      for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: integrityReason("script", path), by: "integrity check" });
       for (const path of sandboxDenials(`${stdout}\n${stderr}`)) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: BLIND_REASON, by: "sandbox" });
       const text = cap(stdout, 50_000) + (stderr.trim() ? `\n[stderr]\n${cap(stderr, 50_000)}` : "");
       const base = { text, outputs, images: images.length ? images : undefined, fidelity: "code_only" as const, manualRoute: `Run the Python code in ${script}`, data: { script, duration_s: (Date.now() - started) / 1000 } };
-      if (changed.length) return { ok: false, error: `the script changed the record or the settings of Cuvette: ${changed.join(", ")}. A script must not write there. Check these files.`, ...base };
+      if (changed.length) return { ok: false, error: integrityError("script", changed), ...base };
       if (aborted) return { ok: false, error: "the script was cancelled", ...base };
       if (timedOut) return { ok: false, error: `the script timed out after ${timeoutS} s`, ...base };
       if (code !== 0) return { ok: false, error: `the script exited with code ${code}: ${tail(withoutBootFrames(stderr).trim(), 2000)}`, ...base };

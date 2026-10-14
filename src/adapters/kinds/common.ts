@@ -763,6 +763,17 @@ export function withoutSecrets(env: NodeJS.ProcessEnv = process.env): Record<str
   return out;
 }
 
+export type Changer = "command" | "script" | "program";
+
+export function integrityError(who: Changer, changed: string[]): string {
+  const files = changed.join(", ");
+  return `The ${who} changed the record or the settings of Cuvette: ${files}. A ${who} must not write there. Cuvette did not undo the change. Do not run it again. Tell the scientist to check ${changed.length === 1 ? "this file" : "these files"}.`;
+}
+
+export function integrityReason(who: Changer, path: string): string {
+  return `The ${who} changed ${path}. This file belongs to the record or the settings of Cuvette. Cuvette did not undo the change. Check the file. If it is wrong, restore it from a backup.`;
+}
+
 export function processFailure(r: RunResult, label: string, timeoutS: number): string | undefined {
   if (r.error) return `cannot start ${label}: ${r.error}`;
   if (r.aborted) return `${label} was cancelled`;

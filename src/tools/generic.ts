@@ -2,9 +2,10 @@ import { closeSync, constants, existsSync, fstatSync, ftruncateSync, lstatSync, 
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
-import { cap, commandLine, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, commandLine, integrityError, integrityReason, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
 import { isCredentialsFile } from "../core/credentials.ts";
+import { writeRefusalReason } from "../core/refusals.ts";
 import { guardCommand } from "./run_script.ts";
 
 const below = (root: string, p: string) => {
@@ -122,8 +123,8 @@ export function genericTools(dirs: Dirs): Tool[] {
         const r = await runProcess(guarded.argv, { cwd, env, signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
         const changed = guarded.changed();
         if (changed.length) {
-          for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_command", path, reason: "The command changed the record or the settings of Cuvette.", by: "integrity check" });
-          return { ok: false, error: `the command changed the record or the settings of Cuvette: ${changed.join(", ")}. A command must not write there. Check these files.`, manualRoute: route };
+          for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_command", path, reason: integrityReason("command", path), by: "integrity check" });
+          return { ok: false, error: integrityError("command", changed), manualRoute: route };
         }
         const text = cap([r.stdout, r.stderr && `[stderr]\n${r.stderr}`].filter(Boolean).join("\n"), 20000);
         const failure = processFailure(r, argv[0], Number(a.timeout_s));
@@ -184,10 +185,13 @@ export function genericTools(dirs: Dirs): Tool[] {
         required: ["name", "text"],
         additionalProperties: false,
       },
-      run(a) {
+      run(a, ctx) {
         const name = String(a.name);
         const asked = resolve(dirs.workDir, name);
-        if (guarded(asked, dirs)) return { ok: false, error: `the path ${asked} belongs to the record or to the settings of Cuvette. The agent cannot write there. Write the file in the session folder ${dirs.workDir}.` };
+        if (guarded(asked, dirs)) {
+          ctx.log("blocked", { callId: ctx.callId, tool: "write_file", path: asked, reason: writeRefusalReason(asked, basename(asked).toLowerCase() === "lab.md"), by: "write rule" });
+          return { ok: false, error: `the path ${asked} belongs to the record or to the settings of Cuvette. The agent cannot write there. Write the file in the session folder ${dirs.workDir}.` };
+        }
         const target = insideWorkDir(dirs.workDir, name) ?? (dirs.projectDir && isAbsolute(name) ? insideWorkDir(dirs.projectDir, name) : undefined);
         if (!target) return { ok: false, error: `the path is outside the session folder ${dirs.workDir} and the project folder ${project}` };
         const fd = openSync(target, constants.O_WRONLY | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o666);

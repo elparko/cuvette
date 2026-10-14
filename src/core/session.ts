@@ -18,7 +18,8 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { COPY_LIMIT_BYTES, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { pathRefusalReason } from "./refusals.ts";
+import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -55,7 +56,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { endTrustOnce, folderTrusted, labLong, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, folderTrusted, labLong, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -565,20 +566,22 @@ export class Session {
             this.method = loadMethod(file);
           } catch {}
         else {
-          const text = `Cuvette did not load the saved method ${String(used.data.name)}, because its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
+          const text = `Cuvette did not load the saved method ${String(used.data.name)}. Its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
           if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
         }
       }
       this.history = this.record.messages();
       const unknown = this.record.unknownKinds();
-      const said = (text: string) => this.record.entries(["notice"]).some((n) => n.data.text === text);
-      const kindsText = unknown.length ? `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}. This version does not know them. Cuvette keeps them in the file as they are.` : "";
-      if (kindsText && !said(kindsText)) this.record.append("notice", { text: kindsText, warn: true });
-      const cutText = "The last line of the record was cut when the app stopped. Cuvette keeps the line in the file as it is.";
-      const earlierCuts = this.record.entries(["notice"]).filter((n) => n.data.text === cutText).length;
-      if (cutLine) this.record.append("notice", { text: cutText, warn: true });
-      const linesText = "Some lines of the record are in a form that this version of Cuvette cannot read. Cuvette keeps them in the file as they are.";
-      if (this.record.skipped > earlierCuts && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
+      const said = (first: string) => this.record.entries(["notice"]).some((n) => String(n.data.text).startsWith(first));
+      const kindsFirst = `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}.`;
+      if (unknown.length && !said(kindsFirst)) this.record.append("notice", { text: `${kindsFirst} This version does not know them. Cuvette keeps them in the file as they are. Update Cuvette to see them.`, warn: true });
+      const cutFirst = "The last line of the record was cut when the app stopped.";
+      const cutNotice = `${cutFirst} Cuvette keeps the line in the file as it is. Cuvette does not read it, so the last action can be missing. Check the last step.`;
+      const earlierCuts = this.record.entries(["notice"]).filter((n) => String(n.data.text).startsWith(cutFirst)).length;
+      if (cutLine) this.record.append("notice", { text: cutNotice, warn: true });
+      const linesFirst = "Some lines of the record are in a form that this version of Cuvette cannot read.";
+      const linesText = `${linesFirst} Cuvette keeps them in the file as they are. If a result is missing, update Cuvette and open the session again.`;
+      if (this.record.skipped > earlierCuts && !said(linesFirst)) this.record.append("notice", { text: linesText, warn: true });
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
@@ -2268,6 +2271,10 @@ export class Session {
     if (tool.source === "generic" || tool.name === "inspect_data") {
       const place = this.pathPlace(args, tool.source !== "generic");
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
+      if (place === "private" || place === "link") {
+        const asked = ["path", "folder", "cwd"].map((k) => args[k]).find((v): v is string => typeof v === "string" && v.length > 0) ?? "";
+        this.record.append("blocked", { callId, tool: tool.name, path: asked, reason: pathRefusalReason(place, asked), by: "path rule" });
+      }
       if (place === "private") return error("This path is in the Cuvette home folder or in the record of another session. The agent cannot read it. Ask the scientist to name the folder in the request.");
       if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
     }
@@ -2380,6 +2387,7 @@ export class Session {
       }), signal, () => {
         abandoned = true;
         this.abandonedIds.add(callId);
+        this.record.append("notice", { text: `The tool ${tool.name} did not stop ${this.abandonMs / 1000} s after you pressed Esc. Cuvette stopped waiting for it. It can still run in the background. Cuvette ignores its late result. If the next step of this program fails or waits, stop the program or start Cuvette again.`, warn: true });
         this.notes.push(`The tool ${tool.name} did not stop after the scientist pressed Esc. It can still run in the background and keep its program busy. Its late result is ignored. If the next call of this program fails or waits, tell the scientist.`);
       });
     } catch (e) {
@@ -2764,13 +2772,16 @@ export class Session {
       if (t) Object.assign(t, { value: this.decisions.value(f.key), by: "you" });
       return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. The scientist asked for this change, so no card asks again.` };
     }
-    const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+    const show = (v: unknown) => {
+      const t = typeof v === "string" ? v : JSON.stringify(v);
+      return t.length > 200 ? `${cutText(t, 200)}...` : t;
+    };
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
     if (!q) {
       q = await this.questions.ask({
         decisionKey: f.key,
         title: `Change ${f.label}?`,
-        text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Reason: ${spec.reason}`,
+        text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Your message did not name this value. Reason: ${spec.reason.trim().replace(/[.\s]+$/, "") || "the agent gave none"}.${current === undefined ? " To keep the setting as it is, answer later." : ""}`,
         options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
         evidence: "",
         ...(current === undefined ? {} : { default: current }),
@@ -2982,7 +2993,7 @@ export class Session {
     if (open?.status === "open") return open;
     const t = trustStatus(this.cwd);
     if (t.state === "none") return undefined;
-    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
+    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) || cannotTrust(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
     this.trustQid = q.qid;
     this.bus.emit({ type: "question", question: q });
     return q;

@@ -338,6 +338,21 @@ describe("a record from a newer version", () => {
     expect(after).toContain('"deep":true');
   });
 
+  test("the notice says what the file holds, what the app does with it and what to do", async () => {
+    const { first } = await newer();
+    const s = await resume(first.id);
+    const notice = s.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("newer version"));
+    expect(notice).toBe("A newer version of Cuvette wrote entries of these kinds: lab_bench_scan. This version does not know them. Cuvette keeps them in the file as they are. Update Cuvette to see them.");
+  });
+
+  test("a record that has the older text of the notice gets no second notice", async () => {
+    const { first, file } = await newer();
+    const old = JSON.stringify({ id: 1000, ts: "2027-01-01T00:00:03.000Z", session: first.id, kind: "notice", data: { text: "A newer version of Cuvette wrote entries of these kinds: lab_bench_scan. This version does not know them. Cuvette keeps them in the file as they are.", warn: true } });
+    appendFileSync(file, `${old}\n`);
+    const s = await resume(first.id);
+    expect(s.record.entries(["notice"]).filter((n) => String(n.data.text).includes("A newer version of Cuvette wrote entries"))).toHaveLength(1);
+  });
+
   test("the notice appears once, however often the session resumes", async () => {
     const { first, file } = await newer();
     for (let i = 0; i < 3; i++) {
@@ -1095,6 +1110,16 @@ test("a cut last line gives one notice about the stop, and the next resume does 
   const b = await resume(first!.id);
   expect(text(b).filter((t) => t.includes("was cut when the app stopped")).length).toBe(1);
   expect(text(b).some((t) => t.includes("cannot read"))).toBe(false);
+});
+
+test("the notice about a cut last line says what to check", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  truncateSync(file, readFileSync(file).length - 30);
+  const s = await resume(first!.id);
+  const notice = s.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("was cut when the app stopped"));
+  expect(notice).toBe("The last line of the record was cut when the app stopped. Cuvette keeps the line in the file as it is. Cuvette does not read it, so the last action can be missing. Check the last step.");
 });
 
 test("damaged lines with an id that is huge, negative, a fraction or a text do not set the next id", async () => {

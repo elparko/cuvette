@@ -3,6 +3,7 @@ import type { Entry, Question } from "../src/core/types.ts";
 import { cardFromEvent, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
+import { failureText, problemOf } from "../src/ui/commands.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 
 const q = (qid: string): Question => ({ qid, session: "s", decisionKey: "k", title: "T", text: "x", options: [{ value: 1, label: "one" }], evidence: "", status: "open", created: "" });
@@ -31,6 +32,70 @@ describe("card queue", () => {
   test("the permission view hides the code from the arguments", () => {
     const v = permissionView({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", timeout: 60 }, touches: "files" });
     expect(v).toMatchObject({ title: "Permission needed: run_script", purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", args: ["timeout = 60"], always: true });
+  });
+});
+
+describe("the permission card for a command", () => {
+  const card = (args: Record<string, unknown>) => permissionView({ t: "permission", rid: "r1", tool: "run_command", args, touches: "files" });
+
+  test("shows the whole command in the card, with each argument that holds a space or a quote in quotes", () => {
+    const v = card({ purpose: "Count", does: "Counts lines.", argv: ["wc", "-l", "my file.csv", 'say "hi"', ""] });
+    expect(v.args).toEqual(['Command: wc -l "my file.csv" "say \\"hi\\"" ""']);
+    expect(v.code).toBeUndefined();
+  });
+
+  test("does not cut a long command, and does not hide the end of it", () => {
+    const tail = "rm -rf /tmp/zzz";
+    const v = card({ purpose: "Run", does: "Runs it.", argv: ["sh", "-c", `${"x".repeat(2000)}; ${tail}`] });
+    expect(v.args).toHaveLength(1);
+    expect(v.args[0]!.endsWith(`${tail}"`)).toBe(true);
+    expect(v.args[0]!.length).toBeGreaterThan(2000);
+  });
+
+  test("writes out a line break, a control code and a text direction control, so that the card shows what runs", () => {
+    const v = card({ purpose: "Print", does: "Prints.", argv: ["echo", "a\nb", "esc\u001b[31m", "cr\rx", "ev\u202eil", "bell\u0007", "c1\u009b2J"] });
+    const text = v.args[0]!;
+    expect(text).toContain("a\\nb");
+    expect(text).toContain("esc\\u001b[31m");
+    expect(text).toContain("cr\\rx");
+    expect(text).toContain("ev\\u202eil");
+    expect(text).toContain("bell\\u0007");
+    expect(text).toContain("c1\\x9b2J");
+    expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e]/);
+  });
+
+  test("keeps Unicode text and emoji as they are", () => {
+    const v = card({ purpose: "Print", does: "Prints.", argv: ["echo", "héllo 日本語 😀"] });
+    expect(v.args).toEqual(['Command: echo "héllo 日本語 😀"']);
+  });
+
+  test("another long value is cut at 1000 characters with the number of characters that it left out", () => {
+    const v = card({ purpose: "Ask", does: "Asks.", argv: ["true"], query: `${"😀".repeat(900)}` });
+    const line = v.args.find((a) => a.startsWith("query = "))!;
+    expect(line).toMatch(/\.\.\. \(\d+ more characters\)$/);
+    expect(line).not.toMatch(/[\ud800-\udbff]\.\.\./);
+  });
+
+  test("script code keeps its line breaks and shows control codes written out", () => {
+    const v = permissionView({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "Run", does: "Runs.", code: "a = 1\n\tb = 2\nprint('\u001b[2J')" }, touches: "files" });
+    expect(v.code).toBe("a = 1\n\tb = 2\nprint('\\x1b[2J')");
+  });
+});
+
+describe("the text of a command error", () => {
+  test("a program error shows the message on one line, with no double period and no cut emoji", () => {
+    const text = failureText("status", new TypeError(`Bad value.\nSecond line ${"😀".repeat(150)}`));
+    expect(text).not.toContain("\n");
+    expect(text).not.toContain("..");
+    expect(text).toMatch(/^\/status failed\. Cuvette hit a program error: TypeError: Bad value\. Second line (😀)+…\. The full error is in the session record\./);
+    expect(text).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);
+    expect(failureText("status", new TypeError("Short message."))).toContain("TypeError: Short message. The full error");
+  });
+
+  test("a folder that is read-only says which path failed, what the cause can be and what to do", () => {
+    const text = problemOf(Object.assign(new Error("EACCES: permission denied"), { code: "EACCES", path: "/data/run/trail.html" }));
+    expect(text).toBe("Cuvette cannot write to /data/run/trail.html. The folder has read-only access, or you have no permission to write in it. Fix the permission, then type the command again.");
+    expect(problemOf(Object.assign(new Error("x"), { code: "ENOSPC" }))).toBe("The disk is full. Free some space, then type the command again.");
   });
 });
 

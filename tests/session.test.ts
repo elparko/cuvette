@@ -231,6 +231,28 @@ test("propose_change asks the scientist, and an agreed change updates the record
   expect(results.at(-1)!.text).toMatch(/No decision nope/);
 });
 
+test("the card for a change that the request did not name says so, gives the reason, and tells how to keep a setting that has no value", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "propose_change", args: { key: "min_size", value: "20", reason: "Objects under 20 px are noise." } }] },
+    { calls: [{ name: "propose_change", args: { key: "method", value: "Otsu", reason: "" } }] },
+    { calls: [{ name: "propose_change", args: { key: "min_size", value: "25", reason: "x".repeat(2000) } }] },
+    { text: "done" },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  const cards: { text: string; options: string[]; default?: unknown }[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    cards.push({ text: e.question.text, options: e.question.options.map((o) => o.label), default: e.question.default });
+    setTimeout(() => session!.answer(e.question.qid, e.question.options.at(-1)!.value), 0);
+  });
+  session.decisions.applySetup({ question: "How many?", min_size: 5 });
+  await session.send("Count the particles in a.tif");
+  expect(cards[0]).toEqual({ text: 'The agent asks to change "Smallest particle" from 5 to 20. Your message did not name this value. Reason: Objects under 20 px are noise.', options: ["Change to 20", "Keep 5"], default: 5 });
+  expect(cards[1]!.text).toBe('The agent asks to change "Threshold method" from not set to Otsu. Your message did not name this value. Reason: the agent gave none. To keep the setting as it is, answer later.');
+  expect(cards[1]!.default).toBeUndefined();
+  expect(cards[2]!.text).toContain(`Reason: ${"x".repeat(2000)}.`);
+});
+
 test("compare_options reruns the last step with other values as comparison runs and keeps the record", async () => {
   const provider = new FakeProvider([
     { calls: [{ name: "compare_options", args: { key: "method", values: ["Otsu"] } }] },
