@@ -91,19 +91,20 @@ export class AnalysisRecord {
   // A crash can leave a cut last line. Call this only with the session lock held: the next entry must start on a new line.
   repairTail(): boolean {
     try {
-      const size = statSync(this.logPath).size;
-      if (!size) return false;
-      const fd = openSync(this.logPath, "r");
-      const last = Buffer.alloc(1);
-      try {
-        readSync(fd, last, 0, 1, size - 1);
-      } finally {
-        closeSync(fd);
+      const buf = readFileSync(this.logPath);
+      if (!buf.length) return false;
+      if (buf[buf.length - 1] !== 0x0a) {
+        appendFileSync(this.logPath, "\n");
+        this.cutTail = false;
+        try {
+          JSON.parse(buf.toString("utf8", buf.lastIndexOf(10) + 1).replace(/^\uFEFF/, ""));
+          return false;
+        } catch {
+          return true;
+        }
       }
-      const cut = last[0] !== 0x0a;
-      if (cut) appendFileSync(this.logPath, "\n");
       this.cutTail = false;
-      return cut;
+      return false;
     } catch {
       return false;
     }

@@ -1133,3 +1133,15 @@ test("a create that fails after the trust window opened closes the window", asyn
   open.splice(open.indexOf(ok), 1);
   expect(trustStatus(project).state).not.toBe("once");
 });
+
+test("a last line that lacks only its newline is not called cut", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  writeFileSync(file, readFileSync(file, "utf8").replace(/\n$/, ""));
+  const s = await resume(first!.id);
+  expect(s.record.entries(["notice"]).some((n) => String(n.data.text).includes("was cut when the app stopped"))).toBe(false);
+  expect(s.record.skipped).toBe(0);
+  await s.send("Thanks.");
+  expect(readFileSync(file, "utf8").split("\n").filter(Boolean).every((l) => { try { JSON.parse(l); return true; } catch { return false; } })).toBe(true);
+});
