@@ -1111,3 +1111,10 @@ test("damaged lines with an id that is huge, negative, a fraction or a text do n
   expect(Math.max(...ids)).toBeLessThan(top + 100);
   expect(s.record.entries().at(-1)!.id).toBeGreaterThan(top);
 });
+
+test("a failed write of the credentials file leaves no temporary file", () => {
+  mkdirSync(join(root, "home"), { recursive: true });
+  mkdirSync(credentialsPath());
+  expect(() => saveClaudeKey("sk-ant-new-key-0000000000")).toThrow();
+  expect(readdirSync(join(root, "home")).filter((n) => n.endsWith(".tmp"))).toEqual([]);
+});

@@ -86,9 +86,14 @@ function write(values: Record<string, unknown>): string {
   mkdirSync(cuvetteHome(), { recursive: true });
   const path = credentialsPath();
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
-  chmodSync(tmp, 0o600);
-  renameSync(tmp, path);
+  try {
+    writeFileSync(tmp, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
   version++;
   return path;
 }
