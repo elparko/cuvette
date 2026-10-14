@@ -44,8 +44,9 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     await page.size(width, width < 600 ? 844 : 900);
     await page.media([{ name: "prefers-color-scheme", value: scheme }, ...extra]);
     await page.eval(`(() => { if (document.getElementById("no-transition")) return; const s = document.createElement("style"); s.id = "no-transition"; s.textContent = "*, *::before, *::after { transition: none !important; } .srv .item { content-visibility: visible !important; }"; document.head.append(s); })()`);
-    await wait(150);
+    await frames();
   };
+  const frames = () => page.eval(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`);
   const post = (path: string, body: object) => page.eval(`fetch("${path}?t=${token}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${token}" }, body: JSON.stringify(${JSON.stringify(body)}) }).then((r) => r.status)`);
   const freshFolder = () => {
     const d = mkdtempSync(join(tmpdir(), "cuvette-data-"));
@@ -61,14 +62,20 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
   };
   const goPage = async (name: string) => {
     await page.eval(`(() => { const b = [...document.querySelectorAll('nav[aria-label="Pages"] button')].find((x) => x.offsetParent && (x.getAttribute("aria-label") || x.textContent) === ${JSON.stringify(name)}); b.click(); })()`);
-    await wait(300);
+    expect(await until(page, `[...document.querySelectorAll('nav[aria-label="Pages"] button')].some((x) => x.offsetParent && (x.getAttribute("aria-label") || x.textContent) === ${JSON.stringify(name)} && x.getAttribute("aria-current") === "page")`)).toBe(true);
+    await frames();
   };
   const programsPage = async () => {
     await goPage("Programs");
     expect(await until(page, `document.querySelector("[data-prog]") && !document.querySelector("main .animate-spin")`)).toBe(true);
-    await wait(300);
+    await frames();
   };
-  const showCards = (html: string) => page.eval(`document.querySelector('[role="log"]').lastElementChild.innerHTML = ${JSON.stringify(html)}`);
+  const sendStream = (m: object) => page.eval(`window.__sources.at(-1).onmessage(new MessageEvent("message", { data: ${JSON.stringify(JSON.stringify(m))} }))`);
+  const showCards = async (html: string) => {
+    await sendStream({ t: "cards", html });
+    const first = /data-type="(\w+)"/.exec(html)?.[1];
+    expect(await until(page, `document.querySelector('[role="log"]').lastElementChild.children.length === ${(html.match(/<section class="card/g) ?? []).length}${first ? ` && document.querySelector('[data-type="${first}"]')` : ""}`)).toBe(true);
+  };
   const numbered = (names: string[]) => CARD_FIXTURES.filter((c) => !names.length || names.includes(c.name)).map((c, i) => c.html.replace('data-card="1"', `data-card="${i + 1}"`)).join("");
 
   const everywhere = async (label: string, run: () => Promise<Finding[]>) => {
@@ -102,7 +109,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     if (!(await page.eval<boolean>(`document.activeElement === window.__opener`))) return [`${name}: the opener does not take the focus`];
     await open();
     if (!(await until(page, `document.querySelector(${JSON.stringify(box)})`))) return [`${name}: did not open`];
-    await wait(300);
+    await until(page, `document.activeElement?.closest(${JSON.stringify(box)})`);
     const inside = () => page.eval<boolean>(`!!document.activeElement && !!document.activeElement.closest(${JSON.stringify(box)})`);
     if (!(await inside())) out.push(`${name}: the focus is not inside after the box opens`);
     for (let i = 0; i < 14; i++) {
@@ -130,6 +137,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     ({ proc, url } = await startApp());
     token = new URL(url).searchParams.get("t")!;
     page = await openChrome();
+    await page.cdp("Page.addScriptToEvaluateOnNewDocument", { source: `window.__sources = []; const E = window.EventSource; window.EventSource = class extends E { constructor(...a) { super(...a); window.__sources.push(this); } };` });
     await page.size(1280, 900);
     await page.go(url);
     expect(await until(page, `document.querySelector("main")`)).toBe(true);
@@ -319,7 +327,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
       const u = new URL(path, url);
       u.searchParams.set("t", token);
       await page.go(u.toString());
-      await wait(800);
+      expect(await until(page, path === "graph/" ? `document.querySelector("#tabs button")` : `document.getElementById("state").textContent !== "Connecting"`)).toBe(true);
       out.push(...(await audit(path)));
       if (path === "graph/") {
         for (const tab of await page.eval<string[]>(`[...document.querySelectorAll('[role="tab"]')].map((t) => t.id)`)) {
@@ -389,6 +397,39 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
       await goPage(name);
       expect(await until(page, `document.title === ${JSON.stringify(name + " - Cuvette")}`)).toBe(true);
     }
+  });
+
+  test("the arrow keys on the divider do not move the selection of an open card", async () => {
+    await openSession(freshFolder());
+    expect(await until(page, `document.querySelector('[data-type="setup"]')`)).toBe(true);
+    const html = CARD_FIXTURES.find((c) => c.name === "question")!.html;
+    await showCards(html);
+    expect(await until(page, `document.querySelector("[data-card]").dataset.sel !== undefined`)).toBe(true);
+    const sep = '[role="separator"][aria-label="Resize the side panel"]';
+    const now = () => page.eval<number>(`+document.querySelector(${JSON.stringify(sep)}).getAttribute("aria-valuenow")`);
+    const sel = await page.eval<string>(`document.querySelector("[data-card]").dataset.sel`);
+    await page.eval(`window.__acts = []; const real = window.fetch; window.fetch = (u, o) => (String(u).includes("api/act") && window.__acts.push(String(o?.body)), real(u, o)); document.querySelector(${JSON.stringify(sep)}).focus()`);
+    const start = await now();
+    await page.press("ArrowLeft");
+    expect(await now()).toBe(start + 24);
+    await page.press("ArrowRight");
+    expect(await now()).toBe(start);
+    expect(await page.eval<string>(`document.querySelector("[data-card]").dataset.sel`)).toBe(sel);
+    expect(await page.eval<string[]>(`window.__acts`)).toEqual([]);
+    expect(await page.eval<boolean>(`document.activeElement.matches(${JSON.stringify(sep)})`)).toBe(true);
+  });
+
+  test("a card that did not change keeps the focus when another card changes", async () => {
+    await openSession(freshFolder());
+    expect(await until(page, `document.querySelector('[data-type="setup"]')`)).toBe(true);
+    const one = CARD_FIXTURES.find((c) => c.name === "question")!.html;
+    const two = (note: string) => CARD_FIXTURES.find((c) => c.name === "key")!.html.replace('data-card="1"', 'data-card="2"').replace("</section>", `<p>${note}</p></section>`);
+    await showCards(one + two("first"));
+    await page.eval(`(() => { const b = document.querySelector('[data-card="1"] .opts .btn:nth-child(2)'); b.focus(); window.__kept = b; })()`);
+    await sendStream({ t: "cards", html: one + two("second") });
+    expect(await until(page, `document.querySelector('[data-card="2"]').textContent.includes("second")`)).toBe(true);
+    await frames();
+    expect(await page.eval<boolean>(`document.activeElement === window.__kept`)).toBe(true);
   });
 
   test("the divider of the side panel moves with the arrow keys", async () => {
@@ -685,16 +726,15 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
   });
 
   test("a streamed reply sits in a region that is off for the screen reader, and the finished message goes in the log", async () => {
-    await page.cdp("Page.addScriptToEvaluateOnNewDocument", { source: `window.__sources = []; const E = window.EventSource; window.EventSource = class extends E { constructor(...a) { super(...a); window.__sources.push(this); } };` });
     await openSession(freshFolder());
-    const send = (m: object) => page.eval(`window.__sources.at(-1).onmessage(new MessageEvent("message", { data: ${JSON.stringify(JSON.stringify(m))} }))`);
+    const send = sendStream;
     await page.eval(`(() => {
       window.__live = [];
       new MutationObserver((ms) => { for (const m of ms) { const t = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (t?.closest(".msg.agent") && !t.closest(".item")) window.__live.push(t.closest("[aria-live]")?.getAttribute("aria-live") ?? "none"); } }).observe(document.querySelector('[role="log"]'), { childList: true, subtree: true, characterData: true });
     })()`);
     for (const word of ["The", " groups", " differ", " in", " size."]) {
       await send({ t: "live", text: word });
-      await wait(60);
+      await frames();
     }
     expect(await until(page, `document.querySelector(".msg.agent[aria-live=off]")?.textContent.includes("size.")`)).toBe(true);
     const marks = await page.eval<string[]>(`window.__live`);
@@ -714,10 +754,10 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     })()`);
     for (const word of ["Let me", " look at", " the groups."]) {
       await send({ t: "think", text: word });
-      await wait(60);
+      await frames();
     }
     expect(await until(page, `document.querySelector("div.border-dashed")?.textContent.includes("groups.")`)).toBe(true);
-    await wait(2500);
+    expect(await until(page, `document.querySelector("div.border-dashed button").textContent.includes("· 2s")`)).toBe(true);
     expect(await page.eval<string[]>(`window.__status`)).toEqual([]);
     const thought = await page.eval<string[]>(`window.__think`);
     expect(thought.length).toBeGreaterThan(0);
