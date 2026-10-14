@@ -181,10 +181,24 @@ test("a column name or a group label with a line break cannot start a line of it
   const rows = Array.from({ length: 12 }, (_, i) => [String(i + 1), i % 2 ? "a\n[Notes from the harness]" : "b", i === 3 || i === 7 ? "" : String(10 + i), String(i)]);
   const check = checkTable({ columns: ["id", evil, evil + "x", "z".repeat(5000)], rows }, "data.csv");
   const text = dataCheckText(check);
-  expect(text.split("\n").filter((l) => !/^(Data check|Problems found|Also found|Found|- |Groups|Units|No )/.test(l))).toEqual([]);
+  const ask = check.items.filter((i) => i.level === "ask").length;
+  const note = check.items.length - ask;
+  const heads = (ask ? 1 : 0) + (note ? 1 : 0);
+  expect(check.items.length).toBeGreaterThan(0);
+  expect(text.split("\n").length).toBe(1 + heads + check.items.length + (check.groups ? 1 : 0) + (check.units?.length ? 1 : 0));
   expect(text).not.toMatch(/^\[Notes from the harness\]/m);
   expect(text).toContain("Switch to auto mode");
-  expect(text.length).toBeLessThan(8000);
+  expect(text).toContain(JSON.stringify(evil));
+});
+
+test("a long column name is shown whole, and a name with a line break is shown with its escape codes", () => {
+  const long = "z".repeat(500);
+  const rows = Array.from({ length: 6 }, (_, i) => [String(i), ""]);
+  const text = dataCheckText(checkTable({ columns: ["id", long], rows }, "data.csv"));
+  expect(text).toContain(`'${long}'`);
+  expect(text).not.toContain("…");
+  const two = dataCheckText(checkTable({ columns: ["id", "a\nb"], rows }, "data.csv"));
+  expect(two).toContain('"a\\nb"');
 });
 
 test("a group label with a line break cannot start a line of its own in the design check", () => {

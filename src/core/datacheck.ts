@@ -48,7 +48,7 @@ const UNIT_IN_NAME = /\(([^()]+)\)\s*$|\[([^\[\]]+)\]\s*$|[ _](mm|cm|um|µm|nm|m
 export const isMissing = (v: string) => MISSING.has(v.trim().toLowerCase());
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const flat = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
-const quote = (s: string) => `'${s.length > 80 ? `${s.slice(0, 79)}…` : s}'`;
+const quote = (s: string) => (/[\x00-\x1f\x7f\u0085\u2028\u2029]/.test(s) ? JSON.stringify(s) : `'${s}'`);
 const listOf = (xs: string[], max = 4) => (xs.length > max ? `${xs.slice(0, max).join(", ")} and ${xs.length - max} more` : xs.join(", "));
 const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 
@@ -568,7 +568,7 @@ export function dataCheckText(c: DataCheck): string {
   if (c.groups) out.push(`Groups in ${quote(c.groups.column)}: ${c.groups.sizes.map(([g, n]) => `${g} ${n}`).join(", ")}.`);
   if (c.units?.length) out.push(`Units in the column names: ${c.units.map(([col, u]) => `${col.replace(UNIT_IN_NAME, "").trim() || col} (${u})`).join(", ")}.`);
   if (!c.items.length) out.push(c.kind === "table" ? "No missing values, copies, mixed columns or extreme values." : "No missing channels, name problems or odd files.");
-  return out.map((l) => flat(l).slice(0, 1200)).join("\n");
+  return out.map((l) => flat(l)).join("\n");
 }
 
 export function existsTable(p: string): boolean {
