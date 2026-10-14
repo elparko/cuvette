@@ -1,4 +1,4 @@
-const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos)>/gi;
+const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>|\[(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\]/gi;
 
 // A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
 export function defang(text: string): string {
@@ -13,7 +13,7 @@ export function defangDeep<T>(v: T): T {
 }
 
 export function wrapperText(text: string): string {
-  return defang(text).replace(/<(\s*\/?\s*)(tool_result|tool_call)/gi, "<$1_$2");
+  return defang(text.replace(/<(\s*\/?\s*)(tool_result|tool_call|tool_response)/gi, "<$1_$2"));
 }
 
 export function splitThink(raw: string): { text: string; thinking: string } {

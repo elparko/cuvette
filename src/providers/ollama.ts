@@ -150,7 +150,7 @@ export class OllamaProvider implements Provider {
             } else body += `\n(image not shown to this model)`;
           }
           if (this.promptedTools) texts.push(`<tool_result name="${p.name.replace(/[^\w.:-]/g, "_")}">\n${wrapperText(p.isError ? errorBody(body) : body)}\n</tool_result>`);
-          else out.push({ role: "tool", tool_name: p.name, content: defang(p.isError ? errorBody(body) : body) });
+          else out.push({ role: "tool", tool_name: p.name, content: wrapperText(p.isError ? errorBody(body) : body) });
         } else if (p.type === "text") texts.push(defang(p.text));
         else if (p.type === "image") {
           if (this.info.vision) pics.push(...budget.pick([p.path]).images.map((i) => i.data));
