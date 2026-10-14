@@ -1557,8 +1557,8 @@ export class Session {
       this.record.append("notice", { text: "The summary of the older messages was empty. The turn continues with the full context." });
       return false;
     }
-    const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
-    const summary = summaryMessage(`${steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary}\n## Folders\n${this.foldersText()}`);
+    const facts = this.summaryFacts(res.request);
+    const summary = summaryMessage(facts ? `${res.summary}\n${facts}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
     const rest = [...(res.request ? [res.request] : []), ...res.kept];
     this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo, kept: rest as unknown as Record<string, unknown>[] });
@@ -1566,6 +1566,19 @@ export class Session {
     this.phiFrom = this.history.length;
     this.contextWarned = false;
     return true;
+  }
+
+  // The summary gets the facts that the harness knows from the session, as the model wrote them or as they stand now.
+  // A block that the kept request of the turn already holds is not written again.
+  private summaryFacts(request?: Message): string {
+    const sent = (request?.parts ?? []).flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n");
+    const plan = this.plan?.steps.length ? [planText(this.plan, { view: "compact" }), ...(this.plan.exclusions?.length ? [planText({ exclusions: this.plan.exclusions }, { view: "details" })] : [])].join("\n\n") : "";
+    const blocks: [string, string][] = [
+      ["Current plan", plan],
+      ...(this.settings.guidance ? ([["Decisions", this.decisions.brief()], ...(this.mode === "watch" ? [] : [["Mode", MODE_NOTE[this.mode]]]), ...(this.pilotOn() ? [["Pilot", PILOT_NOTE]] : [])] as [string, string][]) : []),
+      ["Folders", this.foldersText()],
+    ];
+    return blocks.filter(([head, body]) => body && (head === "Current plan" || !sent.includes(body))).map(([head, body]) => `## ${head}\n${body}`).join("\n");
   }
 
   // ------------------------------------------------------------- patient identifiers

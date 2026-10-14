@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { BUDGET_WARN, budgetProblem, budgetState, budgetUsd, cheaperModel, costUsd, dollars, entryCost, monthStart, promptTokens, readSpend, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
+import { BUDGET_WARN, budgetProblem, budgetState, budgetUsd, cheaperModel, costUsd, dollars, entryCost, kTokens, monthStart, promptTokens, readSpend, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { WebView } from "../src/server/app-view.ts";
@@ -232,4 +232,22 @@ test("a session with a priced model and a model with no price keeps the known pa
   expect(u.usd).toBeCloseTo(0.1, 9);
   expect(u.turns[1]!.usd).toBeUndefined();
   expect(usageShort(u)).toBe("$0.10 and steps with no price · context 1%");
+});
+
+test("the budget stops at the cap when the sum of many small steps has a rounding error", () => {
+  const before = totalSpend();
+  process.env.CUVETTE_BUDGET_USD = String(before + 1);
+  for (let i = 0; i < 10; i++) {
+    expect(budgetProblem()).toBeUndefined();
+    recordSpend("claude-haiku-5-5", { inputTokens: 0, outputTokens: 200_000 });
+  }
+  expect(totalSpend() - before).toBeLessThan(1);
+  expect(budgetProblem()).toMatch(/is used up/);
+});
+
+test("a token count near 100 thousand shows no tenth", () => {
+  expect(kTokens(99_949)).toBe("99.9k");
+  expect(kTokens(99_950)).toBe("100k");
+  expect(kTokens(99_999)).toBe("100k");
+  expect(kTokens(1000)).toBe("1.0k");
 });

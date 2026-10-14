@@ -110,7 +110,8 @@ test("a long single turn on a small window first shortens old output, then summa
   expect(compactions.length).toBeGreaterThan(0);
   expect(notices[0]!.id).toBeLessThan(compactions[0]!.id);
   expect(String(compactions[0]!.data.summary)).toMatch(/^\[Summary of the earlier part of this session\]\n## Question/);
-  expect(String(compactions[0]!.data.summary)).toContain(`## Folders\nFolders of this session. The project folder is ${session.cwd}.`);
+  expect(String(compactions[0]!.data.summary)).not.toContain("## Folders");
+  for (const r of provider.requests) expect(r.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && p.text.includes("Folders of this session")).length).toBe(1);
   const last = provider.requests.at(-1)!;
   const sent = last.messages[1]!.parts[0] as { text: string };
   expect(sent.text).toMatch(/^\[Notes from the harness\]\n- [\s\S]*\n\nRead each plate file\.$/);
@@ -246,4 +247,58 @@ test("a second summary does not carry the old plan statuses into the new summary
   await summarizeOld(h, provider, 10, undefined, h[1]);
   expect(input).toContain("Old question.");
   expect(input).not.toContain("[todo] Segment");
+});
+
+test("a summary of earlier turns holds the folders, the decisions, and the plan with its metrics and exclusions, and a second summary does not repeat them", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const provider = new FakeProvider({ steps: (m) => ({ text: `answer ${m.length}` }), complete: "## Question\nCount the cells." });
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-compact-proj-")), settings: { phi_check: false } as never });
+  session.decisions.applySetup({});
+  session["plan"] = {
+    restatement: "You want: the red cells in each well.",
+    definitions: [{ measure: "Red cell", definition: "A nucleus with a red signal above 120." }],
+    exclusions: [{ what: "Cells on the edge of the image.", effect: "About 5% fewer cells." }],
+    steps: [{ step: "Count the red cells", status: "todo" }],
+  } as never;
+  const compact = async () => {
+    provider.info.contextWindow = 100;
+    const done = await session.compact();
+    provider.info.contextWindow = 1_000_000;
+    return done;
+  };
+  for (const text of ["first", "second", "third"]) await session.send(text);
+  expect(await compact()).toBe(true);
+  for (const text of ["fourth", "fifth", "sixth"]) await session.send(text);
+  expect(await compact()).toBe(true);
+  const summary = String(session.record.entries(["compaction"]).at(-1)!.data.summary);
+  expect(summary).toContain("A nucleus with a red signal above 120.");
+  expect(summary).toContain("Cells on the edge of the image. Effect: About 5% fewer cells.");
+  expect(summary).toContain("Count the red cells");
+  expect(summary).toContain(`## Decisions\n${session.decisions.brief()}`);
+  for (const head of ["Current plan", "Decisions", "Folders"]) expect(summary.split(`\n## ${head}\n`)).toHaveLength(2);
+  await session.close();
+});
+
+test("a plan and decisions that the kept request already holds are not written again in the summary", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const provider = new FakeProvider({ steps: (m) => ({ text: `answer ${m.length}` }), complete: "## Question\nx" });
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-compact-proj-")), settings: { phi_check: false } as never });
+  session.decisions.applySetup({});
+  await session.send("first");
+  const request = session["history"][0]!;
+  const text = (request.parts[0] as { text: string }).text;
+  expect(text).toContain(session.decisions.brief());
+  const facts = session["summaryFacts"](request);
+  expect(facts).not.toContain("## Decisions");
+  expect(facts).not.toContain("## Folders");
+  expect(session["summaryFacts"]()).toContain("## Folders");
+  await session.close();
+});
+
+test("a tool result that quotes the shortening mark in its middle is still shortened", () => {
+  const h = oneLongTurn(6);
+  h[2] = result("c1", `${"row\n".repeat(600)}[Older tool output shortened: 3 lines, 9 characters. The record keeps the full output.]\n${"row\n".repeat(600)}`);
+  const { messages, elided } = elideOld(h, 10);
+  expect(elided).toBe(4);
+  expect((messages[2]!.parts[0] as { text: string }).text.length).toBeLessThan(700);
 });

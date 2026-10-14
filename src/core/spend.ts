@@ -89,6 +89,8 @@ export function budgetUsd(env: Record<string, string | undefined> = process.env)
 
 export const BUDGET_WARN = 0.8;
 
+const CENT_EPSILON = 1e-9;
+
 const CHEAPER: Record<string, string> = {
   "claude-fable-5-1": "claude-sonnet-5-5",
   "claude-opus-5-5": "claude-sonnet-5-5",
@@ -110,7 +112,7 @@ export function budgetProblem(): string | undefined {
   const budget = budgetUsd();
   if (budget === undefined) return undefined;
   const spent = totalSpend(process.env.CUVETTE_BUDGET_SINCE || monthStart());
-  return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise CUVETTE_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
+  return spent >= budget - CENT_EPSILON ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise CUVETTE_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
 }
 
 export function promptTokens(d: Record<string, unknown>): number {
@@ -196,7 +198,7 @@ export function dollars(usd: number | undefined): string {
 }
 
 export function kTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : String(n);
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 99_950 ? 0 : 1)}k` : String(n);
 }
 
 export function percentText(p: number): string {

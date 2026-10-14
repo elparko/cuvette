@@ -87,7 +87,8 @@ export function elisionStub(p: Extract<Part, { type: "tool_result" }>): string {
   return `[Older tool output shortened: ${lines} lines, ${p.text.length} characters${images}. The record keeps the full output. Run the tool again or read the output file if you need it.]`;
 }
 
-const isElided = (text: string) => text.includes("[Older tool output shortened:");
+const STUB_END = /\[Older tool output shortened: \d+ lines, \d+ characters(?: and \d+ image\(s\))?\. The record keeps the full output\. Run the tool again or read the output file if you need it\.\]$/;
+const isElided = (text: string) => STUB_END.test(text);
 
 export const pointerText = (callId: string) => `[The output is the same as the output of the earlier call ${callId} with the same input. It is still above in this conversation.]`;
 const POINTER = /^\[The output is the same as the output of the earlier call (\S+) with the same input\. It is still above in this conversation\.\]$/;
@@ -160,7 +161,7 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const r = at >= start && at < end ? at : -1;
   const old = messages.slice(start, end).filter((_, i) => i + start !== r);
   if (!old.length) return null;
-  const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).replace(/\n## (Current plan|Folders)\n[\s\S]*$/, "").trim() : "";
+  const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).replace(/\n## (Current plan|Decisions|Mode|Pilot|Folders)\n[\s\S]*$/, "").trim() : "";
   const room = Math.max(4000, Math.floor(contextWindow * 3.5 * 0.6) - SUMMARY_SYSTEM.length - prev.length);
   const all = transcriptText(old);
   const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${tailText(all, room)}` : all;
