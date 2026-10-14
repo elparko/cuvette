@@ -3697,7 +3697,7 @@ export class Session {
       done.add(f.key);
       if (f.set && JSON.stringify(this.decisions.value(f.key)) === JSON.stringify(d.value)) continue;
       try {
-        this.decisions.change(f.key, d.value, { by: f.owner === "agent" || (this.settings.headless && !(f.key in this.setupPreset)) ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+        this.decisions.change(f.key, d.value, { by: f.owner === "agent" || (this.settings.headless && !(f.key in this.setupPreset && JSON.stringify(this.setupPreset[f.key]) === JSON.stringify(d.value))) ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
       } catch (e) {
         this.notes.push(`The setting ${d.label} = ${JSON.stringify(d.value)} does not fit the decision ${f.key}: ${(e as Error).message}`);
       }

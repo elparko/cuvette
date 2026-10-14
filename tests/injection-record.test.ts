@@ -283,14 +283,14 @@ test("a new request clears the change request of the scientist", async () => {
   expect(session["askedFor"]({ key: "min_size", label: "Minimum size" }, 20)).toBe(false);
 });
 
-test("in a headless run, the settings that the model puts in the plan are by the agent, except the ones from the answers file", async () => {
+test("in a headless run, the settings that the model puts in the plan are by the agent, except the values that the answers file holds", async () => {
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
-  session.setupPreset = { method: "Default" };
+  session.setupPreset = { method: "Default", min_size: 30 };
   const plan = { steps: [{ step: "Count", decisions: [{ key: "min_size", label: "Minimum size", value: 30, by: "agent" }, { key: "method", label: "Method", value: "Otsu", by: "agent" }] }] };
   session["commitSettings"](plan as never);
   const by = Object.fromEntries(session.record.entries(["decision"]).map((e) => [String(e.data.key), e.data.by]));
-  expect(by.min_size).toBe("agent");
-  expect(by.method).toBe("human");
+  expect(by.min_size).toBe("human");
+  expect(by.method).toBe("agent");
   expect(session.decisions.value("min_size")).toBe(30);
 });
