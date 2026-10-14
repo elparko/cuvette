@@ -51,3 +51,26 @@ test("a long run of punctuation does not take quadratic time", () => {
   expect(namesValue(request, alpha, 0.05)).toBe(true);
   expect(Date.now() - start).toBeLessThan(3000);
 });
+
+test("a negation in the same clause before the number makes the number not asked", () => {
+  expect(namesValue("Don't set alpha to 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not use an alpha of 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Never set the alpha to 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Run it without alpha 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Any alpha except 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Any alpha other than 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Use no more than 5 permutations", perms, 5)).toBe(false);
+});
+
+test("a clause after a comma with its own positive value still applies", () => {
+  expect(namesValue("Set alpha to 0.05, not 0.1", alpha, 0.05)).toBe(true);
+  expect(namesValue("Set alpha to 0.05, not 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not use alpha 0.1 in the second test, use 0.05", alpha, 0.05)).toBe(true);
+  expect(namesValue("Do not use alpha 0.1 in the second test, use 0.05", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not touch the plots.\nSet alpha to 0.1", alpha, 0.1)).toBe(true);
+});
+
+test("a number in brackets before a full stop is read", () => {
+  expect(namesValue("Use the standard level (alpha 0.05).", alpha, 0.05)).toBe(true);
+  expect(namesValue("(alpha 0.05).", alpha, 0.05)).toBe(true);
+});

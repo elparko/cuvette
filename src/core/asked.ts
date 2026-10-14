@@ -2,6 +2,7 @@ interface Item {
   w: string;
   num?: number;
   not?: boolean;
+  clause: number;
 }
 
 const NUMBER = /^[-+]?(?:\d+(?:[.,]\d+)?|\.\d+)$/;
@@ -12,7 +13,8 @@ const THOUSANDS = /(?<![\d.,])([1-9]\d{0,2})((?:[, \u00a0\u202f]\d{3})+)(?!\d)/g
 const ON = new Set(["on", "true", "yes", "enable", "enabled"]);
 const OFF = new Set(["off", "false", "no", "disable", "disabled"]);
 
-const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?"]);
+const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?", "."]);
+const CLAUSE_END = /[,;.!?:][)"'\]]*$/;
 
 function trimEnd(s: string): string {
   let n = s.length;
@@ -23,31 +25,44 @@ function trimEnd(s: string): string {
 function negates(out: Item[], k: number): boolean {
   const w = out[k]!.w;
   const before = out[k - 1]?.w;
-  return w === "not" || w === "no" || (w === "of" && before === "instead") || (w === "than" && before === "rather") || (w === "t" && !!before?.endsWith("n"));
+  return w === "not" || w === "no" || w === "never" || w === "without" || w === "except" || (w === "of" && before === "instead") || (w === "than" && (before === "rather" || before === "other")) || (w === "t" && !!before?.endsWith("n"));
 }
 
 function items(text: string): Item[] {
   const out: Item[] = [];
   const merged = text.replace(THOUSANDS, (_, a: string, b: string) => a + b.replace(/\D/g, ""));
-  for (const raw of merged.toLowerCase().split(/\s+|(=)/).filter(Boolean)) {
-    const token = trimEnd(raw.replace(/^[("'[]+/, "")).replace(/\.$/, "");
-    if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")) });
-    else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w });
-    if (raw === "=") out.push({ w: "=" });
+  let clause = 0;
+  for (const line of merged.toLowerCase().split(/\r?\n/)) {
+    clause++;
+    for (const raw of line.split(/\s+|(=)/).filter(Boolean)) {
+      if (raw === "and" || raw === "but") clause++;
+      const token = trimEnd(raw.replace(/^[("'[]+/, ""));
+      if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), clause });
+      else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w, clause });
+      if (raw === "=") out.push({ w: "=", clause });
+      if (CLAUSE_END.test(raw)) clause++;
+    }
   }
   for (let i = 0; i < out.length; i++) {
     if (out[i]!.num === undefined) continue;
-    for (let k = Math.max(0, i - 3); k < i; k++) if (negates(out, k)) out[i]!.not = true;
+    for (let k = i - 1; k >= 0 && out[k]!.clause === out[i]!.clause; k--) if (negates(out, k)) out[i]!.not = true;
   }
   return out;
 }
 
 function numberNamed(words: Item[], [b, e]: [number, number], value: number): boolean {
   const same = (it: Item) => it.num === value && !it.not;
-  for (let i = e + 1; i <= Math.min(words.length - 1, e + 4); i++) {
+  let limit = e + 4;
+  let skip = SKIP;
+  for (let i = e + 1; i <= Math.min(words.length - 1, limit); i++) {
     const it = words[i]!;
-    if (it.num !== undefined) return same(it);
-    if (!SKIP.has(it.w) && words[i + 1]?.num !== undefined) return false;
+    if (it.num !== undefined) {
+      if (!it.not) return same(it);
+      limit = i + 10;
+      skip = new Set([...SKIP, ...LEAD]);
+      continue;
+    }
+    if (!skip.has(it.w) && words[i + 1]?.num !== undefined) return false;
   }
   for (let i = Math.max(0, b - 2); i < b; i++) {
     const it = words[i]!;
