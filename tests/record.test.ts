@@ -247,3 +247,38 @@ test("a long table in a file is read in linear time", () => {
   expect(extractNumbers(rows).length).toBeGreaterThan(40_000);
   expect(Date.now() - t).toBeLessThan(2000);
 });
+
+test("messages() matches a copy of the history after every entry, also after a reload from disk", () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    let s = seed * 7919;
+    const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+    const dir = tmp();
+    const r = new AnalysisRecord(dir, "s1");
+    const msg = (text: string, role: "user" | "assistant" = "user") => ({ role, parts: [{ type: "text", text }] });
+    let state: string[] = [];
+    const snaps: string[][] = [[]];
+    for (let i = 0; i < 60; i++) {
+      const x = rnd();
+      const id = r.entries().length + 1;
+      if (x < 0.65) {
+        r.append("message", { message: msg(`m${id}`) });
+        state = [...state, `m${id}`];
+      } else if (x < 0.8) {
+        const kept = state.slice(-Math.floor(rnd() * 3)).map((t) => msg(t));
+        r.append("compaction", { summary: `sum${id}`, upTo: id - 1, kept });
+        state = [`sum${id}`, ...kept.map((m) => m.parts[0]!.text)];
+      } else if (x < 0.9 && id > 2) {
+        const upTo = Math.floor(rnd() * (id - 1));
+        r.append("rewind", { upTo, entry: upTo + 1, kind: "message", point: "p", nodes: [] });
+        state = [...snaps[upTo]!];
+      } else r.append("notice", { text: "n" });
+      snaps.push([...state]);
+    }
+    const texts = (m: { parts: unknown[] }[]) => m.map((x) => (x.parts[0] as { text: string }).text);
+    const back = new AnalysisRecord(dir, "s1");
+    for (const rec of [r, back]) {
+      expect(texts(rec.messages())).toEqual(snaps.at(-1));
+      for (let k = 0; k <= snaps.length - 1; k += 7) expect(texts(rec.messages(k))).toEqual(snaps[k]);
+    }
+  }
+});
