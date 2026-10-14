@@ -1174,6 +1174,10 @@ export class Session {
       }
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
       else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.realRequest()?.data.text ?? text), true);
+      if (!opts.internal) {
+        this.scientistAsked = text;
+        this.askedUsed.clear();
+      }
       this.turnNo++;
       this.chooseActiveTools(text, true);
       this.warmAdapters(text);
@@ -2673,11 +2677,16 @@ export class Session {
     }
   }
 
-  private askedFor(f: { key: string; label: string }): boolean {
+  private askedFor(f: { key: string; label: string; choices?: unknown[] }, value: unknown): boolean {
     if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
     const plain = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
     const asked = plain(this.scientistAsked);
-    return [f.key, f.label].some((n) => plain(n).trim() !== "" && asked.includes(plain(n)));
+    if (![f.key, f.label].some((n) => plain(n).trim() !== "" && asked.includes(plain(n)))) return false;
+    if (typeof value === "number") return (this.scientistAsked.match(/-?\d+(?:[.,]\d+)?/g) ?? []).some((x) => Number(x.replace(",", ".")) === value);
+    const choice = (f.choices ?? []).find((c) => String(c !== null && typeof c === "object" && "value" in c ? (c as { value: unknown }).value : c) === String(value));
+    const names = [String(value), ...(choice !== null && typeof choice === "object" && "label" in choice ? [String((choice as { label: unknown }).label)] : [])];
+    if (typeof value === "boolean") names.push(...(value ? ["on", "yes", "enable"] : ["off", "no", "disable"]));
+    return names.some((n) => plain(n).trim() !== "" && asked.includes(plain(n)));
   }
 
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
@@ -2693,7 +2702,7 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
-    if (this.askedFor(f)) {
+    if (this.askedFor(f, value)) {
       const asked = this.scientistAsked;
       this.askedUsed.add(f.key);
       this.decisions.change(f.key, value, { by: "human", reason: `the scientist asked: "${asked}"` });
@@ -4391,6 +4400,8 @@ export class Session {
     if (!point) throw new Error(`No point ${n}. Type /rewind to see the list.`);
     const nodes = this.record.entries(["node"]).filter((e) => e.id > point.upTo && !this.record.setAside(e.id)).map((e) => String(e.node ?? e.data.id));
     const asked = new Set(this.record.entries(["question"]).filter((e) => e.id > point.upTo).map((e) => String(e.data.qid)));
+    this.scientistAsked = undefined;
+    this.askedUsed.clear();
     this.record.append("rewind", { upTo: point.upTo, entry: point.entry, kind: point.kind, point: point.label, nodes });
     for (const q of this.questions.open()) if (asked.has(q.qid)) this.questions.withdraw(q.qid, "The scientist rewound the conversation to a point before this question.");
     const decisions = this.decisions.restoreTo(point.upTo, `rewind to ${point.label}`);

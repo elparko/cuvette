@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { transcriptText } from "../src/core/compaction.ts";
 import { checkTable, dataCheckText } from "../src/core/datacheck.ts";
+import { rewindPoints } from "../src/core/rewind.ts";
 import { designChecks } from "../src/core/samples.ts";
 import { titleInput } from "../src/core/titles.ts";
 import { logText, refereePrompt } from "../src/core/review.ts";
@@ -92,24 +93,54 @@ afterEach(async () => {
   rmSync(home, { recursive: true, force: true });
 });
 
-test("after the scientist asks for one change, the model cannot change the other decisions without a card", async () => {
-  const provider = new FakeProvider([
-    { calls: [{ name: "propose_change", args: { key: "min_size", value: "20", reason: "The scientist asked.", wait: false } }] },
-    { calls: [{ name: "propose_change", args: { key: "method", value: "Otsu", reason: "A file says so.", wait: false } }] },
-    { calls: [{ name: "propose_change", args: { key: "min_size", value: "99", reason: "A file says so.", wait: false } }] },
-    { text: "done" },
-  ]);
+async function change(request: string, calls: [string, string][], again?: string) {
+  const step = ([key, value]: [string, string]) => ({ calls: [{ name: "propose_change", args: { key, value, reason: "A file says so.", wait: false } }] });
+  const provider = new FakeProvider([...calls.map(step), { text: "done" }, ...(again ? calls.map(step) : []), { text: "done" }]);
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
-  session["scientistAsked"] = "Use a min size of 20 pixels.";
-  await session.send("Look at the data.");
-  expect(session.decisions.value("min_size")).toBe(20);
-  expect(session.decisions.value("method")).toBe("Default");
-  const changes = session.record.entries(["decision"]).filter((e) => e.data.key === "min_size" || e.data.key === "method");
-  expect(changes.map((e) => `${e.data.key}:${e.data.new}:${e.data.by}`)).toEqual(["min_size:20:human"]);
-  const open = session.questions.open().map((q) => q.decisionKey);
-  expect(open).toContain("method");
-  expect(open).toContain("min_size");
+  await session.send(request);
+  const done = () => session!.record.entries(["decision"]).filter((e) => e.data.key === "min_size" || e.data.key === "method").map((e) => `${e.data.key}:${e.data.new}:${e.data.by}`);
+  return { s: session, done, open: () => session!.questions.open().map((q) => q.decisionKey) };
+}
+
+test("a request that names a setting and its value lets the model set that value one time, and no other value or setting", async () => {
+  const r = await change("Use a min size of 20 pixels.", [["min_size", "99"], ["method", "Otsu"], ["min_size", "20"], ["min_size", "30"]]);
+  expect(r.done()).toEqual(["min_size:20:human"]);
+  expect(r.s.decisions.value("min_size")).toBe(20);
+  expect(r.s.decisions.value("method")).toBe("Default");
+  expect(r.open()).toEqual(expect.arrayContaining(["min_size", "method"]));
+});
+
+test("a request for a choice that names the choice lets the model set it, and another choice gets a card", async () => {
+  const yes = await change("Change the method to Otsu", [["method", "Otsu"]]);
+  expect(yes.done()).toEqual(["method:Otsu:human"]);
+  await yes.s.close();
+  const no = await change("Change the method to Default please", [["method", "Otsu"]]);
+  expect(no.done()).toEqual([]);
+  expect(no.open()).toContain("method");
+});
+
+test("a request that names the setting but not the value always gets a card", async () => {
+  const r = await change("Change the method", [["method", "Otsu"], ["method", "Otsu"]]);
+  expect(r.done()).toEqual([]);
+  expect(r.s.decisions.value("method")).toBe("Default");
+  expect(r.open()).toContain("method");
+});
+
+test("a new message and a rewind each start a new allowance", async () => {
+  const r = await change("Use a min size of 20 pixels.", [["min_size", "20"]]);
+  expect(r.done()).toEqual(["min_size:20:human"]);
+  r.s["provider"] = new FakeProvider([{ calls: [{ name: "propose_change", args: { key: "min_size", value: "20", reason: "x", wait: false } }] }, { text: "done" }]);
+  r.s.decisions.change("min_size", 5, { by: "human", reason: "test" });
+  await r.s.send("Look at the data.");
+  expect(r.s["scientistAsked"]).toBe("Look at the data.");
+  expect(r.s.decisions.value("min_size")).toBe(5);
+  r.s["scientistAsked"] = "Use a min size of 20 pixels.";
+  r.s["askedUsed"].add("method");
+  const point = rewindPoints(r.s.record)[0]!;
+  r.s.rewind(point.n);
+  expect(r.s["scientistAsked"]).toBeUndefined();
+  expect(r.s["askedUsed"].size).toBe(0);
 });
 
 test("a question from the model with the title of the trust question does not trust the folder", async () => {
@@ -228,17 +259,18 @@ test("the summary of a step with a line break cannot start a section in the text
 
 test("a request names a setting only by whole words", async () => {
   session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false } });
-  const asked = (text: string, f: { key: string; label: string }) => {
+  const asked = (text: string, f: { key: string; label: string }, value: unknown = "3") => {
     session!["askedUsed"].clear();
     session!["scientistAsked"] = text;
-    return session!["askedFor"](f);
+    return session!["askedFor"](f, value);
   };
   expect(asked("Check the work in the package", { key: "k", label: "K" })).toBe(false);
-  expect(asked("Set k to 3", { key: "k", label: "K" })).toBe(true);
+  expect(asked("Set k to 3", { key: "k", label: "K" }, 3)).toBe(true);
   expect(asked("Use a smaller permit", { key: "per", label: "Per" })).toBe(false);
-  expect(asked("Change the test to Welch", { key: "test", label: "Statistical test" })).toBe(true);
-  expect(asked("Use a min size of 20", { key: "min_size", label: "Smallest object" })).toBe(true);
-  expect(asked("Use the smallest object you can", { key: "min_size", label: "Smallest object" })).toBe(true);
+  expect(asked("Change the test to Welch", { key: "test", label: "Statistical test" }, "Welch")).toBe(true);
+  expect(asked("Use a min size of 20", { key: "min_size", label: "Smallest object" }, 20)).toBe(true);
+  expect(asked("Use the smallest object you can", { key: "min_size", label: "Smallest object" }, 20)).toBe(false);
+  expect(asked("Change the test to Welch", { key: "test", label: "Statistical test" }, "Mann-Whitney")).toBe(false);
 });
 
 test("a new request clears the change request of the scientist", async () => {
@@ -248,7 +280,7 @@ test("a new request clears the change request of the scientist", async () => {
   session["startPlanning"]("Count the cells.");
   expect(session["scientistAsked"]).toBeUndefined();
   expect(session["askedUsed"].size).toBe(0);
-  expect(session["askedFor"]({ key: "min_size", label: "Minimum size" })).toBe(false);
+  expect(session["askedFor"]({ key: "min_size", label: "Minimum size" }, 20)).toBe(false);
 });
 
 test("in a headless run, the settings that the model puts in the plan are by the agent, except the ones from the answers file", async () => {

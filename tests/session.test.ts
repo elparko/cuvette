@@ -2334,6 +2334,22 @@ test("pilot: after a change on the pilot card, the model changes the setting tha
   expect(open).toContain("min_size");
 });
 
+test("pilot: a change request that names the setting but not the value gets a card, not a silent change", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, PROPOSE("min_size", "0"), { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none", askWaits: false } });
+  session.decisions.applySetup({ method: "Otsu", min_size: 5 });
+  let pilots = 0;
+  const s = session;
+  s.bus.on((e) => {
+    if (e.type === "question" && !/^Change /.test(e.question.title)) setTimeout(() => s.answer(e.question.qid, e.question.title === "Earlier results" ? "none" : e.question.options[0]?.value ?? "yes"), 0);
+    if (e.type === "plan") setTimeout(() => s.respondPlan(e.stage === "plan" ? { action: "pilot" } : ++pilots === 1 ? { action: "change", text: "Change the min size." } : { action: "confirm" }), 0);
+  });
+  await session.send(`Count the red-positive cells in ${images}`);
+  expect(session.decisions.value("min_size")).toBe(5);
+  expect(session.questions.open().map((q) => q.decisionKey)).toContain("min_size");
+});
+
 test("pilot: in a headless run, the model changes no setting during the pilot", async () => {
   const { proj, images } = pilotProject();
   const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, PROPOSE("min_size", "99"), PROPOSE("method", "Default"), { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
