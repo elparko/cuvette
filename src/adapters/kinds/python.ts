@@ -298,7 +298,7 @@ export function startPython(c: KindContext): AdapterRuntime {
             killTree(p.pid);
             const last = setTimeout(done, 1000);
             p.once("close", () => (clearTimeout(last), done()));
-          }, 2000);
+          }, 500);
           p.once("close", () => (clearTimeout(timer), done()));
         });
       }
