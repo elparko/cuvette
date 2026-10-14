@@ -468,6 +468,26 @@ def fine(): return {"ok": True, "metrics": {"n": 3}}
   expect((await run("fine")).summary).toBe("Fine tool finished. n=3.");
 }, 60000);
 
+test("python: a call to a fast module does not wait for a slow module that the preload imports", async () => {
+  const dir = adapter(
+    `${head("python")}tools:
+  - { name: quick, description: d, function: "fastmod:quick" }
+  - { name: slow, description: d, function: "slowmod:slow" }
+`,
+    {
+      "fastmod.py": "def quick(): return {'ok': True}\n",
+      "slowmod.py": "import time\ntime.sleep(3)\ndef slow(): return {'ok': True}\n",
+    },
+  );
+  const { rt, run } = await start(dir);
+  rt.warm!(true);
+  await new Promise((r) => setTimeout(r, 500));
+  const t0 = Date.now();
+  expect((await run("quick")).ok).toBe(true);
+  expect(Date.now() - t0).toBeLessThan(1500);
+  expect((await run("slow")).ok).toBe(true);
+}, 60000);
+
 test.skipIf(process.platform === "win32")("runProcess returns after the program exits, also if a child keeps the output open", async () => {
   const code = "const c=require('child_process').spawn('sleep',['30'],{stdio:'inherit',detached:true});console.log(c.pid);c.unref();";
   const t0 = Date.now();
