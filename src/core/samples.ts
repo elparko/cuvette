@@ -306,5 +306,6 @@ export function designChecks(rows: SampleRow[], opts: { n?: string; test?: strin
       if (p > 0.05) out.push({ id: "too_few_rank", check: "too_few", level: "warn", text: `With n = ${a} and n = ${b}, the smallest possible two-sided p of the Mann-Whitney test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.` });
     }
   }
-  return out;
+  const flat = (t: string) => t.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
+  return out.map((i) => ({ ...i, text: flat(i.text), ...(i.question ? { question: flat(i.question) } : {}) }));
 }
