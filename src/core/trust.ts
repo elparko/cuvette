@@ -448,9 +448,13 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   const labPath = join(s.folder, LAB_FILE);
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
   if (s.labProblem) out.push(`Cuvette cannot read LAB.md: ${s.labProblem}. Cuvette ignores it. Fix the file, then start the session again.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}. In the app, type /trust on instead.`}`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run in a terminal: cuvette trust add ${shellQuote(s.folder)}. Then start the session again.`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
+}
+
+export function longLabRefusal(s: FolderScan): string {
+  return `Cuvette gives no one-step trust to a LAB.md that is too long for the card. Read the file at ${join(s.folder, LAB_FILE)}. Then run in a terminal: cuvette trust add ${shellQuote(s.folder)}. Then start the session again.`;
 }
 
 export function trustText(t: TrustStatus): string {

@@ -327,6 +327,38 @@ test("a LAB.md that is too long for the card has no one-click trust, and the car
   expect((s["provider"] as FakeProvider).requests.at(-1)!.system).toContain("Rule 150:");
 });
 
+test("on the card for a LAB.md that is too long, no typed answer and no /trust command trusts the folder", async () => {
+  const { s, cwd } = await labSession(longRule(200));
+  const card = await s.askTrust();
+  expect(card?.options.map((o) => o.value)).toEqual(["no"]);
+  for (const typed of ["trust", "once"]) {
+    await s.answer(card!.qid, typed);
+    expect(trustedFolders()).toEqual([]);
+    expect(folderTrusted(cwd)).toBe(false);
+  }
+  for (const choice of ["trust", "once"] as const) {
+    const text = await s.setTrust(choice);
+    expect(text).toContain("Then run in a terminal: cuvette trust add");
+    expect(folderTrusted(cwd)).toBe(false);
+  }
+  expect(s.questions.get(card!.qid)?.status).toBe("open");
+  expect(s.record.entries(["trust"])).toEqual([]);
+  trustFolder(cwd);
+  expect(folderTrusted(cwd)).toBe(true);
+});
+
+test("on the card for a normal LAB.md, a typed trust answer and /trust on still trust the folder", async () => {
+  const { s, cwd } = await labSession(longRule(10));
+  const card = await s.askTrust();
+  expect(card?.options.map((o) => o.value)).toEqual(["trust", "once", "no"]);
+  await s.answer(card!.qid, "trust");
+  expect(folderTrusted(cwd)).toBe(true);
+  await s.setTrust("no");
+  expect(folderTrusted(cwd)).toBe(false);
+  await s.setTrust("trust");
+  expect(folderTrusted(cwd)).toBe(true);
+});
+
 test("a LAB.md over 64 KB is not read, also in a trusted folder, and the card says it is too large", async () => {
   const { s, cwd, provider } = await labSession(`${"x".repeat(70_000)}\n${RULE}`);
   const card = await s.askTrust();
@@ -403,7 +435,7 @@ test("the trust card quotes a folder path with a space, and the trust command do
   writeFileSync(join(cwd, "LAB.md"), longRule(200));
   const scan = scanFolder(cwd);
   const before = folderLines(scan).join("\n");
-  expect(before).toMatch(/Then run: cuvette trust add ".*my data"/);
+  expect(before).toMatch(/Then run in a terminal: cuvette trust add ".*my data"/);
   expect(folderLines(scan, true).join("\n")).not.toContain("Then run");
 });
 

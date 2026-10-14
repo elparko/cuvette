@@ -512,7 +512,7 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a LAB.md 
 test("a LAB.md that is too long for the card says how to trust the folder in the terminal and in the app", () => {
   writeFileSync(join(cwd, "LAB.md"), Array.from({ length: 200 }, (_, i) => `Rule ${i + 1}: use a Welch test.`).join("\n"));
   const lines = folderLines(scanFolder(cwd)).join("\n");
-  expect(lines).toMatch(/Lab rules in LAB\.md: 200 lines, \d+ characters\. This is too long to show here\. Read the file at .*LAB\.md\. Then run: cuvette trust add .*\. In the app, type \/trust on instead\./);
+  expect(lines).toMatch(/Lab rules in LAB\.md: 200 lines, \d+ characters\. This is too long to show here\. Read the file at .*LAB\.md\. Then run in a terminal: cuvette trust add .*\. Then start the session again\./);
 });
 
 test("trusting a folder without a linked folder still runs the SessionStart hook", async () => {
