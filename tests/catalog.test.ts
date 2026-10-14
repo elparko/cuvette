@@ -52,8 +52,10 @@ test("the program check runs once for each adapter in a session", () => {
   expect(adapterIndex(cwd, cache).find((a) => a.name === "stats-here")!.found).toBe("yes");
 });
 
+const withBiostats = (list: ReturnType<typeof adapterIndex>) => list.map((a) => (a.name === "biostats" ? { ...a, found: "yes" as const } : a));
+
 test("the file-type hint names adapters for the files in the request", () => {
-  const list = adapterIndex(cwd);
+  const list = withBiostats(adapterIndex(cwd));
   expect(fileTypeHint("Is drug 2 better? Data: /data/sleep.csv", list, cwd)).toMatch(/sleep\.csv -> [a-z0-9-]+(, [a-z0-9-]+){3}\. .*use_adapter/);
   expect(fileTypeHint("Data: /data/sleep.csv", list, cwd)).toContain("biostats");
   expect(fileTypeHint("Count reads in /data/x.bam and call variants in calls.vcf.gz", list, cwd)).toMatch(/x\.bam -> samtools.*calls\.vcf\.gz -> bcftools/);
@@ -65,7 +67,7 @@ test("the file-type hint names adapters for the files in the request", () => {
 
 test("the file-type hint makes the index only if the request names a file", () => {
   let made = 0;
-  const index = () => (made++, adapterIndex(cwd));
+  const index = () => (made++, withBiostats(adapterIndex(cwd)));
   expect(fileTypeHint("No files here, just a question.", index, cwd)).toBe("");
   expect(made).toBe(0);
   expect(fileTypeHint("Data: /data/sleep.csv", index, cwd)).toContain("biostats");
