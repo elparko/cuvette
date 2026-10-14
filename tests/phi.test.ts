@@ -585,3 +585,35 @@ test("a long line in parts: a hit longer than the overlap that reaches the part 
   expect(line.indexOf("@e.ex") + 5).toBe(4000);
   expect(scanText(line, "f").map((h) => h.value)).toEqual([email]);
 });
+
+test("a CSV cell with a line break does not stop the scan of the rows after it", () => {
+  const csv = 'id,patient name,dob,notes\n1,Jane Doe,1980-01-02,"first\nsecond\nthird"\n2,John Smith,1975-03-04,ok\n3,Mary Jones,1990-05-06,ok\n';
+  const hits = scanContent(csv, "t.csv").filter((h) => h.column);
+  expect(hits.map((h) => h.value).sort()).toEqual(["1975-03-04", "1980-01-02", "1990-05-06", "Jane Doe", "John Smith", "Mary Jones"]);
+  expect(hits.find((h) => h.value === "John Smith")!.line).toBe(5);
+});
+
+test("a long line with many ZIP codes and no date is scanned in linear time", () => {
+  const line = "ZIP 70112 ".repeat(30000);
+  const t0 = Date.now();
+  expect(scanText(line, "f")).toEqual([]);
+  expect(Date.now() - t0).toBeLessThan(5000);
+});
+
+test("the Masker masks 20000 values, and two calls give the same text", () => {
+  const m = new Masker();
+  const names = Array.from({ length: 20000 }, (_, i) => `Pat${String.fromCharCode(97 + (i % 26))}${i.toString(36)} Doe`);
+  m.add(names.map((value) => ({ kind: "name" as const, value, where: "t" })));
+  const text = `${names[0]} met ${names[19999]} and ${names[5000]}x.`;
+  const out = m.text(text);
+  expect(out).toBe(`[NAME 1] met [NAME 20000] and ${names[5000]}x.`);
+  expect(m.text(text)).toBe(out);
+});
+
+test("groupHits of 50000 hits in one group is fast", () => {
+  const hits = Array.from({ length: 50000 }, (_, i) => ({ kind: "name" as const, value: `N${i}`, where: "t", line: i + 1 }));
+  const t0 = Date.now();
+  const g = groupHits(hits);
+  expect(Date.now() - t0).toBeLessThan(1000);
+  expect(g).toHaveLength(1);
+});
