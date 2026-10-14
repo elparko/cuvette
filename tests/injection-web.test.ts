@@ -52,6 +52,11 @@ const cardsFor = (EVIL: string): [string, Card][] => [
   ["plan", planFor(EVIL)],
   ["clarify", { t: "clarify", found: EVIL, qids: ["q1"], skipped: [EVIL], check: EVIL, notes: [EVIL] }],
   ["phi", { t: "phi", rid: "r2", model: EVIL, hits: [{ kind: "name", label: EVIL, masked: EVIL, where: EVIL }], more: 0 }],
+  ["phi local", { t: "phi", rid: "r3", model: EVIL, hits: [{ kind: "name", label: EVIL, masked: EVIL, where: EVIL }], more: 2, local: EVIL }],
+  ["setup", { t: "setup", profiles: [{ name: EVIL, version: 1 }], proposed: { alpha: EVIL }, proposedFrom: EVIL }],
+  ["rewind", { t: "rewind", points: [{ n: 1, kind: "message", entry: 1, upTo: 2, label: EVIL, ts: "2026-01-01T10:00:00Z" }] }],
+  ["programs", { t: "programs", name: EVIL }],
+  ["eln", { t: "eln" }],
 ];
 
 const step = (EVIL: string, extra: Partial<Extract<Item, { t: "step" }>> = {}): Item => ({ key: "s1", t: "step", n: 1, ok: false, tool: EVIL, summary: EVIL, error: EVIL, route: EVIL, settings: EVIL, outputs: [{ n: 1, path: `/tmp/${EVIL.replace(/\//g, "-")}.png`, kind: "image" }, { n: 2, path: `/tmp/${EVIL.replace(/\//g, "-")}.csv`, kind: "file" }], purpose: EVIL, code: EVIL, why: EVIL, ...extra });
