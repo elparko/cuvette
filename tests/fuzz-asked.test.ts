@@ -96,6 +96,22 @@ describe("fuzz: the value gate for setting changes", () => {
     expect(namesValue("Set cells to 5", f, 5, [o])).toBe(true);
   });
 
+  test("a setting name or a value inside a file name or an identifier does not count", () => {
+    const f = NUM[0]!;
+    expect(namesValue("Open min_cells.csv with 5 rows", f, 5)).toBe(false);
+    expect(namesValue("Open data/minimum_cells/run.tsv and use 5", f, 5)).toBe(false);
+    expect(namesValue("Use my_minimum_cells_table 5", f, 5)).toBe(false);
+    expect(namesValue("Set minimum cells to 5", f, 5)).toBe(true);
+    expect(namesValue("Set (minimum cells) to 5.", f, 5)).toBe(true);
+    expect(namesValue("Set minimum_cells to 5", f, 5)).toBe(true);
+    expect(namesValue("Set --minimum-cells to 5", f, 5)).toBe(true);
+    const t = TEXT[0]!;
+    expect(namesValue("Load welch.csv for the test", t, "Welch")).toBe(false);
+    expect(namesValue("Load welch_results for the test", t, "Welch")).toBe(false);
+    expect(namesValue("Set the test to Welch", t, "Welch")).toBe(true);
+    expect(namesValue("Set the test to Welch.", t, "Welch")).toBe(true);
+  });
+
   test("a negation before the value closes the gate", () => {
     const r = new Rng(41003);
     const no = ["Do not", "Don't", "Never", "Please do not", "Dont", "Do NOT", "Do n't", "I do not want you to", "Never ever", "Avoid", "Without"];

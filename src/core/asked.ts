@@ -2,6 +2,8 @@ interface Item {
   w: string;
   num?: number;
   stop?: boolean;
+  head?: boolean;
+  tail?: boolean;
 }
 
 interface Field {
@@ -30,9 +32,12 @@ function items(text: string): Item[] {
   for (const raw of text.toLowerCase().replace(/n['’]t\b/g, " not").split(/\s+|(=)/).filter(Boolean)) {
     const size = out.length;
     const token = raw.replace(/^[("'[]+/, "").replace(/[)"'\],;:!?]+$/, "").replace(/\.$/, "");
-    if (NUMBER.test(token) && !THOUSANDS.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")) });
-    else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w });
-    if (raw === "=") out.push({ w: "=" });
+    if (NUMBER.test(token) && !THOUSANDS.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), head: true, tail: true });
+    else {
+      const parts = raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+      parts.forEach((w, k) => out.push({ w, head: k === 0, tail: k === parts.length - 1 }));
+    }
+    if (raw === "=") out.push({ w: "=", head: true, tail: true });
     if (out.length > size && /[.,;!?][)"'\]]*$/.test(raw)) out.at(-1)!.stop = true;
     if (out.length > size && CLAUSE_END.has(out[size]!.w) && size > 0) out[size - 1]!.stop = true;
   }
@@ -43,7 +48,7 @@ function find(words: Item[], name: string): [number, number][] {
   const parts = name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
   if (!parts.length) return [];
   const hits: [number, number][] = [];
-  for (let i = 0; i + parts.length <= words.length; i++) if (parts.every((p, k) => words[i + k]!.w === p && words[i + k]!.num === undefined)) hits.push([i, i + parts.length - 1]);
+  for (let i = 0; i + parts.length <= words.length; i++) if (words[i]!.head && words[i + parts.length - 1]!.tail && parts.every((p, k) => words[i + k]!.w === p && words[i + k]!.num === undefined)) hits.push([i, i + parts.length - 1]);
   return hits;
 }
 
