@@ -47,7 +47,7 @@ describe.skipIf(!CHROME)("the new app page in headless Chrome", () => {
     page = await openChrome();
     await page.size(1280, 900);
     await page.go(url + "&page=settings");
-    await until(page, `document.querySelector("[data-setting]")`);
+    expect(await until(page, `document.querySelector("[data-setting]")`)).toBe(true);
   }, 90000);
   afterAll(async () => {
     await page?.close();
@@ -94,15 +94,15 @@ describe.skipIf(!CHROME)("the new app page in headless Chrome", () => {
     const row = `document.querySelector('[data-setting="mode"]')`;
     expect(await page.eval(`${row}.querySelector('[data-slot="badge"]').textContent`)).toBe("Project · .cuvette/settings.local.json");
     await page.eval(`[...${row}.querySelectorAll('[role="radio"]')].find((b) => b.textContent === "follow").click()`);
-    await until(page, `${row}.querySelector('[role="group"]')`);
+    expect(await until(page, `${row}.querySelector('[role="group"]')`)).toBe(true);
     expect(await page.eval(`[...${row}.querySelectorAll('[role="group"] button')].map((b) => b.textContent)`)).toEqual(["Me (all projects)", "This project", "Cancel"]);
     await page.eval(`${row}.querySelector('[data-scope="project"]').click()`);
-    await until(page, `document.querySelector('[data-setting="mode"] [role="status"]')`);
+    expect(await until(page, `document.querySelector('[data-setting="mode"] [role="status"]')`)).toBe(true);
     expect(await page.eval(`document.querySelector('[data-setting="mode"] [role="status"]').textContent`)).toContain("Saved for this project. Mode is now follow.");
     expect(JSON.parse(readFileSync(join(proj, ".cuvette", "settings.json"), "utf8"))).toEqual({ mode: "follow" });
     expect(await page.eval(`localStorage.getItem("cuvette.scope.mode")`)).toBe("project");
     await page.eval(`[...document.querySelector('[data-setting="mode"]').querySelectorAll('[role="radio"]')].find((b) => b.textContent === "teach").click()`);
-    await until(page, `document.querySelector('[data-setting="mode"] [data-primary]')`);
+    expect(await until(page, `document.querySelector('[data-setting="mode"] [data-primary]')`)).toBe(true);
     expect(await page.eval(`document.querySelector('[data-setting="mode"] [data-primary]').dataset.scope`)).toBe("project");
   });
 });

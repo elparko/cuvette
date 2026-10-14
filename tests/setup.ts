@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll } from "vitest";
@@ -6,6 +6,7 @@ import { readOldEnv } from "../src/core/old-names.ts";
 
 readOldEnv();
 
-const spendDir = mkdtempSync(join(tmpdir(), "cuvette-spend-"));
-process.env.CUVETTE_SPEND_FILE = join(spendDir, "spend.jsonl");
-afterAll(() => rmSync(spendDir, { recursive: true, force: true }));
+const tempRoot = mkdtempSync(join(realpathSync(tmpdir()), "cuvette-test-"));
+process.env.TMPDIR = tempRoot;
+process.env.CUVETTE_SPEND_FILE = join(tempRoot, "spend.jsonl");
+afterAll(() => rmSync(tempRoot, { recursive: true, force: true, maxRetries: 5 }));

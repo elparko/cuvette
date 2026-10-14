@@ -19,7 +19,7 @@ describe.skipIf(!CHROME)("the step graph page in headless Chrome", () => {
     page = await openChrome();
     await page.size(1280, 900);
     await page.go(win.url);
-    await until(page, `document.querySelectorAll("#canvas button.card").length === 6`);
+    expect(await until(page, `document.querySelectorAll("#canvas button.card").length === 6`)).toBe(true);
   }, 60000);
   afterAll(async () => {
     await page?.close();

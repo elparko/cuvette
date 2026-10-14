@@ -39,7 +39,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     await page.go(url);
     await page.eval(`fetch("api/open?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ folder: ${JSON.stringify(data)} }) })`);
     await page.go(url);
-    await until(page, `document.querySelector("#msg")`);
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
   }, 90000);
   afterAll(async () => {
     await page?.close();
@@ -52,7 +52,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     await page.size(390, 844);
     expect(await page.eval(`${toggle}.getClientRects().length > 0`)).toBe(true);
     await page.eval(`${toggle}.click()`);
-    await until(page, `!document.querySelector('aside[aria-label="Analysis details"]')`);
+    expect(await until(page, `!document.querySelector('aside[aria-label="Analysis details"]')`)).toBe(true);
     expect(await page.eval(`${toggle}.getClientRects().length > 0`)).toBe(true);
     await page.eval(`${toggle}.click()`);
     expect(await until(page, `document.querySelector('aside[aria-label="Analysis details"]')`)).toBe(true);

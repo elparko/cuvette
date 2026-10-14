@@ -605,5 +605,5 @@ describe("the browser app", () => {
     expect(list).toContain('data-prog="obtest"');
     expect(list).toContain('data-prog-act="adapter-update"');
     expect(list).toContain('data-prog-act="adapter-remove"');
-  });
+  }, 180_000);
 });

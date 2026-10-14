@@ -68,7 +68,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.go(url);
     await page.eval(`fetch("api/open?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ folder: ${JSON.stringify(data)} }) })`);
     await page.go(url);
-    await until(page, `document.querySelector("#msg")`);
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
     await page.eval(MOCK);
   }, 90000);
   afterAll(async () => {
@@ -188,9 +188,9 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
 
   test("settings: an arrow key in a radio group selects the next choice and keeps the focus", async () => {
     await goPage("Settings");
-    await until(page, `document.querySelector('[data-setting="mode"]')`);
+    expect(await until(page, `[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].some((b) => b.textContent === "Session")`)).toBe(true);
     await page.eval(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].find((b) => b.textContent === "Session").click()`);
-    await wait(100);
+    expect(await until(page, `document.querySelector('[data-setting="mode"]')`)).toBe(true);
     const row = `document.querySelector('[data-setting="mode"]')`;
     const checked = () => page.eval<string>(`${row}.querySelector('[role="radio"][aria-checked="true"]').textContent`);
     const first = await checked();
@@ -501,7 +501,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
 
   test("settings: Cancel puts back the value that a text box showed before the change", async () => {
     await goPage("Settings");
-    await until(page, `document.querySelector('nav[aria-label="Setting sections"]')`);
+    expect(await until(page, `document.querySelector('nav[aria-label="Setting sections"]')`)).toBe(true);
     await page.eval(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].find((b) => b.textContent === "Outputs").click()`);
     expect(await until(page, `document.querySelector('[data-setting="databook_author"] input')`)).toBe(true);
     await setText('[data-setting="databook_author"] input', "A. Scientist");

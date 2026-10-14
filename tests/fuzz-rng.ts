@@ -43,9 +43,10 @@ export function runs(n: number): number {
 }
 
 export function msFor(f: () => void): number {
-  const t = performance.now();
+  const t = process.cpuUsage();
   f();
-  return performance.now() - t;
+  const d = process.cpuUsage(t);
+  return (d.user + d.system) / 1000;
 }
 
 // Linear growth gives a ratio near 4 for a four times longer input. A quadratic cost gives about 16.
