@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { dropThinking, elideOld, estimateTokens, headText, pointerText, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
+import { rewindPoints } from "../src/core/rewind.ts";
 import { Session } from "../src/core/session.ts";
 import type { Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -327,4 +328,177 @@ test("a provider that numbers its calls again after a summary does not reuse a c
   expect(called).toEqual(ids);
   expect(answered).toEqual(ids);
   await session.close();
+  let m = 0;
+  const again = new FakeProvider({ steps: () => (m++ < 1 ? { calls: [{ name: "read_file", args: { path: file, m } }] } : { text: "done" }) });
+  const stepAgain = again.step.bind(again);
+  again.step = async (req) => {
+    const res = await stepAgain(req);
+    for (const p of res.message.parts) if (p.type === "tool_call") p.id = "call_1";
+    return res;
+  };
+  const resumed = await Session.resume(session.id, { adapters: [], provider: again, cwd, settings: { phi_check: false } as never });
+  await resumed.send("once more");
+  const all = resumed.record.entries(["message"]).flatMap((e) => (e.data.message as unknown as Message).parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
+  expect(all).toEqual([...ids, "call_1-5"]);
+  await resumed.close();
+});
+
+function brokenPairs(messages: Message[]): string[] {
+  const bad: string[] = [];
+  if (messages[0] && messages[0].role !== "user") bad.push("the first message is not from the user");
+  const ids = new Set<string>();
+  messages.forEach((m, i) => {
+    const calls = m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : []));
+    for (const c of calls) {
+      if (ids.has(c)) bad.push(`the call id ${c} comes twice`);
+      ids.add(c);
+    }
+    const next = new Set(messages[i + 1]?.parts.flatMap((p) => (p.type === "tool_result" ? [p.callId] : [])));
+    if (m.role === "assistant") for (const c of calls) if (!next.has(c)) bad.push(`the call ${c} has no result`);
+    const before = new Set(messages[i - 1]?.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
+    for (const p of m.parts) if (p.type === "tool_result" && !before.has(p.callId)) bad.push(`the result ${p.callId} has no call`);
+  });
+  return bad;
+}
+
+test("long sessions with steering, stops, summaries, rewinds and restarts keep every call paired with its result", async () => {
+  const fails: string[] = [];
+  for (let seed = 1; seed <= 12; seed++) {
+    process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-compact-proj-"));
+    let state = seed * 31;
+    const rnd = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+    const files = Array.from({ length: 4 }, (_, i) => {
+      const f = join(cwd, `p${i}.csv`);
+      writeFileSync(f, `well,value\n${Array.from({ length: 100 + Math.floor(rnd() * 300) }, (_, j) => `A${j},${(j * 1.37 + i).toFixed(2)}`).join("\n")}\n`);
+      return f;
+    });
+    let session!: Session;
+    const open = async (resume?: string) => {
+      const provider = new FakeProvider({
+        steps: () => {
+          const x = rnd();
+          if (x < 0.04) session.steer("also check the second group");
+          else if (x < 0.07) session.interrupt();
+          if (x > 0.07 && x < 0.12) return { thinking: "only a thought" };
+          if (x > 0.12 && x < 0.2) return { text: "a short reply" };
+          if (x > 0.2 && x < 0.3) return { text: "done" };
+          return { calls: Array.from({ length: 1 + Math.floor(rnd() * 3) }, () => ({ name: "read_file", args: { path: files[Math.floor(rnd() * 4)] } })) };
+        },
+        complete: "## Question\nsummary",
+      });
+      const options = { adapters: [], provider, cwd, settings: { phi_check: false, maxSteps: 15 } as never };
+      const s = resume ? await Session.resume(resume, options) : await Session.create(options);
+      if (!resume) s.decisions.applySetup({});
+      provider.info.contextWindow = 9000 + Math.floor(rnd() * 20000);
+      return s;
+    };
+    session = await open();
+    const id = session.id;
+    const check = (where: string) => {
+      for (const list of [session["history"], session.record.messages(), ...(session["provider"] as FakeProvider).requests.map((r) => r.messages)]) {
+        const bad = brokenPairs(list);
+        if (bad.length) return void fails.push(`seed ${seed} ${where}: ${bad[0]}`);
+      }
+    };
+    for (let turn = 0; turn < 8; turn++) {
+      await session.send(`turn ${turn}`);
+      check(`after turn ${turn}`);
+      const x = rnd();
+      if (x < 0.2) await session.compact();
+      else if (x < 0.4) {
+        const points = rewindPoints(session.record);
+        if (points.length) session.rewind(points[Math.floor(rnd() * points.length)]!.n);
+      } else if (x < 0.55) {
+        await session.close();
+        session = await open(id);
+      }
+      check(`after the change that follows turn ${turn}`);
+    }
+    await session.close();
+  }
+  expect(fails).toEqual([]);
+}, 120000);
+
+function randomHistory(seed: number): Message[] {
+  let state = seed;
+  const rnd = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  const out: Message[] = [];
+  const bulky: string[] = [];
+  let id = 0;
+  for (let t = 0, turns = 1 + Math.floor(rnd() * 4); t < turns; t++) {
+    out.push(request(`[Notes from the harness]\n- note\n\nrequest ${t} ${"w".repeat(Math.floor(rnd() * 300))}`));
+    for (let s = 0, steps = Math.floor(rnd() * 25); s < steps; s++) {
+      const parts: Message["parts"] = [];
+      if (rnd() < 0.3) parts.push({ type: "thinking", text: "t".repeat(Math.floor(rnd() * 200)) });
+      if (rnd() < 0.4) parts.push({ type: "text", text: "s".repeat(Math.floor(rnd() * 500)) });
+      const ids = Array.from({ length: rnd() < 0.15 ? 0 : 1 + Math.floor(rnd() * 3) }, () => `c${++id}`);
+      for (const c of ids) parts.push({ type: "tool_call", id: c, name: "read_file", args: { path: c } });
+      out.push({ role: "assistant", parts, ...(parts[0]?.type === "thinking" && rnd() < 0.7 ? { raw: [{ type: "thinking", thinking: "x", signature: "sig" }] } : {}) });
+      if (!ids.length) {
+        if (rnd() < 0.8) out.push(request("[Notes from the harness]\n- nudge"));
+        continue;
+      }
+      const results = ids.map((c): Message["parts"][number] => {
+        const kind = rnd();
+        const base = { type: "tool_result" as const, callId: c, name: "read_file" };
+        if (kind < 0.1 && bulky.length) return { ...base, text: pointerText(bulky[Math.floor(rnd() * bulky.length)]!) };
+        if (kind < 0.2) return { ...base, text: "" };
+        if (kind < 0.3) return { ...base, text: " \n\t \n" };
+        if (kind < 0.4) return { ...base, text: "short", images: ["/a.png", "/b.png"] };
+        if (kind < 0.5) return { ...base, text: "ERROR: bad", isError: true };
+        const text = `res ${c}\n${"row,1,2\n".repeat(Math.floor(rnd() * 900))}`;
+        if (text.length > 500) bulky.push(c);
+        return { ...base, text };
+      });
+      if (rnd() < 0.2) results.push({ type: "text", text: "[Notes from the harness]\n- extra" });
+      out.push({ role: "user", parts: results });
+    }
+  }
+  return out;
+}
+
+function danglingPointers(messages: Message[]): string[] {
+  const seen = new Set<string>();
+  const bad: string[] = [];
+  for (const m of messages)
+    for (const p of m.parts) {
+      if (p.type !== "tool_result") continue;
+      const target = /^\[The output is the same as the output of the earlier call (\S+) with/.exec(p.text)?.[1];
+      if (target && !seen.has(target)) bad.push(`the result ${p.callId} points to ${target}, which is not above it`);
+      seen.add(p.callId);
+    }
+  return bad;
+}
+
+test("for random histories, shortening and summarizing keep the pairs, the pointers and the first message, and the estimate never grows", async () => {
+  const provider = new FakeProvider({ steps: [], complete: "sum" });
+  const fails: string[] = [];
+  for (let seed = 1; seed <= 150; seed++) {
+    const h = randomHistory(seed);
+    for (const win of [10, 300, 1500, 5000, 20000]) {
+      const { messages } = elideOld(h, win);
+      const issues = [...brokenPairs(messages), ...danglingPointers(messages)];
+      if (messages.length !== h.length || estimateTokens(messages) > estimateTokens(h) || elideOld(messages, win).elided !== 0) issues.push("the shortening changed the history in a wrong way");
+      const current = h.findLast((m) => m.role === "user" && (m.parts[0] as { text?: string }).text?.includes("request "));
+      const res = await summarizeOld(messages, provider, win, undefined, current && messages.includes(current) ? current : undefined);
+      if (res) issues.push(...brokenPairs([summaryMessage(res.summary), ...(res.request ? [res.request] : []), ...res.kept]), ...danglingPointers(res.kept));
+      if (res?.kept[0] && res.kept[0].role !== "assistant") issues.push("the kept messages do not start with a reply");
+      if (issues.length) fails.push(`seed ${seed} window ${win}: ${issues[0]}`);
+    }
+  }
+  expect(fails).toEqual([]);
+});
+
+test("the estimate does not go down when a text grows", () => {
+  const grow = (n: number): Message[] => [
+    { role: "assistant", parts: [{ type: "thinking", text: "t".repeat(n) }, { type: "text", text: "s".repeat(n) }, { type: "tool_call", id: "a", name: "x", args: { q: "q".repeat(n) } }] },
+    { role: "user", parts: [{ type: "tool_result", callId: "a", name: "x", text: "r".repeat(n), images: ["/a.png"] }] },
+  ];
+  let last = 0;
+  for (let n = 0; n < 4000; n += 7) {
+    const now = estimateTokens(grow(n * 2), "s".repeat(n), []);
+    expect(now).toBeGreaterThanOrEqual(last);
+    last = now;
+  }
 });

@@ -1515,7 +1515,7 @@ export class Session {
 
   private uniqueCallIds(m: Message) {
     if (Array.isArray(m.raw)) return;
-    const used = (this.callIds ??= new Set(this.record.entries(["tool_call"]).map((e) => String(e.data.callId))));
+    const used = (this.callIds ??= new Set(this.record.entries(["message"]).flatMap((e) => (e.data.message as unknown as Message).parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])))));
     for (const p of m.parts) {
       if (p.type !== "tool_call") continue;
       const base = p.id;
