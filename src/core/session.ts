@@ -2231,6 +2231,7 @@ export class Session {
       ? `The harness used the recorded decision${many ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. This result is for the recorded ${many ? "values" : "value"}, not for the ${many ? "values" : "value"} you gave. Do not report it as the result for ${many ? "those values" : "that value"}. To see the result for ${many ? "other values" : "another value"}, call compare_options. To change the record, call propose_change. The scientist owns ${many ? "these values" : "this value"}.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
+    if (this.parentAbandoned(callId)) return error("the call was stopped");
     if (out.node) this.checkPlanned(tool);
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
@@ -2272,9 +2273,9 @@ export class Session {
         workDir: this.workDir,
         sessionDir: this.dir,
         signal,
-        log: (kind, data) => (abandoned ? ({ id: 0, ts: "", session: this.id, kind, data } as Entry) : this.record.append(kind, data)),
+        log: (kind, data) => (abandoned || this.parentAbandoned(callId) ? ({ id: 0, ts: "", session: this.id, kind, data } as Entry) : this.record.append(kind, data)),
         callTool: async (name, a) => {
-          if (abandoned) return { ok: false, error: "the call was stopped" };
+          if (abandoned || this.parentAbandoned(callId)) return { ok: false, error: "the call was stopped" };
           const t = this.findTool(name);
           if (!t) return { ok: false, error: `no tool named ${name}` };
           const id = `${callId}.${++this.callCount}`;

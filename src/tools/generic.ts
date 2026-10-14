@@ -1,4 +1,4 @@
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
@@ -181,8 +181,16 @@ export function genericTools(dirs: Dirs): Tool[] {
         if (guarded(asked, dirs)) return { ok: false, error: `the path ${asked} belongs to the record or to the settings of Cuvette. The agent cannot write there. Write the file in the session folder ${dirs.workDir}.` };
         const target = insideWorkDir(dirs.workDir, name) ?? (dirs.projectDir && isAbsolute(name) ? insideWorkDir(dirs.projectDir, name) : undefined);
         if (!target) return { ok: false, error: `the path is outside the session folder ${dirs.workDir} and the project folder ${project}` };
-        if (existsSync(target) && statSync(target).nlink > 1) return { ok: false, error: `the file ${target} has more than one hard link. The agent cannot write to it. Write a new file in the session folder ${dirs.workDir}.` };
-        writeFileSync(target, String(a.text));
+        const fd = openSync(target, constants.O_WRONLY | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o666);
+        try {
+          const st = fstatSync(fd);
+          if (!st.isFile()) return { ok: false, error: `${target} is not a file` };
+          if (st.nlink > 1) return { ok: false, error: `the file ${target} has more than one hard link. The agent cannot write to it. Write a new file in the session folder ${dirs.workDir}.` };
+          ftruncateSync(fd, 0);
+          writeSync(fd, String(a.text));
+        } finally {
+          closeSync(fd);
+        }
         return { ok: true, summary: `Wrote ${Buffer.byteLength(String(a.text))} bytes to ${target}.`, outputs: [outputFile(target)] };
       },
     }),

@@ -711,8 +711,9 @@ test("a nested call that runs when the outer call is abandoned records no result
   s.interrupt();
   await run;
   await new Promise((r) => setTimeout(r, 300));
-  const ids = s.record.entries(["tool_result"]).map((e) => String(e.data.callId));
-  expect(ids).toEqual(["call_1"]);
+  const done = s.record.entries(["tool_result"]).map((e) => ({ id: String(e.data.callId), error: String(e.data.error) }));
+  expect(done.map((d) => d.id).sort()).toEqual(["call_1", "call_1.1"]);
+  expect(done.find((d) => d.id === "call_1.1")!.error).toBe("the call was stopped");
 });
 
 test("a state tool that returns late after Esc writes nothing to the record", async () => {
@@ -748,7 +749,7 @@ test("a state tool that returns late after Esc writes nothing to the record", as
   release();
   await until(() => lateLog);
   expect(s.record.entries(["note"]).filter((e) => e.data.text === "late state")).toEqual([]);
-  expect(s.record.entries().length).toBeGreaterThanOrEqual(before);
+  expect(s.record.entries().length).toBe(before);
 });
 
 test.skipIf(windows)("a link in the work folder to the settings folder or to the record of another session does not open them", async () => {
@@ -811,8 +812,32 @@ test.skipIf(windows)("killAll stops the group first and kills a child in a new s
   try {
     await killAll(parent.pid);
     await until(() => pids.every((p) => !alive(p)), 20000);
-    expect(process.listenerCount("exit")).toBe(handlers);
+    expect(process.listenerCount("exit")).toBeLessThanOrEqual(handlers + 1);
   } finally {
     for (const p of pids) if (alive(p)) process.kill(p, "SIGKILL");
   }
+});
+
+test.skipIf(windows)("many killAll calls at once add at most one exit handler", async () => {
+  const { killAll } = await import("../src/adapters/kinds/common.ts");
+  await killAll(2147483000);
+  const handlers = process.listenerCount("exit");
+  await Promise.all(Array.from({ length: 15 }, (_, i) => killAll(2147482000 + i)));
+  expect(process.listenerCount("exit")).toBe(handlers);
+});
+
+test("write_file on a folder gives the error of a folder and writes nothing", async () => {
+  const project = mkdtempSync(join(work, "p-"));
+  const workDir = join(project, "out");
+  const sessionDir = join(workDir, ".record");
+  mkdirSync(join(workDir, "sub"), { recursive: true });
+  mkdirSync(sessionDir);
+  const write = genericTools({ workDir, sessionDir, projectDir: project }).find((t) => t.name === "write_file")!;
+  const ctx = { session: "s", callId: "c", workDir, sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
+  const r = await write.execute({ name: "sub", text: "x" }, ctx);
+  expect(r.ok).toBe(false);
+  expect(r.error).toMatch(/EISDIR|is not a file/);
+  expect(await write.execute({ name: "new.txt", text: "first long text" }, ctx)).toMatchObject({ ok: true });
+  expect(await write.execute({ name: "new.txt", text: "short" }, ctx)).toMatchObject({ ok: true });
+  expect(readFileSync(join(workDir, "new.txt"), "utf8")).toBe("short");
 });
