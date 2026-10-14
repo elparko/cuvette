@@ -1,5 +1,5 @@
 const ENT: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-export const noBidi = (v: unknown) => String(v ?? "").replace(/[\u202a-\u202e\u2066-\u2069]/g, "");
+export const noBidi = (v: unknown) => String(v ?? "").replace(/[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "");
 export const esc = (v: unknown) => noBidi(v).replace(/[&<>"']/g, (c) => ENT[c]!);
 
 // A narrow screen shows each row as a block (CSS display: block). The roles keep the table for a screen reader.
