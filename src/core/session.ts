@@ -1267,7 +1267,7 @@ export class Session {
       this.endedBy = "max_steps";
       return "";
     } catch (e) {
-      const msg = signal.aborted && this.cutReply ? "Stopped. The reply above is not complete." : e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
+      const msg = signal.aborted && this.cutReply ? "Stopped. The reply above is not complete." : signal.aborted ? "Stopped." : e instanceof ProviderError ? e.message : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg, warn: true } : { message: msg });
       if (!signal.aborted) this.endedBy = "error";
       this.closeOpenCalls(results);
@@ -1354,6 +1354,7 @@ export class Session {
             compacted = true;
             if (await this.maybeCompact(signal, true)) {
               dropStreamed();
+              allTries += tries;
               this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
               continue;
             }
@@ -1389,6 +1390,7 @@ export class Session {
         allTries = 0;
         if (choice === "stop") throw e;
         if (choice === "local") {
+          compacted = false;
           const problem = await this.useLocalModel("the Claude API could not be reached");
           if (problem) this.record.append("notice", { text: `The local model did not start: ${problem}` });
         }

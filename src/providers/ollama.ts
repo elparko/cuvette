@@ -3,7 +3,7 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
-import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
 
@@ -188,7 +188,7 @@ export class OllamaProvider implements Provider {
     try {
       return await this.retry(() => this.attempt(body, idle), idle.signal, onRetry, budget);
     } catch (e) {
-      if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
+      if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, !noRetry(e));
       throw this.networkError(e, host, idle.signal);
     }
   }
