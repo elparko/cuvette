@@ -1,4 +1,4 @@
-import { existsSync, linkSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -101,4 +101,13 @@ test("the key file is found by its identity: a hard link and a name in other cap
   if (process.platform === "win32") return;
   linkSync(credentialsPath(), join(project, "notes.txt"));
   expect(isCredentialsFile(join(project, "notes.txt"))).toBe(true);
+});
+
+test("a key file that is replaced by a new file inside the cache time is still found by its path", () => {
+  saveClaudeKey(KEY);
+  expect(isCredentialsFile(credentialsPath())).toBe(true);
+  saveClaudeKey(`${KEY}-second`);
+  rmSync(credentialsPath());
+  writeFileSync(credentialsPath(), JSON.stringify({ anthropic_api_key: KEY }));
+  expect(isCredentialsFile(credentialsPath())).toBe(true);
 });

@@ -32,6 +32,7 @@ export function isCredentialsFile(path: string): boolean {
       return resolve(path) === resolve(credentialsPath());
     }
   }
+  if (resolve(path) === cred.real || resolve(path) === resolve(cred.path)) return true;
   try {
     const a = statSync(path, { bigint: true });
     return a.ino !== 0n && a.dev === cred.stat.dev && a.ino === cred.stat.ino;

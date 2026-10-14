@@ -52,7 +52,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { endTrustOnce, labLong, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -2911,6 +2911,7 @@ export class Session {
 
   private async checkTrust(interactive: boolean): Promise<void> {
     const t = trustStatus(this.cwd);
+    if (t.scan.labProblem) this.record.append("notice", { text: `Cuvette could not read LAB.md in ${t.scan.folder}: ${t.scan.labProblem}. It ignores the file.`, warn: true });
     for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");
     if (t.state !== "new" && t.state !== "changed") return;
     this.untrusted = t;
@@ -2927,7 +2928,7 @@ export class Session {
     if (open?.status === "open") return open;
     const t = trustStatus(this.cwd);
     if (t.state === "none") return undefined;
-    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: TRUST_OPTIONS, evidence: trustEvidence(t) });
+    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
     this.trustQid = q.qid;
     this.bus.emit({ type: "question", question: q });
     return q;

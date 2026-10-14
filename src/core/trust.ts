@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
+import { plainText } from "./plain.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
 export const LAB_FILE = "LAB.md";
@@ -31,6 +32,8 @@ export interface FolderScan {
   methods: string[];
   bypass: boolean;
   lab?: string;
+  labBig?: number;
+  labProblem?: string;
 }
 
 export interface TrustEntry {
@@ -123,12 +126,40 @@ function shadows(name: string): string | undefined {
   return undefined;
 }
 
+export const LAB_MAX_BYTES = 64 * 1024;
+export const LAB_CARD_LINES = 60;
+export const LAB_CARD_CHARS = 8000;
+
+function readLab(path: string): { bytes?: Buffer; big?: number; problem?: string } {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    const st = fstatSync(fd);
+    if (!st.isFile()) return {};
+    if (st.size > LAB_MAX_BYTES) return { big: st.size };
+    const buf = Buffer.alloc(st.size);
+    let n = 0;
+    while (n < buf.length) {
+      const got = readSync(fd, buf, n, buf.length - n, n);
+      if (!got) break;
+      n += got;
+    }
+    return { bytes: buf.subarray(0, n) };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return code === "ENOENT" || code === "ELOOP" || code === "ENOTDIR" ? {} : { problem: (e as Error).message };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+export const labLong = (s: FolderScan) => !!s.lab && (s.lab.split("\n").length > LAB_CARD_LINES || s.lab.length > LAB_CARD_CHARS);
+
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  const labPath = join(key, LAB_FILE);
-  const labBytes = existsSync(labPath) && lstatSync(labPath).isFile() ? readFileSync(labPath) : undefined;
+  const { bytes: labBytes, big: labBig, problem: labProblem } = readLab(join(key, LAB_FILE));
   const lab = labBytes ? labBytes.toString("utf8").trim() : "";
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab && !labBig && !labProblem) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
   const methods: string[] = [];
@@ -144,6 +175,7 @@ export function scanFolder(folder: string): FolderScan {
     methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
   }
   if (labBytes) files[LAB_FILE] = sha(labBytes);
+  else if (labBig) files[LAB_FILE] = sha(`too large ${labBig}`);
   for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
@@ -155,10 +187,10 @@ export function scanFolder(folder: string): FolderScan {
       for (const n of readdirSync(dir).sort())
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}) };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}), ...(labBig ? { labBig } : {}), ...(labProblem ? { labProblem } : {}) };
 }
 
-export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0 || !!s.lab;
+export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0 || !!s.lab || !!s.labBig;
 
 function userFile(): string {
   return join(cuvetteHome(), "settings.json");
@@ -268,7 +300,7 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
 }
 
 const show = (v: unknown) => {
-  const t = typeof v === "string" ? v : JSON.stringify(v);
+  const t = plainText(typeof v === "string" ? v : JSON.stringify(v));
   return t.length > 200 ? t.slice(0, 199) + "…" : t;
 };
 
@@ -279,8 +311,12 @@ export function folderLines(s: FolderScan): string[] {
   if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
   if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
   if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
-  if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").slice(0, 8).map((l) => `  ${show(l)}`), ...(s.lab.split("\n").length > 8 ? ["  ..."] : []));
-  return out;
+  const labPath = join(s.folder, LAB_FILE);
+  if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
+  if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}. Then run: cuvette trust add ${s.folder}`);
+  else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
+  return out.map(plainText);
 }
 
 export function trustText(t: TrustStatus): string {
