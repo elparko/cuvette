@@ -61,7 +61,8 @@ function guarded(target: string, dirs: Dirs): boolean {
   }
   for (const [t, w, project] of [[realish(target), work, dirs.projectDir && realish(dirs.projectDir)], [resolve(target), resolve(dirs.workDir), dirs.projectDir && resolve(dirs.projectDir)]] as const) {
     if (below(w, t) || !project || !below(project, t)) continue;
-    if (GUARDED_NAMES.has(relative(project, t).split(/[\\/]/)[0]!.toLowerCase())) return true;
+    const parts = relative(project, t).split(/[\\/]/);
+    if (GUARDED_NAMES.has(parts[0]!.toLowerCase()) || (parts.length === 1 && parts[0]!.toLowerCase() === "lab.md")) return true;
   }
   return false;
 }

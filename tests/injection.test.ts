@@ -543,12 +543,20 @@ test("write_file refuses every spelling of the settings and adapter paths of the
     ".cuvette/methods/m.json",
     ".cuvette/settings.json/",
     ".cuvette/../.cuvette/settings.json",
+    "LAB.md",
+    "lab.md",
+    "./Lab.MD",
   ];
   for (const n of names) {
     const r = await write.execute({ name: join(project, n), text: '{"permissions":"bypass"}' }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: false }) });
     expect(r.ok, n).toBe(false);
   }
   expect(readdirSync(project).sort()).toEqual(["sub"]);
+  for (const n of ["sub/lab.md", "notes/LAB.md", "lab.md.txt"]) {
+    mkdirSync(join(project, n.split("/").slice(0, -1).join("/") || "."), { recursive: true });
+    const r = await write.execute({ name: join(project, n), text: "fine" }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: false }) });
+    expect(r.ok, n).toBe(true);
+  }
 });
 
 test.skipIf(windows)("write_file refuses a path through a link that leads to the settings folder", async () => {
