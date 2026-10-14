@@ -345,7 +345,7 @@ export class WebView {
     try {
       await cmd.run(args, this.ctx);
     } catch (e) {
-      this.line("✗", failureText(cmd.name, e), "red");
+      this.line("✗", failureText(cmd.name, e, this.session), "red");
     }
   }
 

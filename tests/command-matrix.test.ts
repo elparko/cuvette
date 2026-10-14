@@ -258,34 +258,51 @@ describe("the text of the commands", () => {
     const done = runTui(new FakeSession({ delayMs: 0 }), { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
     await until(() => h.all().includes("Type /help for commands."));
     h.type("/Help");
-    await sleep(60);
+    await until(() => h.last().includes("/Help"));
     h.type("\r");
     await until(() => h.all().includes("What it does"));
     h.type("/ ");
-    await sleep(60);
+    await until(() => /\/ ?$/m.test(h.last().trimEnd()) || h.last().includes("/ "));
     h.type("\r");
     await until(() => h.all().includes("Type a command name after the slash."));
-    h.type("\x03");
-    await sleep(20);
-    h.type("\x03");
-    await Promise.race([done, sleep(500)]);
+    h.type("\x03\x03");
+    await done;
   }, 30000);
 
-  test("a command that fails on a bad entry shows plain text with a next step, and a normal failure keeps its text", async () => {
-    expect(failureText("status", new TypeError("Cannot read properties of undefined (reading 'x')"))).toBe("/status failed. Cuvette could not read an entry of the record or a file. Type /export jsonl to save a copy of the record, then report the problem.");
-    expect(failureText("status", new Error("The disk is busy."))).toBe("/status failed: The disk is busy.");
-    const s = new FakeSession({ delayMs: 0 });
-    const view = new WebView(s, { token: "t", env: {}, url: (p) => `http://127.0.0.1:1/${p}`, quit: async () => {} });
-    Object.defineProperty(s, "model", {
-      get() {
-        throw new TypeError("Cannot read properties of undefined (reading 'x')");
-      },
-    });
+  test("a program error shows the short original message and the full error is in the record, in the web view and in the terminal", async () => {
+    const TEXT = "Cannot read properties of undefined (reading 'x')";
+    const s0 = new FakeSession({ delayMs: 0 });
+    const text = failureText("status", new TypeError(TEXT), s0);
+    expect(text).toBe(`/status failed. Cuvette hit a program error: TypeError: ${TEXT}. The full error is in the session record. Type /export jsonl to save a copy of the record, then report the problem.`);
+    const kept = s0.record.entries(["error"]).at(-1)!.data;
+    expect(kept).toMatchObject({ command: "status", name: "TypeError", message: TEXT });
+    expect(String(kept.stack)).toContain("TypeError");
+    expect(failureText("status", new TypeError("y".repeat(500))).length).toBeLessThan(420);
+    expect(failureText("status", new Error("The disk is busy."), s0)).toBe("/status failed: The disk is busy.");
+    expect(s0.record.entries(["error"])).toHaveLength(1);
+
+    const web = new FakeSession({ delayMs: 0 });
+    const view = new WebView(web, { token: "t", env: {}, url: (p) => `http://127.0.0.1:1/${p}`, quit: async () => {} });
+    Object.defineProperty(web, "model", { get: () => { throw new TypeError(TEXT); } });
     await view.runCommand("/model");
-    expect(view.recordHtml()).toContain("Type /export jsonl to save a copy of the record");
-    expect(view.recordHtml()).not.toContain("Cannot read properties");
+    expect(view.recordHtml()).toContain("Cuvette hit a program error: TypeError: Cannot read properties of undefined");
+    expect(view.recordHtml()).not.toContain("at Object");
+    expect(web.record.entries(["error"]).at(-1)!.data).toMatchObject({ command: "model", message: TEXT });
     view.close();
-  });
+
+    const tui = new FakeSession({ delayMs: 0 });
+    const h = makeHarness();
+    const done = runTui(tui, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+    await until(() => h.all().includes("Type /help for commands."));
+    tui.questions.open = () => { throw new TypeError(TEXT); };
+    h.type("/questions");
+    await until(() => h.last().includes("/questions"));
+    h.type("\r");
+    await until(() => h.all().includes("Cuvette hit a program error: TypeError: Cannot read properties"));
+    expect(tui.record.entries(["error"]).at(-1)!.data).toMatchObject({ command: "questions", name: "TypeError", message: TEXT });
+    h.type("\x03\x03");
+    await done;
+  }, 30000);
 
   test("the read-only commands give the same text in the web view and in the command code", async () => {
     const s = await make([count("Otsu"), { text: "Done." }]);

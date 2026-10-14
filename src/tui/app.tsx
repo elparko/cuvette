@@ -320,7 +320,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     try {
       await cmd.run(args, ctx);
     } catch (e) {
-      line("✗", failureText(cmd.name, e), "red");
+      line("✗", failureText(cmd.name, e, session), "red");
     }
   };
 

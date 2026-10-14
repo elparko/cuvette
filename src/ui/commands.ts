@@ -65,8 +65,14 @@ export function parseCommand(text: string): { head: string; args: string[] } {
 
 export const unknownCommand = (head: string) => (head ? `Unknown command /${clip(head, 30)}. Type /help.` : "Type a command name after the slash. Type /help to see the list.");
 
-export function failureText(name: string, e: unknown): string {
-  if (e instanceof TypeError || e instanceof RangeError || e instanceof ReferenceError || e instanceof SyntaxError) return `/${name} failed. Cuvette could not read an entry of the record or a file. Type /export jsonl to save a copy of the record, then report the problem.`;
+export function failureText(name: string, e: unknown, session?: SessionLike): string {
+  if (e instanceof TypeError || e instanceof RangeError || e instanceof ReferenceError || e instanceof SyntaxError) {
+    const short = `${e.name}: ${e.message.slice(0, 200)}`;
+    try {
+      session?.record.append("error", { command: name, name: e.name, message: e.message, stack: e.stack ?? "" });
+    } catch {}
+    return `/${name} failed. Cuvette hit a program error: ${short}. The full error is in the session record. Type /export jsonl to save a copy of the record, then report the problem.`;
+  }
   return `/${name} failed: ${problemOf(e)}`;
 }
 

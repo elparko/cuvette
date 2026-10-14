@@ -235,6 +235,7 @@ export class Mapper {
       case "program":
         return line("⚙", `Programs: ${String(d.text ?? d.action)}`, d.ok === false ? "red" : "cyan");
       case "error":
+        if (d.stack) return [];
         return line("✗", String(d.message ?? d.text ?? "Error"), "red");
       case "usage":
         this.tokens.input += Number(d.inputTokens ?? 0);
