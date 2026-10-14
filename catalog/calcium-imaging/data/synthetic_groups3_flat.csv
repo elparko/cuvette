@@ -1,0 +1,13 @@
+group,animal,field,event_rate_hz
+a,a1,f1,1
+a,a2,f1,2
+a,a3,f1,3
+a,a4,f1,4
+b,b1,f1,2
+b,b2,f1,3
+b,b3,f1,4
+b,b4,f1,5
+c,c1,f1,0
+c,c2,f1,0
+c,c3,f1,0
+c,c4,f1,0
