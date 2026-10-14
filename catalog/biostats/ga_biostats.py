@@ -2,20 +2,8 @@ import os
 import re
 import warnings
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pingouin as pg
-import statsmodels.formula.api as smf
-from lifelines import CoxPHFitter, KaplanMeierFitter
-from lifelines.statistics import logrank_test, multivariate_logrank_test, proportional_hazard_test
-from lifelines.utils import concordance_index
-from scipy import stats
-from statsmodels.duration.hazard_regression import PHReg
-from statsmodels.stats.multitest import multipletests
 
 warnings.filterwarnings("ignore")
 
@@ -163,6 +151,7 @@ def inspect_table(path):
 
 
 def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=None, alternative="two-sided", alpha=0.05, equal_variance=False):
+    from scipy import stats
     frame = _read(path)
     problem = _need(frame, [outcome, group] + ([id_column] if id_column else []))
     if problem:
@@ -217,6 +206,7 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
             name = "Student t-test (equal variances)" if equal_variance else "Welch t-test (unequal variances)"
             statistic, dof = float(res.statistic), float(res.df)
             ci = res.confidence_interval(_ci_level(alpha))
+            import pingouin as pg
             effect = float(pg.compute_effsize(x, y, eftype="cohen"))
             effect_name = "cohen_d"
         else:
@@ -247,6 +237,7 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
 
 
 def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0.05):
+    import pingouin as pg
     posthoc = {"bonferroni": "bonf"}.get(posthoc, posthoc)
     frame = _read(path)
     problem = _need(frame, [outcome, group])
@@ -303,6 +294,7 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
 
 
 def adjust_pvalues(pvalues, method="holm", alpha=0.05):
+    from statsmodels.stats.multitest import multipletests
     p = np.asarray(pvalues, dtype=float)
     reject, adjusted, _, _ = multipletests(p, alpha=alpha, method=method)
     frame = pd.DataFrame({"p_raw": p, "p_adjusted": adjusted, "reject": reject})
@@ -322,6 +314,7 @@ def _coef_table(res, alpha):
 
 
 def fit_ols(path, formula, alpha=0.05, cov_type="nonrobust", cluster=None):
+    import statsmodels.formula.api as smf
     frame = _read(path)
     kwargs = {}
     if cov_type == "cluster":
@@ -345,6 +338,7 @@ def fit_ols(path, formula, alpha=0.05, cov_type="nonrobust", cluster=None):
 
 
 def fit_mixed_model(path, formula, groups, re_formula="1", reml=True, alpha=0.05):
+    import statsmodels.formula.api as smf
     frame = _read(path)
     problem = _need(frame, [groups])
     if problem:
@@ -398,6 +392,11 @@ def _event_problem(series, name):
 
 
 def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None, subset=None):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from lifelines import KaplanMeierFitter
+    from lifelines.statistics import logrank_test, multivariate_logrank_test
     frame = _read(path)
     problem = _need(frame, [duration, event] + ([group] if group else []))
     if problem:
@@ -461,6 +460,10 @@ def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None
 
 
 def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=0.05, categorical=None, reference=None, subset=None):
+    from lifelines import CoxPHFitter
+    from lifelines.statistics import proportional_hazard_test
+    from lifelines.utils import concordance_index
+    from statsmodels.duration.hazard_regression import PHReg
     frame = _read(path)
     covs = _names(covariates)
     strata_cols = _names(strata)
@@ -550,6 +553,7 @@ def _binary_outcome(series, event, name):
 
 
 def fit_logistic(path, outcome, covariates, event=None, categorical=None, reference=None, subset=None, alpha=0.05):
+    from scipy import stats
     import statsmodels.api as sm
     frame = _read(path)
     covs = _names(covariates)
@@ -671,6 +675,7 @@ def _table_frame(table, rows, cols, label="row"):
 
 
 def chi_square_test(path=None, row=None, column=None, counts=None, correction=None, subset=None, alpha=0.05):
+    from scipy import stats
     table, rows, cols, problem, dropped = _contingency(path, row, column, counts, subset)
     if problem:
         return _fail(problem)
@@ -742,6 +747,7 @@ def _fisher_rxc_exact(table, cap):
 
 
 def fisher_exact(path=None, row=None, column=None, counts=None, alternative="two-sided", subset=None, alpha=0.05, seed=1):
+    from scipy import stats
     from scipy.stats.contingency import odds_ratio
     table, rows, cols, problem, dropped = _contingency(path, row, column, counts, subset)
     if problem:
@@ -781,6 +787,7 @@ def fisher_exact(path=None, row=None, column=None, counts=None, alternative="two
 
 
 def mcnemar_test(path=None, first=None, second=None, counts=None, method=None, subset=None, alpha=0.05):
+    from scipy import stats
     from statsmodels.stats.contingency_tables import mcnemar
     if method not in ("exact", "chi-square", "chi-square-corrected"):
         return _fail("method must be exact, chi-square or chi-square-corrected. The decision mcnemar_method sets it.")
