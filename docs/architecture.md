@@ -282,7 +282,7 @@ class HookRunner {
 }
 ```
 
-A `deny` rule or an `ask` rule for `run_command:<name> *` also matches the program with a path, such as `/bin/<name>`. An `allow` rule matches only the name as written.
+A `deny` rule or an `ask` rule for `run_command:<name> *` also matches the program with a path or in other capitals. It also matches the program behind `env`, `command`, `exec`, `nohup`, `sudo` or `xargs`. It does not match `sh -c`, a renamed copy or a script. An `allow` rule matches only the name as written.
 
 Command hooks follow Claude Code. The command gets the input JSON on stdin. Exit 0 with JSON on
 stdout gives the result. Exit 2 gives a deny (PreToolUse) or a block (Stop), with stderr as the
@@ -543,9 +543,9 @@ The harness does not depend on the model to refuse. These rules hold if the mode
 - `Session.answer` trusts a folder only for the question that the harness asked. The model can write a question with the same title.
 - A model proposal for a decision gets a card with the current value as the default. A headless run does not agree to it.
 - The model changes a decision with no card in one case. The scientist asked for a change, and the request names the setting. This works one time for each setting.
-- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder.
+- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder. The trust check reads the file one time, and the prompt uses that text. Cuvette does not read a `LAB.md` that is a link.
 - Text from data goes on one line in the log for the referee, the text for the summary, the data check and the design check. A line break cannot start a fake message.
-- The local providers put a zero-width space in chat template markers, such as `<|im_start|>`, and in `tool_result` tags. A tool result cannot close its wrapper.
-- The terminal app shows all text through `src/tui/text.tsx`, which removes control codes. The web app escapes all text, and `esc` removes text direction controls.
+- The local providers put a zero-width space after the first character of a chat template marker, such as `<|im_start|>` or `[INST]`. In `tool_result`, `tool_call` and `tool_response` tags, they put an underscore after the `<` or `</`. A tool result cannot close its wrapper.
+- The terminal app and the text output of a headless run use `plainText` (`src/core/plain.ts`), which removes control codes. The web app escapes all text, and `esc` removes text direction controls.
 
 Run `npx vitest run tests/injection*.test.ts`. Run the terminal file with `--fileParallelism=false`.

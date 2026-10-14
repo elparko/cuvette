@@ -43,3 +43,18 @@ test("the terminal shows hostile text of the model as plain text and runs none o
   expect(raw).not.toContain("BELL\x07");
   expect(h.term.view()).toContain("y allow");
 });
+
+test("the terminal removes 8-bit control codes", async () => {
+  const h = makeHarness(100, 40);
+  const s = new FakeSession({ delayMs: 0 });
+  const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+  live = { h, done };
+  await until(() => h.all().includes("Type /plan"));
+  s.record.append("assistant", { text: "EIGHT\x9b2J CLIP\x9d52;c;QzFDT1BZ\x9c TITLE\x9d0;pwned\x07 DCS\x90q#0;2\x9c END", final: true });
+  await until(() => h.all().includes("END"));
+  const raw = h.frames.join("");
+  expect(raw).toContain("EIGHT");
+  expect(raw).not.toMatch(/[\x80-\x9f]/);
+  expect(raw).not.toContain("QzFDT1BZ");
+  expect(raw).not.toContain("pwned");
+});
