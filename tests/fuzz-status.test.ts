@@ -233,6 +233,30 @@ describe("fuzz: status and rewind", () => {
   });
 });
 
+describe("rewind and the marks from the disk", () => {
+  const rewindTo = (rec: AnalysisRecord, label: string) => {
+    const p = rewindPoints(rec).find((x) => x.label.endsWith(label))!;
+    rec.append("rewind", { upTo: p.upTo, entry: p.entry, kind: p.kind, point: p.label, nodes: [] });
+  };
+
+  test("a rewind keeps the mark of a changed input file, and clears the mark of a decision change", () => {
+    const rec = new AnalysisRecord(freshDir(), "s");
+    rec.append("user", { text: "one" });
+    const a = rec.addNode(nodeIn(rec, [], ["method"]));
+    const b = rec.addNode(nodeIn(rec, [], []));
+    rec.append("user", { text: "two" });
+    rec.append("stale", { kind: "input", reason: "The input file x changed after this step ran.", nodes: [b.id], direct: [b.id] });
+    rec.markStale("method", "changed");
+    expect(stepStatus(rec).map((s) => s.current)).toEqual([false, false]);
+    rewindTo(rec, "two");
+    expect(rec.stale()).toEqual(new Set([b.id]));
+    const states = stepStatus(rec);
+    expect(states.map((s) => [s.node, s.current])).toEqual([[a.id, true], [b.id, false]]);
+    expect(states[1]!.reasons[0]!.text).toContain("input file x");
+    expect(new AnalysisRecord(rec.dir, "s").stale()).toEqual(new Set([b.id]));
+  });
+});
+
 describe("fuzz: branch", () => {
   test("a branch has the history, the steps and the parents up to the branch point", async () => {
     for (let seed = 1; seed <= runs(3); seed++) {

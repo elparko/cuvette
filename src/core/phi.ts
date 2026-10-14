@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { folderKey } from "./trust.ts";
+import { assertUserFileSound, folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
 
 export type PhiKind = "name" | "birth_date" | "mrn" | "ssn" | "phone" | "email" | "address" | "zip";
@@ -543,6 +543,7 @@ export function folderHasNoPatientData(folder: string): boolean {
 
 export function setFolderNoPatientData(folder: string, on: boolean): void {
   const k = folderKey(folder);
+  assertUserFileSound();
   const data = readUser();
   const list = noPatientDataFolders().filter((x) => x !== k);
   if (on) list.push(k);

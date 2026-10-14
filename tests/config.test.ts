@@ -38,20 +38,28 @@ test("an empty settings file gives the defaults, a file that is not an object st
 });
 
 test("a value of the wrong type gives a note in the session record", async () => {
+  const before = process.env.CUVETTE_HOME;
   const home = (process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-config-home-")));
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-config-"));
-  writeFileSync(join(home, "settings.json"), JSON.stringify({ maxSteps: "ten", mode: "fast", permissions: { Bash: "maybe", run_script: "deny" } }));
-  const notes: string[] = [];
-  const s = loadSettings(cwd, {}, notes);
-  expect(s).toMatchObject({ maxSteps: 40, mode: "watch", permissions: { run_script: "deny" } });
-  expect(notes).toEqual([
-    expect.stringMatching(/settings\.json: maxSteps must be a number above 0, not "ten"\. Cuvette ignores this value\./),
-    expect.stringMatching(/mode must be one of: watch, follow, teach, plan, not "fast"/),
-    expect.stringMatching(/the rule for Bash must be allow, ask or deny, not "maybe"/),
-  ]);
-  const session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd });
-  const recorded = session.record.entries(["notice"]).map((e) => e.data.text);
-  await session.close();
-  expect(recorded).toHaveLength(3);
-  expect(String(recorded[0])).toContain("maxSteps");
+  try {
+    writeFileSync(join(home, "settings.json"), JSON.stringify({ maxSteps: "ten", mode: "fast", permissions: { Bash: "maybe", run_script: "deny" } }));
+    const notes: string[] = [];
+    const s = loadSettings(cwd, {}, notes);
+    expect(s).toMatchObject({ maxSteps: 40, mode: "watch", permissions: { run_script: "deny" } });
+    expect(notes).toEqual([
+      expect.stringMatching(/settings\.json: maxSteps must be a number above 0, not "ten"\. Cuvette ignores this value\./),
+      expect.stringMatching(/mode must be one of: watch, follow, teach, plan, not "fast"/),
+      expect.stringMatching(/the rule for Bash must be allow, ask or deny, not "maybe"/),
+    ]);
+    const session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd });
+    const recorded = session.record.entries(["notice"]).map((e) => String(e.data.text)).filter((t) => /Cuvette ignores/.test(t));
+    await session.close();
+    expect(recorded).toHaveLength(3);
+    expect(recorded[0]).toContain("maxSteps");
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
+    rmSync(home, { recursive: true, force: true });
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });

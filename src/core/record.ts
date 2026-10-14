@@ -327,7 +327,7 @@ export class AnalysisRecord {
 
   stale(): Set<string> {
     if (!this.asideRanges.length) return new Set(this.staleIds);
-    return new Set(this.live(["stale"]).flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
+    return new Set(this.entries(["stale"]).filter((e) => e.data.kind || !this.setAside(e.id)).flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
   }
 
   addEnvironment(lock: EnvLock, name: string): string {

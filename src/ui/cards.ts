@@ -674,9 +674,9 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
     }
     case "setValue": {
       const v = typeof act.value === "string" ? act.value.trim() : act.value;
-      if (st.setIndex < 0) return { state: st };
+      if (st.step !== "setting" || st.setIndex < 0) return { state: st };
       if (v === "" || v === undefined) return to(after);
-      return respond({ action: "set", index: st.setIndex, value: v });
+      return { state: { ...st, step: after, setIndex: -1 }, respond: { action: "set", index: st.setIndex, value: v } };
     }
     case "useProgram": {
       const g = card.programs[st.progIndex ?? -1];

@@ -244,4 +244,15 @@ describe("fuzz: the cards", () => {
       }
     }
   });
+
+  test("a late setValue after the card leaves the setting step sends nothing", () => {
+    const c: PlanCard = { ...plan(new Rng(4)), stage: "pilot", settings: [{ index: 0, step: 1, label: "s", value: 1, options: ["x"] }] };
+    let st = planReduce(c, planInit(c), { a: "item", n: 1 }).state;
+    expect(st.step).toBe("setting");
+    const first = planReduce(c, st, { a: "setValue", value: "x" });
+    expect(first.respond).toEqual({ action: "set", index: 0, value: "x" });
+    expect(planReduce(c, first.state, { a: "setValue", value: "y" }).respond).toBeUndefined();
+    st = planReduce(c, planInit(c), { a: "change" }).state;
+    expect(planReduce(c, st, { a: "setValue", value: "y" }).respond).toBeUndefined();
+  });
 });

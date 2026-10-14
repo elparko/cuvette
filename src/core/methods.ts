@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
@@ -180,6 +180,7 @@ export function listMethods(project?: string): MethodRow[] {
 export function loadMethod(ref: string, project?: string): Method & { path: string; hash: string } {
   const local = project && !ref.endsWith(".json") ? pathOf(ref, projectMethodsDir(project)) : undefined;
   if (local && existsSync(local) && !folderTrusted(project!)) throw new Error(`The method ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
+  if (project && ref.endsWith(".json") && resolve(ref).startsWith(resolve(projectMethodsDir(project)) + sep) && !folderTrusted(project)) throw new Error(`The method file ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
   const path = local && existsSync(local) ? local : ref.endsWith(".json") && existsSync(ref) ? ref : pathOf(ref);
   if (!existsSync(path)) throw new Error(`No method named ${ref}. Type /method in a session, or cuvette method list, to see the list.`);
   const text = readFileSync(path, "utf8");

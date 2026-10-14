@@ -124,7 +124,7 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
     for (const col of [group, unit, batch]) {
       if (col < 0 || col === key) continue;
       const values = [...new Set(idx.map((i) => (t.rows[i]![col] ?? "").trim()).filter((v) => v && !isMissing(v)))];
-      if (values.length > 1) conflicts.push(`${k} has more than one value in '${t.columns[col]}' (${values.slice(0, 4).join(", ")}). The sheet uses ${(t.rows[idx[0]!]![col] ?? "").trim() || values[0]}.`);
+      if (values.length > 1) conflicts.push(`${k} has more than one value in '${t.columns[col]}' (${values.slice(0, 4).join(", ")}). The sheet uses ${(t.rows[idx[0]!]![col] ?? "").trim() || "an empty value"}.`);
     }
   const used = [id >= 0 ? `sample from '${t.columns[id]}'` : "", group >= 0 ? `group from '${t.columns[group]}'` : "", unit >= 0 ? `unit from '${t.columns[unit]}'` : "", batch >= 0 ? `batch from '${t.columns[batch]}'` : ""].filter(Boolean);
   return { source, rows, from: `the table columns (${used.join("; ")})${conflicts.length ? `. ${conflicts.slice(0, 3).join(" ")}${conflicts.length > 3 ? ` ${conflicts.length - 3} more samples have the same problem.` : ""}` : ""}` };

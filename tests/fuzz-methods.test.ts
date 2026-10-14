@@ -4,6 +4,9 @@ import { basename, dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { deleteMethod, exportMethod, fillFromMethod, importMethod, listMethods, loadMethod, methodNote, methodsDir, methodText, readMethod, saveMethod, type Method } from "../src/core/methods.ts";
 import type { AnalysisPlan } from "../src/core/plan.ts";
+import { Session } from "../src/core/session.ts";
+import { FakeProvider } from "../src/providers/fake.ts";
+import { trustFolder } from "../src/core/trust.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-fuzz-methods-"));
@@ -174,5 +177,33 @@ describe("fuzz: methods", () => {
       process.env.CUVETTE_HOME = was;
       chmodSync(home, 0o755);
     }
+  });
+
+  test("a method file in an untrusted project folder is not loaded by its path", () => {
+    const project = join(root, "untrusted-project");
+    const dir = join(project, ".cuvette", "methods");
+    mkdirSync(dir, { recursive: true });
+    const m = method(new Rng(2), "proj");
+    writeFileSync(join(dir, "proj.json"), JSON.stringify(m));
+    expect(() => loadMethod(join(dir, "proj.json"), project)).toThrow(/not trusted/);
+    expect(() => loadMethod("proj", project)).toThrow(/not trusted/);
+    expect(loadMethod(join(dir, "proj.json")).name).toBe("proj");
+    trustFolder(project);
+    expect(loadMethod(join(dir, "proj.json"), project).name).toBe("proj");
+  });
+
+  test("a session that resumes in an untrusted folder skips a project method and says so", async () => {
+    const project = join(root, "resume-project");
+    const dir = join(project, ".cuvette", "methods");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "pm.json"), JSON.stringify(method(new Rng(3), "pm")));
+    const provider = () => new FakeProvider([{ text: "ok" }]);
+    const first = await Session.create({ adapters: [], provider: provider(), cwd: project, trustFolder: true, method: "pm" });
+    const id = first.id;
+    await first.close();
+    const back = await Session.resume(id, { provider: provider(), cwd: project });
+    const notes = back.record.entries(["notice"]).map((e) => String(e.data.text));
+    await back.close();
+    expect(notes.some((t) => /did not load the saved method pm.*not trusted/.test(t))).toBe(true);
   });
 });

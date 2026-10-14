@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DEFAULTS, loadSettings, type Settings } from "../src/core/config.ts";
 import { describe as describeSettings, permissionRules, resolve } from "../src/core/settings.ts";
+import { setFolderNoPatientData } from "../src/core/phi.ts";
 import { trustFolder, untrustFolder } from "../src/core/trust.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
 
@@ -192,5 +193,19 @@ describe("fuzz: the settings layers", () => {
     writeFileSync(file, "");
     trustFolder(cwd);
     expect(JSON.parse(readFileSync(file, "utf8")).trusted_folders).toHaveLength(1);
+  });
+
+  test("a damaged user settings file stays as it is when a folder is marked as free of patient data", () => {
+    const file = join(process.env.CUVETTE_HOME!, "settings.json");
+    const cwd = join(root, "phi-damaged");
+    mkdirSync(cwd, { recursive: true });
+    for (const body of ['{"model": "claude",}', "[1]"]) {
+      writeFileSync(file, body);
+      expect(() => setFolderNoPatientData(cwd, true)).toThrow(/Correct the file, then try again/);
+      expect(readFileSync(file, "utf8")).toBe(body);
+    }
+    writeFileSync(file, "{}");
+    setFolderNoPatientData(cwd, true);
+    expect(JSON.parse(readFileSync(file, "utf8"))).not.toEqual({});
   });
 });

@@ -520,8 +520,10 @@ export class Session {
       const used = this.record.live(["method"]).filter((e) => e.data.action === "started").at(-1);
       if (used)
         try {
-          this.method = loadMethod(String(used.data.path));
-        } catch {}
+          this.method = loadMethod(String(used.data.path), this.cwd);
+        } catch (e) {
+          if (/not trusted/.test((e as Error).message)) this.record.append("notice", { text: `Cuvette did not load the saved method ${String(used.data.name)}: ${(e as Error).message}`, warn: true });
+        }
       this.history = this.record.messages();
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;

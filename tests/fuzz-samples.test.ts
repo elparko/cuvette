@@ -121,6 +121,8 @@ describe("fuzz: the sheet from a table", () => {
     const sheet = sheetFromTable({ columns: ["Animal", "Group"], rows: [["M1", "A"], ["M1", "B"], ["M2", "A"]] }, "/data/t.csv")!;
     expect(sheet.rows.map((s) => [s.sample, s.group])).toEqual([["M1", "A"], ["M2", "A"]]);
     expect(sheet.from).toContain("M1 has more than one value in 'Group' (A, B). The sheet uses A.");
+    const blank = sheetFromTable({ columns: ["Animal", "Group"], rows: [["M1", ""], ["M1", "A"], ["M1", "B"]] }, "/data/t.csv")!;
+    expect(blank.from).toContain("The sheet uses an empty value.");
     expect(sheetFromTable({ columns: ["Animal", "Group"], rows: [["M1", "A"], ["M1", "A"], ["M1", ""]] }, "/data/t.csv")!.from).not.toContain("more than one");
   });
 });

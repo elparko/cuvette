@@ -7,7 +7,7 @@ import { expand, placeholders } from "../adapters/kinds/common.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import { captureEnv, envTarget, packageChanges, type EnvLock } from "./envlock.ts";
 import { stepNumbers } from "./housekeeping.ts";
-import { liveEntries, type AnalysisRecord } from "./record.ts";
+import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
 
 export type ReasonKind = "decision" | "input" | "adapter" | "program" | "environment" | "parent";
@@ -113,7 +113,8 @@ export function recordReasons(record: AnalysisRecord, labels: Record<string, str
     if (!list.some((x) => x.text === r.text)) list.push(r);
     out.set(id, list);
   };
-  for (const e of liveEntries(record, ["stale"])) {
+  for (const e of record.entries(["stale"])) {
+    if (!e.data.kind && record.setAside(e.id)) continue;
     const nodes = (e.data.nodes as string[] | undefined) ?? [];
     if (e.data.kind) {
       for (const id of (e.data.direct as string[] | undefined) ?? nodes) add(id, { kind: e.data.kind as ReasonKind, text: String(e.data.reason) });
