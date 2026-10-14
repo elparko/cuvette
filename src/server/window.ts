@@ -198,24 +198,39 @@ export async function stateOf(session: WindowSession) {
   };
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const parts: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY) {
-        reject(new Error("body too large"));
-        req.destroy();
+        reject(new HttpError(413, "The request body is too large."));
+        parts.length = 0;
       } else parts.push(c);
     });
-    req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
-    req.on("error", reject);
+    req.on("end", () => {
+      try {
+        const text = Buffer.concat(parts).toString("utf8");
+        const body = text ? JSON.parse(text) : {};
+        if (body === null || typeof body !== "object" || Array.isArray(body)) return reject(new HttpError(400, "The request body must be a JSON object."));
+        resolve(body);
+      } catch {
+        reject(new HttpError(400, "The request body is not valid JSON."));
+      }
+    });
+    req.on("error", () => reject(new HttpError(400, "The request body did not arrive.")));
   });
 }
 
-function send(res: ServerResponse, status: number, body: string, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
+function send(res: ServerResponse, status: number, body: string, type = "application/json; charset=utf-8", extra: Record<string, string> = {}) {
+  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", ...extra });
   res.end(body);
 }
 
@@ -243,7 +258,7 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
         }));
       }
       if (req.method === "POST" && url.pathname === "/api/send") {
-        const body = JSON.parse(await readBody(req)) as { text?: string };
+        const body = (await readBody(req)) as { text?: string };
         const text = typeof body.text === "string" ? body.text.trim() : "";
         if (!text) return send(res, 400, '{"error":"text is empty"}');
         if (session.busy) return send(res, 409, '{"error":"the agent is busy"}');
@@ -251,21 +266,21 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
         return send(res, 200, '{"ok":true}');
       }
       if (req.method === "POST" && url.pathname === "/api/permission") {
-        const body = JSON.parse(await readBody(req)) as { rid?: string; ok?: boolean; note?: string; always?: boolean };
+        const body = (await readBody(req)) as { rid?: string; ok?: boolean; note?: string; always?: boolean };
         if (typeof body.rid !== "string" || !permissions.has(body.rid)) return send(res, 404, '{"error":"no such permission request"}');
         session.respondPermission(body.rid, Boolean(body.ok), body.note ?? "", Boolean(body.always));
         permissions.delete(body.rid);
         return send(res, 200, '{"ok":true}');
       }
       if (req.method === "POST" && url.pathname === "/api/follow") {
-        const body = JSON.parse(await readBody(req)) as { step?: number; note?: string; agentDoes?: boolean };
+        const body = (await readBody(req)) as { step?: number; note?: string; agentDoes?: boolean };
         if (typeof body.step !== "number" || !instructions.has(body.step)) return send(res, 404, '{"error":"no such step"}');
         instructions.delete(body.step);
         await session.followDone(body.step, body.note ?? "", Boolean(body.agentDoes));
         return send(res, 200, '{"ok":true}');
       }
       if (req.method === "POST" && url.pathname === "/api/mode") {
-        const body = JSON.parse(await readBody(req)) as { mode?: string };
+        const body = (await readBody(req)) as { mode?: string };
         if (!body.mode || !MODES.has(body.mode)) return send(res, 400, '{"error":"unknown mode"}');
         session.setMode(body.mode as Mode);
         return send(res, 200, '{"ok":true}');
@@ -289,7 +304,7 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/answer") {
-        const body = JSON.parse(await readBody(req)) as { qid?: string; value?: unknown; note?: string };
+        const body = (await readBody(req)) as { qid?: string; value?: unknown; note?: string };
         if (typeof body.qid !== "string" || !session.questions.open().some((q) => q.qid === body.qid)) {
           return send(res, 404, '{"error":"no open question with that id"}');
         }
@@ -298,7 +313,9 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
       }
       send(res, 404, '{"error":"not found"}');
     } catch (e) {
-      send(res, 400, JSON.stringify({ error: (e as Error).message }));
+      if (res.headersSent) return void res.destroy();
+      const big = e instanceof HttpError && e.status === 413;
+      send(res, e instanceof HttpError ? e.status : 400, JSON.stringify({ error: (e as Error).message }), undefined, big ? { connection: "close" } : {});
     }
   };
 
@@ -308,10 +325,10 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
     else if (e.type === "entry" && e.entry.kind === "permission") permissions.delete(String(e.entry.data.rid));
     else if (e.type === "entry" && e.entry.kind === "follow_step" && e.entry.data.status !== "waiting") instructions.delete(Number(e.entry.data.step));
     const data = `data: ${JSON.stringify(e)}\n\n`;
-    for (const c of clients) c.write(data);
+    for (const c of clients) push(c, data);
   });
   const beat = setInterval(() => {
-    for (const c of clients) c.write(": keep-alive\n\n");
+    for (const c of clients) push(c, ": keep-alive\n\n");
   }, 20000);
   beat.unref();
   return {
@@ -322,6 +339,13 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
       for (const c of clients) c.end();
     },
   };
+}
+
+const STALLED_BYTES = 4 * 1024 * 1024;
+
+export function push(res: ServerResponse, data: string): void {
+  if (res.writableLength > STALLED_BYTES) res.destroy();
+  else res.write(data);
 }
 
 export const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox", "referrer-policy": "no-referrer" };
@@ -366,7 +390,12 @@ export async function startWindow(
     const host = req.headers.host ?? "";
     if (!hostAllowed(host, port)) return send(res, 403, '{"error":"bad host"}');
     if (req.headers.origin && req.headers.origin !== `http://${host}`) return send(res, 403, '{"error":"bad origin"}');
-    const url = new URL(req.url ?? "/", `http://${host}`);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", `http://${host}`);
+    } catch {
+      return send(res, 400, '{"error":"bad request"}');
+    }
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
     if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return send(res, 401, '{"error":"missing or wrong token"}');
     await routes.handle(req, res, url);
