@@ -292,7 +292,15 @@ export function startPython(c: KindContext): AdapterRuntime {
         } catch {}
         const p = child;
         child = undefined;
-        setTimeout(() => killTree(p.pid), 500).unref();
+        await new Promise<void>((done) => {
+          if (p.exitCode !== null || p.signalCode !== null) return done();
+          const timer = setTimeout(() => {
+            killTree(p.pid);
+            const last = setTimeout(done, 1000);
+            p.once("close", () => (clearTimeout(last), done()));
+          }, 2000);
+          p.once("close", () => (clearTimeout(timer), done()));
+        });
       }
       log?.end();
     },

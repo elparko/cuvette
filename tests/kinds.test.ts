@@ -580,3 +580,31 @@ map:
   await tool.execute({ target: join(other, "evil.txt") }, ctx(out, dirs.sessionDir));
   expect(existsSync(join(other, "evil.txt"))).toBe(false);
 });
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+test("after close() resolves, the python worker is gone, also if it is busy", async () => {
+  const dir = adapter(`${head("python", "  call_timeout_s: 60\n")}tools:
+  - { name: pid, description: d, function: "m:pid" }
+  - { name: hang, description: d, function: "m:hang" }
+`, { "m.py": "import os, time\ndef pid():\n    return {'metrics': {'pid': os.getpid()}}\ndef hang():\n    time.sleep(120)\n" });
+  for (const busy of [false, true]) {
+    const n = ++counter;
+    const dirs = { workDir: join(root, `work${n}`), sessionDir: join(root, `session${n}`) };
+    const rt = await startAdapter(loadAdapter(dir), dirs);
+    const tools = Object.fromEntries((await rt.tools()).map((t) => [t.name, t]));
+    const first = await tools.pid!.execute({}, ctx(dirs.workDir, dirs.sessionDir));
+    const pid = Number((first.metrics as Record<string, number>).pid);
+    expect(alive(pid)).toBe(true);
+    if (busy) void tools.hang!.execute({}, ctx(dirs.workDir, dirs.sessionDir)).catch(() => undefined);
+    await rt.close();
+    expect(alive(pid)).toBe(false);
+  }
+}, 60_000);
