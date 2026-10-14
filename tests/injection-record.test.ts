@@ -224,7 +224,7 @@ test("a column name or a group label with a line break cannot start a line of it
 });
 
 test("a long column name is shown whole, and a name with a line break is shown with its escape codes", () => {
-  const long = "z".repeat(500);
+  const long = "z".repeat(150);
   const rows = Array.from({ length: 6 }, (_, i) => [String(i), ""]);
   const text = dataCheckText(checkTable({ columns: ["id", long], rows }, "data.csv"));
   expect(text).toContain(`'${long}'`);
@@ -354,4 +354,19 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("an unread
   session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { askWaits: false, autoResume: false } });
   expect(session.record.entries(["notice"]).some((e) => /could not read LAB\.md/.test(String(e.data.text)))).toBe(true);
   chmodSync(join(cwd, "LAB.md"), 0o600);
+});
+
+test("a header of 10000 characters is cut at 200 characters with its length, and many duplicate names are listed in short form", () => {
+  const huge = "h".repeat(10_000);
+  const rows = Array.from({ length: 6 }, (_, i) => [String(i), "", "1"]);
+  const text = dataCheckText(checkTable({ columns: ["id", huge, "it's"], rows }, "data.csv"));
+  expect(text).toContain(`'${"h".repeat(200)}' (10000 characters)`);
+  expect(text).not.toContain("h".repeat(201));
+  expect(text.length).toBeLessThan(3000);
+  const names = Array.from({ length: 40 }, (_, i) => `col${i}`);
+  const dup = dataCheckText(checkTable({ columns: ["id", ...names, ...names], rows: [Array(81).fill("1"), Array(81).fill("2"), Array(81).fill("3")] }, "data.csv"));
+  expect(dup).toContain("and 36 more");
+  expect(dup).not.toContain("col39");
+  const q = dataCheckText(checkTable({ columns: ["id", "it's", "x"], rows }, "data.csv"));
+  expect(q).toContain('"it\'s"');
 });
