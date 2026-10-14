@@ -287,7 +287,7 @@ test("quick start: a stop while the version command runs ends the call at once, 
   }
 }, 30000);
 
-function warmPythonAdapter(importS: number, interpreter = 'exec python3 "$@"'): string {
+function warmPythonAdapter(importS: number, interpreter = 'exec python3 "$@"', connectionExtra = "", startupS = 10): string {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-warmpy-"));
   const exe = join(dir, "python");
   writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) echo "openpyxl 9.9";; *) ${interpreter};; esac\n`);
@@ -301,7 +301,7 @@ function warmPythonAdapter(importS: number, interpreter = 'exec python3 "$@"'): 
     [
       "adapter: { name: warmpy }",
       'program: { name: openpyxl, version: "from the manifest" }',
-      'connection: { kind: python, interpreter: ["{program_path}"], startup_timeout_s: 10 }',
+      `connection: { kind: python, interpreter: ["{program_path}"], startup_timeout_s: ${startupS}${connectionExtra} }`,
       "locate:",
       `  paths: [${JSON.stringify(exe)}]`,
       '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
@@ -333,7 +333,7 @@ const alive = (pid: number) => {
   }
 };
 
-async function quickStart(dir: string) {
+async function quickStart(dir: string, signal?: AbortSignal) {
   const home = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
   const d = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
@@ -342,7 +342,7 @@ async function quickStart(dir: string) {
   if (home === undefined) delete process.env.CUVETTE_HOME;
   else process.env.CUVETTE_HOME = home;
   const tool = (await rt.tools()).find((t) => t.name === "pid")!;
-  return { rt, call: () => tool.execute({}, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir }) };
+  return { rt, call: () => tool.execute({}, { ...ctx(signal), workDir: d.workDir, sessionDir: d.sessionDir }) };
 }
 
 test("warm: the worker starts and imports the adapter modules before the first call, and the call uses that worker", async () => {
@@ -396,4 +396,50 @@ test("warm: a close before the worker starts starts no worker", async () => {
   rt.warm!(true);
   await new Promise((r) => setTimeout(r, 500));
   expect(existsSync(join(dir, "imported"))).toBe(false);
+}, 20000);
+
+test("warm: a call that Esc stops while the worker imports the modules returns at once and does not signal the worker", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(3);
+  const ac = new AbortController();
+  const { rt, call } = await quickStart(dir, ac.signal);
+  rt.warm!(true);
+  await until(() => existsSync(join(dir, "imported")));
+  const t0 = Date.now();
+  const p = call();
+  setTimeout(() => ac.abort(), 300);
+  const out = await p;
+  expect(out.ok).toBe(false);
+  expect(out.error).toMatch(/interrupted/);
+  expect(Date.now() - t0).toBeLessThan(1500);
+  await rt.close();
+}, 20000);
+
+test("warm: the call timeout starts after the modules are imported", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(2.5, 'exec python3 "$@"', ", call_timeout_s: 1");
+  const { rt, call } = await quickStart(dir);
+  rt.warm!(true);
+  await until(() => existsSync(join(dir, "imported")));
+  await new Promise((r) => setTimeout(r, 300));
+  const out = await call();
+  expect(out.ok).toBe(true);
+  await rt.close();
+}, 20000);
+
+test("start: the start timer does not kill a process id after the worker has stopped", async () => {
+  if (process.platform === "win32") return;
+  const { vi } = await import("vitest");
+  const { rt, call } = await quickStart(warmPythonAdapter(0, "exit 3", "", 1));
+  await new Promise((r) => setTimeout(r, 800));
+  const kill = vi.spyOn(process, "kill");
+  try {
+    const out = await call();
+    expect(out.ok).toBe(false);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(kill.mock.calls.filter((a) => a[1] === "SIGKILL")).toEqual([]);
+  } finally {
+    kill.mockRestore();
+    await rt.close();
+  }
 }, 20000);

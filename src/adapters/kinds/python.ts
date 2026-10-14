@@ -54,6 +54,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let spawnedWith = "";
   let closed = false;
   let warming: { error?: unknown } | undefined;
+  let preloading: Promise<unknown> | undefined;
 
   const interpreter = (): string[] => {
     const given = conn.interpreter.map((a) => expand(a, c.ph));
@@ -65,6 +66,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     waiting.clear();
     child = undefined;
     ready = undefined;
+    preloading = undefined;
   };
 
   const spawnWorker = (): Promise<void> => {
@@ -87,11 +89,14 @@ export function startPython(c: KindContext): AdapterRuntime {
     p.stdin?.on("error", () => {});
     return new Promise((ok, fail) => {
       let started = false;
+      let startTimer: NodeJS.Timeout | undefined;
       p.on("error", (e) => {
+        clearTimeout(startTimer);
         if (child === p) stopped(e.message);
         if (!started) fail(new Error(`cannot start ${argv[0]}: ${e.message}`));
       });
       p.on("close", (code, sig) => {
+        clearTimeout(startTimer);
         if (child !== p) return;
         const reason = `${sig ? `signal ${sig}` : `exit code ${code}`}${stderrTail.trim() ? `: ${tail(stderrTail.trim(), 600)}` : ""}`;
         stopped(reason);
@@ -107,13 +112,14 @@ export function startPython(c: KindContext): AdapterRuntime {
         if (!msg || typeof msg !== "object") return;
         if (msg.ready) {
           started = true;
+          clearTimeout(startTimer);
           ok();
         } else if (msg.id !== undefined) {
           waiting.get(msg.id)?.(msg);
           waiting.delete(msg.id);
         }
       });
-      setTimeout(() => {
+      startTimer = setTimeout(() => {
         if (!started) {
           killTree(p.pid);
           fail(new Error(`the Python worker did not start within ${conn.startup_timeout_s} s`));
@@ -160,6 +166,11 @@ export function startPython(c: KindContext): AdapterRuntime {
     started.catch((e) => {
       if (!closed) w.error = e;
     });
+    const settled = started.then(() => undefined, () => undefined);
+    preloading = settled;
+    settled.then(() => {
+      if (preloading === settled) preloading = undefined;
+    });
   };
 
   const send = (msg: Record<string, unknown>): Promise<Reply> => {
@@ -177,6 +188,8 @@ export function startPython(c: KindContext): AdapterRuntime {
       const started = ensure();
       started.catch(() => {});
       await Promise.race([started, stopped]);
+      if (signal.aborted) return cut;
+      if (preloading) await Promise.race([preloading, stopped]);
       if (signal.aborted) return cut;
       const id = nextId;
       const reply = send({ function: fn, args, out_dir: outDir });
