@@ -432,7 +432,9 @@ const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replac
 
 const show = (v: unknown) => {
   const t = plainText(typeof v === "string" ? v : JSON.stringify(v));
-  return t.length > 200 ? t.slice(0, 199) + "…" : t;
+  if (t.length <= 200) return t;
+  const cut = /[\ud800-\udbff]/.test(t[198]!) ? 198 : 199;
+  return t.slice(0, cut) + "…";
 };
 
 export function folderLines(s: FolderScan, trusted = false): string[] {

@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -395,6 +395,19 @@ test("a .cache folder that is not directly in node_modules, and the code folders
     }
     expect(trustStatus(p.root).state, folder).toBe("changed");
     cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+  }
+});
+
+test("a long setting value is cut between characters, not inside a surrogate pair", () => {
+  const dir = join(realpathSync(cwd), ".cuvette");
+  mkdirSync(dir, { recursive: true });
+  for (const pad of [198, 199]) {
+    writeFileSync(join(dir, "settings.json"), JSON.stringify({ model: `${"a".repeat(pad)}😀${"b".repeat(20)}` }));
+    const scan = scanFolder(realpathSync(cwd));
+    const line = folderLines(scan).find((l) => l.includes("model"))!;
+    expect(line, JSON.stringify(scan.keys)).toBeDefined();
+    expect(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(line), String(pad)).toBe(false);
+    expect(line.endsWith("…")).toBe(true);
   }
 });
 
