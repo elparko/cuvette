@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
@@ -17,6 +17,11 @@ export function isCredentialsFile(path: string): boolean {
       return resolve(p);
     }
   };
+  try {
+    const a = statSync(path, { bigint: true });
+    const b = statSync(credentialsPath(), { bigint: true });
+    if (a.ino !== 0n && a.dev === b.dev && a.ino === b.ino) return true;
+  } catch {}
   return real(path) === real(credentialsPath());
 }
 
