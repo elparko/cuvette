@@ -159,7 +159,7 @@ tools:
     title: Find and integrate the peaks
     description: >
       Find peaks in a chromatogram and give the retention time and the area of each one. It fits a skew-normal
-      peak to each window, so it separates peaks that overlap. The area is the summed signal, not the signal times time.
+      peak to each window, so it separates peaks that overlap. The area column is the summed signal. The area_signal_time column is the area times the time step, in signal times time, as a data system reports it.
     function: "ga_chromatography:integrate_peaks"
     params:
       path: { type: string, minLength: 1, description: Absolute path of the exported table. }
@@ -276,7 +276,7 @@ map:
       - { arg: end, label: peak end }
       - { arg: baseline_points, label: baseline start and end }
     fidelity: close
-    difference: "The trapezoid area is in signal times time. A data system usually reports the summed signal, which is this value divided by the sampling step. checks/area_units.py shows both."
+    difference: "The trapezoid area is in signal times time. A data system reports signal times time, like this value. integrate_peaks gives the summed signal, which is this value divided by the sampling step, and the column area_signal_time. checks/area_units.py shows both."
     evidence: { source: code, test: trapezoid-area }
 
   - tool: calibration_curve
