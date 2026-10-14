@@ -440,7 +440,7 @@ export class Session {
 
   private async init(opts: SessionOptions) {
     const resumed = this.record.entries(["session"]).length > 0;
-    if (resumed) this.record.repairTail();
+    const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
@@ -561,8 +561,11 @@ export class Session {
       const said = (text: string) => this.record.entries(["notice"]).some((n) => n.data.text === text);
       const kindsText = unknown.length ? `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}. This version does not know them. Cuvette keeps them in the file as they are.` : "";
       if (kindsText && !said(kindsText)) this.record.append("notice", { text: kindsText, warn: true });
+      const cutText = "The last line of the record was cut when the app stopped. Cuvette keeps the line in the file as it is.";
+      const earlierCuts = this.record.entries(["notice"]).filter((n) => n.data.text === cutText).length;
+      if (cutLine) this.record.append("notice", { text: cutText, warn: true });
       const linesText = "Some lines of the record are in a form that this version of Cuvette cannot read. Cuvette keeps them in the file as they are.";
-      if (this.record.skipped && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
+      if (this.record.skipped > earlierCuts && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;

@@ -1080,3 +1080,19 @@ test.skipIf(process.platform === "win32")("the credentials file has mode 0600 af
   expect(mode()).toBe(0o600);
   expect(readdirSync(join(root, "home")).filter((n) => n.endsWith(".tmp"))).toEqual([]);
 });
+
+test("a cut last line gives one notice about the stop, and the next resume does not call it unreadable", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  truncateSync(file, readFileSync(file).length - 30);
+  const text = (s: Session) => s.record.entries(["notice"]).map((n) => String(n.data.text));
+  const a = await resume(first!.id);
+  expect(text(a).filter((t) => t.includes("was cut when the app stopped")).length).toBe(1);
+  expect(text(a).some((t) => t.includes("cannot read"))).toBe(false);
+  await a.close();
+  open.splice(open.indexOf(a), 1);
+  const b = await resume(first!.id);
+  expect(text(b).filter((t) => t.includes("was cut when the app stopped")).length).toBe(1);
+  expect(text(b).some((t) => t.includes("cannot read"))).toBe(false);
+});
