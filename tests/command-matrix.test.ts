@@ -552,9 +552,15 @@ describe("with no network", () => {
     const s = await make([{ text: "ok" }]);
     const me = s as unknown as SessionLike;
     expect(texts(await run(me, "/eln push"), ["error"])[0]).toBe("eLabFTW has no saved address or key. Run `cuvette eln setup` or /eln setup.");
-    saveElabftw("http://127.0.0.1:1", "1-" + "a".repeat(40));
+    const spare = createServer();
+    await new Promise<void>((r) => spare.listen(0, "127.0.0.1", r));
+    const closed = (spare.address() as { port: number }).port;
+    await new Promise<void>((r) => spare.close(() => r()));
+    saveElabftw(`http://127.0.0.1:${closed}`, "1-" + "a".repeat(40));
     const down = texts(await run(me, "/eln link 3"), ["error"])[0]!;
-    expect(down).toContain("Cuvette cannot reach the eLabFTW server http://127.0.0.1:1.");
+    expect(down).toContain(`Cuvette cannot reach the eLabFTW server http://127.0.0.1:${closed}. The server is not reachable (ECONNREFUSED).`);
+    saveElabftw("https://no-such-host.invalid", "1-" + "a".repeat(40));
+    expect(texts(await run(me, "/eln link 3"), ["error"])[0]).toMatch(/server https:\/\/no-such-host\.invalid\. The server is not reachable \((ENOTFOUND|EAI_AGAIN)\)\./);
     expect(down).toContain("Type /eln status");
     saveElabftw(`http://127.0.0.1:${port}/html`, "1-" + "a".repeat(40));
     const odd = texts(await run(me, "/eln link 3"), ["error"])[0]!;

@@ -66,8 +66,11 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
       headers["Content-Type"] = "application/json";
       payload = JSON.stringify(body);
     }
-    const res = await fetchImpl(root + path, { method, headers, body: payload }).catch(() => {
-      throw new ElabftwError(`Cuvette cannot reach the eLabFTW server ${baseUrl(cfg.url)}. Check the network and the address. Type /eln status to see the address.`, 0);
+    const res = await fetchImpl(root + path, { method, headers, body: payload }).catch((e: { cause?: { code?: string; message?: string; errors?: { code?: string }[] } }) => {
+      const code = e?.cause?.code ?? e?.cause?.errors?.[0]?.code;
+      const tls = code && /CERT|SSL|TLS|ISSUER|SELF_SIGNED/i.test(code) && e?.cause?.message ? ` ${e.cause.message.replace(/\.?$/, ".")}` : "";
+      const why = code ? ` The server is not reachable (${code}).${tls}` : " The server is not reachable.";
+      throw new ElabftwError(`Cuvette cannot reach the eLabFTW server ${baseUrl(cfg.url)}.${why} Check the network and the address. Type /eln status to see the address.`, 0);
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
