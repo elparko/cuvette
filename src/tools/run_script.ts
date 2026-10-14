@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { harnessWrites } from "../core/harness-writes.ts";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
@@ -237,6 +238,7 @@ export function recordFolders(dirs: Dirs): string[] {
   return both(found);
 }
 
+const INDEX_NAME = /^sessions-index\.json(?:\.(?:bak|damaged-.+))?$/;
 const OPEN_PARTS = ["adapters", "methods", "skills"];
 const SETTINGS_NAMES = ["settings.json", "settings.local.json"];
 
@@ -259,7 +261,7 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   for (const home of homes.filter((h) => inside(h) || h === realish(cuvetteHome()))) {
     let index: string[] = [];
     try {
-      index = readdirSync(home).filter((f) => f.startsWith("sessions-index.json")).map((f) => join(home, f));
+      index = readdirSync(home).filter((f) => INDEX_NAME.test(f)).map((f) => join(home, f));
     } catch {}
     const files = [...SETTINGS_NAMES.map((f) => join(home, f)), join(home, "sessions-index.json"), ...index];
     out.locked.push(...files, ...(inside(home) ? [join(home, "sessions")] : []));
@@ -281,9 +283,23 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   return out;
 }
 
+function holdsRecord(dir: string): boolean {
+  return existsSync(join(dir, "log.jsonl")) || existsSync(join(dir, "meta.json"));
+}
+
+// An output folder that is not the work folder opens only if it holds no record, no settings and no code.
+function outputOpens(dirs: Dirs, scope: SettingsScope): boolean {
+  const out = dirs.outputDir;
+  if (!out || both([out]).some((x) => both([dirs.workDir]).includes(x))) return false;
+  const mine = both([dirs.sessionDir]);
+  const others = recordFolders(dirs).filter((r) => !mine.includes(r));
+  const sealed = [...scope.locked, ...others, ...(basename(dirs.sessionDir) === ".record" ? mine : [])];
+  return !both([out]).some((x) => sealed.some((l) => within(x, l)) || x.split(/[\\/]/).includes(".record") || holdsRecord(x));
+}
+
 export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
-  const own = [dirs.workDir, ...(dirs.outputDir ? [dirs.outputDir] : [])];
+  const own = [dirs.workDir, ...(outputOpens(dirs, scope) ? [dirs.outputDir!] : [])];
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both(own).includes(p));
   const keep = both(own);
   const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
@@ -392,26 +408,36 @@ function fileHash(path: string): string {
   }
 }
 
+export function logFingerprint(dirs: Dirs): { changed(): string[] } {
+  const logPath = () => join(dirs.sessionDir, "log.jsonl");
+  const logSize = existsSync(logPath()) ? statSync(logPath()).size : 0;
+  const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
+  return {
+    changed() {
+      const log = logPath();
+      if (!logSize) return [];
+      return !existsSync(log) || statSync(log).size < logSize || hashBytes(log, 0, logSize) !== logHash ? [log] : [];
+    },
+  };
+}
+
+// A change of a settings file or an index file does not count if the harness wrote one of these files while the fingerprint was open.
 export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
   const scope = settingsScope(dirs);
+  const writes = harnessWrites();
   const settingsNow = () => {
     const out = new Map<string, string>();
     for (const p of scope.files) out.set(p, fileHash(p));
     return out;
   };
   const settings = settingsNow();
-  const logPath = () => join(dirs.sessionDir, "log.jsonl");
-  const logSize = withLog && existsSync(logPath()) ? statSync(logPath()).size : 0;
-  const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
+  const log = withLog ? logFingerprint(dirs) : undefined;
   return {
     changed() {
       const out: string[] = [];
       const now = settingsNow();
-      for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
-      const log = logPath();
-      if (logSize) {
-        if (!existsSync(log) || statSync(log).size < logSize || hashBytes(log, 0, logSize) !== logHash) out.push(log);
-      }
+      if (harnessWrites() === writes) for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
+      out.push(...(log?.changed() ?? []));
       return out;
     },
   };

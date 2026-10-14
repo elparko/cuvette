@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { noteHarnessWrite } from "./harness-writes.ts";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
@@ -350,7 +351,9 @@ function writeTrusted(list: TrustEntry[]): void {
   if (list.length) data.trusted_folders = list;
   else delete data.trusted_folders;
   mkdirSync(dirname(userFile()), { recursive: true });
+  noteHarnessWrite();
   writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n");
+  noteHarnessWrite();
 }
 
 const once = new Map<string, number>();

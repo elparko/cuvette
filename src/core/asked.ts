@@ -2,6 +2,7 @@ interface Item {
   w: string;
   num?: number;
   not?: boolean;
+  clause: number;
 }
 
 const NUMBER = /^[-+]?(?:\d+(?:[.,]\d+)?|\.\d+)$/;
@@ -12,7 +13,12 @@ const THOUSANDS = /(?<![\d.,])([1-9]\d{0,2})((?:[, \u00a0\u202f]\d{3})+)(?!\d)/g
 const ON = new Set(["on", "true", "yes", "enable", "enabled"]);
 const OFF = new Set(["off", "false", "no", "disable", "disabled"]);
 
-const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?"]);
+const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?", "."]);
+const CLAUSE_END = /[,;.!?][)"'\]]*$/;
+const BOUNDARY = new Set(["and", "but", "so", "then", "because", "since", "while", "instead"]);
+const AFTER = new Set(["to", "as", "of", "at", "is", "="]);
+const REASK = new Set(["use", "set", "take", "apply", "run", "try", "make"]);
+const REACH = 5;
 
 function trimEnd(s: string): string {
   let n = s.length;
@@ -23,35 +29,58 @@ function trimEnd(s: string): string {
 function negates(out: Item[], k: number): boolean {
   const w = out[k]!.w;
   const before = out[k - 1]?.w;
-  return w === "not" || w === "no" || (w === "of" && before === "instead") || (w === "than" && before === "rather") || (w === "t" && !!before?.endsWith("n"));
+  return w === "not" || w === "no" || w === "never" || w === "without" || w === "except" || (w === "of" && before === "instead") || (w === "than" && (before === "rather" || before === "other")) || (w === "t" && !!before?.endsWith("n"));
 }
 
 function items(text: string): Item[] {
   const out: Item[] = [];
   const merged = text.replace(THOUSANDS, (_, a: string, b: string) => a + b.replace(/\D/g, ""));
-  for (const raw of merged.toLowerCase().split(/\s+|(=)/).filter(Boolean)) {
-    const token = trimEnd(raw.replace(/^[("'[]+/, "")).replace(/\.$/, "");
-    if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")) });
-    else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w });
-    if (raw === "=") out.push({ w: "=" });
+  let clause = 0;
+  for (const line of merged.toLowerCase().split(/\r?\n/)) {
+    clause++;
+    for (const raw of line.split(/\s+|(=)/).filter(Boolean)) {
+      if (BOUNDARY.has(trimEnd(raw))) clause++;
+      const token = trimEnd(raw.replace(/^[("'[]+/, ""));
+      if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), clause });
+      else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w, clause });
+      if (raw === "=") out.push({ w: "=", clause });
+      if (CLAUSE_END.test(raw)) clause++;
+    }
   }
   for (let i = 0; i < out.length; i++) {
     if (out[i]!.num === undefined) continue;
-    for (let k = Math.max(0, i - 3); k < i; k++) if (negates(out, k)) out[i]!.not = true;
+    for (let k = i - 1; k >= 0 && i - k <= REACH && out[k]!.clause === out[i]!.clause; k--) if (negates(out, k)) out[i]!.not = true;
   }
   return out;
 }
 
+function reasked(words: Item[], i: number): boolean {
+  let cs = i;
+  while (cs > 0 && words[cs - 1]!.clause === words[i]!.clause) cs--;
+  return REASK.has(words[cs]!.w) && i - cs <= 4 && words[i + 1]?.w !== "for";
+}
+
 function numberNamed(words: Item[], [b, e]: [number, number], value: number): boolean {
   const same = (it: Item) => it.num === value && !it.not;
-  for (let i = e + 1; i <= Math.min(words.length - 1, e + 4); i++) {
+  let limit = e + 4;
+  let skip = SKIP;
+  let retry = false;
+  for (let i = e + 1; i <= Math.min(words.length - 1, limit); i++) {
     const it = words[i]!;
-    if (it.num !== undefined) return same(it);
-    if (!SKIP.has(it.w) && words[i + 1]?.num !== undefined) return false;
+    if (it.num !== undefined) {
+      const here = it.clause === words[e]!.clause || AFTER.has(words[i - 1]!.w);
+      if (retry ? !reasked(words, i) : !here) return false;
+      if (!it.not) return same(it);
+      limit = i + 10;
+      skip = new Set([...SKIP, ...LEAD]);
+      retry = true;
+      continue;
+    }
+    if (!skip.has(it.w) && words[i + 1]?.num !== undefined) return false;
   }
   for (let i = Math.max(0, b - 2); i < b; i++) {
     const it = words[i]!;
-    if (it.num === undefined) continue;
+    if (it.num === undefined || it.clause !== words[b]!.clause) continue;
     const lead = words[i - 1];
     if (lead === undefined || LEAD.has(lead.w)) return same(it);
   }
