@@ -208,7 +208,8 @@ export class OllamaProvider implements Provider {
       } catch {
         return false;
       }
-      if (j.error) throw ollamaError(String(j.error));
+      if (!j || typeof j !== "object" || Array.isArray(j)) return false;
+      if (j.error) throw ollamaError(typeof j.error === "string" ? j.error : String(j.error.message ?? JSON.stringify(j.error)));
       return take(j);
     };
     const reader = res.body!.getReader();
@@ -296,12 +297,12 @@ export class OllamaProvider implements Provider {
       req.onDelta?.({ type: kind, text: s });
     });
     await this.readLines(res, idle, (j) => {
-      const m = j.message;
-      if (m?.thinking) {
+      const m = j.message && typeof j.message === "object" ? j.message : undefined;
+      if (typeof m?.thinking === "string" && m.thinking) {
         thinkField += m.thinking;
         req.onDelta?.({ type: "thinking", text: m.thinking });
       }
-      if (m?.content) {
+      if (typeof m?.content === "string" && m.content) {
         content += m.content;
         splitter.push(m.content);
         if (content.length >= checkAt) {
@@ -309,7 +310,8 @@ export class OllamaProvider implements Provider {
           if (repeatStart(content) !== null) looped = true;
         }
       }
-      for (const c of m?.tool_calls ?? []) {
+      for (const c of Array.isArray(m?.tool_calls) ? m.tool_calls : []) {
+        if (!c || typeof c !== "object") continue;
         const a = c.function?.arguments;
         const { args, parseError } = parseArgs({ id: "", name: "", args: typeof a === "string" ? a : "", obj: typeof a === "string" ? undefined : (a ?? {}) }, false);
         nativeCalls.push({ name: c.function?.name ?? "", args, ...(parseError ? { parseError } : {}) });
@@ -385,7 +387,7 @@ export class OllamaProvider implements Provider {
       let looped = false;
       let finished = false;
       await this.readLines(res, idle, (j) => {
-        content += j.message?.content ?? "";
+        if (typeof j.message?.content === "string") content += j.message.content;
         if (j.done) finished = true;
         if (content.length >= checkAt) {
           checkAt = content.length + 1000;

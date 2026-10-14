@@ -39,6 +39,7 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
     return new ProviderError(`The Claude API had a server error (${e.status}).`, !noRetry(e));
+  if ((e as any)?.partial === true) return new ProviderError("The Claude API stopped the reply before the end.", true);
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
@@ -198,7 +199,12 @@ export class ClaudeProvider implements Provider {
       live = stream;
       stream.on("text", (d: string) => req.onDelta?.({ type: "text", text: d }));
       stream.on("thinking", (d: string) => req.onDelta?.({ type: "thinking", text: d }));
-      return stream.finalMessage();
+      try {
+        return await stream.finalMessage();
+      } catch (e) {
+        if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError) && /^(stream|request) ended without/.test(e.message)) throw Object.assign(new Error(e.message), { partial: true });
+        throw e;
+      }
     };
     let msg: any;
     try {

@@ -172,7 +172,21 @@ export function trustedFolders(): TrustEntry[] {
   return Array.isArray(list) ? (list.filter((e) => e && typeof e.path === "string") as TrustEntry[]) : [];
 }
 
+export function assertUserFileSound(): void {
+  const text = existsSync(userFile()) ? readFileSync(userFile(), "utf8") : "";
+  if (text.trim()) {
+    let v: unknown;
+    try {
+      v = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`settings file ${userFile()} is not valid JSON: ${(e as Error).message}. Cuvette did not change it. Correct the file, then try again.`);
+    }
+    if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error(`settings file ${userFile()} must hold one JSON object, in braces { }. Cuvette did not change it. Correct the file, then try again.`);
+  }
+}
+
 function writeTrusted(list: TrustEntry[]): void {
+  assertUserFileSound();
   const data = readUser();
   if (list.length) data.trusted_folders = list;
   else delete data.trusted_folders;

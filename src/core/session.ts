@@ -55,7 +55,7 @@ import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replayS
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
-import { fillFromMethod, loadMethod, methodFrom, methodNote, saveMethod, type Method } from "./methods.ts";
+import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
 import { Findings, logText, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
@@ -364,7 +364,8 @@ export class Session {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
     const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
-    const settings = loadSettings(cwd, overrides);
+    const notes: string[] = [];
+    const settings = loadSettings(cwd, overrides, notes);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
@@ -380,6 +381,7 @@ export class Session {
       throw e;
     }
     if (opts.method) s.startMethod(opts.method);
+    for (const text of notes) s.record.append("notice", { text, warn: true });
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
   }
@@ -516,10 +518,17 @@ export class Session {
     this.system = this.buildSystem();
     if (resumed) {
       const used = this.record.live(["method"]).filter((e) => e.data.action === "started").at(-1);
-      if (used)
-        try {
-          this.method = loadMethod(String(used.data.path));
-        } catch {}
+      if (used) {
+        const file = String(used.data.path);
+        if (resumeMethodAllowed(file, this.cwd))
+          try {
+            this.method = loadMethod(file);
+          } catch {}
+        else {
+          const text = `Cuvette did not load the saved method ${String(used.data.name)}, because its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
+          if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+        }
+      }
       this.history = this.record.messages();
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
