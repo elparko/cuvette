@@ -33,6 +33,16 @@ test("run_command argv globs", () => {
   expect(p.check(rc, { argv: ["ls"] })).toBe("ask");
 });
 
+test("a deny or ask rule for a program also covers the program by its full path, and an allow rule does not", () => {
+  const p = new Permissions({ "run_command:git *": "allow", "run_command:rm *": "deny", "run_command:curl *": "ask" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  expect(p.check(rc, { argv: ["/bin/rm", "-rf", "x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["C:\\tools\\rm.exe", "-rf", "x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["./curl", "http://x"] })).toBe("ask");
+  expect(p.check(rc, { argv: ["git", "status"] })).toBe("allow");
+  expect(p.check(rc, { argv: ["/tmp/evil/git", "status"] })).toBe("ask");
+});
+
 test("mode hook", () => {
   let mode: Mode = "plan";
   const h = modeHook(() => mode, (t) => t === "ro");

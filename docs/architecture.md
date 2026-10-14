@@ -282,6 +282,8 @@ class HookRunner {
 }
 ```
 
+A `deny` rule or an `ask` rule for `run_command:<name> *` also matches the program with a path, such as `/bin/<name>`. An `allow` rule matches only the name as written.
+
 Command hooks follow Claude Code. The command gets the input JSON on stdin. Exit 0 with JSON on
 stdout gives the result. Exit 2 gives a deny (PreToolUse) or a block (Stop), with stderr as the
 reason. The harness logs and ignores other exit codes.

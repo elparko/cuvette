@@ -7,9 +7,13 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^${body}$`, "s");
 }
 
-function joinedArgv(args: Args): string {
+function joinedArgv(args: Args): string[] {
   const v = args.argv ?? args.command;
-  return Array.isArray(v) ? v.join(" ") : String(v ?? "");
+  if (!Array.isArray(v)) return [String(v ?? "")];
+  const joined = v.join(" ");
+  const first = String(v[0] ?? "");
+  const name = first.split(/[\\/]/).pop()!.replace(/\.(exe|cmd|bat|com)$/i, "");
+  return name === first ? [joined] : [joined, [name, ...v.slice(1)].join(" ")];
 }
 
 export class Permissions {
@@ -26,7 +30,8 @@ export class Permissions {
   check(tool: Tool, args: Args): Rule {
     const argv = joinedArgv(args);
     for (const rule of ["deny", "ask", "allow"] as Rule[]) {
-      const hit = this.rules.find((r) => r.rule === rule && r.tool.test(tool.name) && (!r.argv || r.argv.test(argv)));
+      const shown = rule === "allow" ? argv.slice(0, 1) : argv;
+      const hit = this.rules.find((r) => r.rule === rule && r.tool.test(tool.name) && (!r.argv || shown.some((a) => r.argv!.test(a))));
       if (hit) return rule;
     }
     if (tool.permission) return tool.permission;
