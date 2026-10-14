@@ -5,6 +5,7 @@ import { scopeLabel, type Scope } from "../core/settings.ts";
 import { pilotText } from "../core/pilot.ts";
 import { rerunBody, rerunTitle, type RerunData } from "../core/status.ts";
 import { commandText } from "../core/plain.ts";
+import { REFUSERS } from "../core/refusals.ts";
 import type { SessionLike } from "./types.ts";
 
 export interface OutputRef {
@@ -127,7 +128,8 @@ export class Mapper {
         }));
       }
       case "blocked":
-        if (REFUSERS.has(String(d.by))) this.refused.add(String(d.callId));
+        if (d.pilot || REFUSERS.has(String(d.by))) this.refused.add(String(d.callId));
+        if (d.pilot) return line("⏸", `Held back ${String(d.tool ?? "a call").replace(/_/g, " ")}: it processes many files. The agent runs the method on one sample first. You confirm that demonstration before the batch runs.`, "yellow");
         if (!d.qid) return line("⚠", `Blocked ${String(d.tool ?? "a call").replace(/_/g, " ")}: ${String(d.reason ?? "")}`, "yellow");
         return line("⏸", `Waiting for your decision: ${String(d.reason ?? "").replace(/^waiting for the scientist:\s*/, "")}`, "yellow");
       case "decision":
@@ -340,7 +342,6 @@ export interface Logged {
 }
 
 const HELD = new Set(["question", "blocked"]);
-const REFUSERS = new Set(["path rule", "write rule", "integrity check"]);
 const holds = (e: Entry) => HELD.has(e.kind) && !(e.kind === "blocked" && !e.data.qid);
 
 export class Collapser {

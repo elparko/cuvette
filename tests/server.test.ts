@@ -37,6 +37,16 @@ async function runToQuestion(s: FakeSession) {
 }
 
 describe("window server", () => {
+  test("a call that Cuvette blocked does not show as a failed call with the text for the model", async () => {
+    const { s, base, token } = await open();
+    s.record.append("tool_call", { callId: "a", tool: "read_file", args: { path: "/home/.cuvette/settings.json" } });
+    s.record.append("blocked", { callId: "a", tool: "read_file", reason: "The agent tried to use X. Cuvette blocked it.", by: "path rule" });
+    s.record.append("tool_result", { callId: "a", tool: "read_file", ok: false, error: "This path is in the Cuvette home folder. Ask the scientist to name the folder in the request." });
+    s.record.append("tool_result", { callId: "b", tool: "list_dir", ok: false, error: "X is not a folder" });
+    const state = await (await fetch(`${base}/api/state?t=${token}`)).json();
+    expect(state.failed.map((f: { tool: string }) => f.tool)).toEqual(["list_dir"]);
+  });
+
   test("serves one self-contained page with the token", async () => {
     const { w, base, token } = await open();
     expect(w.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/\?t=.{20,}$/);

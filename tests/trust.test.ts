@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -445,6 +445,20 @@ test.skipIf(process.platform === "win32")("the trust command for a folder with a
   expect(printed).toContain("Trust: cannot be trusted");
   expect(printed).toContain("Why Cuvette cannot trust the folder:");
   expect(printed).not.toContain("Changes since you trusted the folder");
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a LAB.md that Cuvette cannot read gives the cause, says that Cuvette ignores it, and says what to do", async () => {
+  writeFileSync(join(cwd, "LAB.md"), "Use Welch.");
+  chmodSync(join(cwd, "LAB.md"), 0o000);
+  const lines = folderLines(scanFolder(cwd)).join("\n");
+  expect(lines).toMatch(/Cuvette cannot read LAB\.md: .+\. Cuvette ignores it\. Fix the file, then start the session again\./);
+  session = await start(true);
+  const notice = session.record.entries(["notice"]).map((e) => String(e.data.text)).find((t) => t.startsWith("Cuvette could not read LAB.md in"));
+  expect(notice).toMatch(/\. Cuvette ignores the file\. Fix the file, then start the session again\.$/);
+  const dir = session.record.dir;
+  await session.close();
+  session = await Session.resume(dir, { provider: new FakeProvider([{ text: "ok" }]), interactive: true });
+  expect(session.record.entries(["notice"]).filter((e) => String(e.data.text).startsWith("Cuvette could not read LAB.md in"))).toHaveLength(1);
 });
 
 test("a LAB.md that is too long for the card says how to trust the folder in the terminal and in the app", () => {

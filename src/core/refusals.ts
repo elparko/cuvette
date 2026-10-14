@@ -1,5 +1,7 @@
 import { cutText } from "./places.ts";
 
+export const REFUSERS = new Set(["path rule", "write rule", "integrity check"]);
+
 const shown = (path: string) => {
   const text = path.length > 200 ? `${cutText(path, 200)}...` : path;
   return text.replace(/[\r\n\t]+/g, " ");

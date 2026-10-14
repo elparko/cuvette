@@ -564,6 +564,14 @@ describe("quiet view", () => {
     expect(out.join("\n")).not.toContain("Waiting for your decision");
   });
 
+  test("a batch step that waits for the demonstration shows a short line, not the text for the model", () => {
+    const { log } = feed((s) => {
+      s.record.append("blocked", { callId: "a", tool: "count_all", reason: "Pilot first: This step processes many files. Run the method on one sample only and call pilot_result.", pilot: true });
+      s.record.append("tool_result", { callId: "a", tool: "count_all", ok: false, error: "Pilot first: x" });
+    });
+    expect(texts(mainView(log, true).settled)).toEqual(["⏸ Held back count all: it processes many files. The agent runs the method on one sample first. You confirm that demonstration before the batch runs."]);
+  });
+
   test("a blocked call that waits for an answer keeps the wait text without the internal prefix", () => {
     const { log } = feed((s) => {
       s.record.append("blocked", { tool: "compare_two_groups", reason: "waiting for the scientist: test", qid: "q1" });

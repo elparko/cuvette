@@ -2976,7 +2976,10 @@ export class Session {
 
   private async checkTrust(interactive: boolean): Promise<void> {
     const t = trustStatus(this.cwd);
-    if (t.scan.labProblem) this.record.append("notice", { text: `Cuvette could not read LAB.md in ${t.scan.folder}: ${t.scan.labProblem}. It ignores the file.`, warn: true });
+    if (t.scan.labProblem) {
+      const text = `Cuvette could not read LAB.md in ${t.scan.folder}: ${t.scan.labProblem}. Cuvette ignores the file. Fix the file, then start the session again.`;
+      if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+    }
     for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");
     if (t.state !== "new" && t.state !== "changed") return;
     this.untrusted = t;

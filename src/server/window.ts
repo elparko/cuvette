@@ -7,6 +7,7 @@ import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { BusEvent, Mode, Question } from "../core/types.ts";
 import { roleInRecord, stepNumbers } from "../core/housekeeping.ts";
+import { REFUSERS } from "../core/refusals.ts";
 import { planView } from "../core/plan.ts";
 import { parseRoute, shortReason, trail } from "../core/trail.ts";
 import { panelHtml } from "./panel-page.ts";
@@ -151,7 +152,9 @@ export async function stateOf(session: WindowSession) {
   const nodeByCall = new Map<string, string>();
   const failed: { id: string; entry: number; tool: string; reason: string; error: string; housekeeping: boolean }[] = [];
   const all = record.entries();
+  const refused = new Set(record.entries(["blocked"]).filter((b) => b.data.pilot || REFUSERS.has(String(b.data.by))).map((b) => String(b.data.callId)));
   for (const e of record.entries(["tool_result"])) {
+    if (refused.has(String(e.data.callId))) continue;
     if (e.node) {
       resultByNode.set(e.node, e.data);
       if (e.data.callId) nodeByCall.set(String(e.data.callId), e.node);

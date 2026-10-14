@@ -442,7 +442,7 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
   const labPath = join(s.folder, LAB_FILE);
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
-  if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
+  if (s.labProblem) out.push(`Cuvette cannot read LAB.md: ${s.labProblem}. Cuvette ignores it. Fix the file, then start the session again.`);
   if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}. In the app, type /trust on instead.`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
