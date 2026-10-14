@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
@@ -59,13 +59,17 @@ export function hideKeys(text: string, env: Record<string, string | undefined> =
   return { text: out, found };
 }
 
-function readFile(): Record<string, string> {
+function readAll(): Record<string, unknown> {
   try {
     const v = JSON.parse(readFileSync(credentialsPath(), "utf8"));
-    return v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => typeof x === "string")) as Record<string, string> : {};
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   } catch {
     return {};
   }
+}
+
+function readFile(): Record<string, string> {
+  return Object.fromEntries(Object.entries(readAll()).filter(([, x]) => typeof x === "string")) as Record<string, string>;
 }
 
 export function savedClaudeKey(): string | undefined {
@@ -78,17 +82,24 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
   return k ? { key: k, from: "file" } : { from: "none" };
 }
 
-function write(values: Record<string, string>): string {
+function write(values: Record<string, unknown>): string {
   mkdirSync(cuvetteHome(), { recursive: true });
   const path = credentialsPath();
-  writeFileSync(path, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
-  chmodSync(path, 0o600);
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tmp, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
   version++;
   return path;
 }
 
 export function saveClaudeKey(key: string): string {
-  return write({ ...readFile(), anthropic_api_key: key });
+  return write({ ...readAll(), anthropic_api_key: key });
 }
 
 export function claudeWorkspace(env: Record<string, string | undefined> = process.env): string | undefined {
@@ -96,7 +107,7 @@ export function claudeWorkspace(env: Record<string, string | undefined> = proces
 }
 
 export function saveClaudeWorkspace(id: string): string {
-  const rest = readFile();
+  const rest = readAll();
   if (id) rest.anthropic_workspace_id = id;
   else delete rest.anthropic_workspace_id;
   return write(rest);
@@ -108,11 +119,13 @@ export const WORKSPACE_HELP =
 export function removeClaudeKey(): boolean {
   const path = credentialsPath();
   if (!existsSync(path)) return false;
-  const rest = readFile();
+  const rest = readAll();
   delete rest.anthropic_api_key;
-  if (Object.keys(rest).length) writeFileSync(path, JSON.stringify(rest, null, 1) + "\n", { mode: 0o600 });
-  else rmSync(path);
-  version++;
+  if (Object.keys(rest).length) write(rest);
+  else {
+    rmSync(path);
+    version++;
+  }
   return true;
 }
 
@@ -122,11 +135,11 @@ export function elabftwConfig(): { url: string; key: string } | undefined {
 }
 
 export function saveElabftw(url: string, key: string): string {
-  return write({ ...readFile(), elabftw_url: url, elabftw_api_key: key });
+  return write({ ...readAll(), elabftw_url: url, elabftw_api_key: key });
 }
 
 export function removeElabftw(): boolean {
-  const rest = readFile();
+  const rest = readAll();
   if (!rest.elabftw_url && !rest.elabftw_api_key) return false;
   delete rest.elabftw_url;
   delete rest.elabftw_api_key;

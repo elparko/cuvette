@@ -11,7 +11,7 @@ import { checkAnswer } from "./claims.ts";
 import type { DecisionField } from "./decisions.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
-import type { AnalysisRecord } from "./record.ts";
+import { ownerOf, type AnalysisRecord } from "./record.ts";
 import { replaySheet } from "./samples.ts";
 import type { Node, TablePreview } from "./types.ts";
 import { renvLock, requirementsText } from "./envlock.ts";
@@ -439,7 +439,7 @@ export function writeReferences(record: AnalysisRecord, adapters: LoadedAdapter[
   if (!record.nodes().some((n) => n.adapter)) return undefined;
   const path = join(dir, "references.bib");
   const head = (t: string, refs: Ref[]) => (refs.length ? `% ${t}\n\n${toBibtex(refs)}\n` : "");
-  writeFileSync(path, `% References for session ${record.entries()[0]?.session ?? ""}. Cuvette writes this file; it lists only what ran.\n\n${head("Used", c.used)}${head("Used in a comparison only", c.comparison)}${head("Used only in steps that are out of date", c.outOfDate)}`);
+  writeFileSync(path, `% References for session ${ownerOf(record.entries())}. Cuvette writes this file; it lists only what ran.\n\n${head("Used", c.used)}${head("Used in a comparison only", c.comparison)}${head("Used only in steps that are out of date", c.outOfDate)}`);
   return path;
 }
 
@@ -534,7 +534,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const summary: Cell[][] = [["Question", "Question", show(question), ""]];
   for (const p of w.programs) summary.push(["Program", p.name, p.programVersion || "", p.version ? `adapter ${p.version}` : ""]);
   if (nodes.some((n) => n.tool === "run_script")) summary.push(["Program", "Python script (run_script)", "", ""]);
-  summary.push(["Date", "Session started", localDate(first?.ts ?? new Date().toISOString()), first?.session ?? ""]);
+  summary.push(["Date", "Session started", localDate(first?.ts ?? new Date().toISOString()), ownerOf(record.entries())]);
   summary.push(["Date", "Workbook saved", `${localDate(new Date().toISOString())} ${new Date().toTimeString().slice(0, 8)}`, ""]);
   for (const f of w.fields) {
     if (!f.set || f.key === "question") continue;

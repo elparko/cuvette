@@ -30,6 +30,7 @@ export interface InstalledEntry {
 interface IndexFile {
   adapters: Record<string, InstalledEntry>;
   confirmed: Record<string, string>;
+  [other: string]: unknown;
 }
 
 export interface TrustInfo {
@@ -52,7 +53,7 @@ function readIndex(): IndexFile {
     const j = JSON.parse(readFileSync(indexFile(), "utf8"));
     const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
     const adapters = Object.fromEntries(Object.entries(obj(j?.adapters)).filter(([, e]) => e && typeof e === "object" && typeof (e as { name?: unknown }).name === "string"));
-    return { adapters, confirmed: obj(j?.confirmed) } as IndexFile;
+    return { ...obj(j), adapters, confirmed: obj(j?.confirmed) } as IndexFile;
   } catch {
     return { adapters: {}, confirmed: {} };
   }
