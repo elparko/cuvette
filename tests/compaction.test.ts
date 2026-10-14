@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import { dropThinking, elideOld, estimateTokens, headText, pointerText, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { Session } from "../src/core/session.ts";
-import type { Message } from "../src/core/types.ts";
+import { ProviderError, type Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
 const request = (text: string): Message => ({ role: "user", parts: [{ type: "text", text }] });
@@ -501,4 +501,28 @@ test("the estimate does not go down when a text grows", () => {
     expect(now).toBeGreaterThanOrEqual(last);
     last = now;
   }
+});
+
+test("if the model server refuses a context that is smaller than the window it reports, the summary shortens the recent messages too", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-compact-proj-"));
+  const files = Array.from({ length: 10 }, (_, i) => {
+    const f = join(cwd, `plate${i}.txt`);
+    writeFileSync(f, `plate ${i}\n${"well,12.5,13.1,14.9\n".repeat(1500)}`);
+    return f;
+  });
+  let n = 0;
+  const provider = new FakeProvider({ steps: () => (n < files.length ? { calls: [{ name: "read_file", args: { path: files[n++] } }] } : { text: "All plates read." }), complete: "## Question\nRead each plate." });
+  const limit = 24_000;
+  const step = provider.step.bind(provider);
+  provider.step = async (req) => {
+    if (estimateTokens(req.messages, req.system, req.tools) > limit) throw new ProviderError("prompt is too long", false, true);
+    return step(req);
+  };
+  const session = await Session.create({ adapters: [], provider, cwd, settings: { phi_check: false } as never });
+  session.decisions.applySetup({});
+  expect(await session.send("Read each plate.")).toBe("All plates read.");
+  expect(session.record.entries(["notice"]).some((e) => /too long for the model/.test(String(e.data.text)))).toBe(true);
+  expect(session.record.entries(["error"])).toHaveLength(0);
+  await session.close();
 });

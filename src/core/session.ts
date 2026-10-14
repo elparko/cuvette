@@ -1353,9 +1353,9 @@ export class Session {
         if (e instanceof ProviderError && e.overflow && !signal.aborted) {
           if (!compacted) {
             compacted = true;
-            if (await this.maybeCompact(signal, true)) {
+            if (await this.maybeCompact(signal, true, true)) {
               dropStreamed();
-              this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
+              this.record.append("notice", { text: "The context was too long for the model. The harness made the context shorter and tries again." });
               continue;
             }
           }
@@ -1546,17 +1546,20 @@ export class Session {
   private request?: Message;
   private summaryFailed = false;
 
-  private async maybeCompact(signal: AbortSignal, force = false): Promise<boolean> {
-    const win = this.provider.info.contextWindow;
+  // After a context error, the real window of the model is smaller than the window that the provider reports, so the summary also shortens the recent messages.
+  private async maybeCompact(signal: AbortSignal, force = false, tooLong = false): Promise<boolean> {
     const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
+    const win = tooLong ? Math.min(this.provider.info.contextWindow, Math.floor(size() * 0.8)) : this.provider.info.contextWindow;
+    let shortened = false;
     if (!force && size() <= win * ELIDE_AT) return false;
-    if (!force) {
+    if (!force || tooLong) {
       const { messages, elided } = elideOld(this.history, win);
       if (elided) {
+        shortened = tooLong;
         this.history = messages;
         this.record.append("notice", { text: `The harness shortened ${elided} older tool output(s) in the context. The record keeps the full output.`, elided });
       }
-      if (this.summaryFailed || size() <= win * SUMMARIZE_AT) return false;
+      if (!force && (this.summaryFailed || size() <= win * SUMMARIZE_AT)) return false;
     }
     let res: Awaited<ReturnType<typeof summarizeOld>>;
     try {
@@ -1565,13 +1568,13 @@ export class Session {
       if (signal.aborted) throw e;
       this.summaryFailed = true;
       this.record.append("notice", { text: `The harness could not summarize the older messages: ${(e as Error).message} The turn continues with the full context.` });
-      return false;
+      return shortened;
     }
-    if (!res) return false;
+    if (!res) return shortened;
     if (!res.summary.trim()) {
       this.summaryFailed = true;
       this.record.append("notice", { text: "The summary of the older messages was empty. The turn continues with the full context." });
-      return false;
+      return shortened;
     }
     const facts = this.summaryFacts(res.request);
     const summary = summaryMessage(facts ? `${res.summary}\n${facts}` : res.summary);
