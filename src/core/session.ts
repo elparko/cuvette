@@ -53,7 +53,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, folderTrusted, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -2961,6 +2961,11 @@ export class Session {
 
   async setTrust(choice: TrustChoice): Promise<string> {
     const t = trustStatus(this.cwd);
+    const refused = choice === "no" ? undefined : untrustable(t.scan);
+    if (refused) {
+      this.record.append("notice", { text: refused, warn: true });
+      return refused;
+    }
     const open = this.trustQid ? this.questions.get(this.trustQid) : undefined;
     if (open?.status === "open") this.questions.answer(open.qid, choice);
     this.record.append("trust", { folder: t.scan.folder, choice, hash: t.scan.hash });
@@ -2992,7 +2997,7 @@ export class Session {
     }
     this.index = undefined;
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
-    const start = (project.hooks as Settings["hooks"] | undefined)?.SessionStart;
+    const start = folderTrusted(this.cwd) ? (project.hooks as Settings["hooks"] | undefined)?.SessionStart : undefined;
     if (start?.length) {
       const runner = new HookRunner([], { SessionStart: start }, this.cwd);
       runner.onError = this.hooks.onError;

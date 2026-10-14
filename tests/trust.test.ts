@@ -381,7 +381,7 @@ test("more files than the limit give changed with the reason too many files to c
   const s = trustStatus(p.root);
   expect(s.state).toBe("changed");
   expect(s.changes.join("\n")).toContain("too many files to check");
-  trustFolder(p.root);
+  expect(() => trustFolder(p.root)).toThrow(/too many files to check/);
   expect(trustStatus(p.root).state).toBe("changed");
 });
 
@@ -397,3 +397,34 @@ test.skipIf(process.platform === "win32")("a dangling link or a link to a folder
   expect(() => adapterDirs(p.root)).not.toThrow();
   expect(() => findAdapter("y", p.root)).toThrow(/no adapter named/);
 });
+
+test.skipIf(process.platform === "win32")("the scientist cannot trust a folder that has a linked folder, and the SessionStart hook does not run", async () => {
+  project(".cuvette", { ...hook("ran") });
+  const other = mkdtempSync(join(tmpdir(), "cuvette-evil-"));
+  symlinkSync(other, join(cwd, ".cuvette", "adapters"));
+  session = await start(true);
+  expect(session.trustNotice).toBeDefined();
+  for (const choice of ["trust", "once"] as const) {
+    const text = await session.setTrust(choice);
+    expect(text).toContain("Cuvette cannot trust this folder");
+    expect(text).toContain(".cuvette/adapters");
+    expect(existsSync(join(cwd, "ran"))).toBe(false);
+    expect(trustStatus(cwd).state).toBe("changed");
+  }
+  expect(trustedFolders()).toEqual([]);
+  expect(session.record.entries(["trust"])).toEqual([]);
+  expect(() => trustFolder(cwd)).toThrow(/cannot trust/);
+});
+
+test("trusting a folder without a linked folder still runs the SessionStart hook", async () => {
+  project(".cuvette", { ...hook("ran") });
+  session = await start(true);
+  const text = await session.setTrust("trust");
+  expect(text).toMatch(/trusted/);
+  await until(() => existsSync(join(cwd, "ran")));
+  expect(trustStatus(cwd).state).toBe("trusted");
+});
+
+async function until(check: () => boolean) {
+  for (let i = 0; i < 200 && !check(); i++) await new Promise((r) => setTimeout(r, 50));
+}

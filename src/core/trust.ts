@@ -312,6 +312,8 @@ export function endTrustOnce(folder: string): void {
 
 export function trustFolder(folder: string): TrustEntry {
   const s = scanFolder(folder);
+  const refused = untrustable(s);
+  if (refused) throw new Error(refused);
   const entry: TrustEntry = { path: s.folder, hash: s.hash, files: s.files, keys: s.keys, hooks: s.hooks, adapters: s.adapters.map((a) => a.name), trusted: new Date().toISOString() };
   writeTrusted([...trustedFolders().filter((e) => e.path !== s.folder), entry]);
   return entry;
@@ -346,6 +348,11 @@ export function trustStatus(folder: string): TrustStatus {
   if (!e) return { state: "new", scan, changes: [] };
   if (e.hash === scan.hash) return { state: "trusted", scan, changes: [] };
   return { state: "changed", scan, changes: changesSince(e, scan) };
+}
+
+export function untrustable(scan: FolderScan): string | undefined {
+  const reasons = [...scan.linked.map((p) => `the linked folder ${p}`), ...scan.incomplete];
+  return reasons.length ? `Cuvette cannot trust this folder: ${reasons.join("; ")}. Remove the link or the extra files, then try again.` : undefined;
 }
 
 export function folderTrusted(folder: string): boolean {
