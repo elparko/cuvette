@@ -868,6 +868,100 @@ In the third run with `on`, the answer had no thinking. Thus its first text came
   harnesses.
 - The proxy and the runner are not in the repository. They are about 150 lines in total.
 
+## Whole task after the first-step and referee changes
+
+This section repeats the whole task on the branch `perf/whole-task`. Measured on 14 October 2026.
+
+### Method of this run
+
+1. The task, the request and the prices are the same as in "Cost of a whole task with real
+   Haiku". `data.csv` has new values with the same group means: control 4.2, treated 5.1. The
+   Welch t-test gives t = 5.38, 9.0 degrees of freedom, p = 0.00045 and a 95% confidence
+   interval (CI) of 0.52 to 1.28.
+2. Each run has a new temporary `CUVETTE_HOME` or `CLAUDE_CONFIG_DIR`. The Cuvette home has a
+   link to the adapter environments and a `settings.json` with `"effort": "low"`. The owner
+   asked for low thinking in these runs. Claude Code has an empty config, so it uses effort
+   medium.
+3. Claude Code is version 2.1.299.
+4. A proxy on a private localhost port forwarded each request and recorded the time and the
+   usage of each reply. It refused each request after 36 real model calls.
+
+The first runs of the day were not valid as a comparison. Another client used the same proxy
+port at the same time, so the calls of two benchmarks mixed. The runs below used a private port.
+
+### Results
+
+| Metric | Cuvette, before (main, 3 runs) | Cuvette, after (3 runs) | Claude Code (3 runs) |
+| --- | --- | --- | --- |
+| Wall time, median | 22.1 s | 12.1 s | 11.3 s |
+| Wall time of each run | 19.4 s, 22.1 s, 23.7 s | 13.8 s, 12.1 s, 12.1 s | 12.6 s, 10.7 s, 11.3 s |
+| Model calls | 6 | 4 | 3 |
+| Harness time (wall time minus model time) | 4.2 to 5.4 s | 0.5 s | 1.2 s |
+| Output tokens, median | 2,380 | 1,866 | 1,494 |
+| Cost estimate, median | 0.0032 USD | 0.0025 USD | 0.0024 USD |
+| Referee calls | 1 in each run | 1 in each run | none |
+| Answer: groups differ, difference 0.9, Welch p = 0.00045 | 3 of 3 | 3 of 3 | 3 of 3 (no test in 2 runs) |
+
+The ratio of the medians is 12.1 s to 11.3 s, or 1.07. The "before" runs used effort medium.
+
+### Time of each call in the median Cuvette run
+
+Run 2 has the median wall time, 12.1 s.
+
+| Call | Reply | Output tokens | First byte | Total | Step before |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `inspect_table` and `read_file` in one reply | 225 | 0.82 s | 1.74 s | 0.21 s (program start) |
+| 2 | `compare_two_groups` | 227 | 0.67 s | 2.07 s | 0.02 s |
+| 3 | Answer | 575 | 0.78 s | 2.98 s | 0.01 s |
+| 4 | Referee, no stream | 839 | 4.79 s | 4.79 s | 0.02 s |
+| End | | | | | 0.23 s (record and results file) |
+
+### Changes
+
+1. The first message says that adapter tools do not send table rows to a cloud model. If an
+   adapter has `inspect_table`, it also says to call `read_file` in the same reply. Before
+   this change, Haiku called `inspect_table` two times, and then `read_file`, in each run.
+   The harness still sends no rows itself (`src/core/session.ts`, `folderList`).
+2. The cloud view of a table result has a note: the harness does not send the rows, and
+   `read_file` shows the data (`src/core/session.ts`, `render`).
+3. The referee reports only problems, the most severe first, at most five
+   (`src/core/review.ts`). Before, it also wrote findings for checks that passed.
+4. The biostats adapter imports scipy, pingouin, statsmodels, lifelines and matplotlib inside
+   the tools that use them (`catalog/biostats/ga_biostats.py`).
+5. The Python worker imports the preload modules in a background thread. The preload reply
+   returns at once. If a call fails with an import deadlock while the thread runs, the worker
+   waits for the thread and runs the call again (`src/adapters/kinds/python_worker.py`).
+6. Two calls that ask for the same package scan share one scan (`src/core/envlock.ts`).
+
+Before changes 4 and 5, the first adapter call waited 0.6 to 3.5 s for the imports. After the
+changes, it took 16 to 56 ms in mock runs with a 1.5 s model delay.
+
+### Benchmark subset
+
+The bench harness ran the six papers of "Benchmark subset" above, one run each, with
+`claude:claude-haiku-5-5` in blind mode. The bench uses effort medium.
+
+| Metric | Result |
+| --- | --- |
+| Computed items | 22 of 22 |
+| Reported items | 14 of 14 |
+| Real model calls, with referee and titles | 30 |
+| Output tokens | 21,106 |
+| Cost (token estimate) | 0.030 USD |
+
+### Not fixed
+
+- The referee is now the largest call: 2.3 to 6.2 s. Its output is mostly hidden thinking.
+- Run the referee while the answer streams. This is an owner decision.
+- A lower effort for routine steps only. These runs used effort low for all session calls.
+
+### Limits
+
+- Three runs of each harness. The Haiku replies change from run to run.
+- Cuvette used effort low and Claude Code used effort medium.
+- Other agents ran tests on the same computer during the runs.
+- The cost is an estimate from the token counts. It is not the invoice.
+
 ## Method
 
 1. A mock Messages API server on localhost answers each request at once. Thus the model
