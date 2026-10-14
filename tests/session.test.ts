@@ -1203,7 +1203,7 @@ test("Questions come before the proposed metrics; technical questions and questi
     { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
     { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
   ]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true });
   session.decisions.applySetup({});
   const order: string[] = [];
   const asked: string[] = [];
@@ -1254,7 +1254,7 @@ test("the proposed metrics leave no setting open", async () => {
     { text: "I will fill them in." },
     { text: "I will fill them in." },
   ]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true });
   session.decisions.applySetup({});
   await session.send("Count the particles in a.tif");
   const r = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan").at(-1)!;
