@@ -59,7 +59,7 @@ export function transcriptText(messages: Message[]): string {
   const out: string[] = [];
   for (const m of messages)
     for (const p of m.parts) {
-      if (p.type === "text") out.push(`${m.role}: ${p.text}`);
+      if (p.type === "text") out.push(`${m.role}: ${JSON.stringify(p.text)}`);
       else if (p.type === "tool_call") out.push(`tool call ${JSON.stringify(p.name)} ${JSON.stringify(p.args)}`);
       else if (p.type === "tool_result") out.push(`result of ${JSON.stringify(p.name)}: ${JSON.stringify(headText(p.text, 1500))}`);
     }
