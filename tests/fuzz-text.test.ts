@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ThinkSplitter, defang, defangDeep, extractTextToolCall, refang, refangDeep, splitThink } from "../src/providers/text.ts";
+import { ThinkSplitter, defang, defangDeep, extractTextToolCall, refang, refangDeep, splitThink, wrapperText } from "../src/providers/text.ts";
 import { linear as once, Rng, runs } from "./fuzz-rng.ts";
 
 function linear(make: (n: number) => string, run: (s: string) => void, n: number) {
@@ -106,6 +106,17 @@ describe("fuzz: the think tags and the text tool call", () => {
     }
   });
 
+  test("wrapperText breaks the result tags in any spacing and keeps other text", () => {
+    expect(wrapperText("a <tool_result> b </ tool_call> c < / tool_response>")).not.toMatch(/<\s*\/?\s*tool_/);
+    expect(wrapperText("x < y and a<b")).toBe("x < y and a<b");
+    const r = new Rng(93004);
+    for (let i = 0; i < runs(500); i++) {
+      const gap = r.string(" \t\n", 0, 4);
+      const tag = `<${gap}${r.pick(["", "/"])}${gap}${r.pick(["tool_result", "TOOL_CALL", "tool_response"])}>`;
+      expect(wrapperText(`a${tag}b`), JSON.stringify(tag)).not.toMatch(/<\s*\/?\s*tool_(result|call|response)/i);
+    }
+  });
+
   test("splitThink keeps all text outside the tags, and thinking goes to the other field", () => {
     const r = new Rng(93002);
     for (let i = 0; i < runs(1500); i++) {
@@ -146,6 +157,8 @@ describe("fuzz: the think tags and the text tool call", () => {
       ["open braces and keys", (n) => '{"a":'.repeat(n / 5), (s) => void extractTextToolCall(s, names)],
       ["braces in text", (n) => "if (x) {\n".repeat(n / 9), (s) => void extractTextToolCall(s, names)],
       ["open braces and a call", (n) => "{".repeat(n) + JSON.stringify({ name: "read_file", arguments: {} }), (s) => void extractTextToolCall(s, names)],
+      ["spaces after a less-than sign", (n) => "<" + " ".repeat(n) + "x", (s) => void wrapperText(s)],
+      ["less-than signs and spaces", (n) => "< ".repeat(n / 2), (s) => void wrapperText(s)],
       ["splitter input", (n) => "<thi".repeat(n / 4), (s) => {
         const sp = new ThinkSplitter(() => {});
         sp.push(s);
