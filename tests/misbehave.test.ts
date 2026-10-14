@@ -5,7 +5,7 @@ import { parse, stringify } from "yaml";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { saveAccess } from "../src/adapters/access.ts";
 import { applyInstall, prepareAdd } from "../src/adapters/install.ts";
-import { CATALOG_DIR } from "../src/adapters/manifest.ts";
+import { CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
 import { Session, cleanText } from "../src/core/session.ts";
 import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
@@ -428,6 +428,96 @@ test("the saved credentials file is not readable, also through a link", async ()
   expect(t[0]).toContain("holds the saved API keys. The agent cannot read it.");
   if (!windows) expect(t[1]).toMatch(/link that leads outside|holds the saved API keys/);
   expect(JSON.stringify(provider.requests.at(-1)!.messages)).not.toContain(key);
+});
+
+const HOME_TEXT = /^ERROR: This path is in the Cuvette home folder or in the record of another session\. The agent cannot read it\. Ask the scientist to name the folder in the request\.$/;
+
+function otherSessions(cwd: string) {
+  const record = join(cwd, "cuvette", "2026-10-13-other", ".record");
+  mkdirSync(record, { recursive: true });
+  writeFileSync(join(record, "log.jsonl"), '{"id":1,"kind":"user"}\n');
+  writeFileSync(join(record, "meta.json"), "{}");
+  writeFileSync(join(home, "sessions-index.json"), "[]");
+  mkdirSync(join(home, "projects", "other", "run"), { recursive: true });
+  writeFileSync(join(home, "projects", "other", "run", "results.csv"), "a\n1\n");
+  return record;
+}
+
+test("the model cannot list the Cuvette home folder or read the session index, another record or the output of another project", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const record = otherSessions(cwd);
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  steps.push(
+    call("list_dir", { path: home }),
+    call("read_file", { path: join(home, "sessions-index.json") }),
+    call("read_file", { path: join(record, "log.jsonl") }),
+    call("list_dir", { path: record }),
+    call("list_dir", { path: join(home, "projects", "other") }),
+    call("read_file", { path: join(home, "projects", "other", "run", "results.csv") }),
+    { text: "ok" },
+  );
+  await s.send("look");
+  const t = texts(provider);
+  expect(t).toHaveLength(6);
+  for (const x of t) expect(x).toMatch(HOME_TEXT);
+});
+
+test("the model reads the work and output files of its own session and the files of the project", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  otherSessions(cwd);
+  writeFileSync(join(cwd, "data.csv"), "id,value\n1,5\n");
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  writeFileSync(join(s.workDir, "result.csv"), "mean\n3.5\n");
+  mkdirSync(join(s.workDir, "tables"));
+  writeFileSync(join(s.workDir, "tables", "t1.csv"), "x\n9\n");
+  steps.push(call("read_file", { path: join(s.workDir, "result.csv") }), call("list_dir", { path: join(s.workDir, "tables") }), call("read_file", { path: "data.csv" }), call("list_dir", { path: s.workDir }), call("read_file", { path: "cuvette/2026-10-13-other/notes.txt" }), { text: "ok" });
+  writeFileSync(join(cwd, "cuvette", "2026-10-13-other", "notes.txt"), "notes of the other session");
+  await s.send("look");
+  const t = texts(provider);
+  expect(t[0]).toContain("3.5");
+  expect(t[1]).toContain("t1.csv");
+  expect(t[2]).toContain("1,5");
+  expect(t[3]).toContain("result.csv");
+  expect(t[4]).toContain("notes of the other session");
+});
+
+test("a folder that the scientist names in the request is readable, also in the Cuvette home folder", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const record = otherSessions(cwd);
+  const folder = join(home, "projects", "other", "run");
+  const steps: Bad[] = [call("read_file", { path: join(folder, "results.csv") }), call("read_file", { path: join(record, "log.jsonl") }), call("read_file", { path: join(home, "sessions-index.json") }), { text: "ok" }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send(`Compare with ${folder} and ${record}`);
+  const t = texts(provider);
+  expect(t[0]).toContain("1");
+  expect(t[1]).toContain('"kind":"user"');
+  expect(t[2]).toMatch(HOME_TEXT);
+});
+
+test.skipIf(windows)("a link in the project folder that leads into the Cuvette home folder is refused", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  otherSessions(cwd);
+  symlinkSync(home, join(cwd, "homelink"));
+  const { provider, session: s } = await start([call("list_dir", { path: "homelink" }), call("read_file", { path: "homelink/sessions-index.json" }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  for (const x of texts(provider)) expect(x).toMatch(HOME_TEXT);
+});
+
+test("a skill of an adapter in the Cuvette home folder is read through load_skill", async () => {
+  const root = join(home, "adapters", "astropy");
+  cpSync(join(CATALOG_DIR, "astropy"), root, { recursive: true });
+  const adapter = loadAdapter(root);
+  const skill = adapter.skills()[0]!;
+  const provider = new ScriptedProvider([call("load_skill", { name: skill.name }), call("read_file", { path: join(home, "adapters", "other-adapter", "x.md") }), { text: "ok" }]);
+  session = await Session.create({ adapters: [root], provider, cwd: mkdtempSync(join(work, "proj-")), settings: { guidance: false, askWaits: false, permissionMode: "bypass" } });
+  await session.send("go");
+  const t = texts(provider);
+  expect(t[0]).toContain(readFileSync(skill.path, "utf8").slice(0, 40));
+  expect(t[1]).toMatch(HOME_TEXT);
 });
 
 test("the model cannot write to the record folder or to the settings folder of the project", async () => {

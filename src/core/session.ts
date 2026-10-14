@@ -2184,6 +2184,7 @@ export class Session {
     if (tool.source === "generic") {
       const place = this.pathPlace(args);
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
+      if (place === "private") return error("This path is in the Cuvette home folder or in the record of another session. The agent cannot read it. Ask the scientist to name the folder in the request.");
       if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
     }
     const gate = this.pilotGate(tool, args);
@@ -2475,17 +2476,28 @@ export class Session {
 
   // ------------------------------------------------------------- decisions owned by the scientist
 
-  private pathPlace(args: Args): "ok" | "outside" | "link" {
+  private pathPlace(args: Args): "ok" | "outside" | "link" | "private" {
     const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v));
-    if (!paths.length) return "ok";
+    if (!paths.length || paths.every(isCredentialsFile)) return "ok";
     const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
-    const roots = [this.cwd, this.dir, cuvetteHome(), ...this.adapters.map((a) => a.root), ...named, ...named.map((n) => join(n, ".."))];
+    const mine = [this.dir, this.workDir, this.place.outDir, ...this.adapters.map((a) => a.root)];
     const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
-    roots.push(...nodeFiles);
     const within = (list: string[], p: string) => list.some((r) => {
       const rel = relative(r, p);
       return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
     });
+    const home = [cuvetteHome(), realPath(cuvetteHome())];
+    const ownRecord = realPath(this.dir);
+    const recordOf = (p: string) => {
+      for (let at = p; dirname(at) !== at; at = dirname(at)) if (basename(at) === ".record" && realPath(at) !== ownRecord && (existsSync(join(at, "log.jsonl")) || existsSync(join(at, "meta.json")))) return true;
+      return false;
+    };
+    const closed = (p: string) => [p, realPath(p)].some((x) => within(home, x) || recordOf(x));
+    const asked = [...named.filter(closed), ...named.map((n) => join(n, "..")).filter((n) => closed(n) && !home.includes(n))];
+    const open = [...mine, ...nodeFiles, ...asked];
+    if (paths.some((p) => closed(p) && !(within(open, p) && within(open, realPath(p))))) return "private";
+    const roots = [this.cwd, ...mine, ...named, ...named.map((n) => join(n, ".."))];
+    roots.push(...nodeFiles);
     if (!paths.every((p) => within(roots, p))) return "outside";
     const real = roots.map(realPath);
     return paths.every((p) => within(real, realPath(p))) ? "ok" : "link";
