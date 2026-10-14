@@ -61,3 +61,18 @@ test("a very long text gives a key fast, and a change at the end or in the lengt
   expect(a).not.toBe(key({ ok: true, text: big + "x" }));
   expect(a).not.toBe(key({ ok: true, text: big + big }));
 });
+
+test("a temporary path starts at a path boundary and a real temporary root", () => {
+  expect(key({ ok: true, text: "read /data/tmp/a.csv" })).not.toBe(key({ ok: true, text: "read /data/tmp/b.csv" }));
+  expect(key({ ok: true, text: "read ~/tmp/a.csv" })).not.toBe(key({ ok: true, text: "read ~/tmp/b.csv" }));
+  expect(key({ ok: true, text: "read /home/p/var/tmp/a.csv" })).not.toBe(key({ ok: true, text: "read /home/p/var/tmp/b.csv" }));
+  expect(key({ ok: true, text: "wrote /tmp/a1/x.csv" })).toBe(key({ ok: true, text: "wrote /tmp/b2/x.csv" }));
+  expect(key({ ok: true, text: "wrote /private/var/folders/aa/bb/T/x1" })).toBe(key({ ok: true, text: "wrote /private/var/folders/cc/dd/T/y2" }));
+});
+
+test("a long text that differs only in the middle gives another key", () => {
+  const edge = "x".repeat(30_000);
+  const a = key({ ok: true, text: `${edge}row 5 = 120${edge}` });
+  expect(a).not.toBe(key({ ok: true, text: `${edge}row 5 = 130${edge}` }));
+  expect(a).toBe(key({ ok: true, text: `${edge}row 5 = 120${edge}` }));
+});
