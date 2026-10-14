@@ -42,7 +42,7 @@ beforeEach(() => {
 afterEach(async () => {
   await session?.close();
   session = undefined;
-  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  rmSync(home, { recursive: true, force: true });
   rmSync(work, { recursive: true, force: true });
 });
 
