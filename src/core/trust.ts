@@ -347,7 +347,7 @@ function changesSince(e: TrustEntry, s: FolderScan): string[] {
 
 export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
-  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `a linked folder: ${p}. Cuvette does not load adapters, methods or skills from a linked folder.`), ...scan.incomplete.map((r) => `${r}. Cuvette cannot check the folder, so it does not trust it.`)] };
+  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${p}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${r}. Cuvette cannot check the folder, so it does not trust it.`)] };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
   if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);

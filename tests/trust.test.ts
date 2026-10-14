@@ -337,7 +337,7 @@ test.skipIf(process.platform === "win32")("a linked adapters folder is not loade
   symlinkSync(other, folder);
   const s = trustStatus(p.root);
   expect(s.state).toBe("changed");
-  expect(s.changes.join("\n")).toContain("a linked folder: .cuvette/adapters");
+  expect(s.changes).toContain("The project cannot be trusted while it has a linked folder: .cuvette/adapters. Replace the link with a copy of the folder.");
   expect(adapterDirs(p.root).evil).toBeUndefined();
   expect(adapterDirs(p.root).x).toBeUndefined();
   expect(() => findAdapter("evil", p.root)).toThrow(/no adapter named/);
