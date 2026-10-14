@@ -5,7 +5,7 @@ import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 import { addOldEnv } from "../../core/old-names.ts";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
-import type { LoadedAdapter, MapEntry, ToolDef } from "../manifest.ts";
+import { cuvetteHome, type LoadedAdapter, type MapEntry, type ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import { ROOT } from "../../root.ts";
 
@@ -81,6 +81,15 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   env.CUVETTE_PROGRAM_PATH = c.programPath ?? "";
   if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
   if (c.dirs.outputDir) env.CUVETTE_OUTPUT_DIR = c.dirs.outputDir;
+  if (!env.PYTHONPYCACHEPREFIX && !env.PYTHONDONTWRITEBYTECODE) {
+    const prefix = join(cuvetteHome(), "pycache");
+    try {
+      mkdirSync(prefix, { recursive: true, mode: 0o700 });
+      env.PYTHONPYCACHEPREFIX = prefix;
+    } catch {
+      env.PYTHONDONTWRITEBYTECODE = "1";
+    }
+  }
   return addOldEnv({ ...env, ...extra });
 }
 

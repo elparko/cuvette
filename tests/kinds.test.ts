@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterAll, expect, test } from "vitest";
+import { statSync } from "node:fs";
+import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
@@ -518,5 +520,34 @@ map:
   for (const target of [join(out, ".record", "log.jsonl"), join(project, ".cuvette", "settings.json")]) {
     await run(target);
     expect(readFileSync(target, "utf8")).not.toContain("x");
+  }
+});
+
+
+test("a python adapter in a trusted project folder writes no __pycache__ there, and the folder stays trusted", async () => {
+  const oldHome = process.env.CUVETTE_HOME;
+  const home = mkdtempSync(join(root, "home-"));
+  process.env.CUVETTE_HOME = home;
+  try {
+    const project = realpathSync(mkdtempSync(join(root, "project-")));
+    const dir = join(project, ".cuvette", "adapters", "pyx");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "adapter.yaml"), `${head("python", "  call_timeout_s: 20\n")}tools:\n  - { name: one, description: d, function: "m:one" }\n`);
+    writeFileSync(join(dir, "helper.py"), "VALUE = 41\n");
+    writeFileSync(join(dir, "m.py"), "import helper\ndef one():\n    return {'metrics': {'v': helper.VALUE + 1}}\n");
+    trustFolder(project);
+    expect(trustStatus(project).state).toBe("trusted");
+    const dirs = { workDir: join(root, "pywork"), sessionDir: join(root, "pysession"), projectDir: project };
+    const rt = await startAdapter(loadAdapter(dir), dirs);
+    started.push(rt);
+    const tool = (await rt.tools()).find((t) => t.name === "one")!;
+    const r = await tool.execute({}, ctx(dirs.workDir, dirs.sessionDir));
+    expect(r.ok).toBe(true);
+    expect(existsSync(join(dir, "__pycache__"))).toBe(false);
+    expect(trustStatus(project).state).toBe("trusted");
+    if (process.platform !== "win32") expect(statSync(join(home, "pycache")).mode & 0o077).toBe(0);
+  } finally {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
   }
 });
