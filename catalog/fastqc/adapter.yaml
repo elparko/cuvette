@@ -57,8 +57,10 @@ decisions:
     default: auto
     group: Method
     help: >
-      auto lets FastQC guess the encoding from the quality characters. Use phred64 for old
-      Illumina 1.3 to 1.7 files. A wrong encoding can change the quality modules from FAIL to PASS.
+      auto decodes the quality characters as Sanger (offset 33). FastQC 0.13 does not detect the
+      old Illumina encodings. Use phred64 for Illumina 1.3 to 1.7 files. A wrong encoding can
+      change the quality modules from FAIL to PASS. If log_note asks if the file is Phred64, run
+      the tool again with phred64.
     essential: true
     owner: human
     stage: setup
@@ -89,7 +91,7 @@ tools:
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the read file. }
-      encoding: { type: string, enum: [auto, phred64], description: "Quality score encoding. auto is the FastQC default." }
+      encoding: { type: string, enum: [auto, phred64], description: "Quality score encoding. auto decodes as Sanger. Use phred64 for Illumina 1.3 to 1.7 files." }
     required: [path]
     command: ["/bin/sh", "{adapter_dir}/scripts/run_fastqc.sh", "{program_path}", "{path}", "{encoding}"]
     parse: keyvalue
@@ -111,7 +113,7 @@ map:
     route: "Run: fastqc --extract --outdir <folder> [--phred64] <reads file>. In the FastQC window: File > Open..."
     params:
       - { arg: path, label: "<reads file>" }
-      - { arg: encoding, label: "--phred64", ui_default: auto, note: "FastQC reads the encoding from the file unless you give --phred64." }
+      - { arg: encoding, label: "--phred64", ui_default: auto, note: "FastQC 0.13 decodes as Sanger unless you give --phred64. It only prints a hint if the file looks like Phred64." }
     fidelity: exact
     evidence: { source: docs, test: good_file, note: "The command line is the manual route. The test reads fastqc_data.txt, the file that the report is made from." }
     summary: "{metrics.total_sequences} reads of length {metrics.sequence_length}. {metrics.n_pass} PASS, {metrics.n_warn} WARN, {metrics.n_fail} FAIL."
