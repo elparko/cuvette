@@ -259,8 +259,6 @@ describe("the event stream", () => {
     }
     await new Promise((d) => setTimeout(d, 200));
     expect(sseCount()).toBe(before);
-    const view = (app as unknown as { view?: unknown }).view;
-    void view;
     expect(errors).toEqual([]);
     await alive();
   });
@@ -272,7 +270,6 @@ describe("the event stream", () => {
     slow.on("close", () => (closed = true));
     slow.pause();
     await new Promise((d) => setTimeout(d, 100));
-    const before = sseCount();
     const big = "y".repeat(200_000);
     for (let i = 0; i < 150; i++) session.bus.emit({ type: "delta", kind: "text", text: big });
     const t = performance.now();

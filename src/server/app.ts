@@ -242,8 +242,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const open = (o: { folder?: string; resume?: string; first?: string; adapter?: string }) => {
     opening = (async () => {
       lastError = "";
-      await detach();
       try {
+        await detach();
         const s = await makeSession({ folder: o.folder, resume: o.resume, model: opts.model, adapter: o.adapter });
         attach(s, true);
         if (o.first) s.send(o.first).catch(() => {});
