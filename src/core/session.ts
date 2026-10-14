@@ -2280,7 +2280,7 @@ export class Session {
     }
     const gate = this.pilotGate(tool, args);
     if (gate) {
-      this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true });
+      this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true, ...(pilotState(this.record).stale ? { stale: String(pilotState(this.record).stale) } : {}) });
       return error(gate);
     }
     if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && tool.name !== "clarify" && ++this.planLooks === 4) this.notes.push(this.clarified ? "You have looked at the data enough. Call plan now." : "You have looked at the data enough. Call clarify now.");

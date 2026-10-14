@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { UI_DIST } from "../src/server/app.ts";
-import { CARD_FIXTURES, ITEM_FIXTURES, ITEM_LIVE_FIXTURE, STATUS_FIXTURE } from "./a11y-cards.ts";
+import { cardHtml } from "../src/server/app-html.ts";
+import { CARD_CTX, CARD_FIXTURES, ITEM_FIXTURES, ITEM_LIVE_FIXTURE, STATUS_FIXTURE } from "./a11y-cards.ts";
 import { contrastFindings, focusOrder, installAudit, layoutFindings, motionFindings, namesFindings, structureFindings, targetFindings, type Finding } from "./a11y-audit.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
@@ -599,6 +600,24 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
       }
     }
     expect([...new Set(out)]).toEqual([]);
+  }, LONG);
+
+  test("a command of 100 KB in the permission card scrolls inside the card, and all of its text is in the page", async () => {
+    await openSession();
+    const tail = "END-OF-COMMAND";
+    const argv = ["sh", "-c", `${"abcdefghij".repeat(10_000)}${tail}`];
+    const html = cardHtml(CARD_CTX, { id: 1, card: { t: "permission", rid: "r9", tool: "run_command", args: { purpose: "Run", does: "Runs it.", argv }, touches: "Runs on this computer." } });
+    for (const width of [1280, 320]) {
+      await page.size(width, 800);
+      await goPage("Analysis");
+      await showCards(html);
+      const r = await page.eval<{ full: boolean; client: number; scroll: number; page: number; focusable: boolean }>(`(() => { const li = document.querySelector("li.command"); return { full: li.textContent.includes(${JSON.stringify(tail)}) && li.textContent.length > 100000, client: li.clientHeight, scroll: li.scrollHeight, page: document.documentElement.scrollWidth, focusable: li.tabIndex === 0 }; })()`);
+      expect(r.full).toBe(true);
+      expect(r.client).toBeLessThanOrEqual(260);
+      expect(r.scroll).toBeGreaterThan(r.client);
+      expect(r.page).toBeLessThanOrEqual(width);
+      expect(r.focusable).toBe(true);
+    }
   }, LONG);
 
   test("with the wide text spacing of WCAG 1.4.12, no text is cut off and no control covers another", async () => {

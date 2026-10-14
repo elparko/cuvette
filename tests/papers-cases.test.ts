@@ -116,6 +116,7 @@ beforeAll(() => {
     e("tool_call", { callId: "c1", tool: "compare_two_groups", adapter: "biostats", args: { path: file, paired: false } }),
     e("question", { decisionKey: "paired", title: "Paired test", text: "Pair or not.", options: [], qid: "q1" }),
     e("blocked", { callId: "c1", tool: "compare_two_groups", reason: "waiting for the scientist: paired", qid: "q1" }),
+    e("blocked", { callId: "c1", tool: "compare_two_groups", reason: "The agent tried to use X. Cuvette blocked it.", by: "path rule" }),
     e("answer", { qid: "q1", value: true, note: "answered from the answers file", by: "human" }),
     e("tool_result", { callId: "c1", tool: "compare_two_groups", ok: true, summary: "diff 1.5", text: '{"ok":true}' }, { node: "n1" }),
     e("node", node, { node: "n1" }),
@@ -149,6 +150,7 @@ test("buildCases writes an index, a case page and a sanitized session record", (
   expect(page).toContain("doi.org/10.1000/toy");
   expect(page).toContain("gave the scientist's answers automatically");
   expect(page).toContain("The harness held <code>compare_two_groups</code> until the scientist chose: Paired test");
+  expect(page).not.toContain("until the scientist chose: The agent tried");
   expect(page).toContain("The agent asked for paired = false. The scientist chose true for Paired test. The harness kept true.");
   expect(page).toContain("Source in the paper: Methods section.");
   expect(page).toContain("published in the paper");
@@ -162,7 +164,7 @@ test("buildCases writes an index, a case page and a sanitized session record", (
   const rec = join(root, "out", "papers", "records", "toy-Claude.jsonl.gz");
   expect(existsSync(rec)).toBe(true);
   const log = gunzipSync(readFileSync(rec)).toString("utf8");
-  expect(log.trim().split("\n")).toHaveLength(16);
+  expect(log.trim().split("\n")).toHaveLength(17);
   expect(log).not.toContain(root);
   expect(log).not.toContain("/Users/");
   expect(log).toContain("{data}/toy/toy.csv");

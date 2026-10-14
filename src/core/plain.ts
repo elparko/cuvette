@@ -17,7 +17,7 @@ export function plainText(s: string): string {
 }
 
 
-const WRITTEN_OUT = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
+const WRITTEN_OUT = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u00ad\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\u3164\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
 
 export function visibleText(text: string): string {
   return text.replace(WRITTEN_OUT, (c) => {

@@ -44,7 +44,7 @@ const ctx = {
     adapterInfo: [{ title: "ImageJ" }],
   },
 } as unknown as Ctx;
-
+export const CARD_CTX = ctx;
 const planBase = { stage: "plan" as const, version: 1, text: "1. Count the cells.\n2. [1] Compare the groups.", update: false, qids: [], programs: [{ part: "counting", adapter: "imagej", alternatives: ["cellpose"] }], mode: "watch" as const, restatement: "You want: the cell count in each image.", definitions: [{ measure: "cell", definition: "A nucleus with a clear edge" }], pilot: "image 1" };
 
 const slot = (card: Card, seq?: Slot["seq"], plan?: Partial<ReturnType<typeof planInit>>, msg?: string): Slot => {

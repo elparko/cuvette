@@ -405,7 +405,7 @@ export function transcriptHtml(ctx: RunCtx, c: CaseSpec | undefined, finalText: 
           const code = String((d.args as { code?: string; expression?: string })?.code ?? (d.args as { expression?: string })?.expression ?? JSON.stringify(d.args));
           out.push(`<div class="ev call" id="e${e.id}">${details(`The agent runs <code>${esc(tool)}</code>.`, pre(san(code)))}</div>`);
         } else out.push(`<div class="ev call small" id="e${e.id}">The agent calls <code>${esc(tool)}</code>${d.adapter ? ` (adapter ${esc(String(d.adapter))})` : ""}.</div>`);
-        const b = entries.find((x) => x.kind === "blocked" && x.data.callId === d.callId && x.id > e.id);
+        const b = entries.find((x) => x.kind === "blocked" && !!x.data.qid && x.data.callId === d.callId && x.id > e.id);
         if (b) out.push(held(b));
         break;
       }
@@ -425,7 +425,7 @@ export function transcriptHtml(ctx: RunCtx, c: CaseSpec | undefined, finalText: 
         out.push(questionCard(e, ctx, answers, c));
         break;
       case "blocked":
-        if (!heldShown.has(e.id)) out.push(held(e));
+        if (e.data.qid && !heldShown.has(e.id)) out.push(held(e));
         break;
       case "decision": {
         if (/^answer to q/.test(String(d.reason ?? ""))) break;

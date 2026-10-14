@@ -1099,6 +1099,12 @@
   font: 12.5px var(--font-mono);
   padding-left: 18px;
 }
+.srv .card .args li.command {
+  max-height: 14rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .srv .card .cardmsg,
 .srv .cardmsg {
   color: var(--bad);

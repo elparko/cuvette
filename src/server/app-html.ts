@@ -266,7 +266,7 @@ function setupCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "setup" }>): str
 function permissionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "permission" }>): string {
   const v = permissionView(card);
   return frame(slot, v.title, "yellow", `${v.purpose ? `<p><strong>${esc(v.purpose)}</strong></p>` : ""}${v.does ? `<p>${esc(v.does)}</p>` : ""}
-${v.args.length ? `<ul class="args">${v.args.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+${v.args.length ? `<ul class="args">${v.args.map((a) => (a.startsWith("Command: ") ? `<li class="command" tabindex="0">${esc(a)}</li>` : `<li>${esc(a)}</li>`)).join("")}</ul>` : ""}
 ${v.code ? `<details><summary>Show the code</summary><pre>${esc(v.code)}</pre></details>` : ""}
 <p class="touches">${esc(v.touches)}</p>
 <div class="row">${btn("Allow", act("allow"), "primary")}${v.always ? btn(`Always allow ${card.tool} in this session`, act("always")) : ""}${btn("Deny", act("deny"), "danger")}${btn("Stop the agent", act("stop"), "quiet")}</div>

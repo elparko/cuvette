@@ -129,7 +129,7 @@ export class Mapper {
       }
       case "blocked":
         if (d.pilot || REFUSERS.has(String(d.by))) this.refused.add(String(d.callId));
-        if (d.pilot) return line("⏸", `Held back ${String(d.tool ?? "a call").replace(/_/g, " ")}: it processes many files. The agent runs the method on one sample first. You confirm that demonstration before the batch runs.`, "yellow");
+        if (d.pilot) return line("⏸", `Held back ${String(d.tool ?? "a call").replace(/_/g, " ")}: it processes many files. The agent runs the method on one sample first.${d.stale ? ` The earlier demonstration is out of date: ${String(d.stale).replace(/[.\s]+$/, "")}.` : ""} You confirm that demonstration before the batch runs.`, "yellow");
         if (!d.qid) return line("⚠", `Blocked ${String(d.tool ?? "a call").replace(/_/g, " ")}: ${String(d.reason ?? "")}`, "yellow");
         return line("⏸", `Waiting for your decision: ${String(d.reason ?? "").replace(/^waiting for the scientist:\s*/, "")}`, "yellow");
       case "decision":

@@ -123,8 +123,8 @@ export function permissionView(card: Extract<Card, { t: "permission" }>) {
   const hidden = new Set(["purpose", "does", "code", ...(argv ? ["argv"] : [])]);
   const args = Object.entries(card.args)
     .filter(([k, v]) => !hidden.has(k) && !(code && typeof v === "string" && v.trim() === code.trim()))
-    .map(([k, v]) => visibleText(`${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`))
-    .map((a) => (a.length > ARG_LIMIT ? `${cutText(a, ARG_LIMIT)}... (${a.length - ARG_LIMIT} more characters)` : a));
+    .map(([k, v]) => [k, visibleText(`${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`)] as const)
+    .map(([k, a]) => (a.length > ARG_LIMIT && !(argv && k === "cwd") ? `${cutText(a, ARG_LIMIT)}... (${a.length - ARG_LIMIT} more characters)` : a));
   if (argv) args.unshift(`Command: ${commandText(argv)}`);
   return {
     title: card.search ? "Search outside the project" : `Permission needed: ${card.tool}`,

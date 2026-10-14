@@ -53,7 +53,7 @@ describe("the permission card for a command", () => {
   });
 
   test("writes out a line break, a control code and a text direction control, so that the card shows what runs", () => {
-    const v = card({ purpose: "Print", does: "Prints.", argv: ["echo", "a\nb", "esc\u001b[31m", "cr\rx", "ev\u202eil", "bell\u0007", "c1\u009b2J"] });
+    const v = card({ purpose: "Print", does: "Prints.", argv: ["echo", "a\nb", "esc\u001b[31m", "cr\rx", "ev\u202eil", "bell\u0007", "c1\u009b2J", "ls\u2028x", "soft\u00adhy", "blank\u3164"] });
     const text = v.args[0]!;
     expect(text).toContain("a\\nb");
     expect(text).toContain("esc\\u001b[31m");
@@ -61,6 +61,9 @@ describe("the permission card for a command", () => {
     expect(text).toContain("ev\\u202eil");
     expect(text).toContain("bell\\u0007");
     expect(text).toContain("c1\\x9b2J");
+    expect(text).toContain("ls\\u2028x");
+    expect(text).toContain("soft\\xadhy");
+    expect(text).toContain("blank\\u3164");
     expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e]/);
   });
 
@@ -74,6 +77,13 @@ describe("the permission card for a command", () => {
     const line = v.args.find((a) => a.startsWith("query = "))!;
     expect(line).toMatch(/\.\.\. \(\d+ more characters\)$/);
     expect(line).not.toMatch(/[\ud800-\udbff]\.\.\./);
+  });
+
+  test("the working folder of a command is not cut, and the card shows the whole text of a 100 KB command", () => {
+    const cwd = `/data/${"d".repeat(1500)}`;
+    const v = card({ purpose: "Run", does: "Runs it.", argv: ["sh", "-c", "x".repeat(100_000)], cwd });
+    expect(v.args.find((a) => a.startsWith("cwd = "))).toBe(`cwd = ${cwd}`);
+    expect(v.args[0]!.length).toBe("Command: sh -c ".length + 100_000);
   });
 
   test("script code keeps its line breaks and shows control codes written out", () => {

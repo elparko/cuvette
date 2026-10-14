@@ -572,6 +572,13 @@ describe("quiet view", () => {
     expect(texts(mainView(log, true).settled)).toEqual(["⏸ Held back count all: it processes many files. The agent runs the method on one sample first. You confirm that demonstration before the batch runs."]);
   });
 
+  test("a batch step that waits again because the demonstration is out of date says why", () => {
+    const { log } = feed((s) => {
+      s.record.append("blocked", { callId: "a", tool: "count_all", reason: "Pilot first: x", pilot: true, stale: "The input file changed after the demonstration." });
+    });
+    expect(texts(mainView(log, true).settled)[0]).toContain("The agent runs the method on one sample first. The earlier demonstration is out of date: The input file changed after the demonstration. You confirm");
+  });
+
   test("a blocked call that waits for an answer keeps the wait text without the internal prefix", () => {
     const { log } = feed((s) => {
       s.record.append("blocked", { tool: "compare_two_groups", reason: "waiting for the scientist: test", qid: "q1" });
