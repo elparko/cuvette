@@ -89,6 +89,18 @@ test("env -S takes a command string, and a deny rule tests that string", () => {
   expect(p.check(rc, { argv: ["env", "-S", "echo hello"] })).toBe("ask");
 });
 
+test("a deny rule catches env with the text of -S in the same word, and a command after many options", () => {
+  const p = new Permissions({ "run_command:rm *": "deny" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  for (const argv of [["env", "-Srm -rf x"], ["env", "--split-string=rm -rf x"], ["env", "--split-string", "rm -rf x"], ["env", "-i", "-i", "-i", "-i", "-i", "rm", "x"], ["env", "-i", "-i", "-i", "-i", "-i", "-i", "-i", "-i", "FOO=1", "rm", "x"], ["sudo", "-A", "-b", "-E", "-H", "-k", "-n", "rm", "x"]]) expect(p.check(rc, { argv }), argv.join(" ")).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "-Secho hello"] })).toBe("ask");
+  expect(p.check(rc, { argv: ["env", "-i", "-i", "-i", "-i", "-i", "git", "commit", "-m", "rm old"] })).toBe("ask");
+  const many = ["env", ...Array.from({ length: 3000 }, () => "-i"), "echo", "hi"];
+  const t0 = performance.now();
+  for (let i = 0; i < 50; i++) expect(p.check(rc, { argv: many })).toBe("ask");
+  expect(performance.now() - t0).toBeLessThan(2000);
+});
+
 test("a deny rule does not catch a shell command, a renamed copy or a script, and an allow rule does not look through a wrapper", () => {
   const p = new Permissions({ "run_command:rm *": "deny" });
   const rc = tool({ name: "run_command", source: "generic" });

@@ -36,14 +36,30 @@ function joinedArgv(args: Args, programs: RegExp[]): string[] {
     const wrapper = WRAPPERS[programName(words[0] ?? "")];
     if (!wrapper || depth > 4) return;
     let rest = words.slice(1);
+    const command = (text: string) => peel(text.split(/\s+/).filter(Boolean).filter((x, i, all) => !/^[A-Za-z_]\w*=/.test(x) || all.slice(0, i).some((y) => !/^[A-Za-z_]\w*=/.test(y))), depth + 1);
+    const env = programName(words[0]!) === "env";
     while (rest.length) {
       const w = rest[0]!;
       if (w === "--" || /^[A-Za-z_]\w*=/.test(w)) rest = rest.slice(1);
       else if (wrapper.has(w)) {
-        if (programName(words[0]!) === "env" && w === "-S" && rest[1] !== undefined) peel(rest[1].split(/\s+/).filter(Boolean).filter((x, i, all) => !/^[A-Za-z_]\w*=/.test(x) || all.slice(0, i).some((y) => !/^[A-Za-z_]\w*=/.test(y))), depth + 1);
+        if (env && w === "-S" && rest[1] !== undefined) command(rest[1]);
+        rest = rest.slice(2);
+      } else if (env && w.startsWith("-S") && w.length > 2) {
+        command(w.slice(2));
+        rest = rest.slice(1);
+      } else if (env && w.startsWith("--split-string=")) {
+        command(w.slice("--split-string=".length));
+        rest = rest.slice(1);
+      } else if (env && w === "--split-string" && rest[1] !== undefined) {
+        command(rest[1]);
         rest = rest.slice(2);
       } else if (w.startsWith("-")) {
-        for (let i = 1; i <= 4 && i < rest.length; i++) if (wanted(rest.slice(i))) peel(rest.slice(i), depth + 1);
+        let tried = 0;
+        for (let i = 1; i < rest.length && tried < 4; i++) {
+          if (rest[i]!.startsWith("-") || /^[A-Za-z_]\w*=/.test(rest[i]!)) continue;
+          tried++;
+          if (wanted(rest.slice(i))) peel(rest.slice(i), depth + 1);
+        }
         return;
       } else break;
     }
