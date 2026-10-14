@@ -582,6 +582,21 @@ test("a folder that the scientist names in the request is readable, also in the 
   expect(t[2]).toMatch(HOME_TEXT);
 });
 
+test("a session folder that the request names opens only that folder, not the sessions folder", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  for (const id of ["x", "y"]) {
+    mkdirSync(join(home, "sessions", id), { recursive: true });
+    writeFileSync(join(home, "sessions", id, "log.jsonl"), `{"id":"${id}"}\n`);
+  }
+  const named = join(home, "sessions", "x");
+  const { provider, session: s } = await start([call("read_file", { path: join(named, "log.jsonl") }), call("read_file", { path: join(home, "sessions", "y", "log.jsonl") }), call("list_dir", { path: join(home, "sessions") }), { text: "ok" }], {}, cwd);
+  await s.send(`Look at ${named}`);
+  const t = texts(provider);
+  expect(t[0]).toContain('"id":"x"');
+  expect(t[1]).toMatch(HOME_TEXT);
+  expect(t[2]).toMatch(HOME_TEXT);
+});
+
 test.skipIf(windows)("a link in the project folder that leads into the Cuvette home folder is refused", async () => {
   const cwd = mkdtempSync(join(work, "proj-"));
   otherSessions(cwd);

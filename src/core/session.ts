@@ -2568,7 +2568,7 @@ export class Session {
     };
     const hard = (p: string) => [p, realPath(p)].some((x) => within(private_, x) || indexed(x) || recordOf(x));
     const soft = (p: string) => [p, realPath(p)].some((x) => within(home, x));
-    const asked = [...named.filter((n) => hard(n) || soft(n)), ...named.map((n) => join(n, "..")).filter((n) => (hard(n) || soft(n)) && !home.includes(n))];
+    const asked = [...named.filter((n) => hard(n) || soft(n)), ...named.map((n) => join(n, "..")).filter((n) => soft(n) && !hard(n) && !home.includes(n))];
     const open = [...mine, ...nodeFiles, ...asked];
     const shut = (p: string) => {
       const free = (list: string[]) => within(list, p) && within(list, realPath(p));
