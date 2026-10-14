@@ -379,13 +379,9 @@ function hashBytes(path: string, from = 0, limit = Infinity): string {
   return h.digest("hex");
 }
 
-const BIG = 5_000_000;
-
 function fileHash(path: string): string {
   try {
-    const size = statSync(path).size;
-    if (size <= BIG) return hashBytes(path);
-    return `${size}:${hashBytes(path, 0, 1 << 20)}:${hashBytes(path, size - (1 << 20), 1 << 20)}`;
+    return hashBytes(path);
   } catch {
     return "";
   }
