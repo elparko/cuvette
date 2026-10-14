@@ -17,7 +17,7 @@ export function ModeMenu({ mode }: { mode: string }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="rounded-full" aria-label={`Mode: ${m.name}`}>
           <m.icon className="text-muted-foreground" />
-          <span className="text-muted-foreground">Mode</span>
+          <span className="text-muted-foreground max-sm:hidden">Mode</span>
           <span className="font-semibold">{m.name}</span>
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
         </Button>

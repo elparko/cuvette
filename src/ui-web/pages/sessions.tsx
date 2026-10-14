@@ -91,7 +91,7 @@ export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions
             tabIndex={rove.tabIndex(s.id)}
             disabled={s.moved}
             onClick={() => onOpen(s.id)}
-            className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-card transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-55"
+            className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-card transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring disabled:opacity-55"
           >
             {!compact && (
               <div className="flex aspect-[16/8] w-full items-center justify-center overflow-hidden border-b bg-muted">
@@ -112,7 +112,7 @@ export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions
             </div>
           </button>
           {s.moved && onRemove && (
-            <button type="button" onClick={() => onRemove(s.id)} className="self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={`Remove ${s.title} from the list`}>
+            <button type="button" onClick={() => onRemove(s.id)} className="self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Remove ${s.title} from the list`}>
               Remove from the list
             </button>
           )}

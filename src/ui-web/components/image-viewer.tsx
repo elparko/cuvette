@@ -48,7 +48,7 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
         role="group"
         aria-roledescription="image viewer"
         aria-label={`${alt || "Image"}. Arrow keys move the image. Plus and minus zoom. 0 fits the image, 1 shows 100%.`}
-        className="relative min-h-0 flex-1 touch-none overflow-hidden rounded-lg bg-muted outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="relative min-h-0 flex-1 touch-none overflow-hidden rounded-lg bg-muted outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring"
         style={{ cursor: drag.current ? "grabbing" : "grab" }}
         onPointerDown={(e) => {
           drag.current = { x: e.clientX, y: e.clientY };

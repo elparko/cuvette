@@ -50,7 +50,7 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
             <ul className="rounded-xl border bg-card p-1">
               {recent.slice(0, 6).map((r) => (
                 <li key={r}>
-                  <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+                  <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                     <ClockIcon className="size-4 text-muted-foreground" />
                     <span className="max-w-[65%] shrink-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
                     <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(r, 40)}</span>
@@ -90,7 +90,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
 
   const row = (key: string, icon: React.ReactNode, label: string, target: string, sub?: string) => (
     <li key={key}>
-      <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={target} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+      <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={target} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
         <span className="text-muted-foreground">{icon}</span>
         <span className="max-w-[65%] shrink-0 truncate">{label}</span>
         {sub && <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(sub, 40)}</span>}

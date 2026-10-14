@@ -2,7 +2,7 @@ import type * as React from "react";
 import { cn } from "../../lib/utils.ts";
 
 export const fieldClass =
-  "h-9 w-full min-w-0 rounded-lg border bg-field px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50";
+  "h-9 w-full min-w-0 rounded-lg border border-input bg-field px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function Input({ className, type = "text", ...props }: React.ComponentProps<"input">) {
   return <input type={type} data-slot="input" className={cn(fieldClass, className)} {...props} />;
