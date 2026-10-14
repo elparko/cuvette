@@ -695,7 +695,9 @@ export class Session {
           return { name: e.name, folder: st ? st.isDirectory() : e.folder, size: st?.isFile() ? st.size : undefined };
         }),
       );
-      return folderListNote(shown, names.length > FOLDER_LIST_MAX);
+      const hidden = isCloud(this.provider.info) && this.runtimes.some((rt) => rt.adapter.manifest.data_rules.cloud_visibility === "summaries");
+      const inspect = this.runtimes.some((rt) => rt.adapter.manifest.tools.some((t) => t.name === "inspect_table"));
+      return folderListNote(shown, names.length > FOLDER_LIST_MAX) + (hidden ? "\nAdapter tools do not send table rows to a cloud model." + (inspect ? " To see the column names of a small CSV file, call read_file on it in the same reply as inspect_table." : "") : "");
     };
     const limit = new Promise<undefined>((done) => AbortSignal.timeout(this.folderListMs).addEventListener("abort", () => done(undefined)));
     try {
@@ -2540,6 +2542,7 @@ export class Session {
           vis === "summaries"
             ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path }
             : { path: o.table.path, ...o.table, rows: data?.fullTable ? o.table.rows : o.table.rows.slice(0, small ? 5 : 12) };
+      if (o.table && vis === "summaries") obj.note = "The harness does not send the rows of this table to a cloud model. Read the source file with read_file to see the data.";
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = small ? JSON.stringify(obj) : `{\n${Object.entries(obj).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n")}\n}`;

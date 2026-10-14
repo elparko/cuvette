@@ -49,6 +49,7 @@ for (p in .libPaths()) cat("LIB\\t", p, "\\n", sep = "")
 cat(paste0("PKG\\t", ip[, "Package"], "\\t", ip[, "Version"], "\\n"), sep = "")`;
 
 const memory = new Map<string, Cached>();
+const scanning = new Map<string, Promise<EnvLock | undefined>>();
 
 function cacheFile(): string {
   return join(cuvetteHome(), "cache", "env-locks.json");
@@ -130,6 +131,15 @@ export async function captureEnv(t: EnvTarget): Promise<EnvLock | undefined> {
     memory.set(key, hit);
     return hit.lock;
   }
+  let run = scanning.get(key);
+  if (!run) {
+    run = scan(t, key).finally(() => scanning.delete(key));
+    scanning.set(key, run);
+  }
+  return run;
+}
+
+async function scan(t: EnvTarget, key: string): Promise<EnvLock | undefined> {
   const argv = t.kind === "python" ? [t.path, "-c", PY] : [t.path, "--vanilla", "-e", R];
   const r = await runProcess(argv, { cwd: dirname(t.path), timeoutMs: TIMEOUT_MS });
   let got: ReturnType<typeof parsePython>;

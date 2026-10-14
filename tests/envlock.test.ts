@@ -39,6 +39,13 @@ test("the lock of a Python environment lists each package and its version, with 
   expect(requirementsText(lock)).toBe("numpy==1.26.4\nanndata==0.10.8\n");
 });
 
+test("two captures of one environment at the same time run one package scan", async () => {
+  const f = fakePython([["numpy", "1.26.4"]]);
+  const [a, b] = await Promise.all([captureEnv({ kind: "python", path: f.py }), captureEnv({ kind: "python", path: f.py })]);
+  expect(f.calls()).toBe(1);
+  expect(b!.hash).toBe(a!.hash);
+});
+
 test("the cache keeps the lock until the environment folder changes", async () => {
   const f = fakePython([["numpy", "1.26.4"]]);
   const a = (await captureEnv({ kind: "python", path: f.py }))!;
