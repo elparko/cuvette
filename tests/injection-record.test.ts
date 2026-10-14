@@ -435,3 +435,15 @@ test("a request that says on or no near a setting name still gets a card from th
   expect(r.done()).toEqual([]);
   expect(r.open()).toEqual(expect.arrayContaining(["min_size", "method"]));
 });
+
+test("a long column name is cut on a code point boundary, so no lone surrogate is left", () => {
+  const rows = Array.from({ length: 6 }, (_, i) => [String(i), ""]);
+  for (const pad of [198, 199, 200]) {
+    const name = `${"a".repeat(pad)}😀${"b".repeat(50)}`;
+    const text = dataCheckText(checkTable({ columns: ["id", name], rows }, "data.csv"));
+    expect(text).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/);
+    expect(text).toContain(`(${name.length} characters)`);
+  }
+  const edge = dataCheckText(checkTable({ columns: ["id", `${"a".repeat(199)}😀bb`], rows }, "data.csv"));
+  expect(edge).toContain(`'${"a".repeat(199)}'`);
+});

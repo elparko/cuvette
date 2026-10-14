@@ -49,7 +49,8 @@ export const isMissing = (v: string) => MISSING.has(v.trim().toLowerCase());
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const flat = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
 const quote = (s: string) => {
-  const head = s.length > 200 ? s.slice(0, 200) : s;
+  let head = s.slice(0, 200);
+  if (s.length > 200 && /[\ud800-\udbff]$/.test(head)) head = head.slice(0, 199);
   const body = /[\x00-\x1f\x7f\u0085\u2028\u2029']/.test(head) ? JSON.stringify(head) : `'${head}'`;
   return s.length > 200 ? `${body} (${s.length} characters)` : body;
 };
