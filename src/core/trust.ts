@@ -15,7 +15,7 @@ export const TRUST_OPTIONS = [
   { value: "once", label: "Trust once (this session)" },
   { value: "no", label: "Do not trust (the session runs with user settings only)" },
 ];
-const LISTED = new Set(["node_modules", ".venv", ".git"]);
+const LISTED = new Set(["node_modules", ".venv"]);
 const CACHE_NAMES = new Set([".pytest_cache"]);
 const skipped = (dir: string, name: string) => CACHE_NAMES.has(name) || (name === ".cache" && basename(dir) === "node_modules");
 const MAX_FILES = 2000;
@@ -88,6 +88,7 @@ function parse(path: string): Record<string, unknown> {
 
 interface WalkState {
   root: string;
+  top: string;
   files: Record<string, string>;
   count: number;
   incomplete: string[];
@@ -149,11 +150,18 @@ function listing(dir: string, key: string, st: WalkState): void {
         return;
       }
       if (l.isSymbolicLink() && leavesRoot(p, st.root)) st.linked.push(relative(key, p));
-      h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? "link" : ""}\n`);
+      h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? linkHash(p) : ""}\n`);
       if (l.isDirectory()) stack.push(p);
     }
   }
   st.files[`(listing) ${relative(key, dir)}`] = h.digest("hex");
+}
+
+function gitFolder(git: string, key: string, st: WalkState, found: string[]): void {
+  const config = join(git, "config");
+  if (existsSync(config)) st.files[relative(key, config)] = readHash(config);
+  const hooks = join(git, "hooks");
+  if (lstatSync(hooks, { throwIfNoEntry: false })?.isDirectory()) walk(hooks, key, st, found);
 }
 
 function walk(dir: string, key: string, st: WalkState, found: string[]): void {
@@ -184,7 +192,8 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
       continue;
     }
     if (l.isDirectory()) {
-      if (LISTED.has(name)) listing(p, key, st);
+      if (name === ".git" && dir !== st.top) gitFolder(p, key, st, found);
+      else if (LISTED.has(name)) listing(p, key, st);
       else walk(p, key, st, found);
       continue;
     }
@@ -310,7 +319,7 @@ export function scanFolder(folder: string): FolderScan {
       }
       if (!st.isDirectory()) continue;
       const found: string[] = [];
-      const state: WalkState = { root: realpathSync(dir), files, count: 0, incomplete, linked };
+      const state: WalkState = { root: realpathSync(dir), top: dir, files, count: 0, incomplete, linked };
       walk(dir, key, state, found);
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }

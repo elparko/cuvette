@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, readlinkSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -336,6 +336,29 @@ describe("fuzz: the scan of a project folder", () => {
     expect(trustStatus(folder).state).toBe("changed");
   });
 
+  test("inside a .git folder of an adapter only the hooks and the config are part of the hash", () => {
+    const folder = join(root, "git-narrow");
+    const git = join(join(folder, ".cuvette", "adapters", "tool"), ".git");
+    mkdirSync(join(git, "hooks"), { recursive: true });
+    mkdirSync(join(git, "refs"), { recursive: true });
+    writeFileSync(join(folder, ".cuvette", "adapters", "tool", "adapter.yaml"), "name: tool\n");
+    writeFileSync(join(git, "config"), "[core]\n");
+    writeFileSync(join(git, "hooks", "post-checkout"), "echo one\n");
+    writeFileSync(join(git, "index"), "one");
+    writeFileSync(join(git, "refs", "main"), "abc");
+    trustFolder(folder);
+    writeFileSync(join(git, "index"), "two and more");
+    writeFileSync(join(git, "refs", "main"), "def");
+    writeFileSync(join(git, "COMMIT_EDITMSG"), "x");
+    expect(trustStatus(folder).state).toBe("trusted");
+    writeFileSync(join(git, "config"), "[core]\n\thooksPath = /tmp/x\n");
+    expect(trustStatus(folder).state).toBe("changed");
+    untrustFolder(folder);
+    trustFolder(folder);
+    writeFileSync(join(git, "hooks", "post-checkout"), "echo two\n");
+    expect(trustStatus(folder).state).toBe("changed");
+  });
+
   test("more files than the limit give the state changed, and the folder cannot be trusted", () => {
     const folder = join(root, "many");
     const dir = join(folder, ".cuvette", "adapters", "tool");
@@ -424,11 +447,11 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
     expect(scanFolder(folder).hash).not.toBe(second);
   });
 
-  test("a link to a folder outside the adapter folder is linked also inside node_modules, .venv and .git", () => {
+  test("a link to a folder outside the adapter folder is linked also inside node_modules and .venv", () => {
     const outside = join(root, "outside-listed");
     mkdirSync(outside, { recursive: true });
     writeFileSync(join(outside, "code.py"), "print(1)\n");
-    for (const listed of ["node_modules", ".venv", ".git"]) {
+    for (const listed of ["node_modules", ".venv"]) {
       const folder = join(root, `listed-${counter++}`);
       const base = join(folder, ".cuvette", "adapters", "tool");
       mkdirSync(join(base, listed, "lib"), { recursive: true });
@@ -443,6 +466,28 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
       expect(scanFolder(folder).linked, listed).toEqual([join(".cuvette", "adapters", "tool", listed, "escape")]);
       expect(trustStatus(folder).state, listed).toBe("changed");
       untrustFolder(folder);
+    }
+  });
+
+  test("a link to a file or a dangling link inside node_modules and .venv is hashed with its target", () => {
+    for (const listed of ["node_modules", ".venv"]) {
+      const folder = join(root, `listed-file-${counter++}`);
+      const base = join(folder, ".cuvette", "adapters", "tool");
+      mkdirSync(join(base, listed), { recursive: true });
+      writeFileSync(join(base, "adapter.yaml"), "name: tool\n");
+      const target = join(root, `listed-target-${counter++}.js`);
+      writeFileSync(target, "one");
+      symlinkSync(target, join(base, listed, "tool.js"));
+      symlinkSync(join(root, `missing-${counter++}.js`), join(base, listed, "dangling.js"));
+      trustFolder(folder);
+      expect(trustStatus(folder).state, listed).toBe("trusted");
+      writeFileSync(target, "one-changed");
+      expect(trustStatus(folder).state, listed).toBe("changed");
+      untrustFolder(folder);
+      trustFolder(folder);
+      const dangling = readlinkSync(join(base, listed, "dangling.js"));
+      writeFileSync(dangling, "now it exists");
+      expect(trustStatus(folder).state, listed).toBe("changed");
     }
   });
 
