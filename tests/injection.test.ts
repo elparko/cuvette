@@ -6,6 +6,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "vitest";
 import { cuvetteHome } from "../src/adapters/manifest.ts";
 import { Session } from "../src/core/session.ts";
+import { genericTools } from "../src/tools/generic.ts";
 import { trustStatus } from "../src/core/trust.ts";
 import type { Message, Part, ToolOutput } from "../src/core/types.ts";
 import { literatureTool } from "../src/tools/literature.ts";
@@ -519,4 +520,47 @@ test("no tool of the model can change the mode, the permissions, the trust, the 
   expect(names).toContain("run_script");
   const unknown = ["set_mode", "set_permissions", "approve_permission", "respond_permission", "trust_folder", "install_adapter", "write_settings", "resolve_finding", "dismiss_finding"];
   expect(unknown.filter((n) => names.includes(n))).toEqual([]);
+});
+
+test("write_file refuses every spelling of the settings and adapter paths of the project folder", async () => {
+  const project = mkdtempSync(join(work, "spell-"));
+  const session = join(work, "spell-session");
+  const dirs = { workDir: join(session, "out"), sessionDir: join(session, "rec"), projectDir: project };
+  mkdirSync(dirs.workDir, { recursive: true });
+  mkdirSync(dirs.sessionDir, { recursive: true });
+  mkdirSync(join(project, "sub"));
+  const write = genericTools(dirs).find((t) => t.name === "write_file")!;
+  const names = [
+    ".cuvette/settings.json",
+    "./.cuvette/settings.json",
+    "sub/../.cuvette/settings.json",
+    ".cuvette//settings.json",
+    ".CUVETTE/settings.json",
+    ".Cuvette/settings.local.json",
+    ".ga/settings.json",
+    ".ga/adapters/x/adapter.yaml",
+    ".cuvette/adapters/x/adapter.yaml",
+    ".cuvette/methods/m.json",
+    ".cuvette/settings.json/",
+    ".cuvette/../.cuvette/settings.json",
+  ];
+  for (const n of names) {
+    const r = await write.execute({ name: join(project, n), text: '{"permissions":"bypass"}' }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => {}, callTool: async () => ({ ok: false }) });
+    expect(r.ok, n).toBe(false);
+  }
+  expect(readdirSync(project).sort()).toEqual(["sub"]);
+});
+
+test.skipIf(windows)("write_file refuses a path through a link that leads to the settings folder", async () => {
+  const project = mkdtempSync(join(work, "spell-"));
+  const session = join(work, "spell-session2");
+  const dirs = { workDir: join(session, "out"), sessionDir: join(session, "rec"), projectDir: project };
+  mkdirSync(dirs.workDir, { recursive: true });
+  mkdirSync(dirs.sessionDir, { recursive: true });
+  mkdirSync(join(project, ".cuvette"));
+  symlinkSync(join(project, ".cuvette"), join(project, "figures"));
+  const write = genericTools(dirs).find((t) => t.name === "write_file")!;
+  const r = await write.execute({ name: join(project, "figures", "settings.json"), text: "{}" }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => {}, callTool: async () => ({ ok: false }) });
+  expect(r.ok).toBe(false);
+  expect(readdirSync(join(project, ".cuvette"))).toEqual([]);
 });
