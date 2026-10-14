@@ -25,6 +25,15 @@ export function isCredentialsFile(path: string): boolean {
   return real(path) === real(credentialsPath());
 }
 
+const SECRET_FOLDERS = new Set([".ssh", ".aws", ".gnupg", ".kube", ".azure", ".docker", "keychains"]);
+const SECRET_NAMES = /^(id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|\.netrc|_netrc|\.git-credentials|\.npmrc|\.pypirc|\.env(\..+)?|.+\.(pem|p12|pfx|kdbx))$/i;
+
+export function isSecretFile(path: string): boolean {
+  if (isCredentialsFile(path)) return true;
+  const parts = resolve(path).split(/[\\/]/);
+  return parts.slice(0, -1).some((d) => SECRET_FOLDERS.has(d.toLowerCase())) || SECRET_NAMES.test(parts.at(-1) ?? "");
+}
+
 export const KEY_REMOVED = "[API key removed]";
 
 const KEY_PATTERNS = [

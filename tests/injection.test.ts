@@ -433,13 +433,21 @@ function filesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesUnder(join(dir, e.name)) : [join(dir, e.name)]));
 }
 
-test("a tool result that names the saved key file as an output: the harness does not copy the file into the record", async () => {
+test("a tool result that names a key or password file as an output: the harness does not copy the file into the record", async () => {
   const credentials = join(home, "credentials.json");
+  const ssh = join(work, "fakehome", ".ssh");
+  mkdirSync(ssh, { recursive: true });
+  writeFileSync(join(ssh, "id_ed25519"), "PRIVATE-KEY-BODY");
+  writeFileSync(join(work, "fakehome", ".env"), "TOKEN=PRIVATE-KEY-BODY");
   const x = await start({ reads: () => [{ name: "lab_tool", args: {} }, { name: "lab_tool", args: {} }] });
   let n = 0;
-  toolOf(x.s, "lab_tool", () => (++n === 1 ? { ok: true, text: "saved", outputs: [{ path: credentials, kind: "file", name: "report.txt" }] } : { ok: true, text: "saved", images: [credentials], outputs: [{ path: credentials, kind: "image", name: "plot.png" }] }));
+  toolOf(x.s, "lab_tool", () =>
+    ++n === 1
+      ? { ok: true, text: "saved", outputs: [{ path: credentials, kind: "file", name: "report.txt" }, { path: join(ssh, "id_ed25519"), kind: "file", name: "a.txt" }] }
+      : { ok: true, text: "saved", images: [credentials], outputs: [{ path: credentials, kind: "image", name: "plot.png" }, { path: join(work, "fakehome", ".env"), kind: "file", name: "b.txt" }] },
+  );
   await ask(x);
-  const copies = filesUnder(x.s.record.dir).filter((f) => readFileSync(f).includes(KEY));
+  const copies = filesUnder(x.s.record.dir).filter((f) => /PRIVATE-KEY-BODY/.test(readFileSync(f, "latin1")) || readFileSync(f).includes(KEY));
   expect(copies).toEqual([]);
   expect(recordText(x.s)).not.toContain(KEY);
   expect(sent(x.provider)).not.toContain(KEY);
