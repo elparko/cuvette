@@ -527,3 +527,23 @@ can start and stop it without the command line.
 - **Question cards.** An item with an `ask` text and no value becomes a question card. The title is `Checklist ARRIVE 4a: Randomisation`. The answer is an `answer` entry in the record. The next `/checklist` reads it and shows the item as "Covered". The answer "not applicable" gives "Not applicable". An answer to a checklist card does not restart the agent.
 - **Offer.** A turn can run a step and leave no open plan step. After such a turn, the session writes one `notice` entry with `checklist: "offer"`. It does this only when the scientist sets a guideline.
 - **Exports.** The checklist is in `trail.md`, `trail.html`, the `Checklist` sheet of `results.xlsx`, and `checklist.md` and `checklist.csv` in the `.eln` file. Without a guideline, no file has a checklist.
+
+## Hostile data (`tests/injection*.test.ts`)
+
+WARNING: Do not trust the model or the data that it reads. A file, a file name, a tool result or a model reply can hold text that looks like an instruction.
+
+The harness does not depend on the model to refuse. These rules hold if the model does what the data says:
+
+- No tool changes the mode, the permission mode or the trust. Only the scientist does, with a command or a card.
+- The model never answers a permission card. A permission card for `run_script`, `run_command` or a write asks the scientist. A search that sends text to the outside asks the scientist also in bypass mode.
+- `write_file` refuses the record, `.cuvette/` and `.ga/` also after the scientist approves the card. `isCredentialsFile` finds the saved key file by its identity, so a hard link or another capital letter does not pass.
+- The harness does not copy the saved key file into the record, also if a tool result names it as an output.
+- `Session.answer` trusts a folder only for the question that the harness asked. The model can write a question with the same title.
+- A model proposal for a decision gets a card with the current value as the default. A headless run does not agree to it.
+- The model changes a decision with no card in one case. The scientist asked for a change, and the request names the setting. This works one time for each setting.
+- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder.
+- Text from data goes on one line in the log for the referee, the text for the summary, the data check and the design check. A line break cannot start a fake message.
+- The local providers put a zero-width space in chat template markers, such as `<|im_start|>`, and in `tool_result` tags. A tool result cannot close its wrapper.
+- The terminal app shows all text through `src/tui/text.tsx`, which removes control codes. The web app escapes all text, and `esc` removes text direction controls.
+
+Run `npx vitest run tests/injection*.test.ts`. Run the terminal file with `--fileParallelism=false`.
