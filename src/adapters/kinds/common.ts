@@ -613,12 +613,7 @@ export function killTree(pid: number | undefined): void {
   }
 }
 
-export async function killWithChildren(pid: number | undefined): Promise<void> {
-  if (!pid) return;
-  if (process.platform === "win32") {
-    killTree(pid);
-    return;
-  }
+async function descendants(pid: number): Promise<number[]> {
   const r = await runProcess(["ps", "-A", "-o", "pid=,ppid="], { timeoutMs: 5000 });
   const kids = new Map<number, number[]>();
   for (const line of r.stdout.split("\n")) {
@@ -633,7 +628,28 @@ export async function killWithChildren(pid: number | undefined): Promise<void> {
     }
   };
   walk(pid);
-  for (const n of [pid, ...all]) {
+  return all;
+}
+
+export async function killWithChildren(pid: number | undefined): Promise<void> {
+  if (!pid) return;
+  if (process.platform === "win32") {
+    killTree(pid);
+    return;
+  }
+  for (const n of [pid, ...(await descendants(pid))]) {
+    try {
+      process.kill(n, "SIGKILL");
+    } catch {}
+  }
+}
+
+// A script can start a process in a new session. The process group kill does not reach it, so the children are listed first.
+export async function killAll(pid: number | undefined): Promise<void> {
+  if (!pid) return;
+  const kids = process.platform === "win32" ? [] : await descendants(pid).catch(() => []);
+  killTree(pid);
+  for (const n of kids) {
     try {
       process.kill(n, "SIGKILL");
     } catch {}

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { Args, Tool, ToolOutput } from "../core/types.ts";
+import { validateArgs } from "../adapters/kinds/common.ts";
 
 export interface CoreDeps {
   adapters: LoadedAdapter[];
@@ -89,15 +90,19 @@ const PLAN_FULL = {
   required: [],
 };
 
-function tool(name: string, description: string, properties: Record<string, unknown>, required: string[], execute: (a: Args) => Promise<ToolOutput> | ToolOutput): Tool {
+function tool(name: string, description: string, properties: Record<string, unknown>, required: string[], execute: (a: Args) => Promise<ToolOutput> | ToolOutput, check = true): Tool {
+  const inputSchema = { type: "object", properties, required };
   return {
     name,
     description,
-    inputSchema: { type: "object", properties, required },
+    inputSchema,
     source: "harness",
     readOnly: true,
     permission: "allow",
-    execute: async (a) => execute(a),
+    execute: async (a) => {
+      const v = check ? validateArgs(inputSchema, a) : { args: a };
+      return v.error ? { ok: false, error: v.error } : execute(v.args);
+    },
   };
 }
 
@@ -198,10 +203,12 @@ export function coreTools(d: CoreDeps): Tool[] {
         (a) => {
           if (d.plan && d.fullPlan?.()) return d.plan(a);
           const steps = a.steps;
-          const list = Array.isArray(steps) ? steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") })) : [];
+          if (!Array.isArray(steps)) return { ok: false, error: "steps must be a list. Each item is an object with step and status." };
+          const list = steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") }));
           d.log("note", { text: "Plan:\n" + list.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`).join("\n"), plan: list, by: "agent" });
           return { ok: true, summary: `Plan with ${list.length} steps.` };
         },
+        false,
       ),
       get description() {
         return d.fullPlan?.()
