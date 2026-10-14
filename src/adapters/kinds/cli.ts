@@ -10,8 +10,9 @@ export async function runArgv(c: KindContext, def: ToolDef, args: Args, call: Ca
   const cwd = conn.cwd ? expand(conn.cwd, c.ph) : call.dir;
   const outEnv: Record<string, string> = {};
   for (const [k, p] of Object.entries(call.outputs)) outEnv[`CUVETTE_OUTPUT_${k.toUpperCase().replace(/\W/g, "_")}`] = p;
-  const guarded = await guardCommand(argv, c.dirs);
-  const r = await runProcess(guarded.argv, { cwd, env: childEnv(c, { ...outEnv, CUVETTE_CALL_DIR: call.dir, ...extraEnv }), signal, timeoutMs: conn.call_timeout_s * 1000 });
+  const env = childEnv(c, { ...outEnv, CUVETTE_CALL_DIR: call.dir, ...extraEnv });
+  const guarded = await guardCommand(argv, c.dirs, { cwd, env });
+  const r = await runProcess(guarded.argv, { cwd, env, signal, timeoutMs: conn.call_timeout_s * 1000 });
   const changed = guarded.changed();
   if (changed.length) return { ok: false, error: `the program changed the record or the settings of Cuvette: ${changed.join(", ")}. A program must not write there. Check these files.`, manualRoute: route };
   const failure = processFailure(r, basename(argv[0] ?? "the program"), conn.call_timeout_s);

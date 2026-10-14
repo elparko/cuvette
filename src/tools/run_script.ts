@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { addOldEnv } from "../core/old-names.ts";
@@ -213,7 +213,7 @@ function realish(p: string): string {
     rest.unshift(basename(at));
     at = dirname(at);
   }
-  return join(existsSync(at) ? realpathSync(at) : at, ...rest);
+  return join(existsSync(at) ? realpathSync.native(at) : at, ...rest);
 }
 
 const both = (paths: string[]) => [...new Set(paths.flatMap((p) => [p, realish(p)]))];
@@ -237,17 +237,48 @@ export function recordFolders(dirs: Dirs): string[] {
   return both(found);
 }
 
-export function settingsFolders(dirs: Dirs): string[] {
-  return dirs.projectDir ? both([".cuvette", ".ga"].map((n) => join(dirs.projectDir!, n))) : [];
+const OPEN_PARTS = ["adapters", "methods", "skills"];
+const SETTINGS_NAMES = ["settings.json", "settings.local.json"];
+
+export interface SettingsScope {
+  locked: string[];
+  open: string[];
+  files: string[];
+  roots: string[];
+}
+
+export function settingsScope(dirs: Dirs): SettingsScope {
+  const out: SettingsScope = { locked: [], open: [], files: [], roots: [] };
+  if (!dirs.projectDir) return out;
+  const home = realish(cuvetteHome());
+  for (const name of [".cuvette", ".ga"]) {
+    const dir = join(dirs.projectDir, name);
+    if (name === ".cuvette" && within(home, realish(dir))) {
+      let index: string[] = [];
+      try {
+        index = readdirSync(home).filter((f) => f.startsWith("sessions-index.json")).map((f) => join(home, f));
+      } catch {}
+      const files = [...SETTINGS_NAMES.map((f) => join(home, f)), ...(dir === home ? [] : SETTINGS_NAMES.map((f) => join(dir, f))), join(home, "sessions-index.json"), ...index];
+      out.locked.push(...files, join(home, "sessions"));
+      out.files.push(...files);
+      continue;
+    }
+    out.locked.push(dir);
+    out.roots.push(dir);
+    out.open.push(...OPEN_PARTS.map((n) => join(dir, n)));
+  }
+  return out;
 }
 
 export function writeSteps(dirs: Dirs): WriteStep[] {
-  const locked = both([...recordFolders(dirs), ...settingsFolders(dirs)]).filter((p) => !both([dirs.workDir]).includes(p));
+  const scope = settingsScope(dirs);
+  const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both([dirs.workDir]).includes(p));
   const keep = both([dirs.workDir]);
   const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
+  steps.push(...both(scope.open).map((path) => ({ path, allow: true })));
   const top = dirs.projectDir ? both([dirs.projectDir]) : [];
   const fixed = new Set(keep);
   for (const l of locked) {
@@ -279,20 +310,24 @@ function bwrapLocks(steps: WriteStep[]): string[] {
   return steps.filter((x) => !x.fixed).flatMap((x) => (existsSync(x.path) ? [x.allow ? "--bind" : "--ro-bind", x.path, x.path] : []));
 }
 
-function programExists(cmd: string | undefined): boolean {
+function programExists(cmd: string | undefined, cwd: string, env: Record<string, string | undefined>): boolean {
   if (!cmd) return false;
-  if (isAbsolute(cmd) || cmd.includes("/")) return existsSync(cmd);
-  return (process.env.PATH ?? "").split(delimiter).some((d) => d && existsSync(join(d, cmd)));
+  if (isAbsolute(cmd) || cmd.includes("/")) return existsSync(resolve(cwd, cmd));
+  return (env.PATH ?? "").split(delimiter).some((d) => d && existsSync(resolve(cwd, d, cmd)));
 }
 
-export async function guardCommand(argv: string[], dirs: Dirs): Promise<{ argv: string[]; changed(): string[] }> {
+export function bwrapCommand(argv: string[], steps: WriteStep[]): string[] {
+  return ["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv];
+}
+
+export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined> } = {}): Promise<{ argv: string[]; changed(): string[] }> {
   await probeSandbox();
   const steps = writeSteps(dirs);
   const guard = fingerprint(dirs, true);
-  if (!programExists(argv[0])) return { argv, changed: guard.changed };
+  if (!programExists(argv[0], o.cwd ?? process.cwd(), o.env ?? process.env)) return { argv, changed: guard.changed };
   const blind = blindPolicy();
   if (process.platform === "darwin" && sandbox === "on") return { argv: ["/usr/bin/sandbox-exec", "-p", `(version 1)(allow default)${writeRules(steps)}${blind ? sandboxReadRules(agentRules(blind)) : ""}`, ...argv], changed: guard.changed };
-  if (process.platform === "linux" && sandbox === "bwrap") return { argv: ["bwrap", "--bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv], changed: guard.changed };
+  if (process.platform === "linux" && sandbox === "bwrap") return { argv: bwrapCommand(argv, steps), changed: guard.changed };
   return { argv, changed: guard.changed };
 }
 
@@ -301,11 +336,11 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
-    const real = realpathSync(workDir);
-    const extra = project && !blind && existsSync(project) ? [project, realpathSync(project)] : [];
+    const real = realpathSync.native(workDir);
+    const extra = project && !blind && existsSync(project) ? [project, realpathSync.native(project)] : [];
     const subs = [real, workDir, ...extra, "/private/var/folders", "/private/tmp", "/dev"].map((p) => `(subpath ${sbString(p)})`).join("");
     const cred = credentialsPath();
-    const credPaths = [cred, ...(existsSync(cred) ? [realpathSync(cred)] : [])];
+    const credPaths = [cred, ...(existsSync(cred) ? [realpathSync.native(cred)] : [])];
     const secrets = `(deny file-read* file-write* ${credPaths.map((p) => `(literal ${sbString(p)})`).join("")})`;
     const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${writeRules(steps)}${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
@@ -313,13 +348,13 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
   return argv;
 }
 
-function hashBytes(path: string, limit = Infinity): string {
+function hashBytes(path: string, from = 0, limit = Infinity): string {
   const h = createHash("sha256");
   const buf = Buffer.alloc(1 << 20);
   const fd = openSync(path, "r");
   try {
     for (let done = 0; done < limit; ) {
-      const n = readSync(fd, buf, 0, Math.min(buf.length, limit - done), null);
+      const n = readSync(fd, buf, 0, Math.min(buf.length, limit - done), from + done);
       if (!n) break;
       h.update(buf.subarray(0, n));
       done += n;
@@ -330,32 +365,66 @@ function hashBytes(path: string, limit = Infinity): string {
   return h.digest("hex");
 }
 
-function filesUnder(dir: string, out: string[] = []): string[] {
+const fileHashes = new Map<string, { size: number; mtime: number; hash: string }>();
+
+function fileHash(path: string): string {
+  try {
+    const st = statSync(path);
+    if (st.size > 5_000_000) return "";
+    const hit = fileHashes.get(path);
+    if (hit && hit.size === st.size && hit.mtime === st.mtimeMs) return hit.hash;
+    const hash = hashBytes(path);
+    fileHashes.set(path, { size: st.size, mtime: st.mtimeMs, hash });
+    return hash;
+  } catch {
+    return "";
+  }
+}
+
+function filesUnder(dir: string, skip: string[], out: string[] = []): string[] {
   try {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (out.length >= 2000) break;
       const p = join(dir, e.name);
-      if (e.isDirectory()) filesUnder(p, out);
+      if (skip.includes(p)) continue;
+      if (e.isDirectory()) filesUnder(p, skip, out);
       else if (e.isFile()) out.push(p);
     }
   } catch {}
   return out;
 }
 
+const WINDOW = 65536;
+
+function edges(path: string, size: number): string {
+  return hashBytes(path, 0, Math.min(size, WINDOW)) + hashBytes(path, Math.max(0, size - WINDOW), Math.min(size, WINDOW));
+}
+
 export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
-  const settings = new Map<string, string>();
-  const settingsNow = () => new Map(settingsFolders(dirs).flatMap((d) => filesUnder(d)).flatMap((p) => { try { return statSync(p).size <= 5_000_000 ? [[p, hashBytes(p)] as const] : []; } catch { return []; } }));
-  for (const [p, h] of settingsNow()) settings.set(p, h);
+  const scope = settingsScope(dirs);
+  const skip = both(scope.open);
+  const settingsNow = () => {
+    const out = new Map<string, string>();
+    for (const p of [...scope.files, ...scope.roots.flatMap((r) => both([r]).flatMap((x) => filesUnder(x, skip)))]) out.set(p, fileHash(p));
+    return out;
+  };
+  const settings = settingsNow();
   const logPath = () => join(dirs.sessionDir, "log.jsonl");
-  const logSize = withLog && existsSync(logPath()) ? statSync(logPath()).size : 0;
-  const logHash = logSize ? hashBytes(logPath(), logSize) : "";
+  const first = withLog && existsSync(logPath()) ? statSync(logPath()) : undefined;
+  const logSize = first?.size ?? 0;
+  const logEdges = logSize ? edges(logPath(), logSize) : "";
+  const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
   return {
     changed() {
       const out: string[] = [];
       const now = settingsNow();
       for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
       const log = logPath();
-      if (logSize && (!existsSync(log) || statSync(log).size < logSize || hashBytes(log, logSize) !== logHash)) out.push(log);
+      if (logSize) {
+        const st = existsSync(log) ? statSync(log) : undefined;
+        const same = st && st.size === logSize && st.mtimeMs === first!.mtimeMs;
+        if (!st || st.size < logSize || edges(log, logSize) !== logEdges || (!same && hashBytes(log, 0, logSize) !== logHash)) out.push(log);
+      }
       return out;
     },
   };

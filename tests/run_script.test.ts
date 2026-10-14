@@ -1,12 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, utimesSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { genericTools } from "../src/tools/generic.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { describeLimits, fingerprint, guardCommand, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -318,7 +318,7 @@ test("write steps lock the records and the settings folders, and keep the work f
   expect(locked).toEqual(expect.arrayContaining([join(l.out, ".record"), join(l.other, ".record"), join(l.project, ".cuvette")]));
   expect(locked).not.toContain(l.out);
   expect(locked).not.toContain(join(l.project, "data", ".record"));
-  expect(steps.some((x) => x.allow)).toBe(false);
+  expect(steps.filter((x) => x.allow).map((x) => x.path)).toEqual([join(l.project, ".cuvette", "adapters"), join(l.project, ".cuvette", "methods"), join(l.project, ".cuvette", "skills"), join(l.project, ".ga", "adapters"), join(l.project, ".ga", "methods"), join(l.project, ".ga", "skills")]);
   expect(steps.filter((x) => x.fixed).map((x) => x.path)).toEqual(expect.arrayContaining([l.out, join(l.project, "cuvette"), l.project]));
   expect(recordFolders(l.dirs)).toContain(join(l.other, ".record"));
 });
@@ -412,7 +412,7 @@ test.skipIf(!sandboxWorks)("a script still writes its results in the work folder
 });
 
 
-test.skipIf(!sandboxWorks)("a script cannot rename the work folder or a parent folder, and the record stays the same", async () => {
+test.skipIf(!sandboxWorks)("a script cannot rename the work folder or a parent folder on macOS (Linux has no rename lock, only the check after the script), and the record stays the same", async () => {
   const l = layout();
   const tool = runScriptTool(l.dirs, { network: false });
   const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
@@ -469,4 +469,134 @@ test("the command guard reports a change of the settings when no sandbox protect
   const g = await guardCommand(["true"], l.dirs);
   writeFileSync(l.settings, '{"permissions":"bypass"}');
   expect(g.changed()).toEqual([l.settings]);
+});
+
+
+function fakeHome() {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-")));
+  const cuvette = join(home, ".cuvette");
+  mkdirSync(join(cuvette, "envs", "x"), { recursive: true });
+  mkdirSync(join(cuvette, "sessions", "old"), { recursive: true });
+  writeFileSync(join(cuvette, "settings.json"), '{"permissions":"ask"}');
+  writeFileSync(join(cuvette, "sessions", "old", "log.jsonl"), '{"id":1}\n');
+  const out = join(home, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  writeFileSync(join(out, ".record", "log.jsonl"), '{"id":1}\n');
+  return { home, cuvette, out, dirs: { workDir: out, sessionDir: join(out, ".record"), projectDir: home } };
+}
+
+async function withHome<T>(cuvette: string, body: () => Promise<T> | T): Promise<T> {
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = cuvette;
+  try {
+    return await body();
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
+}
+
+test("when the project folder is the home folder, the scope is only the settings files, the index and the sessions folder", async () => {
+  const h = fakeHome();
+  await withHome(h.cuvette, () => {
+    const scope = settingsScope(h.dirs);
+    expect(scope.roots).toEqual([join(h.home, ".ga")]);
+    expect(scope.locked).toEqual(expect.arrayContaining([join(h.cuvette, "settings.json"), join(h.cuvette, "settings.local.json"), join(h.cuvette, "sessions-index.json"), join(h.cuvette, "sessions"), join(h.home, ".ga")]));
+    expect(scope.locked).not.toContain(h.cuvette);
+    const guard = fingerprint(h.dirs, true);
+    writeFileSync(join(h.cuvette, "envs", "x", "lib.txt"), "package");
+    mkdirSync(join(h.cuvette, "cache"), { recursive: true });
+    writeFileSync(join(h.cuvette, "cache", "a"), "1");
+    expect(guard.changed()).toEqual([]);
+    writeFileSync(join(h.cuvette, "settings.json"), '{"permissions":"bypass"}');
+    expect(guard.changed()).toEqual([join(h.cuvette, "settings.json")]);
+  });
+});
+
+test.skipIf(!sandboxWorks)("with the project folder as the home folder, a script installs into the Cuvette folders and cannot write the settings", async () => {
+  const h = fakeHome();
+  await withHome(h.cuvette, async () => {
+    const tool = runScriptTool(h.dirs, { network: false });
+    const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: h.out, sessionDir: h.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+    const good = await run(`import os\nos.makedirs(${JSON.stringify(join(h.cuvette, "envs", "x", "R"))}, exist_ok=True)\nopen(${JSON.stringify(join(h.cuvette, "envs", "x", "R", "pkg.txt"))}, 'w').write('ok')`);
+    expect(good.error).toBeUndefined();
+    expect(readFileSync(join(h.cuvette, "envs", "x", "R", "pkg.txt"), "utf8")).toBe("ok");
+    const before = readFileSync(join(h.cuvette, "settings.json"), "utf8");
+    for (const target of [join(h.cuvette, "settings.json"), join(h.cuvette, "sessions", "old", "log.jsonl"), join(h.cuvette, "settings.local.json")]) {
+      const bad = await run(`open(${JSON.stringify(target)}, 'a').write('x')`);
+      expect(bad.ok, target).toBe(false);
+    }
+    expect(readFileSync(join(h.cuvette, "settings.json"), "utf8")).toBe(before);
+    expect(readFileSync(join(h.cuvette, "sessions", "old", "log.jsonl"), "utf8")).toBe('{"id":1}\n');
+    expect(existsSync(join(h.cuvette, "settings.local.json"))).toBe(false);
+  });
+});
+
+test("the folders adapters, methods and skills of the project settings are not locked and not hashed", () => {
+  const l = layout();
+  mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
+  writeFileSync(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"), "a: 1");
+  const guard = fingerprint(l.dirs, true);
+  mkdirSync(join(l.project, ".cuvette", "adapters", "x", "__pycache__"));
+  writeFileSync(join(l.project, ".cuvette", "adapters", "x", "__pycache__", "m.pyc"), "c");
+  writeFileSync(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"), "a: 2");
+  writeFileSync(join(l.project, ".cuvette", "skills.md"), "kept in the lock");
+  expect(guard.changed()).toEqual([join(l.project, ".cuvette", "skills.md")]);
+  rmSync(join(l.project, ".cuvette", "skills.md"));
+  writeFileSync(l.settings, "{}");
+  expect(guard.changed()).toEqual([l.settings]);
+});
+
+test.skipIf(!sandboxWorks)("a script writes under the adapters folder of the project settings, and not in settings.json", async () => {
+  const l = layout();
+  mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
+  const tool = runScriptTool(l.dirs, { network: false });
+  const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+  const good = await run(`open(${JSON.stringify(join(l.project, ".cuvette", "adapters", "x", "cache.pyc"))}, 'w').write('c')`);
+  expect(good.error).toBeUndefined();
+  expect((await run(`open(${JSON.stringify(l.settings)}, 'a').write('x')`)).ok).toBe(false);
+});
+
+test("the log check reads a same-size change in the old part, in the middle or at the edges", () => {
+  const l = layout();
+  const body = `${"a".repeat(200_000)}\n`;
+  writeFileSync(l.ownLog, body);
+  const middle = fingerprint(l.dirs, true);
+  appendFileSync(l.ownLog, '{"id":2}\n');
+  expect(middle.changed()).toEqual([]);
+  writeFileSync(l.ownLog, body.slice(0, 100_000) + "b" + body.slice(100_001) + '{"id":2}\n');
+  expect(middle.changed()).toEqual([l.ownLog]);
+  writeFileSync(l.ownLog, body);
+  const edge = fingerprint(l.dirs, true);
+  const t = new Date();
+  writeFileSync(l.ownLog, "b" + body.slice(1));
+  utimesSync(l.ownLog, t, t);
+  expect(edge.changed()).toEqual([l.ownLog]);
+});
+
+test("Linux: the command wrap uses the real devices and the read-only mounts", () => {
+  const l = layout();
+  const argv = bwrapCommand(["tool", "--x"], writeSteps(l.dirs));
+  expect(argv.slice(0, 7)).toEqual(["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev"]);
+  expect(argv).not.toContain("--dev");
+  expect(argv.join(" ")).toContain(`--ro-bind ${join(l.project, ".cuvette")} ${join(l.project, ".cuvette")}`);
+  expect(argv.slice(-2)).toEqual(["tool", "--x"]);
+});
+
+test.skipIf(!sandboxWorks)("a relative program that exists in the working folder runs with the lock, and a missing one does not wrap", async () => {
+  const l = layout();
+  writeFileSync(join(l.project, "tool.sh"), "#!/bin/sh\n");
+  const wrapped = await guardCommand(["./tool.sh"], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin" } });
+  expect(wrapped.argv[0]).toBe("/usr/bin/sandbox-exec");
+  expect((await guardCommand(["./none.sh"], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin" } })).argv).toEqual(["./none.sh"]);
+  expect((await guardCommand(["tool.sh"], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin" } })).argv).toEqual(["tool.sh"]);
+  expect((await guardCommand(["tool.sh"], l.dirs, { cwd: l.project, env: { PATH: `/usr/bin:${l.project}` } })).argv[0]).toBe("/usr/bin/sandbox-exec");
+});
+
+test("the lock rules use the true case of a path", () => {
+  const l = layout();
+  const variant = l.project.replace(/cuvette-guard-/, "CUVETTE-GUARD-");
+  if (!existsSync(variant)) return;
+  const locked = writeSteps({ ...l.dirs, projectDir: variant }).filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toContain(join(l.project, ".cuvette"));
 });

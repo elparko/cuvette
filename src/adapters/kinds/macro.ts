@@ -126,8 +126,9 @@ async function runMacroTool(c: KindContext, def: ToolDef, args: Args, call: Call
   const manual = mod.manualRoute?.(def.name, args) ?? shown;
   const fidelity = (mod as { fidelity?: (t: string, a: Args) => Fidelity | undefined }).fidelity?.(def.name, args);
   const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: macroFile, call_dir: call.dir }));
-  const guarded = await guardCommand(argv, c.dirs);
-  const r = await runProcess(guarded.argv, { cwd: call.dir, env: childEnv(c), signal, timeoutMs: conn.call_timeout_s * 1000 });
+  const env = childEnv(c);
+  const guarded = await guardCommand(argv, c.dirs, { cwd: call.dir, env });
+  const r = await runProcess(guarded.argv, { cwd: call.dir, env, signal, timeoutMs: conn.call_timeout_s * 1000 });
   const changed = guarded.changed();
   if (changed.length) return { ok: false, error: `the program changed the record or the settings of Cuvette: ${changed.join(", ")}. A program must not write there. Check these files.`, manualRoute: manual };
   const failure = processFailure(r, basename(argv[0] ?? "the program"), conn.call_timeout_s);

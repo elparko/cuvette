@@ -116,8 +116,9 @@ export function genericTools(dirs: Dirs): Tool[] {
         const argv = a.argv as string[];
         const route = commandLine(argv);
         const cwd = a.cwd ? here(String(a.cwd)) : project;
-        const guarded = await guardCommand(argv, dirs);
-        const r = await runProcess(guarded.argv, { cwd, env: withoutSecrets(), signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
+        const env = withoutSecrets();
+        const guarded = await guardCommand(argv, dirs, { cwd, env });
+        const r = await runProcess(guarded.argv, { cwd, env, signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
         const changed = guarded.changed();
         if (changed.length) {
           for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_command", path, reason: "The command changed the record or the settings of Cuvette.", by: "integrity check" });
