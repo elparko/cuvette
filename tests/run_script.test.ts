@@ -342,6 +342,26 @@ test("Linux wrap: bubblewrap mounts a locked folder read-only after the writable
   expect(b).toContain(`--ro-bind ${join(l.other, ".record")} ${join(l.other, ".record")}`);
 });
 
+test("an output folder next to the work folder opens, and one inside a record, the settings or the code folders does not", () => {
+  const l = layout();
+  const opens = (dirs: { workDir: string; sessionDir: string; projectDir?: string; outputDir: string }) => writeSteps(dirs).some((x) => x.allow && x.path === dirs.outputDir);
+  const base = { workDir: l.out, sessionDir: join(l.out, ".record"), projectDir: l.project };
+  mkdirSync(join(l.out, ".record", "sub"), { recursive: true });
+  mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
+  expect(opens({ ...base, outputDir: join(l.out, ".record", "sub") })).toBe(false);
+  expect(opens({ ...base, outputDir: join(l.other, ".record") })).toBe(false);
+  expect(opens({ ...base, outputDir: join(l.other, ".record", "sub") })).toBe(false);
+  expect(opens({ ...base, outputDir: join(l.project, ".cuvette") })).toBe(false);
+  expect(opens({ ...base, outputDir: join(l.project, ".cuvette", "adapters", "x") })).toBe(false);
+  expect(opens({ ...base, outputDir: l.other })).toBe(false);
+  const flat = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-flat-")));
+  mkdirSync(join(flat, "out"));
+  writeFileSync(join(flat, "log.jsonl"), "{}\n");
+  const own = { workDir: join(flat, "work"), sessionDir: flat };
+  expect(opens({ ...own, outputDir: join(flat, "out") })).toBe(true);
+  expect(opens({ ...own, outputDir: flat })).toBe(false);
+});
+
 test("the check ignores a change of the settings if the harness wrote a settings file or an index during the script, and ignores temp files of the index", () => {
   const l = layout();
   const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-home-")));

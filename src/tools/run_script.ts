@@ -283,9 +283,23 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   return out;
 }
 
+function holdsRecord(dir: string): boolean {
+  return existsSync(join(dir, "log.jsonl")) || existsSync(join(dir, "meta.json"));
+}
+
+// An output folder that is not the work folder opens only if it holds no record, no settings and no code.
+function outputOpens(dirs: Dirs, scope: SettingsScope): boolean {
+  const out = dirs.outputDir;
+  if (!out || both([out]).some((x) => both([dirs.workDir]).includes(x))) return false;
+  const mine = both([dirs.sessionDir]);
+  const others = recordFolders(dirs).filter((r) => !mine.includes(r));
+  const sealed = [...scope.locked, ...others, ...(basename(dirs.sessionDir) === ".record" ? mine : [])];
+  return !both([out]).some((x) => sealed.some((l) => within(x, l)) || x.split(/[\\/]/).includes(".record") || holdsRecord(x));
+}
+
 export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
-  const own = [dirs.workDir, ...(dirs.outputDir ? [dirs.outputDir] : [])];
+  const own = [dirs.workDir, ...(outputOpens(dirs, scope) ? [dirs.outputDir!] : [])];
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both(own).includes(p));
   const keep = both(own);
   const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
