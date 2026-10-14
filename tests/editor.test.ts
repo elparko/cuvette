@@ -136,6 +136,24 @@ describe("mac style in each terminal", () => {
     expect(feed("mac", ["\x1b[A", "\x1b[A"], at("abcdefghij", 7), 5).cur).toBe(2);
   });
 
+  test("Left, Right and Backspace move over a whole character: an emoji, a flag or a letter with a mark", () => {
+    expect(feed("mac", ["\x7f"], "a😀").text).toBe("a");
+    expect(feed("mac", ["\x1b[D"], "a🇩🇪").cur).toBe(1);
+    expect(feed("mac", ["\x1b[C"], at("e\u0301x", 0)).cur).toBe(2);
+    expect(feed("mac", ["\x1b[3~"], at("👩‍🔬x", 0)).text).toBe("x");
+    expect(feed("mac", ["\x1b[1;3D"], "ab 𝒜𝒜").cur).toBe(3);
+  });
+
+  test("a lone surrogate in typed or pasted text is dropped", () => {
+    expect(feed("mac", ["a\ud83dd"]).text).toBe("ad");
+    expect(feed("mac", ["\ude00"]).text).toBe("");
+  });
+
+  test("the layout counts a wide character as two columns", () => {
+    expect(layout("日本語日本語", 4).map((r) => [r.start, r.end])).toEqual([[0, 2], [2, 4], [4, 6], [6, 6]]);
+    expect(layout("ab日", 4).map((r) => [r.start, r.end, r.last])).toEqual([[0, 3, false], [3, 3, true]]);
+  });
+
   test("Ctrl+Z and Cmd+Z undo one word at a time", () => {
     const typed = chars("ab cd");
     expect(feed("mac", [...typed, "\x1a"]).text).toBe("ab ");
