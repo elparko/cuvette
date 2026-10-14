@@ -283,14 +283,22 @@ test("a normal adapter in a trusted project folder still loads", () => {
   expect(adapterDirs(p.root).x).toBe(p.adapter);
 });
 
-test("a script that writes a new file under the adapters folder makes the folder changed", async () => {
+test("a new file under the adapters folder makes the folder changed", () => {
   const p = trustedProject();
-  const r = await p.run(`import os\nos.makedirs(${JSON.stringify(join(p.adapter, "skills"))}, exist_ok=True)\nopen(${JSON.stringify(join(p.adapter, "skills", "evil.md"))}, 'w').write('x')\nopen(${JSON.stringify(join(p.adapter, "run.sh"))}, 'w').write('x')`);
-  expect(r.error).toBeUndefined();
+  mkdirSync(join(p.adapter, "skills"), { recursive: true });
+  writeFileSync(join(p.adapter, "skills", "evil.md"), "x");
+  writeFileSync(join(p.adapter, "run.sh"), "x");
   const s = trustStatus(p.root);
   expect(s.state).toBe("changed");
   expect(s.changes).toEqual(expect.arrayContaining([expect.stringContaining("new file: .cuvette/adapters/x/run.sh"), expect.stringContaining("new file: .cuvette/adapters/x/skills/evil.md")]));
   expect(adapterDirs(p.root).x).toBeUndefined();
+});
+
+test.skipIf(!sandboxWorks)("on the real macOS sandbox, a script cannot write a new file under the adapters folder", async () => {
+  const p = trustedProject();
+  expect((await p.run(`open(${JSON.stringify(join(p.adapter, "run.sh"))}, 'w').write('x')`)).ok).toBe(false);
+  expect(existsSync(join(p.adapter, "run.sh"))).toBe(false);
+  expect(trustStatus(p.root).state).toBe("trusted");
 });
 
 test("a new skills folder of the project settings counts in the trust hash", () => {
@@ -306,7 +314,7 @@ test.skipIf(!sandboxWorks)("on the real macOS sandbox, a script cannot replace t
   mkdirSync(join(other, "evil"), { recursive: true });
   writeFileSync(join(other, "evil", "adapter.yaml"), "adapter: { name: evil }\n");
   const folder = join(p.root, ".cuvette", "adapters");
-  const move = `import os, shutil\nshutil.move(${JSON.stringify(folder)}, ${JSON.stringify(folder + "-old")})\nos.symlink(${JSON.stringify(other)}, ${JSON.stringify(folder)})`;
+  const move = `import os, shutil\nshutil.move(${JSON.stringify(folder)}, ${JSON.stringify(join(p.root, "moved"))})\nos.symlink(${JSON.stringify(other)}, ${JSON.stringify(folder)})`;
   expect((await p.run(move)).ok).toBe(false);
   expect(lstatSync(folder).isSymbolicLink()).toBe(false);
   expect(trustStatus(p.root).state).toBe("trusted");

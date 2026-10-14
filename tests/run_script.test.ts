@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { appendFileSync, existsSync, statSync, utimesSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, statSync, utimesSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { genericTools } from "../src/tools/generic.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -318,7 +318,8 @@ test("write steps lock the records and the settings folders, and keep the work f
   expect(locked).toEqual(expect.arrayContaining([join(l.out, ".record"), join(l.other, ".record"), join(l.project, ".cuvette")]));
   expect(locked).not.toContain(l.out);
   expect(locked).not.toContain(join(l.project, "data", ".record"));
-  expect(steps.filter((x) => x.allow).map((x) => x.path)).toEqual([join(l.project, ".cuvette", "adapters"), join(l.project, ".cuvette", "methods"), join(l.project, ".cuvette", "skills"), join(l.project, ".ga", "adapters"), join(l.project, ".ga", "methods"), join(l.project, ".ga", "skills")]);
+  expect(steps.some((x) => x.allow)).toBe(false);
+  expect(writeSteps(l.dirs, { adapterFolders: true }).filter((x) => x.allow).map((x) => x.path)).toEqual([join(l.project, ".cuvette", "adapters"), join(l.project, ".cuvette", "methods"), join(l.project, ".cuvette", "skills"), join(l.project, ".ga", "adapters"), join(l.project, ".ga", "methods"), join(l.project, ".ga", "skills")]);
   expect(steps.filter((x) => x.fixed).map((x) => x.path)).toEqual(expect.arrayContaining([l.out, join(l.project, "cuvette"), l.project]));
   expect(recordFolders(l.dirs)).toContain(join(l.other, ".record"));
 });
@@ -350,10 +351,10 @@ test("the check after the script finds a change of the settings or of the old pa
 
   const settings = fingerprint(l.dirs, true);
   writeFileSync(l.settings, '{"permissions":"bypass"}');
-  writeFileSync(join(l.project, ".cuvette", "hooks.json"), "{}");
-  expect(settings.changed().sort()).toEqual([join(l.project, ".cuvette", "hooks.json"), l.settings].sort());
+  writeFileSync(join(l.project, ".cuvette", "settings.local.json"), "{}");
+  expect(settings.changed().sort()).toEqual([join(l.project, ".cuvette", "settings.local.json"), l.settings].sort());
   writeFileSync(l.settings, '{"permissions":"ask"}');
-  rmSync(join(l.project, ".cuvette", "hooks.json"));
+  rmSync(join(l.project, ".cuvette", "settings.local.json"));
   expect(settings.changed()).toEqual([]);
 
   const log = fingerprint(l.dirs, true);
@@ -500,7 +501,8 @@ test("when the project folder is the home folder, the scope is only the settings
   const h = fakeHome();
   await withHome(h.cuvette, () => {
     const scope = settingsScope(h.dirs);
-    expect(scope.roots).toEqual([join(h.home, ".ga")]);
+    expect(scope.files).toContain(join(h.home, ".ga", "settings.json"));
+    expect(scope.locked).toContain(join(h.home, ".ga"));
     expect(scope.locked).toEqual(expect.arrayContaining([join(h.cuvette, "settings.json"), join(h.cuvette, "settings.local.json"), join(h.cuvette, "sessions-index.json"), join(h.cuvette, "sessions"), join(h.home, ".ga")]));
     expect(scope.locked).not.toContain(h.cuvette);
     const guard = fingerprint(h.dirs, true);
@@ -532,7 +534,7 @@ test.skipIf(!sandboxWorks)("with the project folder as the home folder, a script
   });
 });
 
-test("the folders adapters, methods and skills of the project settings are not locked and not hashed", () => {
+test("the check after a script covers the settings files, not the adapters, methods or skills folders", () => {
   const l = layout();
   mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
   writeFileSync(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"), "a: 1");
@@ -540,21 +542,32 @@ test("the folders adapters, methods and skills of the project settings are not l
   mkdirSync(join(l.project, ".cuvette", "adapters", "x", "__pycache__"));
   writeFileSync(join(l.project, ".cuvette", "adapters", "x", "__pycache__", "m.pyc"), "c");
   writeFileSync(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"), "a: 2");
-  writeFileSync(join(l.project, ".cuvette", "skills.md"), "kept in the lock");
-  expect(guard.changed()).toEqual([join(l.project, ".cuvette", "skills.md")]);
-  rmSync(join(l.project, ".cuvette", "skills.md"));
+  writeFileSync(join(l.project, ".cuvette", "notes.txt"), "not a settings file");
+  expect(guard.changed()).toEqual([]);
   writeFileSync(l.settings, "{}");
   expect(guard.changed()).toEqual([l.settings]);
 });
 
-test.skipIf(!sandboxWorks)("a script writes under the adapters folder of the project settings, and not in settings.json", async () => {
+test.skipIf(!sandboxWorks)("a script cannot write under the adapters folder of the project settings or replace it, and writes normal results", async () => {
   const l = layout();
   mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
+  writeFileSync(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"), "a: 1");
   const tool = runScriptTool(l.dirs, { network: false });
   const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
-  const good = await run(`open(${JSON.stringify(join(l.project, ".cuvette", "adapters", "x", "cache.pyc"))}, 'w').write('c')`);
-  expect(good.error).toBeUndefined();
-  expect((await run(`open(${JSON.stringify(l.settings)}, 'a').write('x')`)).ok).toBe(false);
+  const folder = join(l.project, ".cuvette", "adapters");
+  for (const code of [
+    `open(${JSON.stringify(join(folder, "x", "evil.py"))}, 'w').write('x')`,
+    `open(${JSON.stringify(join(folder, "x", "adapter.yaml"))}, 'a').write('x')`,
+    `import os\nos.makedirs(${JSON.stringify(join(folder, "y"))})`,
+    `import os\nos.makedirs(${JSON.stringify(join(l.project, ".cuvette", "skills"))})`,
+    `import os\nos.rename(${JSON.stringify(folder)}, ${JSON.stringify(join(l.project, "moved"))})`,
+  ]) expect((await run(code)).ok, code).toBe(false);
+  expect(readdirSync(join(folder, "x"))).toEqual(["adapter.yaml"]);
+  expect(readFileSync(join(folder, "x", "adapter.yaml"), "utf8")).toBe("a: 1");
+  expect(existsSync(join(l.project, "moved"))).toBe(false);
+  const ok = await run(`open(${JSON.stringify(join(l.project, "data", "results.csv"))}, 'w').write('a,1')`);
+  expect(ok.error).toBeUndefined();
+  expect(readFileSync(join(l.project, "data", "results.csv"), "utf8")).toBe("a,1");
 });
 
 test("the check finds a change in the middle of the log or of a settings file, also when the size and the time are restored", () => {
@@ -631,7 +644,7 @@ test("the settings files of a home folder inside the project are locked and hash
     await withHome(elsewhere, () => {
       const scope = settingsScope(h.dirs);
       expect(scope.locked).toEqual(expect.arrayContaining([join(elsewhere, "settings.json"), join(elsewhere, "settings.local.json"), join(old, "settings.json"), join(h.cuvette, "settings.json"), join(elsewhere, "sessions")]));
-      expect(scope.roots).toEqual([join(h.home, ".ga")]);
+      expect(scope.files).toContain(join(h.home, ".ga", "settings.json"));
       const guard = fingerprint(h.dirs, true);
       mkdirSync(join(elsewhere, "envs"));
       writeFileSync(join(elsewhere, "envs", "pkg"), "1");
@@ -665,4 +678,22 @@ test.skipIf(!sandboxWorks)("a script cannot write the settings of a home folder 
     if (oldHome === undefined) delete process.env.HOME;
     else process.env.HOME = oldHome;
   }
+});
+
+
+test.skipIf(!sandboxWorks)("an adapter program through guardCommand writes in its own project adapter folder, and not in the settings", async () => {
+  const l = layout();
+  const own = join(l.project, ".cuvette", "adapters", "x");
+  mkdirSync(own, { recursive: true });
+  const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(own, "cache.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
+  expect(g.argv[0]).toBe("/usr/bin/sandbox-exec");
+  expect(spawnSync(g.argv[0]!, g.argv.slice(1)).status).toBe(0);
+  expect(readFileSync(join(own, "cache.txt"), "utf8")).toBe("ok\n");
+  expect(g.changed()).toEqual([]);
+  const bad = await guardCommand(["/bin/sh", "-c", `echo x >> ${JSON.stringify(l.settings)}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
+  expect(spawnSync(bad.argv[0]!, bad.argv.slice(1)).status).not.toBe(0);
+  const move = await guardCommand(["/bin/sh", "-c", `mv ${JSON.stringify(join(l.project, ".cuvette", "adapters"))} ${JSON.stringify(join(l.project, "moved"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
+  expect(spawnSync(move.argv[0]!, move.argv.slice(1)).status).not.toBe(0);
+  expect(existsSync(own)).toBe(true);
+  expect(existsSync(join(l.project, "moved"))).toBe(false);
 });

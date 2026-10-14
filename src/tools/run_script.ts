@@ -244,11 +244,10 @@ export interface SettingsScope {
   locked: string[];
   open: string[];
   files: string[];
-  roots: string[];
 }
 
 export function settingsScope(dirs: Dirs): SettingsScope {
-  const out: SettingsScope = { locked: [], open: [], files: [], roots: [] };
+  const out: SettingsScope = { locked: [], open: [], files: [] };
   if (!dirs.projectDir) return out;
   const project = realish(dirs.projectDir);
   const homes = [...new Set([cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")].map(realish))].filter((h) => within(h, project));
@@ -270,13 +269,13 @@ export function settingsScope(dirs: Dirs): SettingsScope {
       continue;
     }
     out.locked.push(dir);
-    out.roots.push(dir);
+    out.files.push(...SETTINGS_NAMES.map((f) => join(dir, f)));
     out.open.push(...OPEN_PARTS.map((n) => join(dir, n)));
   }
   return out;
 }
 
-export function writeSteps(dirs: Dirs): WriteStep[] {
+export function writeSteps(dirs: Dirs, opts: { adapterFolders?: boolean } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both([dirs.workDir]).includes(p));
   const keep = both([dirs.workDir]);
@@ -284,7 +283,7 @@ export function writeSteps(dirs: Dirs): WriteStep[] {
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
-  steps.push(...both(scope.open).map((path) => ({ path, allow: true })));
+  if (opts.adapterFolders) steps.push(...both(scope.open).map((path) => ({ path, allow: true })));
   const top = dirs.projectDir ? both([dirs.projectDir]) : [];
   const fixed = new Set([...keep, ...both(scope.open)]);
   for (const l of locked) {
@@ -328,7 +327,7 @@ export function bwrapCommand(argv: string[], steps: WriteStep[]): string[] {
 
 export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined> } = {}): Promise<{ argv: string[]; changed(): string[] }> {
   await probeSandbox();
-  const steps = writeSteps(dirs);
+  const steps = writeSteps(dirs, { adapterFolders: true });
   const guard = fingerprint(dirs, true);
   if (!programExists(argv[0], o.cwd ?? process.cwd(), o.env ?? process.env)) return { argv, changed: guard.changed };
   const blind = blindPolicy();
@@ -371,33 +370,23 @@ function hashBytes(path: string, from = 0, limit = Infinity): string {
   return h.digest("hex");
 }
 
+const BIG = 5_000_000;
+
 function fileHash(path: string): string {
   try {
-    return statSync(path).size > 5_000_000 ? "" : hashBytes(path);
+    const size = statSync(path).size;
+    if (size <= BIG) return hashBytes(path);
+    return `${size}:${hashBytes(path, 0, 1 << 20)}:${hashBytes(path, size - (1 << 20), 1 << 20)}`;
   } catch {
     return "";
   }
 }
 
-function filesUnder(dir: string, skip: string[], out: string[] = []): string[] {
-  try {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (out.length >= 2000) break;
-      const p = join(dir, e.name);
-      if (skip.includes(p)) continue;
-      if (e.isDirectory()) filesUnder(p, skip, out);
-      else if (e.isFile()) out.push(p);
-    }
-  } catch {}
-  return out;
-}
-
 export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
   const scope = settingsScope(dirs);
-  const skip = both(scope.open);
   const settingsNow = () => {
     const out = new Map<string, string>();
-    for (const p of [...scope.files, ...scope.roots.flatMap((r) => both([r]).flatMap((x) => filesUnder(x, skip)))]) out.set(p, fileHash(p));
+    for (const p of scope.files) out.set(p, fileHash(p));
     return out;
   };
   const settings = settingsNow();
