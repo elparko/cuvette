@@ -79,7 +79,7 @@ function usageOf(u: any): Usage {
 }
 
 function toolResultContent(text: string, images: { media: string; data: string }[], note: string): unknown {
-  const body = (text || "(no output)") + (note ? `\n[${note}]` : "");
+  const body = (text.trim() ? text : "(no output)") + (note ? `\n[${note}]` : "");
   if (!images.length) return body;
   return [
     { type: "text", text: body },
@@ -134,7 +134,7 @@ export class ClaudeProvider implements Provider {
         }
         const content: unknown[] = [];
         for (const p of m.parts) {
-          if (p.type === "text" && p.text) content.push({ type: "text", text: p.text });
+          if (p.type === "text" && p.text.trim()) content.push({ type: "text", text: p.text });
           else if (p.type === "tool_call") content.push({ type: "tool_use", id: toolId(p.id), name: toolName(p.name), input: p.args && typeof p.args === "object" ? p.args : {} });
         }
         if (!content.length) content.push({ type: "text", text: "(no reply)" });
@@ -150,7 +150,7 @@ export class ClaudeProvider implements Provider {
           if (p.isError) block.is_error = true;
           results.push(block);
         } else if (p.type === "text") {
-          if (p.text) rest.push({ type: "text", text: p.text });
+          if (p.text.trim()) rest.push({ type: "text", text: p.text });
         } else if (p.type === "image") {
           const { images, note } = budget.pick([p.path]);
           for (const i of images) rest.push({ type: "image", source: { type: "base64", media_type: i.media, data: i.data } });
@@ -226,10 +226,10 @@ export class ClaudeProvider implements Provider {
     const stop: string = msg.stop_reason ?? "end_turn";
     let content: any[] = msg.content ?? [];
     if (stop === "refusal" || stop === "max_tokens") content = content.filter((b) => b.type !== "tool_use");
-    content = content.filter((b) => !(b.type === "text" && !b.text)).map((b) => (b.type === "tool_use" && (b.input === undefined || b.input === null) ? { ...b, input: {} } : b));
+    content = content.filter((b) => !(b.type === "text" && !b.text?.trim())).map((b) => (b.type === "tool_use" && (b.input === undefined || b.input === null) ? { ...b, input: {} } : b));
     const parts: Part[] = [];
     for (const b of content) {
-      if (b.type === "text" && b.text) parts.push({ type: "text", text: b.text });
+      if (b.type === "text" && b.text.trim()) parts.push({ type: "text", text: b.text });
       else if (b.type === "thinking" && b.thinking) parts.push({ type: "thinking", text: b.thinking });
       else if (b.type === "tool_use") parts.push({ type: "tool_call", id: b.id, name: b.name, args: b.input ?? {} });
     }

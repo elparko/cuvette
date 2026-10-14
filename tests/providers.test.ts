@@ -169,6 +169,24 @@ describe("claude", () => {
     expect(content[1]).toMatchObject({ tool_use_id: "b", is_error: true, content: "boom" });
   });
 
+  test("text that holds only white space never goes to the API as a text block", async () => {
+    const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
+    const native: any[] = p.toNative([
+      user(" \n"),
+      { role: "assistant", parts: [{ type: "text", text: "\n\n" }, { type: "tool_call", id: "a", name: "run", args: {} }] },
+      { role: "user", parts: [{ type: "tool_result", callId: "a", name: "run", text: " \n\t" }, { type: "text", text: "  " }] },
+      { role: "assistant", parts: [{ type: "text", text: " " }] },
+    ]);
+    expect(native[0].content).toEqual([{ type: "text", text: "(empty)" }]);
+    expect(native[1].content).toEqual([{ type: "tool_use", id: "a", name: "run", input: {} }]);
+    expect(native[2].content).toEqual([{ type: "tool_result", tool_use_id: "a", content: "(no output)" }]);
+    expect(native[3].content).toEqual([{ type: "text", text: "(no reply)" }]);
+    const { client } = fakeClient([claudeMsg([{ type: "text", text: "\n\n" }, { type: "tool_use", id: "t", name: "add", input: {} }], "tool_use")]);
+    const r = await new ClaudeProvider("claude-opus-5-5", { client }).step(req([user("go")]));
+    expect(r.message.parts).toEqual([{ type: "tool_call", id: "t", name: "add", args: {} }]);
+    expect(r.message.raw).toEqual([{ type: "tool_use", id: "t", name: "add", input: {} }]);
+  });
+
   test("an error result with images sends text only", () => {
     dirImg();
     const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
