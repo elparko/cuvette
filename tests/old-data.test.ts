@@ -793,3 +793,40 @@ describe("a method file from a newer version", () => {
     expect(() => loadMethod("later")).toThrow("format 2. This version of Cuvette reads format 1. Update Cuvette to use it.");
   });
 });
+
+describe.each(["v5-open-question", "v7-open-question"])("a session that the app closed with a question open (%s)", (format) => {
+  beforeEach(() => install(format));
+
+  test("the list says that it waits, and the resume closes the unfinished questions once", async () => {
+    const [first] = projectSessions();
+    expect(listSessions().find((x) => x.id === first!.id)?.status).toBe("waiting for you");
+    const s = await resume(first!.id);
+    expect(s.questions.open()).toEqual([]);
+    const stops = s.record.entries(["clarify"]).filter((e) => e.data.action === "stopped");
+    expect(stops.length).toBe(1);
+    expect(stops[0]!.data.reason).toBe("The session stopped before the answers.");
+    await s.close();
+    open.splice(open.indexOf(s), 1);
+    const again = await resume(first!.id);
+    expect(again.record.entries(["clarify"]).filter((e) => e.data.action === "stopped").length).toBe(1);
+    await again.send("Count with one cluster as one particle.");
+  });
+});
+
+describe("a home session folder that sits in another place", () => {
+  test.each(["v1-first-build", "v2-home-sessions"])("%s: cuvette open with the folder path resumes the session in that folder", async (format) => {
+    install(format);
+    const id = readdirSync(join(root, "home", "sessions"))[0]!;
+    const elsewhere = join(root, "backup", id);
+    mkdirSync(join(root, "backup"), { recursive: true });
+    renameSync(join(root, "home", "sessions", id), elsewhere);
+    expect(listSessions()).toEqual([]);
+    const before = readFileSync(join(elsewhere, "log.jsonl"), "utf8");
+    const s = await resume(elsewhere);
+    expect(s.id).toBe(id);
+    expect(s.dir).toBe(elsewhere);
+    await s.send("Thanks.");
+    expect(readFileSync(join(elsewhere, "log.jsonl"), "utf8").startsWith(before)).toBe(true);
+    expect(existsSync(join(root, "home", "sessions", id))).toBe(false);
+  });
+});
