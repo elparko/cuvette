@@ -670,6 +670,101 @@ test("a python adapter that changes the settings gets an error, or cannot write 
   }
 });
 
+const GO = `import os
+def go(base):
+    os.makedirs(os.path.join(base, 'figures'), exist_ok=True)
+    open(os.path.join(base, 'figures', 'x.png'), 'wb').write(b'png')
+    open(os.path.join(base, 'data.csv'), 'w').write('a,b\\n1,2\\n')
+    os.makedirs(os.path.join(base, 'sub', 'deeper'), exist_ok=True)
+    open(os.path.join(base, 'sub', 'deeper', 'a.txt'), 'w').write('a')
+    os.rename(os.path.join(base, 'data.csv'), os.path.join(base, 'data2.csv'))
+    os.rename(os.path.join(base, 'sub'), os.path.join(base, 'sub2'))
+    os.remove(os.path.join(base, 'sub2', 'deeper', 'a.txt'))
+    os.rmdir(os.path.join(base, 'sub2', 'deeper'))
+    os.rmdir(os.path.join(base, 'sub2'))
+    os.makedirs(os.path.join(base, 'sub'), exist_ok=True)
+    open(os.path.join(base, 'sub', 'b.txt'), 'w').write('b')
+    return {'metrics': {'done': 1}}
+def attack(target):
+    try:
+        open(target, 'a').write('x')
+        return {'metrics': {'wrote': 1}}
+    except OSError:
+        return {'metrics': {'wrote': 0}}
+`;
+
+interface Layout {
+  name: string;
+  home?: string;
+  dirs: { workDir: string; sessionDir: string; projectDir?: string; outputDir?: string };
+  locked: string[];
+}
+
+function layouts(): Layout[] {
+  const base = realpathSync(mkdtempSync(join(root, "layouts-")));
+  const made: Layout[] = [];
+  const put = (p: string, text: string) => (mkdirSync(join(p, ".."), { recursive: true }), writeFileSync(p, text), p);
+  const project = join(base, "new", "project");
+  const out = join(project, "cuvette", "s1");
+  made.push({ name: "new place", dirs: { workDir: out, sessionDir: join(out, ".record"), projectDir: project }, locked: [put(join(out, ".record", "log.jsonl"), "{}\n"), put(join(project, ".cuvette", "settings.json"), "{}")] });
+  const legacy = join(base, "legacy", "session");
+  made.push({ name: "legacy place", dirs: { workDir: join(legacy, "work"), sessionDir: legacy }, locked: [put(join(legacy, "log.jsonl"), "{}\n")] });
+  const asHome = join(base, "ashome");
+  const homeOut = join(asHome, "cuvette", "s2");
+  made.push({ name: "project is the home folder", home: join(asHome, ".cuvette"), dirs: { workDir: homeOut, sessionDir: join(homeOut, ".record"), projectDir: asHome }, locked: [put(join(homeOut, ".record", "log.jsonl"), "{}\n"), put(join(asHome, ".cuvette", "settings.json"), "{}"), put(join(asHome, ".cuvette", "sessions-index.json"), "[]")] });
+  const cuvetteHome = join(base, "inhome", "home");
+  const inner = join(cuvetteHome, "proj");
+  const innerOut = join(inner, "cuvette", "s3");
+  made.push({ name: "project inside the Cuvette home", home: cuvetteHome, dirs: { workDir: innerOut, sessionDir: join(innerOut, ".record"), projectDir: inner }, locked: [put(join(innerOut, ".record", "log.jsonl"), "{}\n"), put(join(cuvetteHome, "settings.json"), "{}"), put(join(inner, ".cuvette", "settings.json"), "{}")] });
+  const flat = join(base, "flat");
+  made.push({ name: "output folder next to the work folder, inside the session folder", dirs: { workDir: join(flat, "work"), sessionDir: flat, outputDir: join(flat, "out") }, locked: [put(join(flat, "log.jsonl"), "{}\n")] });
+  for (const l of made) {
+    mkdirSync(l.dirs.workDir, { recursive: true });
+    if (l.dirs.outputDir) mkdirSync(l.dirs.outputDir, { recursive: true });
+  }
+  return made;
+}
+
+test.skipIf(!sandboxWorks)("under the real sandbox a python adapter writes, renames and deletes inside the output folder in every folder layout, and cannot write the record or the settings", async () => {
+  const dir = adapter(`${head("python", "  call_timeout_s: 30\n")}tools:
+  - { name: go, description: d, function: "m:go", params: { base: { type: string } }, required: [base] }
+  - { name: attack, description: d, function: "m:attack", params: { target: { type: string } }, required: [target] }
+`, { "m.py": GO });
+  const oldHome = process.env.CUVETTE_HOME;
+  const oldHomeDir = process.env.HOME;
+  try {
+    for (const l of layouts()) {
+      if (l.home) {
+        process.env.CUVETTE_HOME = l.home;
+        mkdirSync(l.home, { recursive: true });
+        if (l.name === "project is the home folder") process.env.HOME = l.dirs.projectDir!;
+      } else {
+        process.env.CUVETTE_HOME = mkdtempSync(join(root, "home-"));
+        process.env.HOME = oldHomeDir;
+      }
+      const rt = await startAdapter(loadAdapter(dir), l.dirs);
+      started.push(rt);
+      const tools = Object.fromEntries((await rt.tools()).map((t) => [t.name, t]));
+      const c = ctx(l.dirs.workDir, l.dirs.sessionDir);
+      const base = l.dirs.outputDir ?? l.dirs.workDir;
+      const r = await tools.go!.execute({ base }, c);
+      expect(r.error, l.name).toBeUndefined();
+      expect(r.ok, l.name).toBe(true);
+      for (const rel of ["figures/x.png", "data2.csv", "sub/b.txt"]) expect(existsSync(join(base, rel)), `${l.name}: ${rel}`).toBe(true);
+      const before = l.locked.map((f) => readFileSync(f, "utf8"));
+      for (const target of l.locked) {
+        const a = await tools.attack!.execute({ target }, c);
+        expect(a.metrics?.wrote, `${l.name}: ${target}`).toBe(0);
+      }
+      expect(l.locked.map((f) => readFileSync(f, "utf8")), l.name).toEqual(before);
+    }
+  } finally {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+    process.env.HOME = oldHomeDir;
+  }
+});
+
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
