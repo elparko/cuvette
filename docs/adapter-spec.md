@@ -26,7 +26,7 @@ my-adapter/
 | `adapter.yaml` | Tools, tool-to-UI map, decisions, checks, known-answer tests, connection. |
 | `STANDARDS.md` | How results in this field must be reported. Plain text. The `standards` field in `adapter.yaml` is added in front of it. |
 | `skills/*.md` | One procedure per file. Each file starts with frontmatter that has `name` and `description`. |
-| `adapter.ts` | A module named in the `module` field. Its default export has the keys `checks`, `hooks`, `tools` and `manualRoute`. |
+| `adapter.ts` | A module named in the `module` field. Its default export has the keys in [The module](#the-module). |
 | `data/` | Files that known-answer tests read. Refer to them with `{adapter_dir}/data/<file>`. |
 | `data/SOURCES.md` | One table, `| File | Source | License |`, with a row for each file or folder that the tests read. For made-up data, name the script and write "synthetic". "not confirmed" in the license column gives a warning. |
 
@@ -54,6 +54,8 @@ The checker reports an error for a skill with no `name` or no `description`.
 | `tools` | list | Extra tools. Each has `name`, `description`, `inputSchema`, `source: "adapter"` and `execute(args, ctx)`. |
 | `manualRoute` | function | `(tool, args) => string or undefined`. It returns the manual route for a call when a fixed template is not enough. |
 | `suggest` | function | `(key, args) => { value, reason } or undefined`. When a call waits for a decision, the harness calls it with the decision key and the call arguments. The card of the question shows the value as the recommendation and the reason as evidence. Use it to detect a value from the input files. |
+| `openPanel` | function | `(url, { sessionDir })`. It shows the adapter's own panel at `url`. The `/panel` command calls it. |
+| `historySteps` | function | `(output) => [{ tool, args, line }]`. Teach mode calls it to get the steps of a tool result. |
 
 ## `adapter.yaml`
 
@@ -401,7 +403,7 @@ tests:
     expect:
       - { path: metrics.threshold, approx: 120, abs: 1 }
       - { path: metrics.n_objects, equals: 64 }
-      - { path: outputs[0].path, contains: ".png" }
+      - { path: "outputs[0].path", contains: ".png" }
 ```
 
 #### Self-test
@@ -660,8 +662,8 @@ English. It gives a warning, not an error.
 | An `exact` entry has the evidence source `unverified`. | warning |
 | The status is not `draft` and `tested_versions` is empty. | warning |
 | The installed version is not in `tested_versions`. | warning |
-| A checklist rule with level error fails: `field`, `file-types`, `install-hint`, `locate-identity`, `tool-description`, `arg-description` (required argument), `arg-schema`, `batch-flag`, `manual-route`, `approval-code`, `blinding-number`, `decision-type`, `decision-default`, `decision-help`, `sensitivity-compare`, `kat-present`, `kat-data-license`, `kat-gui`. | error |
-| A checklist rule with level warning fails: `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, `text-style`, a license that is not confirmed. | warning |
+| A checklist rule with level error fails: `field`, `file-types`, `program-citation`, `install-hint`, `locate-identity`, `tool-description`, `arg-description` (required argument), `arg-schema`, `batch-flag`, `manual-route`, `approval-code`, `blinding-number`, `decision-type`, `decision-default`, `decision-help`, `sensitivity-compare`, `kat-present`, `kat-data-license`, `kat-gui`. | error |
+| A checklist rule with level warning fails: `method-citation`, `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, `text-style`, a license that is not confirmed. | warning |
 
 `cuvette adapter check <name> --drive [--model ollama:qwen3:8b] [--tool <name>]` is the drive test.
 For each tool, it makes one plain request from the tool description and the input of a
@@ -670,7 +672,6 @@ the model called the right tool, whether the arguments were valid, and whether t
 the answer reached the known value. Each confusion names its record entry. The default model is
 `ollama:qwen3:8b`.
 
-The pull request workflow `.github/workflows/adapter-check.yml` (on the license branch, not yet on
-main) runs `cuvette adapter check` on each changed adapter folder. The checklist rules run inside that
+The pull request workflow `.github/workflows/adapter-check.yml` runs `cuvette adapter check` on each changed adapter folder. The checklist rules run inside that
 command, so the workflow needs no new step. The ImageJ job in `.github/workflows/test.yml` passes
 `--gui`.

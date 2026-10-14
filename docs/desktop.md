@@ -188,7 +188,7 @@ you have it:
 
 - The onboarding adapter (`cuvette onboard`) needs tsx. It does not run in the app. Use the terminal
   install for it.
-- The app does not contain the known-answer test data of the adapters (`catalog/*/data`, 12 MB).
+- The app does not contain the known-answer test data of the adapters (`catalog/*/data`, about 33 MB).
   `cuvette adapter check --run-tests` needs the repository.
 - `cuvette install-launcher` makes a different `~/Applications/Cuvette.app` (a small script). If you
   use the desktop app, remove it with `cuvette uninstall-launcher`.

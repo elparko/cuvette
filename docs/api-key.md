@@ -39,6 +39,13 @@ Cuvette also has its own monthly budget setting. Type `/config` in Cuvette to ch
 - Any time in the terminal: run `cuvette key`.
 - Any time in a session: type `/key`.
 
+## Where Cuvette reads the key
+
+Cuvette uses the first key that it finds, in this order:
+
+1. The `ANTHROPIC_API_KEY` variable in the shell.
+2. The `anthropic_api_key` value in `~/.cuvette/credentials.json`. Only your user can read this file.
+
 ## Commands
 
 | Command | What it does |
@@ -48,8 +55,9 @@ Cuvette also has its own monthly budget setting. Type `/config` in Cuvette to ch
 | `cuvette key open` | Opens the keys page in the browser. |
 | `cuvette key status` | Shows the saved key in masked form. |
 | `cuvette key remove` | Deletes the saved key. |
+| `cuvette key workspace <id>` | Saves the workspace ID for a key that belongs to no workspace. |
 
-In a session, `/key`, `/key help`, `/key open`, `/key status` and `/key remove` do the same.
+In a session, `/key`, `/key help`, `/key open`, `/key status`, `/key remove` and `/key workspace <id>` do the same.
 
 ## If the check fails
 
@@ -59,7 +67,8 @@ In a session, `/key`, `/key help`, `/key open`, `/key status` and `/key remove` 
 | The key has a space or a line break in it | Copy the whole key again and paste it in one piece. |
 | This looks like an OpenAI key | Create a Claude key at the keys page. |
 | HTTP 401 | The key is wrong or deleted. Copy it again, or create a new key. |
-| HTTP 403, or "credit balance is too low" | Add credit on the billing page. Then try again. |
+| HTTP 402 or 403, or "credit balance is too low" | Add credit on the billing page. Then try again. |
+| HTTP 429 | Wait a minute. If it continues, check the spend limit. |
 | Cannot reach the Claude API | Check the internet connection. Then try again. |
 
 ## No key and no payment

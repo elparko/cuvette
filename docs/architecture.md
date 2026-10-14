@@ -70,10 +70,11 @@ src/adapters/
   kinds/common.ts            templates, schema checks, output parsing                 [C]
   kinds/macro.ts             macro-language runtime (ImageJ and others)               [G]
 src/tools/
-  core.ts                    find_tools, load_skill, ask_scientist, plan, note       [lead]
+  core.ts                    find_tools, load_skill, ask_scientist, plan, note,
+                             propose_change, compare_options, propose_lab_rule       [lead]
   generic.ts                 run_command, read_file, list_dir, write_file, screenshot [C]
   run_script.ts              sandboxed Python script that calls tools back            [C]
-  task.ts                    subagents (referee, onboarding)                          [lead]
+  task.ts                    read-only helper agent for any job (the task tool)       [lead]
 src/ui/                      view-independent commands, cards, messages, settings;    [F]
                              the terminal UI and the browser app both call them
 src/tui/                     Ink app                                                  [F]
@@ -154,6 +155,8 @@ are `n1`, `n2`, .... `messages()` returns the `message` entries in order; after 
 it.
 
 ### Entry kinds and their writers
+
+The table lists the main kinds. `src/core/types.ts` has the full list.
 
 | Kind | Writer | Data |
 | --- | --- | --- |
@@ -289,7 +292,8 @@ by `human` has no value until the scientist answers; `enforce` lists it in `wait
 call that it links to. Owner `fixed`: a different value is overwritten (`overwritten: true`).
 Owner `agent`: the harness records the agent's first value as a `decision` by `agent`. A link `arg` can
 be a dotted path into nested objects (`params.tol_ppm`). The harness adds one built-in
-decision: `question` (text, human, setup, "What question are you asking?").
+decision: `question` (text, human, setup, "What question are you asking?"). The adapter,
+test-family and reporting-guideline decisions come from `src/core/decisions.ts`.
 
 ## Folder trust (`src/core/trust.ts`)
 
@@ -345,8 +349,8 @@ function applyOverlay(adapter: LoadedAdapter): LoadedAdapter
 ## Session (`src/core/session.ts`, lead)
 
 ```ts
-type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow"
-interface SessionOptions { adapters: string[]; model: string; referee?: string; mode?: Mode;
+type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow" | "eln" | "xlsx"
+interface SessionOptions { adapters: string[]; model?: string; referee?: string; mode?: Mode;
   cwd?: string; id?: string; settings?: Partial<Settings> }
 class Session {
   static create(opts: SessionOptions): Promise<Session>
@@ -363,7 +367,7 @@ class Session {
   setMode(mode: Mode): void
   followDone(step: number, note?: string): Promise<void>
   review(): Promise<Finding[]>
-  compact(): Promise<void>
+  compact(): Promise<boolean>
   exportAs(fmt: ExportFormat): Promise<string>
   close(): Promise<void>
 }
@@ -400,10 +404,10 @@ class Session {
 ## Terminal UI (`src/tui/`, owner F)
 
 Built like Claude Code: a scrolling transcript, an input box at the bottom, a status line, and
-modal cards. Esc interrupts. Shift+Tab cycles the mode. Slash commands: `/setup`, `/decisions`,
+modal cards. Esc interrupts. Shift+Tab cycles the mode. Slash commands include `/setup`, `/decisions`,
 `/owner`, `/mode`, `/questions`, `/answer`, `/trail [1|2|3]`, `/graph`, `/review`, `/findings`, `/tests`,
 `/export <fmt>`, `/model`, `/adapters`, `/skills`, `/lab`, `/compact`, `/resume`, `/help`,
-`/quit`. Cards: setup form, permission request, question with options and sensitivity table,
+`/quit`. `src/ui/commands.ts` has the full list. Cards: setup form, permission request, question with options and sensitivity table,
 Follow-mode instruction.
 
 ## Command line (`src/cli.ts`, lead)
@@ -411,7 +415,7 @@ Follow-mode instruction.
 ```
 cuvette [--adapter imagej] [--model ollama:qwen3:8b] [--referee claude] [--mode watch] [--resume <id>]
 cuvette -p "<prompt>" --adapter imagej --model ... [--answers answers.json] [--setup setup.json] [--output text|json|stream-json]
-cuvette adapters | cuvette adapter check <dir|name> [--run-tests] | cuvette adapter approve <name>
+cuvette adapters | cuvette adapter check <name|dir> [--run-tests] | cuvette adapter approve <name|dir> --by <name>
 cuvette onboard <program> --model ... [--docs <url> ...] [--kind cli]
 cuvette export <session> --format <fmt>
 cuvette replay <flow.json> [--input name=path ...] [--session <id>]
@@ -442,7 +446,8 @@ take the first option of a list.
   values. Plan and teach mode deny a non-read-only tool before any hook runs.
 - **After an answer.** A call that the harness blocked runs again with the linked arguments set from the
   decision record, not with the value that the model proposed.
-- **Small models.** If an adapter has more than 24 tools, the model sees up to 16 adapter tools.
+- **Small models.** An adapter with more than 24 tools shows the model up to 16 of them. This applies when
+  `toolExposure` is `search`, or when it is `auto` and the model is small.
   The harness chooses them by relevance to the request. The harness lists skills as procedures, not tools.
   It removes null optional arguments. It reads a bare handle string such as `"h1"` as `{"handle": "h1"}`.
   An empty reply gets up to two retries. When the model produced tokens, the retry says that the

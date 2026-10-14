@@ -7,7 +7,7 @@ The harness keeps the decision record, the question queue, and the audit trail.
 ## Prerequisites
 
 - Node 22 or later. Claude Desktop must find the `node` command.
-- The packages: run `npm install` in `/Users/parker/Code/guided-analysis`.
+- The packages: run `npm install` in the repository folder, for example `/path/to/cuvette`.
 - The program of the adapter. For `imagej`, ImageJ or Fiji must be on this computer.
 
 ## Set up
@@ -22,7 +22,7 @@ The harness keeps the decision record, the question queue, and the audit trail.
   "mcpServers": {
     "cuvette": {
       "command": "node",
-      "args": ["/Users/parker/Code/guided-analysis/bin/cuvette.js", "mcp", "--adapter", "imagej"]
+      "args": ["/path/to/cuvette/bin/cuvette.js", "mcp", "--adapter", "imagej"]
     }
   }
 }
@@ -48,7 +48,10 @@ the tool list and sends a tool list change notice.
 | `cuvette_questions` | List the open questions for the scientist. |
 | `cuvette_answer` | Record the answer of the scientist to a question. |
 | `cuvette_trail` | Show the audit trail. Level 1 is one line for each step. |
-| `cuvette_export` | Write the trail, the protocol, a script, a notebook, or a flow. Returns the file path. |
+| `cuvette_export` | Write the trail, the protocol, a script, a notebook, a flow, an electronic lab notebook (ELN) file or an xlsx file. Returns the file path. |
+| `cuvette_eln_push` | Refuses to send data to eLabFTW. The scientist runs `cuvette eln push <session>` and approves the data. |
+
+The server also exposes shared tools, such as `list_adapters`, `use_adapter`, `calculate` and `read_file`.
 
 ## Use
 
@@ -75,6 +78,6 @@ the tool list and sends a tool list change notice.
 
 - The tools do not appear: check that the path in `args` is correct and that `node` runs from a terminal.
 - Run this command in a terminal to see startup errors:
-  `node /Users/parker/Code/guided-analysis/bin/cuvette.js mcp --adapter imagej`.
+  `node /path/to/cuvette/bin/cuvette.js mcp --adapter imagej`.
   The command waits for input. Press Control-C to stop it.
 - Claude Desktop writes a log for each server in `~/Library/Logs/Claude/mcp-server-cuvette.log`.
