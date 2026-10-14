@@ -109,6 +109,21 @@ describe("checker", () => {
     expect([...scriptReads("const p = readParams();\nrun(p.folder, p?.every_nth, p.items.map(f));", "run.mjs")].sort()).toEqual(["every_nth", "folder", "items"]);
   });
 
+  test("pythonSignature does not throw on a function name with regex characters", () => {
+    expect(() => pythonSignature("def run(x): pass", "run(")).not.toThrow();
+    expect(pythonSignature("def run(x): pass", "run(")).toBeUndefined();
+  });
+
+  test("pythonSignature keeps a lambda default whole and ignores an equals sign in an annotation", () => {
+    expect(pythonSignature("def run(x, f=lambda a, b: a, y=1): pass", "run")).toEqual({ names: ["x", "f", "y"], required: ["x"], kwargs: false });
+    expect(pythonSignature('def run(x: Literal["a=b"]): pass', "run")).toEqual({ names: ["x"], required: ["x"], kwargs: false });
+  });
+
+  test("scriptReads does not report properties of a js value that is not the params", () => {
+    expect([...scriptReads("const p = args.path;\nrun(p.length);", "run.mjs")]).toEqual([]);
+    expect([...scriptReads("const p = input.params;\nrun(p.folder);", "run.mjs")]).toEqual(["folder"]);
+  });
+
   test("a manifest argument that the Python function does not take is an error, and a function argument outside params is a warning", async () => {
     const dir = join(tmp, "tables-args");
     cpSync("catalog/tables", dir, { recursive: true });

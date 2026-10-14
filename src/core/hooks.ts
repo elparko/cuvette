@@ -75,6 +75,8 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
         finish({ error: `Command hook "${label}" timed out after 30 s.` });
       }, TIMEOUT_MS);
       signal?.addEventListener("abort", onAbort, { once: true });
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
       child.stdout.on("data", (d) => (stdout += d));
       child.stderr.on("data", (d) => (stderr += d));
       child.on("error", (err) => finish({ error: `Command hook "${label}" failed to start: ${err.message}` }));
