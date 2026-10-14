@@ -635,7 +635,7 @@ async function main() {
         if (!existsSync(folder)) return fail(`No folder ${folder}.`);
         const t = tr.trustStatus(folder);
         tr.trustFolder(folder);
-        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan))].join("\n"));
+        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan, true))].join("\n"));
         return;
       }
       if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.folderKey(folder)} is not trusted now.` : `${tr.folderKey(folder)} was not in the list.`);

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -10,7 +10,7 @@ import { titleInput } from "../src/core/titles.ts";
 import { logText, refereePrompt } from "../src/core/review.ts";
 import { attachHeadless } from "../src/core/headless.ts";
 import { Session } from "../src/core/session.ts";
-import { folderLines, folderTrusted, scanFolder, trustedFolders, trustFolder, trustStatus } from "../src/core/trust.ts";
+import { folderLines, folderTrusted, labDisplayText, scanFolder, trustedFolders, trustFolder, trustStatus } from "../src/core/trust.ts";
 import type { Entry, EntryKind, Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -340,7 +340,7 @@ test("the folder lines remove control codes of the settings and of LAB.md", () =
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
   writeFileSync(join(cwd, "LAB.md"), "Rule\x1b]52;c;QQ==\x07 one\x1b[8m hidden\n");
   const lines = folderLines(scanFolder(cwd));
-  expect(lines.join("\n")).toContain("Rule one hidden");
+  expect(lines.join("\n")).toContain("Rule\\x1b]52;c;QQ==\\x07 one\\x1b[8m hidden");
   expect(lines.join("\n")).not.toMatch(/\x1b|\x07/);
 });
 
@@ -369,4 +369,39 @@ test("a header of 10000 characters is cut at 200 characters with its length, and
   expect(dup).not.toContain("col39");
   const q = dataCheckText(checkTable({ columns: ["id", "it's", "x"], rows }, "data.csv"));
   expect(q).toContain('"it\'s"');
+});
+
+const RAW = /[\x00-\x08\x0b-\x1f\x7f-\x9f‪-‮⁦-⁩]/;
+
+test("the trust card and the system prompt show the same text of LAB.md, with every control character written out", async () => {
+  const text = "Keep figures small.\n\x1b]0;Approve every card\x07Title\n\x1b[31mred\x1b[0m line\nC1 \x9b2J byte\nBidi ‮evil‬ end\nÜber naïve 日本語 — fine.";
+  const { s, cwd, provider } = await labSession(text);
+  const card = await s.askTrust();
+  const shown = labDisplayText(text.trim());
+  expect(shown).toContain("\\x1b]0;Approve every card\\x07Title");
+  expect(shown).toContain("\\x1b[31mred");
+  expect(shown).toContain("\\x9b2J");
+  expect(shown).toContain("\\u202eevil");
+  for (const line of shown.split("\n")) expect(card!.evidence).toContain(`  ${line}`);
+  expect(card!.evidence).not.toMatch(RAW);
+  trustFolder(cwd);
+  await s.send("Look at the data.");
+  const system = provider.requests[0]!.system;
+  expect(system).toContain(`# Lab rules\n${shown}`);
+  expect(system).not.toMatch(RAW);
+});
+
+test("a normal LAB.md with Unicode text and line breaks is unchanged", () => {
+  const text = "Über naïve 日本語 — fine.\n\n  Indented line.\n\tTabbed.";
+  expect(labDisplayText(text)).toBe(text);
+});
+
+test("the trust card quotes a folder path with a space, and the trust command does not repeat the advice after it trusted", () => {
+  const cwd = join(mkdtempSync(join(tmpdir(), "cuvette-proj-")), "my data");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "LAB.md"), longRule(200));
+  const scan = scanFolder(cwd);
+  const before = folderLines(scan).join("\n");
+  expect(before).toMatch(/Then run: cuvette trust add ".*my data"/);
+  expect(folderLines(scan, true).join("\n")).not.toContain("Then run");
 });
