@@ -260,10 +260,10 @@ function findUp(start: string, outputFolder: string): Place | undefined {
 }
 
 function inIndex(project: string): Place | undefined {
-  const rows = readIndex().filter((r) => resolve(r.project) === resolve(project)).sort((a, b) => b.date.localeCompare(a.date));
+  const rows = readIndex().filter((r) => r.project && resolve(r.project) === resolve(project)).sort((a, b) => b.date.localeCompare(a.date));
   for (const r of rows) {
     const p = placeAt(join(r.folder, ".record"));
-    if (p) return p;
+    if (p && p.project && resolve(p.project) === resolve(project)) return p;
   }
   return undefined;
 }

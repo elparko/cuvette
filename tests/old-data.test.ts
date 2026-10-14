@@ -1048,3 +1048,19 @@ test("an unreadable last line with an id still holds its id, so a new entry gets
   const points = rewindPoints(s.record);
   expect(s.rewind(points[0]!.n).point.n).toBe(points[0]!.n);
 });
+
+describe("the index fallback of cuvette open", () => {
+  test("a row with no project and a row of another project with the same name are not opened", () => {
+    install("v7-agent-loop");
+    const indexFile = join(root, "home", "sessions-index.json");
+    const rows = JSON.parse(readFileSync(indexFile, "utf8"));
+    const other = join(root, "elsewhere", "project");
+    mkdirSync(other, { recursive: true });
+    delete rows[0].project;
+    rows[1].project = other;
+    writeFileSync(indexFile, JSON.stringify(rows));
+    expect(findPlace(other, { cwd: root, outputFolder: "results" })?.id).toBeUndefined();
+    expect(findPlace(".", { cwd: root, outputFolder: "results" })).toBeUndefined();
+    expect(findPlace(join(root, "project"), { cwd: root, outputFolder: "results" })).toBeUndefined();
+  });
+});
