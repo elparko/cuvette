@@ -7,6 +7,8 @@ import { afterAll, expect, test } from "vitest";
 import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
+import { interruptTarget } from "../src/adapters/kinds/python.ts";
+import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
 import { parseCsv, parseKeyValue, readFields, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
 
@@ -763,6 +765,69 @@ test.skipIf(!sandboxWorks)("under the real sandbox a python adapter writes, rena
     else process.env.CUVETTE_HOME = oldHome;
     process.env.HOME = oldHomeDir;
   }
+});
+
+
+test("a change of the settings between two calls is reported at the next call and again until the file is as before", async () => {
+  const project = realpathSync(mkdtempSync(join(root, "project-")));
+  const out = join(project, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  mkdirSync(join(project, ".cuvette"), { recursive: true });
+  const settings = join(project, ".cuvette", "settings.json");
+  writeFileSync(settings, "{}");
+  const dir = pythonWriter(project, "pz", "");
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "append")!;
+  const run = () => tool.execute({ target: join(out, "free.txt") }, ctx(out, dirs.sessionDir));
+  expect((await run()).ok).toBe(true);
+  writeFileSync(settings, '{"permissions":"bypass"}');
+  for (let i = 0; i < 2; i++) {
+    const r = await run();
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain(settings);
+  }
+  writeFileSync(settings, "{}");
+  expect((await run()).ok).toBe(true);
+  expect((await run()).ok).toBe(true);
+});
+
+test("the python worker starts again when the blind policy turns on after it started", async () => {
+  const dir = adapter(`${head("python", "  call_timeout_s: 20\n")}tools:\n  - { name: pid, description: d, function: "m:pid" }\n`, { "m.py": "import os\ndef pid():\n    return {'metrics': {'pid': os.getpid()}}\n" });
+  const n = ++counter;
+  const dirs = { workDir: join(root, `work${n}`), sessionDir: join(root, `session${n}`) };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "pid")!;
+  const pid = async () => (await tool.execute({}, ctx(dirs.workDir, dirs.sessionDir))).metrics?.pid;
+  const first = await pid();
+  expect(await pid()).toBe(first);
+  try {
+    setBlindPolicy({ allow: [], deny: [join(root, "hidden")] });
+    const second = await pid();
+    expect(second).not.toBe(first);
+    expect(await pid()).toBe(second);
+  } finally {
+    setBlindPolicy(undefined);
+  }
+});
+
+test("a cancel sends SIGINT to the process group of the worker, and to the process on Windows nowhere", () => {
+  const sent: [number, string][] = [];
+  const kill = (pid: number, signal: NodeJS.Signals) => void sent.push([pid, signal]);
+  expect(interruptTarget(4242, "linux", kill)).toBe(true);
+  expect(sent).toEqual([[-4242, "SIGINT"]]);
+  expect(interruptTarget(4242, "win32", kill)).toBe(false);
+  expect(interruptTarget(undefined, "linux", kill)).toBe(false);
+  expect(sent).toHaveLength(1);
+  const calls: number[] = [];
+  const noGroup = (pid: number) => {
+    calls.push(pid);
+    if (pid < 0) throw new Error("ESRCH");
+  };
+  expect(interruptTarget(7, "linux", noGroup as never)).toBe(true);
+  expect(calls).toEqual([-7, 7]);
 });
 
 const alive = (pid: number) => {
