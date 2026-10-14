@@ -4,7 +4,7 @@ import { extname, isAbsolute, join, relative } from "node:path";
 import { COPY_LIMIT_BYTES, local, portable } from "./places.ts";
 import { extractNumbers } from "./claims.ts";
 import type { EnvLock } from "./envlock.ts";
-import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
+import { ENTRY_KINDS, type Entry, type EntryKind, type Message, type Node, type NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
@@ -32,15 +32,19 @@ function sha256File(path: string): string {
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 // A damaged line can hold valid JSON that is not an entry. The record skips it, so that no reader gets a wrong shape.
+const validId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
 function intact(e: unknown): e is Entry {
-  if (!isObject(e) || typeof e.kind !== "string" || !Number.isFinite(e.id) || !isObject(e.data)) return false;
+  if (!isObject(e) || typeof e.kind !== "string" || !validId(e.id) || !isObject(e.data)) return false;
   const d = e.data;
-  if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
+  if (e.kind === "node") return typeof d.id === "string" && typeof d.tool === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
   if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
   if (e.kind === "stale") return Array.isArray(d.nodes ?? []);
   if (e.kind === "compaction") return Array.isArray(d.kept ?? []);
   return true;
 }
+
+export const ownerOf = (entries: Pick<Entry, "kind" | "session">[]): string => entries.findLast((e) => e.kind === "fork")?.session ?? entries[0]?.session ?? "";
 
 export const liveEntries = (r: Pick<AnalysisRecord, "entries"> & { live?: AnalysisRecord["live"] }, kinds?: EntryKind[]): Entry[] => (r.live ? r.live(kinds) : r.entries(kinds));
 
@@ -63,6 +67,7 @@ export class AnalysisRecord {
   private nextNode = 1;
   private cutTail = false;
   private lastId = 0;
+  skipped = 0;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
@@ -84,20 +89,25 @@ export class AnalysisRecord {
   }
 
   // A crash can leave a cut last line. Call this only with the session lock held: the next entry must start on a new line.
-  repairTail(): void {
+  repairTail(): boolean {
     try {
-      const size = statSync(this.logPath).size;
-      if (!size) return;
-      const fd = openSync(this.logPath, "r");
-      const last = Buffer.alloc(1);
-      try {
-        readSync(fd, last, 0, 1, size - 1);
-      } finally {
-        closeSync(fd);
+      const buf = readFileSync(this.logPath);
+      if (!buf.length) return false;
+      if (buf[buf.length - 1] !== 0x0a) {
+        appendFileSync(this.logPath, "\n");
+        this.cutTail = false;
+        try {
+          JSON.parse(buf.toString("utf8", buf.lastIndexOf(10) + 1).replace(/^\uFEFF/, ""));
+          return false;
+        } catch {
+          return true;
+        }
       }
-      if (last[0] !== 0x0a) appendFileSync(this.logPath, "\n");
       this.cutTail = false;
-    } catch {}
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   private load(): void {
@@ -113,14 +123,28 @@ export class AnalysisRecord {
       try {
         e = local(JSON.parse(line), this.project) as Entry;
       } catch {
+        if (end < buf.length) this.skipped++;
         continue;
       }
-      if (!intact(e)) continue;
+      if (!intact(e)) {
+        this.skip(e);
+        continue;
+      }
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.lastId = Math.max(this.lastId, e.id);
       this.index(e);
     }
+    if (this.skipped) for (const n of this.nodeList) n.parents = n.parents.filter((p) => this.nodeById.has(p));
+  }
+
+  private skip(e: unknown): void {
+    this.skipped++;
+    if (!isObject(e)) return;
+    if (validId(e.id)) this.lastId = Math.max(this.lastId, e.id);
+    if (e.kind !== "node" || !isObject(e.data)) return;
+    const num = Number(/^n(\d+)$/.exec(String(e.data.id))?.[1] ?? 0);
+    if (num >= this.nextNode) this.nextNode = num + 1;
   }
 
   // A loaded message holds the full model history of its turn. Only a resume or a rewind reads it, so it stays on disk until then.
@@ -160,6 +184,11 @@ export class AnalysisRecord {
     } else if (e.kind === "rewind") {
       this.asideRanges.push([Number(e.data.upTo), e.id]);
     }
+  }
+
+  unknownKinds(): string[] {
+    const known = new Set<string>(ENTRY_KINDS);
+    return [...new Set(this.log.map((e) => e.kind).filter((k) => !known.has(k)))].sort();
   }
 
   setAside(id: number): boolean {

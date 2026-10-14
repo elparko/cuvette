@@ -379,7 +379,7 @@ const TABLE_ROWS = 20;
 const oneLine = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
 
 function clip(x: unknown, n = 200): string {
-  const s = oneLine(typeof x === "string" ? x : JSON.stringify(x));
+  const s = oneLine(typeof x === "string" ? x : (JSON.stringify(x) ?? ""));
   return s.length > n ? s.slice(0, n - 3) + "..." : s;
 }
 

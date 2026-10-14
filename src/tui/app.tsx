@@ -5,7 +5,7 @@ import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
-import { commands, openPanels, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
+import { commands, openPanels, openSetup, openWithOs, failureText, parseCommand, suggestions, table, unknownCommand, type CommandCtx } from "../ui/commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
@@ -314,14 +314,14 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   );
 
   const runCommand = async (text: string) => {
-    const [head, ...args] = text.slice(1).trim().split(/\s+/);
+    const { head, args } = parseCommand(text);
     push({ key: `u${++counter.current}`, t: "user", text });
     const cmd = commands.find((c) => c.name === head);
-    if (!cmd) return line("✗", `Unknown command /${head}. Type /help.`, "red");
+    if (!cmd) return line("✗", unknownCommand(head), "red");
     try {
       await cmd.run(args, ctx);
     } catch (e) {
-      line("✗", `/${cmd.name} failed: ${(e as Error).message}`, "red");
+      line("✗", failureText(cmd.name, e, session), "red");
     }
   };
 

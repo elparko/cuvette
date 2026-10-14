@@ -58,6 +58,31 @@ async function lazy<T>(load: () => Promise<T>): Promise<T | undefined> {
 
 const unavailable = (ctx: CommandCtx) => ctx.notice("Not available yet.");
 
+export function parseCommand(text: string): { head: string; args: string[] } {
+  const [head = "", ...args] = text.replace(/^\//, "").trim().split(/\s+/);
+  return { head: head.toLowerCase(), args };
+}
+
+export const unknownCommand = (head: string) => (head ? `Unknown command /${clip(head, 30)}. Type /help.` : "Type a command name after the slash. Type /help to see the list.");
+
+export function failureText(name: string, e: unknown, session?: SessionLike): string {
+  if (e instanceof TypeError || e instanceof RangeError || e instanceof ReferenceError || e instanceof SyntaxError) {
+    const short = `${e.name}: ${e.message.slice(0, 200)}`;
+    try {
+      session?.record.append("error", { command: name, name: e.name, message: e.message, stack: e.stack ?? "" });
+    } catch {}
+    return `/${name} failed. Cuvette hit a program error: ${short}. The full error is in the session record. Type /export jsonl to save a copy of the record, then report the problem.`;
+  }
+  return `/${name} failed: ${problemOf(e)}`;
+}
+
+export function problemOf(e: unknown): string {
+  const err = e as NodeJS.ErrnoException;
+  if (err?.code === "EACCES" || err?.code === "EPERM" || err?.code === "EROFS") return `Cuvette cannot write in ${err.path ?? "that folder"}. The folder has read-only access, or you have no permission. Choose another folder, or fix the permission, then type the command again.`;
+  if (err?.code === "ENOSPC") return "The disk is full. Free some space, then type the command again.";
+  return err?.message ?? String(e);
+}
+
 export function table(headers: string[], rows: string[][]): string {
   const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
   const fmt = (r: string[]) => r.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd();
@@ -279,7 +304,7 @@ async function allOpen(): Promise<Question[] | undefined> {
   return (await lazy(() => import("../core/questions.ts")))?.allOpenQuestions();
 }
 
-export const commands: Command[] = [
+const base: Command[] = [
   {
     name: "help",
     help: "Show this list.",
@@ -300,14 +325,14 @@ export const commands: Command[] = [
   {
     name: "decisions",
     args: "[agent|me]",
-    help: "Show every decision, its owner and who set it. agent gives all your decisions to the agent; me takes them back.",
+    help: "Show each decision, its owner and who set it. Type agent to give your decisions to the agent. Type me to take all agent decisions back.",
     run([who], ctx) {
       if (who === "agent" || who === "me") {
         const [from, to]: Owner[] = who === "agent" ? ["human", "agent"] : ["agent", "human"];
         const keys = ctx.session.decisions.fields().filter((f) => ctx.session.decisions.owner(f.key) === from).map((f) => f.key);
         for (const k of keys) ctx.session.setOwner(k, to);
         ctx.notice(keys.length ? `${who === "agent" ? "The agent now owns" : "You now own"} ${keys.length} ${keys.length === 1 ? "decision" : "decisions"}: ${keys.join(", ")}. Fixed decisions do not change.` : "No decision changed owner.");
-      } else if (who) return ctx.error("Use: /decisions, /decisions agent or /decisions me");
+      } else if (who) return ctx.error("Use: /decisions, /decisions agent or /decisions me.");
       ctx.print(table(["Key", "Value", "Owner", "Set by"], decisionRows(ctx.session)), "Decisions");
     },
   },
@@ -322,18 +347,23 @@ export const commands: Command[] = [
         if (!rows.length) return ctx.notice("No answer or decision to change yet.");
         if (!key) return ctx.openCard(changePicker(rows));
         const row = findChange(rows, key);
-        return row ? ctx.openCard(changeCard(row)) : ctx.error(`No answer or decision named ${key}. Type /change to see the list.`);
+        return row ? ctx.openCard(changeCard(row)) : ctx.error(`No answer or decision named ${clip(key, 40)}. Type /change to see the list.`);
       }
       const f = ctx.session.decisions.fields().find((x) => x.key === key);
-      if (!f) return ctx.error(`No decision named ${key}. See /decisions.`);
-      if (f.owner === "fixed") return ctx.error(`The lab profile fixes ${f.label}.`);
+      if (!f) return ctx.error(`No decision named ${clip(key, 40)}. See /decisions.`);
+      if (f.owner === "fixed") return ctx.error(`${f.label} has the owner fixed. A lab profile or /owner set it. /change does not change a fixed decision.`);
       let value: unknown;
       try {
         value = parseDecision(f, raw);
       } catch (e) {
         return ctx.error((e as Error).message);
       }
-      const stale = ctx.session.setDecision(key, value, "changed by the scientist");
+      let stale: string[];
+      try {
+        stale = ctx.session.setDecision(key, value, "changed by the scientist");
+      } catch (e) {
+        return ctx.error(`${(e as Error).message} The value did not change.`);
+      }
       ctx.notice(`${f.label} is now ${show(value)}.${stale.length ? ` ${stale.length} ${stale.length === 1 ? "step is" : "steps are"} out of date. Type /rerun to run them again.` : ""}`);
       ctx.refresh();
     },
@@ -361,7 +391,7 @@ export const commands: Command[] = [
     help: "Change who owns a decision.",
     run([key, owner], ctx) {
       if (!key || !OWNERS.includes(owner as Owner)) return ctx.error("Use: /owner <key> <human|agent|fixed>");
-      if (!ctx.session.decisions.fields().some((f) => f.key === key)) return ctx.error(`No decision named ${key}. See /decisions.`);
+      if (!ctx.session.decisions.fields().some((f) => f.key === key)) return ctx.error(`No decision named ${clip(key, 40)}. See /decisions.`);
       ctx.session.setOwner(key, owner as Owner);
       ctx.notice(`Owner of ${key} is now ${owner}.`);
     },
@@ -379,7 +409,7 @@ export const commands: Command[] = [
       ctx.print(
         now === "bypass"
           ? "Bypass permissions is on. The harness allows each tool call that has a permission card, without a card, and logs it with the reason \"bypass permissions\".\n" +
-              "These do not change: method decisions stay with you (/decisions agent gives them to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS sandbox still apply; a push to eLabFTW still asks; deny rules in settings still deny.\n" +
+              "These do not change. Method decisions stay with you (/decisions agent gives them to the agent). Plan and teach mode still block steps. The blind benchmark rules and the macOS sandbox still apply. A push to eLabFTW still asks. Deny rules in settings still deny.\n" +
               "Type /permissions ask to show the permission cards again."
           : "Ask (the default). A tool call that needs permission shows a card, and you allow or deny it. Type /permissions bypass to allow them without a card.",
         "Permissions",
@@ -416,6 +446,7 @@ export const commands: Command[] = [
     help: "Change the mode.",
     run([m], ctx) {
       if (!MODES.includes(m as Mode)) return ctx.error("Use: /mode <watch|follow|teach|plan>");
+      if (ctx.session.mode === m) return ctx.notice(`The mode is already ${m}.`);
       ctx.session.setMode(m as Mode);
       ctx.refresh();
     },
@@ -423,7 +454,7 @@ export const commands: Command[] = [
   {
     name: "plan",
     args: "[on|off|<request>]",
-    help: "Show the proposed analysis: Questions, Proposed metrics, Demonstration on a sample, Confirmed. /plan <request> starts it for one request. /plan off skips it for later requests. Also /proposal.",
+    help: "Show the proposed analysis: Questions, Proposed metrics, Demonstration on a sample, Confirmed. Type /plan <request> to start it for one request. Type /plan off to skip it for later requests. /proposal does the same.",
     run(args, ctx) {
       const s = ctx.session;
       const sub = args.join(" ").trim();
@@ -473,6 +504,7 @@ export const commands: Command[] = [
         s.setPilot(sub === "on");
         return ctx.refresh();
       }
+      if (sub) return ctx.error("Use: /pilot, /pilot on or /pilot off.");
       const run = s.record.entries(["pilot_run"]).at(-1);
       if (!run) return ctx.notice("No pilot yet.");
       const done = s.record.entries(["pilot_approved"]).some((e) => e.data.run === run.id);
@@ -526,11 +558,12 @@ export const commands: Command[] = [
       const q = ctx.session.questions.open().find((x) => x.qid === qid);
       if (!q) {
         const other = (await allOpen())?.find((x) => x.qid === qid);
-        return ctx.error(other ? `${qid} belongs to session ${other.session}. Run: cuvette --resume ${other.session}` : `No open question ${qid}.`);
+        return ctx.error(other ? `${qid} belongs to session ${other.session}. Run: cuvette --resume ${other.session}` : `No open question ${clip(qid, 40)}. Type /questions to see the open questions.`);
       }
       const hit = matchOption(q, raw);
       await ctx.session.answer(qid, hit.ok ? hit.value : raw);
-      ctx.notice(`Answered ${qid}.`);
+      if (hit.ok) ctx.notice(`Answered ${qid}: ${clip(q.options.find((o) => o.value === hit.value)?.label ?? show(hit.value), 60)}.`);
+      else ctx.notice(q.options.length ? `Answered ${qid} with your own value: ${clip(raw, 60)}. It is not one of the options.` : `Answered ${qid}.`);
     },
   },
   {
@@ -538,6 +571,7 @@ export const commands: Command[] = [
     args: "[1|2|3]",
     help: "Show the audit trail. 1 is short, 3 is the technical record.",
     async run([lv], ctx) {
+      if (lv !== undefined && !["1", "2", "3"].includes(lv)) return ctx.error("Use: /trail, /trail 2 or /trail 3.");
       const level = lv === "2" ? 2 : lv === "3" ? 3 : 1;
       const mod = await lazy(() => import("../core/trail.ts"));
       if (!mod?.trail) return unavailable(ctx);
@@ -614,6 +648,7 @@ export const commands: Command[] = [
         ctx.notice(r.text);
         return ctx.refresh();
       }
+      if (s.busy) return ctx.error("The agent is busy. Press Esc to stop it, then rewind.");
       const points = rewindPoints(s.record);
       if (!points.length) return ctx.notice("No point to return to yet.");
       ctx.openCard({ t: "rewind", points });
@@ -622,18 +657,19 @@ export const commands: Command[] = [
   {
     name: "branch",
     args: "<name> [at <n>]",
-    help: "Copy this session into a new folder next to it, to try another method. at <n> copies up to point n of /rewind.",
+    help: "Copy this session into a new folder next to it, to try another method. Add at <n> to copy up to point n of /rewind.",
     run(args, ctx) {
       const s = ctx.session;
       if (!s.branch) return unavailable(ctx);
       const at = args.length >= 3 && args.at(-2) === "at" && /^\d+$/.test(args.at(-1)!) ? Number(args.at(-1)) : undefined;
       const name = (at === undefined ? args : args.slice(0, -2)).join(" ").trim();
       if (!name) return ctx.error("Use: /branch <name> or /branch <name> at <n>");
+      if (at === undefined && args.length >= 3 && args.at(-2) === "at" && /^-?\d/.test(args.at(-1)!)) return ctx.error("After at, type the number of a point from /rewind. Use: /branch <name> at <n>");
       try {
         const r = s.branch(name, at);
-        ctx.print(`The branch ${name} is in ${r.folder}.\nThis session does not change. Both records link to each other.\nTo work in the branch, open it: cuvette open "${r.folder}"`, "Branch");
+        ctx.print(`The branch ${clip(name, 60)} is in ${r.folder}.\nThis session does not change. Both records link to each other.\nTo work in the branch, open it: cuvette open "${r.folder}"`, "Branch");
       } catch (e) {
-        ctx.error((e as Error).message);
+        ctx.error(problemOf(e));
       }
     },
   },
@@ -680,7 +716,7 @@ export const commands: Command[] = [
         const r = s.saveMethod(name, project ? "project" : "home");
         ctx.print(`${methodText(r.method)}\n\nSaved in ${r.path}.\nUse it on new data: cuvette --method ${r.method.name} <folder>, or /method ${r.method.name} in a new session.`, `Method ${r.method.name}`);
       } catch (e) {
-        ctx.error((e as Error).message);
+        ctx.error(problemOf(e));
       }
     },
   },
@@ -719,7 +755,7 @@ export const commands: Command[] = [
         try {
           ctx.notice(deck.deckLine(await ctx.session.exportImages(o)));
         } catch (e) {
-          ctx.error(`Image deck failed: ${(e as Error).message}`);
+          ctx.error(`Image deck failed: ${problemOf(e)}`);
         }
         return;
       }
@@ -727,7 +763,7 @@ export const commands: Command[] = [
       try {
         ctx.notice(`Exported: ${await ctx.session.exportAs(fmt)}`);
       } catch (e) {
-        ctx.error(`Export failed: ${(e as Error).message}`);
+        ctx.error(`Export failed: ${problemOf(e)}`);
       }
     },
   },
@@ -740,7 +776,7 @@ export const commands: Command[] = [
         const r = await citeCommand(args, ctx.session);
         ctx.print(r, "Cite");
       } catch (e) {
-        ctx.error((e as Error).message);
+        ctx.error(problemOf(e));
       }
     },
   },
@@ -755,7 +791,7 @@ export const commands: Command[] = [
         const name = args.slice(1).join(" ").trim();
         if (!name) return ctx.error("Use: /databook author <name>");
         await changeSetting({ cwd }, "databook_author", name, "user");
-        return ctx.notice(`Data book author saved in user settings: ${name}`);
+        return ctx.notice(`Data book author saved in user settings: ${clip(name, 60)}`);
       }
       const formats = args.filter((a) => ["pdf", "docx", "html"].includes(a)) as ("pdf" | "docx" | "html")[];
       const project = args.includes("project");
@@ -769,7 +805,7 @@ export const commands: Command[] = [
         const ask = s.author ? "" : "\nNo author is set. Type /databook author <name> to save it once.";
         ctx.print(db.writtenLines(w).join("\n") + ask, "Data book");
       } catch (e) {
-        ctx.error(`Data book failed: ${(e as Error).message}`);
+        ctx.error(`Data book failed: ${problemOf(e)}`);
       }
     },
   },
@@ -779,7 +815,7 @@ export const commands: Command[] = [
     help: "Open output number n with the system viewer.",
     run([n], ctx) {
       const outs = ctx.outputs();
-      const ref = outs[Number(n) - 1];
+      const ref = /^\+?\d+(\.0+)?$/.test(n ?? "") ? outs[Number(n) - 1] : undefined;
       if (!ref) return ctx.error(outs.length ? `Use a number from 1 to ${outs.length}.` : "No outputs yet.");
       openWithOs(ref.path);
       ctx.notice(`Opening ${ref.path}`);
@@ -787,8 +823,9 @@ export const commands: Command[] = [
   },
   {
     name: "model",
-    help: "Show the model.",
-    run(_, ctx) {
+    help: "Show the model. Change it in /config.",
+    run(args, ctx) {
+      if (args.length) return ctx.error("/model only shows the model. Type /config to change it.");
       const m = ctx.session.model;
       ctx.print(`${m.provider}:${m.model}\ncontext window ${m.contextWindow} tokens · vision ${m.vision ? "yes" : "no"} · ${m.small ? "small model" : "full model"}`, "Model");
     },
@@ -813,7 +850,7 @@ export const commands: Command[] = [
       }
       if (sub === "workspace") {
         saveClaudeWorkspace(args[1] ?? "");
-        return ctx.notice(args[1] ? `Saved the workspace ID ${args[1]}. Each request now sends it.` : "Removed the workspace ID.");
+        return ctx.notice(args[1] ? `Saved the workspace ID ${clip(args[1], 60)}. Each request now sends it.` : "Removed the workspace ID.");
       }
       if (sub === "help") return ctx.print(keyGuideText(), "How do I get a key?");
       if (sub === "open") {
@@ -833,7 +870,7 @@ export const commands: Command[] = [
       if (sub === "setup") return ctx.openCard({ t: "eln" });
       if (sub === "status") {
         const c = elabftwConfig();
-        return ctx.notice(c ? `eLabFTW: ${c.url}, key ${maskKey(c.key)}, saved in ${credentialsPath()}.` : "eLabFTW is not set up. Type /eln setup.");
+        return ctx.notice(c ? `eLabFTW: ${c.url}, key ${maskKey(c.key)}, saved in ${credentialsPath()}.` : "eLabFTW has no saved address or key. Type /eln setup.");
       }
       if (sub === "remove") {
         if (!removeElabftw()) return ctx.notice("There is no saved eLabFTW key.");
@@ -852,7 +889,7 @@ export const commands: Command[] = [
       }
       if (sub === "link") {
         if (!s.elnLink) return unavailable(ctx);
-        if (!/^\d+$/.test(id ?? "")) return ctx.error("Use: /eln link <experiment id>");
+        if (!/^\d+$/.test(id ?? "") || !Number.isSafeInteger(Number(id))) return ctx.error("Use: /eln link <experiment id>");
         try {
           const r = await s.elnLink(Number(id));
           ctx.print(r.text, "eLabFTW experiment");
@@ -990,6 +1027,19 @@ export const commands: Command[] = [
   { name: "clear", help: "Clear the screen. The record stays.", run: (_, ctx) => ctx.clear() },
   { name: "quit", help: "Leave the program.", run: (_, ctx) => ctx.quit() },
 ];
+
+const MOST_WORDS: Record<string, number> = { mode: 1, permissions: 1, trust: 1, owner: 2, rewind: 1, decisions: 1, pilot: 1, trail: 1, open: 1, checklist: 1, program: 1, programs: 1, compare: 2, eln: 2 };
+
+const mostWords = (name: string, args: string[]) => (name === "key" ? (args[0] === "workspace" ? 2 : 1) : MOST_WORDS[name]);
+
+export const commands: Command[] = base.map((c) => ({
+  ...c,
+  run(args, ctx) {
+    const most = mostWords(c.name, args);
+    if (most !== undefined && args.length > most) return ctx.error(`Too many words. Use: /${c.name}${c.args ? ` ${c.args}` : ""}`);
+    return c.run(args, ctx);
+  },
+}));
 
 export function suggestions(input: string, session?: SessionLike): Command[] {
   const arg = /^\/change (\S*)$/.exec(input);

@@ -364,6 +364,15 @@ export class Session {
   static async create(opts: SessionOptions, record?: AnalysisRecord): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
+    try {
+      return await Session.build(opts, cwd, record);
+    } catch (e) {
+      if (opts.trustFolder) endTrustOnce(cwd);
+      throw e;
+    }
+  }
+
+  private static async build(opts: SessionOptions, cwd: string, record?: AnalysisRecord): Promise<Session> {
     const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
     const notes: string[] = [];
     const settings = loadSettings(cwd, overrides, notes);
@@ -399,8 +408,28 @@ export class Session {
     const record = new AnalysisRecord(place.recordDir, id, recordPlaces(place));
     const first = record.entries(["session"])[0] as any;
     const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
-    const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
+    const gone = new Map<string, boolean>();
+    const recorded = new Map<string, string>();
+    for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path && existsSync(a.path) ? a.path : a.name);
+    if (opts.trustFolder && cwd) trustOnce(cwd);
+    let adapters: string[];
+    try {
+      adapters =
+        opts.adapters ??
+        [...recorded].filter(([name, ref]) => {
+          try {
+            findAdapter(ref, cwd);
+            return true;
+          } catch (e) {
+            if (!(e as Error).message.startsWith("no adapter named")) throw e;
+            gone.set(name, existsSync(ref));
+            return false;
+          }
+        }).map(([, ref]) => ref);
+    } finally {
+      if (opts.trustFolder && cwd) endTrustOnce(cwd);
+    }
     const lastMode = record.entries(["mode"]).at(-1)?.data;
     const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
     const switched = record.live(["setting"]).filter((e) => e.data.name === "model" && typeof e.data.new === "string" && e.data.new).at(-1)?.data.new as string | undefined;
@@ -409,12 +438,19 @@ export class Session {
       const last = record.live(["setting"]).filter((e) => e.data.name === name).at(-1)?.data;
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
-    return Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    for (const [name, untrusted] of gone) {
+      const text = untrusted
+        ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
+        : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
+      if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
+    }
+    return s;
   }
 
   private async init(opts: SessionOptions) {
     const resumed = this.record.entries(["session"]).length > 0;
-    if (resumed) this.record.repairTail();
+    const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
@@ -531,6 +567,15 @@ export class Session {
         }
       }
       this.history = this.record.messages();
+      const unknown = this.record.unknownKinds();
+      const said = (text: string) => this.record.entries(["notice"]).some((n) => n.data.text === text);
+      const kindsText = unknown.length ? `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}. This version does not know them. Cuvette keeps them in the file as they are.` : "";
+      if (kindsText && !said(kindsText)) this.record.append("notice", { text: kindsText, warn: true });
+      const cutText = "The last line of the record was cut when the app stopped. Cuvette keeps the line in the file as it is.";
+      const earlierCuts = this.record.entries(["notice"]).filter((n) => n.data.text === cutText).length;
+      if (cutLine) this.record.append("notice", { text: cutText, warn: true });
+      const linesText = "Some lines of the record are in a form that this version of Cuvette cannot read. Cuvette keeps them in the file as they are.";
+      if (this.record.skipped > earlierCuts && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
@@ -866,6 +911,8 @@ export class Session {
     try {
       a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
     } catch (e) {
+      const shown = name.length > 40 ? `${name.slice(0, 39)}…` : name;
+      if (/^no adapter named/.test((e as Error).message)) return { ok: false, text: `No adapter named ${shown}. Type /programs to see the adapters.` };
       return { ok: false, text: `${(e as Error).message}. /adapters lists the loaded programs.` };
     }
     if (this.decisions.has(ADAPTER_DECISION.key)) this.decisions.change(ADAPTER_DECISION.key, a.name, { by: "human", reason: PROGRAM_REASON });
@@ -4231,7 +4278,8 @@ export class Session {
         this.saveSheet(rows, "reloaded", "read samples.csv again");
         return { done: false, said: `Read samples.csv again: ${rows.length} rows.` };
       } catch (e) {
-        return { done: false, said: `Could not read samples.csv: ${(e as Error).message}` };
+        const missing = (e as NodeJS.ErrnoException).code === "ENOENT";
+        return { done: false, said: missing ? `The file ${join(this.outputDir, "samples.csv")} is not there. Type /samples to see the sheet. Change one cell to write the file again.` : `Could not read samples.csv: ${(e as Error).message}` };
       }
     }
     const r = applyEdit(this.sheet!.rows, text);
@@ -4285,7 +4333,7 @@ export class Session {
   }
 
   startMethod(ref: string): Method {
-    if (this.record.live(["user"]).some((e) => !e.data.internal)) throw new Error(`This session has a request already. Start a new session with the method: cuvette --method ${ref} <folder>`);
+    if (this.record.live(["user"]).some((e) => !e.data.internal)) throw new Error(`This session has a request already. Start a new session with the method: cuvette --method ${ref.length > 60 ? `${ref.slice(0, 59)}…` : ref} <folder>`);
     const m = loadMethod(ref, this.cwd);
     this.method = m;
     this.record.append("method", { action: "started", name: m.name, path: m.path, hash: m.hash, saved: m.saved, from: m.from ?? null, questions: m.questions.length });
@@ -4324,7 +4372,10 @@ export class Session {
   compareBranches(a: string, b: string): { a: BranchInfo; b: BranchInfo; rows: string[][]; differ: number } {
     const src = { id: this.id, place: this.place, record: this.record };
     const [x, y] = [findBranch(src, a), findBranch(src, b)];
-    if (!x || !y) throw new Error(`No branch named ${!x ? a : b}. Type /branches to see the list.`);
+    if (!x || !y) {
+      const miss = !x ? a : b;
+      throw new Error(`No branch named ${miss.length > 40 ? `${miss.slice(0, 39)}…` : miss}. Type /branches to see the list.`);
+    }
     const rec = (i: BranchInfo) => {
       if (i.role === "this") return this.record;
       const p = placeAt(join(i.folder, ".record"));
@@ -4467,7 +4518,7 @@ export class Session {
   async elnPush(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW has no saved address or key. Run `cuvette eln setup` or /eln setup.");
     const { elabftw } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const plan = sync.planPush(this, cfg.url);
@@ -4492,7 +4543,7 @@ export class Session {
   async elnLink(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW has no saved address or key. Run `cuvette eln setup` or /eln setup.");
     const { elabftw, baseUrl } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const client = elabftw(cfg);
