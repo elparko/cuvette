@@ -120,6 +120,7 @@ export function removeClaudeKey(): boolean {
   const path = credentialsPath();
   if (!existsSync(path)) return false;
   const rest = readAll();
+  if (!rest.anthropic_api_key) return false;
   delete rest.anthropic_api_key;
   if (Object.keys(rest).length) write(rest);
   else {

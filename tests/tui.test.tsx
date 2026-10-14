@@ -775,7 +775,7 @@ describe("bypass permissions", () => {
     await submit(h, "/permissions bypass");
     await until(() => s.permissionMode === "bypass" && h.last().includes("bypass permissions ·"));
     expect(h.all()).toContain("Bypass permissions is on.");
-    expect(h.all()).toContain("method decisions stay with you");
+    expect(h.all()).toContain("Method decisions stay with you");
     await submit(h, "/permissions ask");
     await until(() => s.permissionMode === "ask" && !h.last().includes("bypass permissions ·"));
     expect(s.record.entries(["permission_mode"]).map((e) => e.data.new)).toEqual(["bypass", "ask"]);

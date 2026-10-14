@@ -92,3 +92,11 @@ test("an id that is not a positive whole number is refused before the request", 
   await expect(c.readEntity("items", "1/../../users" as unknown as number)).rejects.toThrow(/positive whole number/);
   expect(mock.requests.length).toBe(0);
 });
+
+test("a network failure names the cause code, and a certificate failure adds the reason", async () => {
+  const fail = (cause: object) => elabftw({ url: "https://lab.example.org", key: "1-abc" }, (async () => { throw Object.assign(new TypeError("fetch failed"), { cause }); }) as unknown as typeof fetch);
+  await expect(fail({ code: "ECONNREFUSED" }).readEntity("experiments", 1)).rejects.toThrow("The server is not reachable (ECONNREFUSED).");
+  await expect(fail({ errors: [{ code: "ENOTFOUND" }] }).readEntity("experiments", 1)).rejects.toThrow("(ENOTFOUND)");
+  await expect(fail({ code: "DEPTH_ZERO_SELF_SIGNED_CERT", message: "self-signed certificate" }).readEntity("experiments", 1)).rejects.toThrow("(DEPTH_ZERO_SELF_SIGNED_CERT). self-signed certificate.");
+  await expect(fail({}).readEntity("experiments", 1)).rejects.toThrow("The server is not reachable. Check the network");
+});

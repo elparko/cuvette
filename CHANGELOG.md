@@ -3,6 +3,27 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 14 October 2026
+
+### Slash command fixes
+
+- A command name works in any case. `/Help` runs `/help` in the browser app, as in the terminal app. `/` alone tells you to type a command name.
+- `/trail`, `/pilot` and `/model` give an error for an argument that they do not know. Before, they ignored it. `/mode` tells you if the mode does not change.
+- `/answer` says which option it saved. It says so if your text is not one of the options. `/open` takes only a whole number.
+- `/change` says that a fixed decision has the owner fixed. Before, it always blamed the lab profile. A value that the decision refuses leaves the value as it was, and says so.
+- `/rewind` says at once that the agent is busy. `/branch <name> at -1` gives an error.
+- `/databook`, `/export`, `/cite`, `/branch` and `/save-method` name the problem if the folder is read-only or the disk is full.
+- `/eln link` says if the server is not reachable or does not answer like eLabFTW. Before, it showed `fetch failed` or a JSON error.
+- `/key remove` no longer says that it removed a key if only the workspace ID was saved.
+- `/program` with an unknown name tells you to type `/programs`. It no longer lists every adapter.
+- The record no longer shows a line "Out of date:" with no step in it.
+- A result entry with no tool name is skipped when the record loads. Before, `/status`, `/graph`, `/trail 3`, the exports and the data book failed.
+- `/review` no longer fails on a decision entry with no old value.
+- An error message cuts a very long argument.
+- The help text of `/decisions`, `/plan` and `/branch` follows the 20-word limit.
+- A command that fails on a bad entry shows plain text and tells you to type `/export jsonl`.
+- `tests/command-matrix.test.ts` runs every command in 12 states with 7 kinds of argument.
+
 ## 13 October 2026
 
 ### Retry limits
