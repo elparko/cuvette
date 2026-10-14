@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
@@ -667,5 +668,88 @@ describe("the exports of a branch", () => {
     s.saveResults(0, true);
     const bib = join(s.workDir, "references.bib");
     if (existsSync(bib)) expect(readFileSync(bib, "utf8")).toContain(branch.id);
+  });
+});
+
+describe("the cuvette command on old data", () => {
+  const CUVETTE = join(__dirname, "..", "bin/cuvette.js");
+
+  function cli(args: string[]) {
+    const env = { ...process.env, CUVETTE_HOME: join(root, "home"), HOME: root, USERPROFILE: root, CUVETTE_NO_OPEN: "1", ANTHROPIC_API_KEY: "" };
+    const r = spawnSync("node", [CUVETTE, ...args], { cwd: join(root, "project"), env, encoding: "utf8", timeout: 120_000 });
+    return { code: r.status, out: r.stdout, err: r.stderr };
+  }
+
+  test.each(["v2-home-sessions", "v3-project-folder", "v7-agent-loop"])("%s: sessions, status and export work", (format) => {
+    install(format);
+    const list = cli(["sessions"]);
+    expect(list.code, list.err).toBe(0);
+    expect(list.out).toContain("Count the particles in a.tif");
+    const id = list.out.match(/\d{8}-\d{6}-[0-9a-f]{4}/)![0];
+    const status = cli(["status", id]);
+    expect(status.code, status.err).toBe(0);
+    expect(status.out).toContain(`Session ${id}`);
+    const exported = cli(["export", id, "--format", "protocol"]);
+    expect(exported.code, exported.err).toBe(0);
+    expect(statSync(exported.out.trim().split("\n").at(-1)!).size).toBeGreaterThan(0);
+  });
+});
+
+describe("a log with a byte order mark and Windows line ends", () => {
+  test("the record, the session list and the status load the same entries", async () => {
+    install("v2-home-sessions");
+    const id = readdirSync(join(root, "home", "sessions"))[0]!;
+    const file = join(root, "home", "sessions", id, "log.jsonl");
+    const plain = readFileSync(file, "utf8");
+    const before = new AnalysisRecord(dirname(file), id).entries().length;
+    writeFileSync(file, "\uFEFF" + plain.split("\n").join("\r\n"));
+    const record = new AnalysisRecord(dirname(file), id);
+    expect(record.entries().length).toBe(before);
+    expect(record.messages().length).toBeGreaterThan(0);
+    const [info] = listSessions();
+    expect(info!.cwd).toBe(join(root, "project"));
+    expect(info!.ask).toBe("Count the particles in a.tif");
+    const s = await resume(id);
+    expect(s.history.length).toBe(record.messages().length);
+    await s.send("Thanks.");
+    expect(new AnalysisRecord(dirname(file), id).entries().length).toBeGreaterThan(before);
+  });
+});
+
+describe("a session whose adapter is not on this computer", () => {
+  function removeAdapter(): void {
+    const moved = join(root, "gone-adapter");
+    const walk = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const p = join(d, n);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(json|jsonl)$/.test(n)) writeFileSync(p, readFileSync(p, "utf8").split(LAB).join(moved));
+      }
+    };
+    walk(root);
+  }
+
+  test.each(["v3-project-folder", "v7-agent-loop"])("%s: it resumes without the adapter, with one notice, and it exports", async (format) => {
+    install(format);
+    removeAdapter();
+    const [first] = projectSessions();
+    const before = logLines(first!.folder);
+    for (let i = 0; i < 2; i++) {
+      const s = await resume(first!.id);
+      expect(s.adapters.length).toBe(0);
+      expect(s.record.entries(["notice"]).filter((n) => String(n.data.text).includes("The adapter lab is not installed here")).length).toBe(1);
+      expect(statSync(await s.exportAs("protocol")).size).toBeGreaterThan(0);
+      expect(statSync(await s.exportAs("notebook")).size).toBeGreaterThan(0);
+      expect(await run(s, "status")).toContain("Status");
+      await s.close();
+      open.splice(open.indexOf(s), 1);
+    }
+    expect(logLines(first!.folder).startsWith(before)).toBe(true);
+  });
+
+  test("an adapter that the user names on the command line must exist", async () => {
+    install("v7-agent-loop");
+    const [first] = projectSessions();
+    await expect(Session.resume(first!.id, { provider: new FakeProvider([]), adapters: ["not-an-adapter"] })).rejects.toThrow('no adapter named "not-an-adapter"');
   });
 });
