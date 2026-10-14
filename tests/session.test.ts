@@ -1582,6 +1582,25 @@ test("a failure in the middle of a turn shows a card and Resume does not repeat 
   expect(sent[1]).toBe(sent[0]! + 2);
 });
 
+test("after Resume, the status is thinking while the model step runs again", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  failOn(provider, new Set([0]));
+  session = await recoverySession(provider);
+  let last = "";
+  session.bus.on((e) => {
+    if (e.type === "status") last = e.state;
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+  });
+  const step = provider.step;
+  let during = "";
+  provider.step = async (req) => {
+    during = last;
+    return step(req);
+  };
+  expect(await session.send("go")).toBe("All done.");
+  expect(during).toBe("thinking");
+});
+
 test("Stop on the card ends the turn and keeps the finished steps", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "never" }]);
   failOn(provider, new Set([1, 2, 3]));

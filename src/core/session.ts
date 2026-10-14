@@ -1389,6 +1389,7 @@ export class Session {
         started = Date.now();
         allTries = 0;
         if (choice === "stop") throw e;
+        this.bus.emit({ type: "status", state: "thinking" });
         if (choice === "local") {
           compacted = false;
           const problem = await this.useLocalModel("the Claude API could not be reached");
