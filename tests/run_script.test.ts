@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -685,14 +685,14 @@ test.skipIf(!sandboxWorks)("an adapter program through guardCommand writes in it
   const l = layout();
   const own = join(l.project, ".cuvette", "adapters", "x");
   mkdirSync(own, { recursive: true });
-  const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(own, "cache.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
+  const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(own, "cache.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterFolders: true });
   expect(g.argv[0]).toBe("/usr/bin/sandbox-exec");
   expect(spawnSync(g.argv[0]!, g.argv.slice(1)).status).toBe(0);
   expect(readFileSync(join(own, "cache.txt"), "utf8")).toBe("ok\n");
   expect(g.changed()).toEqual([]);
   const bad = await guardCommand(["/bin/sh", "-c", `echo x >> ${JSON.stringify(l.settings)}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
   expect(spawnSync(bad.argv[0]!, bad.argv.slice(1)).status).not.toBe(0);
-  const move = await guardCommand(["/bin/sh", "-c", `mv ${JSON.stringify(join(l.project, ".cuvette", "adapters"))} ${JSON.stringify(join(l.project, "moved"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
+  const move = await guardCommand(["/bin/sh", "-c", `mv ${JSON.stringify(join(l.project, ".cuvette", "adapters"))} ${JSON.stringify(join(l.project, "moved"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterFolders: true });
   expect(spawnSync(move.argv[0]!, move.argv.slice(1)).status).not.toBe(0);
   expect(existsSync(own)).toBe(true);
   expect(existsSync(join(l.project, "moved"))).toBe(false);
@@ -716,4 +716,28 @@ test("a settings file over 5 MB is checked by its size and its first and last me
   writeFileSync(l.settings, Buffer.concat([big, Buffer.from("x")]));
   expect(second.changed()).toEqual([l.settings]);
   rmSync(l.settings);
+});
+
+
+test("the profile for a model command locks the adapters, methods and skills folders, and the profile for an adapter program opens them", () => {
+  const l = layout();
+  const folder = join(l.project, ".cuvette", "adapters");
+  const model = writeRules(writeSteps(l.dirs));
+  expect(model).toContain(`(deny file-write* (subpath "${join(l.project, ".cuvette")}"))`);
+  expect(model).not.toContain(`(allow file-write* (subpath "${folder}"))`);
+  const adapter = writeRules(writeSteps(l.dirs, { adapterFolders: true }));
+  expect(adapter).toContain(`(allow file-write* (subpath "${folder}"))`);
+});
+
+test.skipIf(!sandboxWorks)("run_command cannot create a file under the adapters folder, and writes results in the project folder", async () => {
+  const l = layout();
+  mkdirSync(join(l.project, ".cuvette", "adapters"), { recursive: true });
+  const tool = genericTools(l.dirs).find((t) => t.name === "run_command")!;
+  const run = (argv: string[]) => tool.execute({ purpose: "Test", does: "Runs a test.", argv }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+  for (const cmd of [`mkdir -p ${JSON.stringify(join(l.project, ".cuvette", "adapters", "x"))} && echo a > ${JSON.stringify(join(l.project, ".cuvette", "adapters", "x", "adapter.yaml"))}`, `mkdir -p ${JSON.stringify(join(l.project, ".cuvette", "skills", "s"))}`]) {
+    expect((await run(["/bin/sh", "-c", cmd])).ok, cmd).toBe(false);
+  }
+  expect(readdirSync(join(l.project, ".cuvette", "adapters"))).toEqual([]);
+  expect(existsSync(join(l.project, ".cuvette", "skills"))).toBe(false);
+  expect((await run(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(l.project, "data", "r.txt"))}`])).error).toBeUndefined();
 });

@@ -325,9 +325,9 @@ export function bwrapCommand(argv: string[], steps: WriteStep[]): string[] {
   return ["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv];
 }
 
-export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined> } = {}): Promise<{ argv: string[]; changed(): string[] }> {
+export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined>; adapterFolders?: boolean } = {}): Promise<{ argv: string[]; changed(): string[] }> {
   await probeSandbox();
-  const steps = writeSteps(dirs, { adapterFolders: true });
+  const steps = writeSteps(dirs, { adapterFolders: o.adapterFolders });
   const guard = fingerprint(dirs, true);
   if (!programExists(argv[0], o.cwd ?? process.cwd(), o.env ?? process.env)) return { argv, changed: guard.changed };
   const blind = blindPolicy();
