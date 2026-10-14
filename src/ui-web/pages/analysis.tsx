@@ -208,6 +208,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     sc.scrollTop = sc.scrollHeight;
     lastTop.current = sc.scrollTop;
   };
+  // A card that did not change stays in the page, so that a screen reader does not read it again.
+  const cardText = useRef(new Map<string, string>());
+  const keptCards = useRef<Set<Element>>(new Set());
+  useLayoutEffect(() => {
+    if (cardsRef.current) keptCards.current = patchCards(cardsRef.current, stream.cards, cardText.current);
+  }, [stream.cards]);
+
   useLayoutEffect(() => {
     const sc = scrollRef.current;
     if (sc) pin(sc);
@@ -248,17 +255,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     for (const d of scrollRef.current?.querySelectorAll<HTMLDetailsElement>("details[data-run]") ?? []) if (openRuns.current.has(d.dataset.run!)) d.open = true;
   }, [stream.items, stream.pending]);
 
-  // A card that did not change stays in the page, so that a screen reader does not read it again.
-  const cardText = useRef(new Map<string, string>());
-  useLayoutEffect(() => {
-    if (cardsRef.current) patchCards(cardsRef.current, stream.cards, cardText.current);
-  }, [stream.cards]);
-
   // Cards: put the keyboard focus on the card that waits for an answer.
   useLayoutEffect(() => {
     const box = cardsRef.current;
     if (!box) return;
-    for (const s of box.querySelectorAll('[data-type="config"] .settings')) {
+    for (const s of box.querySelectorAll<HTMLElement>('[data-type="config"] .settings:not([data-replaced])')) {
+      s.dataset.replaced = "1";
       s.innerHTML = '<p class="dim small">The settings are on their own page.</p><div class="row"><button type="button" class="btn primary" data-open-settings="1">Open the settings</button></div>';
     }
     const card = activeCard(box);
@@ -268,9 +270,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (document.activeElement === document.body && !document.querySelector("[role=dialog]") && !matchMedia("(pointer: coarse)").matches) inputRef.current?.focus({ preventScroll: true });
       return;
     }
+    const a = document.activeElement;
+    const keptHere = [...keptCards.current].some((k) => !!a && k.contains(a));
+    if (keptHere) return;
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
-    const a = document.activeElement;
     const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
     if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
@@ -306,6 +310,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       const a = document.activeElement;
       const inCards = !!a && !!cardsRef.current?.contains(a);
@@ -743,6 +748,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               const w = { ArrowLeft: sideWidth + 24, ArrowRight: sideWidth - 24, Home: 300, End: 900 }[e.key];
               if (w === undefined) return;
               e.preventDefault();
+              e.stopPropagation();
               const next = Math.min(Math.max(w, 300), 900);
               setSideWidth(next);
               try {

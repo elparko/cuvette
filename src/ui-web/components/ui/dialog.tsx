@@ -27,7 +27,7 @@ export function DialogContent({ className, children, wide, onCloseAutoFocus, ...
         onCloseAutoFocus={(e) => {
           onCloseAutoFocus?.(e);
           const now = document.activeElement;
-          if (e.defaultPrevented || !before?.isConnected || (now && now !== document.body)) return;
+          if (e.defaultPrevented || !before?.isConnected || (now && now !== document.body) || document.querySelector('[role="dialog"]')) return;
           e.preventDefault();
           before.focus();
         }}
