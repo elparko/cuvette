@@ -414,7 +414,7 @@ cuvette -p "<prompt>" --adapter imagej --model ... [--answers answers.json] [--s
 cuvette adapters | cuvette adapter check <dir|name> [--run-tests] | cuvette adapter approve <name>
 cuvette onboard <program> --model ... [--docs <url> ...] [--kind cli]
 cuvette export <session> --format <fmt>
-cuvette replay <session> --input <old>=<new> ...
+cuvette replay <flow.json> [--input name=path ...] [--session <id>]
 cuvette questions
 cuvette bench [scenario|all] --model ... [--guidance on|off|both]
 cuvette mcp
