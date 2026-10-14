@@ -2309,6 +2309,10 @@ export class Session {
     const mod = adapter ? await adapter.module() : {};
     const manualRoute = output.manualRoute ?? mod.manualRoute?.(remote, args) ?? entry?.route ?? "";
     const fidelity = output.fidelity ?? entry?.fidelity ?? (tool.source === "adapter" ? (manualRoute ? "close" : "none") : tool.source === "harness" ? undefined : "none");
+    if ([...(output.outputs ?? []).map((o) => o.path), ...(output.images ?? [])].some(isCredentialsFile)) {
+      output = { ...output, outputs: output.outputs?.filter((o) => !isCredentialsFile(o.path)), images: output.images?.filter((i) => !isCredentialsFile(i)) };
+      this.record.append("notice", { text: `Cuvette did not keep the saved key file that the result of ${tool.name} named as an output.`, warn: true });
+    }
     const fileList = [...(output.outputs ?? [])];
     for (const img of output.images ?? []) if (!fileList.some((o) => o.path === img)) fileList.push({ path: img, kind: "image" });
     const outputs = fileList
