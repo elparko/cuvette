@@ -9,7 +9,7 @@ export const ContextMenuSeparator = ({ className, ...props }: React.ComponentPro
 export function ContextMenuContent({ className, ...props }: React.ComponentProps<typeof M.Content>) {
   return (
     <M.Portal>
-      <M.Content className={cn("z-50 min-w-[12rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95", className)} {...props} />
+      <M.Content className={cn("z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[12rem] overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95", className)} {...props} />
     </M.Portal>
   );
 }

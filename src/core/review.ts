@@ -3,6 +3,7 @@ import type { DecisionRecord } from "./decisions.ts";
 import { approvedPlan, currentPlan, definitionFindings, planFindings, planText } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import { powerFindings } from "./power.ts";
+import { stepNumbers as nodeStepNumbers } from "./housekeeping.ts";
 import { checkText, summary } from "./ste.ts";
 import { latestValue, testRows } from "./testcount.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
@@ -59,7 +60,7 @@ function stepNumbers(entries: Entry[]): Map<string, number> {
 
 function failedNotRepeated(ctx: ReviewContext): FindingIn[] {
   const { record } = ctx;
-  const steps = stepNumbers(record.entries(["tool_call"]));
+  const steps = nodeStepNumbers(record.nodes());
   const results = record.entries(["tool_result"]);
   const skipped = new Set(record.entries(["blocked"]).map((e) => String(e.data.callId)));
   const out: FindingIn[] = [];
@@ -67,11 +68,11 @@ function failedNotRepeated(ctx: ReviewContext): FindingIn[] {
     if (r.data.ok !== false || skipped.has(String(r.data.callId))) return;
     const tool = String(r.data.tool);
     if (results.slice(i + 1).some((x) => x.data.tool === tool && x.data.ok !== false)) return;
-    const n = steps.get(String(r.data.callId));
+    const n = r.node ? steps.get(r.node) : undefined;
     out.push({
       check: "failed_result_used",
       severity: "warning",
-      message: `Step ${n ?? "?"} (${tool}) failed and was not repeated.${r.data.error ? ` Error: ${String(r.data.error).slice(0, 160)}` : ""}`,
+      message: `${n ? `Step ${n} (${tool})` : `The call to ${tool}`} failed and was not repeated.${r.data.error ? ` Error: ${String(r.data.error).slice(0, 160)}` : ""}`,
       entries: [r.id],
       nodes: r.node ? [r.node] : undefined,
     });

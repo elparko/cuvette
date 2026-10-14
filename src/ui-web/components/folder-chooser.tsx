@@ -52,8 +52,8 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
                 <li key={r}>
                   <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
                     <ClockIcon className="size-4 text-muted-foreground" />
-                    <span className="min-w-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
-                    <span className="ml-auto min-w-0 shrink-[3] truncate text-xs text-muted-foreground">{midText(r, 40)}</span>
+                    <span className="max-w-[65%] shrink-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
+                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(r, 40)}</span>
                   </button>
                 </li>
               ))}
@@ -92,8 +92,8 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
     <li key={key}>
       <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={target} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
         <span className="text-muted-foreground">{icon}</span>
-        <span className="min-w-0 truncate">{label}</span>
-        {sub && <span className="ml-auto min-w-0 shrink-[3] truncate text-xs text-muted-foreground">{midText(sub, 40)}</span>}
+        <span className="max-w-[65%] shrink-0 truncate">{label}</span>
+        {sub && <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(sub, 40)}</span>}
       </button>
     </li>
   );
@@ -121,7 +121,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
       {(msg || pick.msg) && <p className="text-sm text-bad" role="alert">{msg || pick.msg}</p>}
       {pick.pending && <SuggestCard pending={pick.pending} busy={pick.busy} open={pick.open} cancel={pick.cancel} />}
       {d && !pick.pending && (
-        <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 50vh)" }}>
+        <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 35vh)" }}>
           <ul>
             {d.parent && row("up", <ArrowUpIcon className="size-4" />, "Up one folder", d.parent, d.parent)}
             {d.path !== d.home && row("home", <HomeIcon className="size-4" />, "Home folder", d.home)}

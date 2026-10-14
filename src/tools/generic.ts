@@ -128,7 +128,11 @@ export function genericTools(dirs: Dirs): Tool[] {
       run(a) {
         const path = here(String(a.path));
         if (!existsSync(path) || !statSync(path).isDirectory()) return { ok: false, error: `${path} is not a folder` };
-        const entries = readdirSync(path, { withFileTypes: true }).map((e) => ({ name: e.name, kind: e.isDirectory() ? "folder" : "file", size: e.isFile() ? statSync(resolve(path, e.name)).size : undefined }));
+        const entries = readdirSync(path, { withFileTypes: true }).map((e) => {
+          const st = e.isSymbolicLink() ? statSync(resolve(path, e.name), { throwIfNoEntry: false }) : undefined;
+          const folder = st ? st.isDirectory() : e.isDirectory();
+          return { name: e.name, kind: folder ? "folder" : "file", size: st ? (st.isFile() ? st.size : undefined) : e.isFile() ? statSync(resolve(path, e.name)).size : undefined };
+        });
         return { ok: true, summary: `${entries.length} entries in ${path}.`, data: { entries }, text: entries.map((e) => `${e.kind === "folder" ? "d" : "-"} ${e.name}${e.size === undefined ? "" : `  ${e.size}`}`).join("\n") };
       },
     }),

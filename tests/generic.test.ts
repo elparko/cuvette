@@ -53,6 +53,16 @@ test("read_file and list_dir", async () => {
   expect((l.data as { entries: { name: string }[] }).entries.map((e) => e.name)).toContain("work");
 });
 
+test("list_dir shows a link to a folder as a folder", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-generic-link-"));
+  mkdirSync(join(dir, "real"));
+  symlinkSync(join(dir, "real"), join(dir, "linkdir"));
+  symlinkSync(join(dir, "none"), join(dir, "broken"));
+  const l = await tools.list_dir.execute({ path: dir }, ctx());
+  expect(l.text).toContain("d linkdir");
+  expect(l.text).toContain("- broken");
+});
+
 test("write_file writes an absolute path in the project folder that the scientist names", async () => {
   const project = mkdtempSync(join(tmpdir(), "cuvette-generic-proj-"));
   const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;

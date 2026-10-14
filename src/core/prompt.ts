@@ -88,11 +88,12 @@ export function foldersNote(f: { project: string; work: string; output?: string 
 }
 
 export const FOLDER_LIST_MAX = 50;
+export const FOLDER_LIST_READ_MAX = 2000;
 
 export function folderListNote(entries: { name: string; folder: boolean; size?: number }[], more: boolean): string {
   if (!entries.length) return "The project folder is empty.";
   const lines = entries.map((e) => `  ${e.folder ? "d" : "-"} ${pathText(e.name)}${e.size === undefined ? "" : `  ${e.size}`}`);
-  const tail = more ? `\n  The list shows the first ${FOLDER_LIST_MAX} entries. Call list_dir to see all.` : "";
+  const tail = more ? `\n  The list shows ${FOLDER_LIST_MAX} entries, sorted by name. More entries exist. Call list_dir to see all.` : "";
   return `The harness listed the project folder at the start, in the format of list_dir (d is a folder, - is a file with its size in bytes):\n${lines.join("\n")}${tail}`;
 }
 

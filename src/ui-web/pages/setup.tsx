@@ -127,7 +127,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
           <div className="mt-4">
             <p className="mb-2 text-[13px] text-muted-foreground">Paste your key. The app checks it with Anthropic, then saves it in a file that only your user can read.</p>
             <div className="flex flex-wrap gap-2">
-              <div className="relative min-w-[220px] flex-1">
+              <div className="relative min-w-[min(220px,100%)] flex-1">
                 <KeyRoundIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="password"

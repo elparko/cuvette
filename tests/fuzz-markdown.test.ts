@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { inline, md } from "../src/core/markdown.ts";
-import { liveHtml } from "../src/ui-web/lib/markdown.ts";
+import { liveCut, liveHtml } from "../src/ui-web/lib/markdown.ts";
 import { linear, Rng, runs } from "./fuzz-rng.ts";
 
 const CARET = `<span class="caret" aria-hidden="true"></span>`;
@@ -115,5 +115,34 @@ describe("fuzz: markdown renderer", () => {
     ];
     const slow = shapes.map(([name, make]) => ({ name, ...linear(make, (s) => liveHtml(s), 5000) })).filter((x) => !x.ok);
     expect(slow).toEqual([]);
+  });
+  test("the live reply gives the same HTML when only the last block is parsed again", () => {
+    const r = new Rng(606);
+    const bad: string[] = [];
+    for (let i = 0; i < runs(1500); i++) {
+      const src = Array.from({ length: r.int(1, 6) }, () => randomMd(r)).join(r.pick(["\n\n", "\n", "\n\n\n"]));
+      let head = "";
+      for (let n = 1; n <= src.length; n += r.int(1, 9)) {
+        const text = src.slice(0, n);
+        const cut = liveCut(text, head.length);
+        const next = cut > head.length ? text.slice(0, cut) : head;
+        const once = md(next.slice(head.length)) + liveHtml(text.slice(next.length));
+        const whole = liveHtml(text.slice(head.length));
+        if (once !== whole) bad.push(`${JSON.stringify(text)} cut ${cut}`);
+        head = next;
+        if (head && liveHtml(text) !== md(head) + liveHtml(text.slice(head.length))) bad.push(`all ${JSON.stringify(text)} head ${JSON.stringify(head)}`);
+      }
+    }
+    expect(bad.slice(0, 4)).toEqual([]);
+  });
+
+  test("a long reply parses only the new block", () => {
+    const text = Array.from({ length: 400 }, (_, i) => `## Part ${i}\n\n| a | b |\n|---|---|\n| ${i} | 2 |\n\nA line of text.\n`).join("\n");
+    const cut = liveCut(text);
+    expect(cut).toBeGreaterThan(text.length - 100);
+    expect(liveCut(text, cut)).toBe(cut);
+    expect(liveCut("a\n\n```\nx\n\ny\n")).toBe(3);
+    expect(liveCut("- a\n\n- b\n\nplain\n")).toBe("- a\n\n- b\n\n".length);
+    expect(liveCut("a\n\nb")).toBe(0);
   });
 });

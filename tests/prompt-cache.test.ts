@@ -1,10 +1,16 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
+
+const hang = vi.hoisted(() => ({ on: false }));
+vi.mock("node:fs/promises", async (original) => {
+  const real = await original<typeof import("node:fs/promises")>();
+  return { ...real, opendir: ((...args: Parameters<typeof real.opendir>) => (hang.on ? new Promise(() => {}) : real.opendir(...args))) as typeof real.opendir };
+});
 
 let sessions: Session[] = [];
 afterEach(async () => {
@@ -173,5 +179,43 @@ test("the folder list stops at 50 entries and names list_dir for the rest", asyn
   await s.send("First");
   const first = userTexts(p.requests[0]!.messages)[0]!;
   expect(first.match(/^ {2}[-d] /gm)!.length).toBe(50);
-  expect(first).toContain("The list shows the first 50 entries. Call list_dir to see all.");
+  expect(first).toContain("The list shows 50 entries, sorted by name. More entries exist. Call list_dir to see all.");
+});
+
+test("the folder list is sorted, so the first entries by name are in it", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"));
+  for (let i = 119; i >= 0; i--) writeFileSync(join(cwd, `f${String(i).padStart(3, "0")}.txt`), "x");
+  const p = new FakeProvider([{ text: "one" }]);
+  const s = await fakeSession(p, cwd);
+  await s.send("First");
+  const names = [...userTexts(p.requests[0]!.messages)[0]!.matchAll(/^ {2}- (\S+)/gm)].map((m) => m[1]);
+  expect(names[0]).toBe("f000.txt");
+  expect(names).toEqual(names.map((_, i) => `f${String(i).padStart(3, "0")}.txt`));
+});
+
+test("the folder list shows a link to a folder as a folder", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"));
+  mkdirSync(join(cwd, "real"));
+  symlinkSync(join(cwd, "real"), join(cwd, "linkdir"));
+  const p = new FakeProvider([{ text: "one" }]);
+  const s = await fakeSession(p, cwd);
+  await s.send("First");
+  expect(userTexts(p.requests[0]!.messages)[0]).toContain("  d linkdir\n");
+});
+
+test("a folder list that takes too long is left out and the first message goes on", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-note-proj-"));
+  writeFileSync(join(cwd, "data.csv"), "x");
+  const p = new FakeProvider([{ text: "one" }]);
+  const s = await fakeSession(p, cwd);
+  s.folderListMs = 1;
+  hang.on = true;
+  try {
+    await s.send("First");
+  } finally {
+    hang.on = false;
+  }
+  const first = userTexts(p.requests[0]!.messages)[0]!;
+  expect(first).toContain("Folders of this session.");
+  expect(first).not.toContain("The harness listed the project folder");
 });

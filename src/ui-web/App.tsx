@@ -248,7 +248,7 @@ export function App() {
                       className={cn("flex w-full min-w-0 flex-col overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", state.session?.id === s.id && "bg-muted")}
                     >
                       <span className="line-clamp-2 min-w-0 text-[13px] leading-snug break-words">{s.title}</span>
-                      <span className="block min-w-0 truncate text-xs text-muted-foreground">{s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
+                      <span className="block min-w-0 truncate text-xs text-muted-foreground">{s.hasRequest === false ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
                     </button>
                   </ContextMenuTrigger>
                   <ContextMenuContent>

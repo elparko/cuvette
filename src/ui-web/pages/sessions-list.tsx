@@ -4,6 +4,7 @@ import type { AppCtx } from "../App.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Select } from "../components/ui/select.tsx";
+import { foldText, folderLabels } from "../lib/folders.ts";
 import { SessionGrid, type Sessions } from "./sessions.tsx";
 
 export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }) {
@@ -12,9 +13,10 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
   const [moved, setMoved] = useState(false);
   const movedCount = sessions.list.filter((s) => s.moved).length;
   const folders = useMemo(() => [...new Set(sessions.list.map((s) => s.folder).filter(Boolean))].sort(), [sessions.list]);
+  const labels = useMemo(() => folderLabels(folders), [folders]);
   const shown = sessions.list.filter((s) => {
-    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const text = `${s.title} ${s.text} ${s.folder}`.toLowerCase();
+    const words = foldText(q).split(/\s+/).filter(Boolean);
+    const text = foldText(`${s.title} ${s.text} ${s.folderName}`);
     return words.every((w) => text.includes(w)) && (folder === "all" || s.folder === folder) && (moved || !s.moved);
   });
 
@@ -33,7 +35,7 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search titles, requests and folders" aria-label="Search sessions" className="pl-9" />
           </div>
-          <Select value={folder} onValueChange={setFolder} label="Folder" className="min-w-[180px]" options={[{ value: "all", label: "All folders" }, ...folders.map((f) => ({ value: f, label: f.split("/").filter(Boolean).pop() || f }))]} />
+          <Select value={folder} onValueChange={setFolder} label="Folder" className="min-w-[180px]" options={[{ value: "all", label: "All folders" }, ...folders.map((f) => ({ value: f, label: labels.get(f) ?? f }))]} />
           {movedCount > 0 && (
             <Button variant="ghost" onClick={() => setMoved(!moved)} aria-pressed={moved}>
               {moved ? "Hide the moved sessions" : `Show the moved sessions (${movedCount})`}
