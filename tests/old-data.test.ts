@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFi
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { cpSync, symlinkSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
@@ -984,5 +985,50 @@ describe("a branch from a rewound old session", () => {
     expect(child.record.rewound()).toEqual(s.record.rewound());
     expect(child.branches().map((x) => x.role)).toEqual(["this", "parent"]);
     expect(listSessions().map((x) => x.id)).toContain(b.id);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("a project adapter on resume", () => {
+  async function started() {
+    const project = join(root, "project");
+    mkdirSync(join(project, ".cuvette", "adapters"), { recursive: true });
+    const dir = join(project, ".cuvette", "adapters", "lab");
+    cpSync(LAB, dir, { recursive: true });
+    writeFileSync(join(project, "package.json"), '{"type":"module"}');
+    symlinkSync(join(__dirname, "..", "node_modules"), join(project, "node_modules"));
+    const s = await Session.create({ adapters: [dir], provider: new FakeProvider([{ text: "Hello." }]), cwd: project, trustFolder: true });
+    await s.send("Hi");
+    const id = s.id;
+    await s.close();
+    return { project, id };
+  }
+
+  test("with trustFolder, an untrusted folder loads the adapter, with no notice", async () => {
+    const { project, id } = await started();
+    const t = await Session.resume(id, { provider: new FakeProvider([{ text: "ok" }]), cwd: project, trustFolder: true });
+    open.push(t);
+    expect(t.adapters.map((a) => a.manifest.adapter.name)).toEqual(["lab"]);
+    expect(t.record.entries(["notice"]).filter((n) => n.data.warn && String(n.data.text).includes("adapter lab")).length).toBe(0);
+  });
+
+  test("without trustFolder, the notice names the trust and not a missing install", async () => {
+    const { id } = await started();
+    const s = await resume(id);
+    expect(s.adapters.length).toBe(0);
+    const texts = s.record.entries(["notice"]).map((n) => String(n.data.text));
+    expect(texts.some((x) => x.includes("this folder is not trusted"))).toBe(true);
+    expect(texts.some((x) => x.includes("not installed here"))).toBe(false);
+  });
+
+  test("a really missing adapter still gives the not installed notice once", async () => {
+    const { id, project } = await started();
+    rmSync(join(project, ".cuvette"), { recursive: true, force: true });
+    for (let i = 0; i < 2; i++) {
+      const s = await resume(id);
+      await s.close();
+      open.splice(open.indexOf(s), 1);
+    }
+    const s = await resume(id);
+    expect(s.record.entries(["notice"]).filter((n) => String(n.data.text).includes("not installed here")).length).toBe(1);
   });
 });

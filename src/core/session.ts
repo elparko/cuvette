@@ -399,21 +399,27 @@ export class Session {
     const first = record.entries(["session"])[0] as any;
     const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
-    const gone: string[] = [];
+    const gone = new Map<string, boolean>();
     const recorded = new Map<string, string>();
     for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path && existsSync(a.path) ? a.path : a.name);
-    const adapters =
-      opts.adapters ??
-      [...recorded].filter(([name, ref]) => {
-        try {
-          findAdapter(ref, cwd);
-          return true;
-        } catch (e) {
-          if (!(e as Error).message.startsWith("no adapter named")) throw e;
-          gone.push(name);
-          return false;
-        }
-      }).map(([, ref]) => ref);
+    if (opts.trustFolder && cwd) trustOnce(cwd);
+    let adapters: string[];
+    try {
+      adapters =
+        opts.adapters ??
+        [...recorded].filter(([name, ref]) => {
+          try {
+            findAdapter(ref, cwd);
+            return true;
+          } catch (e) {
+            if (!(e as Error).message.startsWith("no adapter named")) throw e;
+            gone.set(name, existsSync(ref));
+            return false;
+          }
+        }).map(([, ref]) => ref);
+    } finally {
+      if (opts.trustFolder && cwd) endTrustOnce(cwd);
+    }
     const lastMode = record.entries(["mode"]).at(-1)?.data;
     const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
     const switched = record.live(["setting"]).filter((e) => e.data.name === "model" && typeof e.data.new === "string" && e.data.new).at(-1)?.data.new as string | undefined;
@@ -423,8 +429,10 @@ export class Session {
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
-    for (const name of gone) {
-      const text = `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
+    for (const [name, untrusted] of gone) {
+      const text = untrusted
+        ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
+        : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
     return s;
