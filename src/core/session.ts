@@ -2242,6 +2242,11 @@ export class Session {
   }
 
   abandonMs = 5000;
+  private abandonedIds = new Set<string>();
+
+  private parentAbandoned(callId: string): boolean {
+    return [...this.abandonedIds].some((a) => callId.startsWith(`${a}.`));
+  }
 
   private untilStopped<T>(run: Promise<T>, signal: AbortSignal, abandon: () => void): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -2279,12 +2284,14 @@ export class Session {
         },
       }), signal, () => {
         abandoned = true;
+        this.abandonedIds.add(callId);
         this.notes.push(`The tool ${tool.name} did not stop after the scientist pressed Esc. It can still run in the background and keep its program busy. Its late result is ignored. If the next call of this program fails or waits, tell the scientist.`);
       });
     } catch (e) {
       output = { ok: false, error: signal.aborted ? `interrupted: the scientist stopped this tool${abandoned ? `. The tool did not stop within ${this.abandonMs / 1000} s, so Cuvette stopped waiting for it` : ""}` : `${(e as Error).name}: ${(e as Error).message}` };
     }
     output = { ...output, ...(output.text === undefined ? {} : { text: cleanText(output.text) }), ...(output.summary === undefined ? {} : { summary: cleanText(output.summary) }), ...(output.error === undefined ? {} : { error: cleanText(output.error) }), ...(output.table === undefined ? {} : { table: cleanDeep(output.table) as ToolOutput["table"] }), ...(output.data === undefined ? {} : { data: cleanDeep(output.data) }), ...(output.metrics === undefined ? {} : { metrics: cleanDeep(output.metrics) as ToolOutput["metrics"] }) };
+    if (this.parentAbandoned(callId)) return { output: { ok: false, error: "the call was stopped" } };
     const durationS = (performance.now() - t0) / 1000;
     const adapter = this.adapterOf(tool);
     const remote = tool.remoteName ?? tool.name;
@@ -2757,7 +2764,8 @@ export class Session {
     const stateTool = adapter?.manifest.connection.state_tool ? this.findTool(adapter.manifest.connection.state_tool) : undefined;
     if (stateTool && stateTool.name !== tool.name) {
       try {
-        state = (await this.untilStopped(stateTool.execute({}, { session: this.id, callId: `${callId}.state`, workDir: this.workDir, sessionDir: this.dir, signal, log: (k, d) => this.record.append(k, d), callTool: async () => ({ ok: false }) }), signal, () => {})).data;
+        let late = false;
+        state = (await this.untilStopped(stateTool.execute({}, { session: this.id, callId: `${callId}.state`, workDir: this.workDir, sessionDir: this.dir, signal, log: (k, d) => (late ? ({ id: 0, ts: "", session: this.id, kind: k, data: d } as Entry) : this.record.append(k, d)), callTool: async () => ({ ok: false }) }), signal, () => (late = true))).data;
       } catch {}
     }
     const cmp = compareNote(done.note, out.output.metrics ?? {});

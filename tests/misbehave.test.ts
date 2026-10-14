@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
@@ -598,7 +598,7 @@ test("when the output falls back to a folder under .cuvette, the name check uses
   const ctx = { session: "s", callId: "c", workDir, sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
   expect(await write.execute({ name: "a.txt", text: "fine" }, ctx)).toMatchObject({ ok: true });
   expect(await write.execute({ name: join(workDir, "figures", "b.txt"), text: "fine" }, ctx)).toMatchObject({ ok: true });
-  expect(await write.execute({ name: join(workDir, ".cuvette", "settings.json"), text: "{}" }, ctx)).toMatchObject({ ok: false });
+  expect(await write.execute({ name: join(workDir, ".cuvette", "settings.json"), text: "{}" }, ctx)).toMatchObject({ ok: true });
   expect(await write.execute({ name: join(sessionDir, "log.jsonl"), text: "evil" }, ctx)).toMatchObject({ ok: false });
   expect(readFileSync(join(workDir, "a.txt"), "utf8")).toBe("fine");
   const outside = await write.execute({ name: join(project, ".cuvette", "settings.json"), text: "{}" }, ctx);
@@ -695,4 +695,124 @@ test("cleanText accepts a value that is not a string, and the cells of a table a
   expect(JSON.stringify(provider.requests.at(-1)!.messages)).not.toMatch(/\\u001b|\\u0007/);
   expect(JSON.stringify(provider.requests.at(-1)!.messages)).toContain("xy");
   expect(JSON.stringify(s.record.entries(["tool_result"]))).not.toMatch(/\\u001b|\\u0007/);
+});
+
+test("a nested call that runs when the outer call is abandoned records no result of its own", async () => {
+  const { session: s } = await start([call("outer", {}), { text: "never reached" }]);
+  s.abandonMs = 50;
+  let innerStarted = false;
+  const tools = s["tools"] as Map<string, unknown>;
+  const base = { description: "Test.", inputSchema: { type: "object", properties: {} }, source: "adapter", adapter: "lab", readOnly: true, permission: "allow" };
+  tools.set("inner", { ...base, name: "inner", execute: () => ((innerStarted = true), new Promise<ToolOutput>(() => {})) });
+  tools.set("outer", { ...base, name: "outer", execute: (_a: unknown, ctx: { callTool: (n: string, a: Record<string, unknown>) => Promise<ToolOutput> }) => ctx.callTool("inner", {}) });
+  s["useTools"](["outer", "inner"]);
+  const run = s.send("go");
+  await until(() => innerStarted);
+  s.interrupt();
+  await run;
+  await new Promise((r) => setTimeout(r, 300));
+  const ids = s.record.entries(["tool_result"]).map((e) => String(e.data.callId));
+  expect(ids).toEqual(["call_1"]);
+});
+
+test("a state tool that returns late after Esc writes nothing to the record", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Default" } }] }, { text: "done" }]);
+  const cwd = mkdtempSync(join(work, "proj-"));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd, mode: "follow", settings: { guidance: false } });
+  const s = session;
+  s.abandonMs = 50;
+  s.decisions.applySetup({});
+  s.decisions.change("method", "Default");
+  let release: () => void = () => {};
+  let started = false;
+  let lateLog = false;
+  const tools = s["tools"] as Map<string, { execute: unknown }>;
+  tools.set("state", {
+    ...(tools.get("state") as object),
+    execute: async (_a: unknown, ctx: { log: (k: string, d: Record<string, unknown>) => unknown }) => {
+      started = true;
+      await new Promise<void>((r) => (release = r));
+      ctx.log("note", { text: "late state" });
+      lateLog = true;
+      return { ok: true, data: {} };
+    },
+  } as never);
+  s.bus.on((e) => {
+    if (e.type === "instruction") setTimeout(() => s.followDone(e.step, "I got count = 64"), 0);
+  });
+  const run = s.send("count");
+  await until(() => started);
+  s.interrupt();
+  await run.catch(() => {});
+  const before = s.record.entries().length;
+  release();
+  await until(() => lateLog);
+  expect(s.record.entries(["note"]).filter((e) => e.data.text === "late state")).toEqual([]);
+  expect(s.record.entries().length).toBeGreaterThanOrEqual(before);
+});
+
+test.skipIf(windows)("a link in the work folder to the settings folder or to the record of another session does not open them", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  mkdirSync(join(cwd, ".cuvette"));
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  const other = join(cwd, "cuvette", "2026-01-01-other", ".record");
+  mkdirSync(other, { recursive: true });
+  writeFileSync(join(other, "log.jsonl"), "{}\n");
+  symlinkSync(join(cwd, ".cuvette"), join(s.workDir, "to-settings"));
+  symlinkSync(other, join(s.workDir, "to-other"));
+  steps.push(
+    call("write_file", { name: join(s.workDir, "to-settings", "settings.json"), text: "{}" }),
+    call("write_file", { name: join(s.workDir, "to-other", "log.jsonl"), text: "evil" }),
+    call("write_file", { name: join(s.workDir, "to-other", "new.txt"), text: "evil" }),
+    { text: "ok" },
+  );
+  await s.send("write");
+  for (const x of texts(provider).slice(0, 3)) expect(x).toMatch(GUARD_TEXT);
+  expect(existsSync(join(cwd, ".cuvette", "settings.json"))).toBe(false);
+  expect(readFileSync(join(other, "log.jsonl"), "utf8")).toBe("{}\n");
+  expect(existsSync(join(other, "new.txt"))).toBe(false);
+});
+
+test.skipIf(windows)("a hard link to the record file is refused", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  const log = join(s.record.dir, "log.jsonl");
+  linkSync(log, join(s.workDir, "hard.txt"));
+  steps.push(call("write_file", { name: "hard.txt", text: "evil" }), { text: "ok" });
+  const before = readFileSync(log, "utf8");
+  await s.send("write");
+  expect(texts(provider)[0]).toContain("has more than one hard link");
+  expect(readFileSync(log, "utf8").startsWith(before)).toBe(true);
+});
+
+test("a folder named .record or .ga deeper in the project is a normal folder", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const { provider, session: s } = await start([call("write_file", { name: join(cwd, "data", ".ga", "a.txt"), text: "fine" }), call("write_file", { name: "x/.record/b.txt", text: "fine" }), call("write_file", { name: join(cwd, ".ga", "a.txt"), text: "evil" }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  const t = texts(provider);
+  expect(t[0]).toContain("Wrote 4 bytes");
+  expect(t[1]).toContain("Wrote 4 bytes");
+  expect(t[2]).toMatch(GUARD_TEXT);
+});
+
+test.skipIf(windows)("killAll stops the group first and kills a child in a new session and removes its exit handler", async () => {
+  const { spawn } = await import("node:child_process");
+  const { killAll } = await import("../src/adapters/kinds/common.ts");
+  const parent = spawn("python3", ["-c", "import subprocess, time\np = subprocess.Popen(['sleep','300'], start_new_session=True)\nprint(p.pid, flush=True)\nsame = subprocess.Popen(['sleep','300'])\nprint(same.pid, flush=True)\ntime.sleep(300)"], { detached: true, stdio: ["ignore", "pipe", "ignore"] });
+  let out = "";
+  parent.stdout.on("data", (d) => (out += d));
+  await until(() => out.trim().split("\n").length === 2);
+  const pids = [parent.pid!, ...out.trim().split("\n").map(Number)];
+  const handlers = process.listenerCount("exit");
+  try {
+    await killAll(parent.pid);
+    await until(() => pids.every((p) => !alive(p)), 20000);
+    expect(process.listenerCount("exit")).toBe(handlers);
+  } finally {
+    for (const p of pids) if (alive(p)) process.kill(p, "SIGKILL");
+  }
 });

@@ -645,20 +645,30 @@ export async function killWithChildren(pid: number | undefined): Promise<void> {
 }
 
 // A script can start a process in a new session. The process group kill does not reach it, so the children are listed first.
-// The group stops first, so the script starts no new process while the list is made.
+// SIGSTOP stops the group, so the script starts no new process in it while the list is made. A child in a new session keeps running.
+// If Cuvette exits during the list, the exit handler kills the stopped group.
 export async function killAll(pid: number | undefined): Promise<void> {
   if (!pid) return;
-  if (process.platform !== "win32") {
+  if (process.platform === "win32") {
+    killTree(pid);
+    return;
+  }
+  const onExit = () => killTree(pid);
+  process.once("exit", onExit);
+  try {
     try {
       process.kill(-pid, "SIGSTOP");
     } catch {}
-  }
-  const kids = process.platform === "win32" ? [] : await descendants(pid).catch(() => []);
-  killTree(pid);
-  for (const n of kids) {
-    try {
-      process.kill(n, "SIGKILL");
-    } catch {}
+    const kids = await descendants(pid).catch(() => []);
+    killTree(pid);
+    for (const n of kids) {
+      try {
+        process.kill(n, "SIGKILL");
+      } catch {}
+    }
+  } finally {
+    killTree(pid);
+    process.off("exit", onExit);
   }
 }
 
