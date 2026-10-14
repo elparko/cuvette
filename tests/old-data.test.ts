@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { cpSync, symlinkSync } from "node:fs";
 import { chmodSync } from "node:fs";
@@ -46,15 +46,32 @@ afterEach(async () => {
   rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 });
 
+function fill(text: string, base: string, lab: string, json: boolean, separator = sep): string {
+  const put = (v: string) => (json ? JSON.stringify(v).slice(1, -1) : v);
+  return text.replace(/@@(ROOT|LAB)@@((?:\/[^"\\\s,;)]*)*)/g, (_m, which: string, rest: string) => put((which === "ROOT" ? base : lab) + rest.split("/").join(separator)));
+}
+
 function copyTree(from: string, to: string): void {
   mkdirSync(to, { recursive: true });
   for (const name of readdirSync(from)) {
     const src = join(from, name);
     const dest = join(to, name);
     if (statSync(src).isDirectory()) copyTree(src, dest);
-    else writeFileSync(dest, TEXT.test(name) ? readFileSync(src, "utf8").split("@@ROOT@@").join(root).split("@@LAB@@").join(LAB) : readFileSync(src));
+    else writeFileSync(dest, TEXT.test(name) ? fill(readFileSync(src, "utf8"), root, LAB, /\.jsonl?$/.test(name)) : readFileSync(src));
   }
 }
+
+test("the fixture copy writes valid JSON and native paths for a Windows-style root", () => {
+  const winRoot = "C:\\Users\\x\\AppData\\Local\\Temp\\y";
+  const winLab = "C:\\repo\\tests\\fixtures\\lab";
+  const line = '{"project":"@@ROOT@@/project","folder":"@@ROOT@@/project/cuvette/a","adapter":"@@LAB@@/x","note":"@@ROOT@@"}';
+  const out = JSON.parse(fill(line, winRoot, winLab, true, "\\"));
+  expect(out.project).toBe(winRoot + "\\project");
+  expect(out.folder).toBe(winRoot + "\\project\\cuvette\\a");
+  expect(out.adapter).toBe(winLab + "\\x");
+  expect(out.note).toBe(winRoot);
+  expect(fill("@@ROOT@@/project", winRoot, winLab, false, "\\")).toBe(winRoot + "\\project");
+});
 
 function install(format: string): void {
   copyTree(join(FIXTURES, format), root);
@@ -424,7 +441,7 @@ describe("a session folder that moved or changed its name", () => {
     renameSync(join(root, "project"), moved);
     expect(listPlaces().every((p) => p.moved)).toBe(true);
     await expect(Session.resume(before[0]!.id, { provider: new FakeProvider([]) })).rejects.toThrow("is gone");
-    const folder = join(moved, "cuvette", before[0]!.folder.split("/").at(-1)!);
+    const folder = join(moved, "cuvette", basename(before[0]!.folder));
     const s = await resume(folder);
     expect(s.id).toBe(before[0]!.id);
     expect(s.cwd).toBe(moved);
@@ -938,7 +955,7 @@ describe("a session folder outside the project that moves with the home folder",
     mkdirSync(join(root, "disk2"), { recursive: true });
     renameSync(join(root, "home"), disk2);
     process.env.CUVETTE_HOME = disk2;
-    const moved = join(disk2, "projects", "lab", folder.split("/").at(-1)!);
+    const moved = join(disk2, "projects", "lab", basename(folder));
     expect(listSessions().find((x) => x.id === id)?.moved).toBe(true);
     const s = await resume(moved);
     expect(s.id).toBe(id);
