@@ -50,6 +50,24 @@ test("a deny rule looks through env, command, exec, nohup, sudo and xargs, and i
   expect(p.check(rc, { argv: ["env", "git", "status"] })).toBe("ask");
 });
 
+test("a deny rule for a program with capitals matches the program by any path and capitals, and the arguments stay case-sensitive", () => {
+  const p = new Permissions({ "run_command:Rscript *": "deny", "run_command:git push --force *": "deny" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  expect(p.check(rc, { argv: ["/usr/bin/Rscript", "a.R"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["rscript", "a.R"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["RSCRIPT.EXE", "a.R"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["/usr/bin/GIT", "push", "--force", "origin"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["git", "push", "--FORCE", "origin"] })).toBe("ask");
+});
+
+test("a deny rule looks past the value of an option of a wrapper, and past an unknown option", () => {
+  const p = new Permissions({ "run_command:rm *": "deny" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  for (const argv of [["sudo", "-u", "root", "rm", "x"], ["sudo", "-g", "wheel", "-u", "root", "rm", "x"], ["xargs", "-n", "1", "rm", "x"], ["xargs", "-I", "{}", "rm", "{}"], ["env", "-u", "HOME", "rm", "x"], ["env", "-S", "FOO", "rm", "x"], ["sudo", "--user", "root", "rm", "x"], ["sudo", "-uroot", "rm", "x"], ["env", "--chdir=/tmp", "rm", "x"], ["nohup", "--", "rm", "x"], ["sudo", "env", "-u", "A", "nohup", "rm", "x"]]) expect(p.check(rc, { argv }), argv.join(" ")).toBe("deny");
+  expect(p.check(rc, { argv: ["sudo", "-u", "root", "ls"] })).toBe("ask");
+  expect(p.check(rc, { argv: ["xargs", "-n", "1", "echo"] })).toBe("ask");
+});
+
 test("a deny rule does not catch a shell command, a renamed copy or a script, and an allow rule does not look through a wrapper", () => {
   const p = new Permissions({ "run_command:rm *": "deny" });
   const rc = tool({ name: "run_command", source: "generic" });

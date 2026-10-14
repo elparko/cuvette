@@ -7,10 +7,22 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^${body}$`, "s");
 }
 
-const WRAPPERS = new Set(["env", "command", "exec", "nohup", "sudo", "xargs"]);
+const WRAPPERS: Record<string, Set<string>> = {
+  env: new Set(["-u", "-C", "-S"]),
+  command: new Set(),
+  exec: new Set(),
+  nohup: new Set(),
+  sudo: new Set(["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-r", "-t", "-T"]),
+  xargs: new Set(["-n", "-L", "-I", "-P", "-s", "-d", "-E", "-a"]),
+};
 
 function programName(p: string): string {
   return p.split(/[\\/]/).pop()!.replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
+}
+
+function foldProgram(text: string): string {
+  const i = text.indexOf(" ");
+  return (i < 0 ? text : text.slice(0, i)).toLowerCase() + (i < 0 ? "" : text.slice(i));
 }
 
 function joinedArgv(args: Args): string[] {
@@ -18,32 +30,43 @@ function joinedArgv(args: Args): string[] {
   if (!Array.isArray(v)) return [String(v ?? "")];
   const list = v.map(String);
   const out = [list.join(" ")];
+  const add = (w: string[]) => out.push([programName(w[0] ?? ""), ...w.slice(1)].join(" "));
   let rest = list;
   for (let n = 0; n < 4; n++) {
-    out.push([programName(rest[0] ?? ""), ...rest.slice(1)].join(" "));
-    if (!WRAPPERS.has(programName(rest[0] ?? ""))) break;
+    add(rest);
+    const wrapper = WRAPPERS[programName(rest[0] ?? "")];
+    if (!wrapper) break;
     rest = rest.slice(1);
-    while (rest.length && (rest[0]!.startsWith("-") || /^[A-Za-z_]\w*=/.test(rest[0]!))) rest = rest.slice(1);
+    while (rest.length) {
+      const w = rest[0]!;
+      if (w === "--") rest = rest.slice(1);
+      else if (/^[A-Za-z_]\w*=/.test(w)) rest = rest.slice(1);
+      else if (wrapper.has(w)) rest = rest.slice(2);
+      else if (w.startsWith("-")) {
+        for (let i = 1; i < rest.length; i++) add(rest.slice(i));
+        return [...new Set(out)];
+      } else break;
+    }
   }
   return [...new Set(out)];
 }
 
 export class Permissions {
-  private rules: { rule: Rule; tool: RegExp; argv?: RegExp }[];
+  private rules: { rule: Rule; tool: RegExp; argv?: RegExp; folded?: RegExp }[];
 
   constructor(rules: Record<string, Rule>) {
     this.rules = Object.entries(rules).map(([key, rule]) => {
       const i = key.indexOf(":");
       if (i < 0) return { rule, tool: globToRegex(key) };
-      return { rule, tool: globToRegex(key.slice(0, i)), argv: globToRegex(key.slice(i + 1)) };
+      const glob = key.slice(i + 1);
+      return { rule, tool: globToRegex(key.slice(0, i)), argv: globToRegex(glob), folded: globToRegex(foldProgram(glob)) };
     });
   }
 
   check(tool: Tool, args: Args): Rule {
     const argv = joinedArgv(args);
     for (const rule of ["deny", "ask", "allow"] as Rule[]) {
-      const shown = rule === "allow" ? argv.slice(0, 1) : argv;
-      const hit = this.rules.find((r) => r.rule === rule && r.tool.test(tool.name) && (!r.argv || shown.some((a) => r.argv!.test(a))));
+      const hit = this.rules.find((r) => r.rule === rule && r.tool.test(tool.name) && (!r.argv || (rule === "allow" ? r.argv.test(argv[0]!) : argv.some((a) => r.folded!.test(foldProgram(a))))));
       if (hit) return rule;
     }
     if (tool.permission) return tool.permission;
