@@ -487,6 +487,7 @@ map:
     params:
       - { arg: distance, label: "vegdist() method", ui_default: bray }
       - { arg: permutations, label: "permutations of permutest()", ui_default: 999 }
+      - { arg: type, label: "type of betadisper()", ui_default: median }
     fidelity: close
     difference: A person has not run the route and compared the numbers.
     evidence:
