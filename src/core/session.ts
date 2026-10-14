@@ -2203,7 +2203,7 @@ export class Session {
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     this.useTools([tool.name]);
     const r = await this.pipeline(tool, this.callArgs(tool, call.args), call.id, signal);
-    this.outcomes.set(call.id, { ok: !r.isError, key: r.output ? resultKey(r.output) : createHash("sha1").update(r.text).digest("hex") });
+    this.outcomes.set(call.id, { ok: !r.isError, key: r.output ? resultKey(r.output, this.workDir) : createHash("sha1").update(r.text).digest("hex") });
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     const earlier = tool.readOnly && !r.isError && !r.images?.length && r.text.length > 400 ? this.sameEarlierResult(call, r.text) : undefined;
     if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: pointerText(earlier) };
