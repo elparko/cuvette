@@ -1,4 +1,5 @@
-export function patchCards(box: HTMLElement, html: string, seen: Map<string, string>): void {
+export function patchCards(box: HTMLElement, html: string, seen: Map<string, string>): Set<Element> {
+  const kept_ = new Set<Element>();
   const t = document.createElement("template");
   t.innerHTML = html;
   const before = new Map<string, Element>();
@@ -10,7 +11,9 @@ export function patchCards(box: HTMLElement, html: string, seen: Map<string, str
     const text = n.outerHTML;
     const old = id ? before.get(id) : undefined;
     if (id) kept.set(id, text);
-    next.push(old && seen.get(id!) === text ? old : n);
+    const keep = !!old && seen.get(id!) === text;
+    if (keep) kept_.add(old!);
+    next.push(keep ? old! : n);
   }
   seen.clear();
   for (const [id, text] of kept) seen.set(id, text);
@@ -24,4 +27,5 @@ export function patchCards(box: HTMLElement, html: string, seen: Map<string, str
     at.remove();
     at = after;
   }
+  return kept_;
 }
