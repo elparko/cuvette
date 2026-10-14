@@ -349,3 +349,51 @@ test.skipIf(process.platform === "win32")("a linked methods folder makes the fol
   symlinkSync(other, join(p.root, ".cuvette", "methods"));
   expect(trustStatus(p.root).state).toBe("changed");
 });
+
+
+test("a new file in __pycache__, .venv or node_modules under a project adapter makes the folder changed", () => {
+  for (const [folder, name] of [["__pycache__", "m.cpython-312.pyc"], [".venv", "lib.py"], ["node_modules", "evil.js"]] as const) {
+    const p = trustedProject();
+    expect(trustStatus(p.root).state).toBe("trusted");
+    mkdirSync(join(p.adapter, folder), { recursive: true });
+    writeFileSync(join(p.adapter, folder, name), "x");
+    const s = trustStatus(p.root);
+    expect(s.state, folder).toBe("changed");
+    cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+  }
+});
+
+test("a change of the size of a file in node_modules makes the folder changed, and an unchanged listing stays trusted", () => {
+  const p = trustedProject();
+  mkdirSync(join(p.adapter, "node_modules", "pkg"), { recursive: true });
+  writeFileSync(join(p.adapter, "node_modules", "pkg", "index.js"), "one");
+  trustFolder(p.root);
+  expect(trustStatus(p.root).state).toBe("trusted");
+  writeFileSync(join(p.adapter, "node_modules", "pkg", "index.js"), "three");
+  expect(trustStatus(p.root).state).toBe("changed");
+});
+
+test("more files than the limit give changed with the reason too many files to check", () => {
+  const p = trustedProject();
+  const many = join(p.adapter, "data");
+  mkdirSync(many);
+  for (let i = 0; i < 2001; i++) writeFileSync(join(many, `f${i}.txt`), "");
+  const s = trustStatus(p.root);
+  expect(s.state).toBe("changed");
+  expect(s.changes.join("\n")).toContain("too many files to check");
+  trustFolder(p.root);
+  expect(trustStatus(p.root).state).toBe("changed");
+});
+
+test.skipIf(process.platform === "win32")("a dangling link or a link to a folder inside an adapter does not stop the scan or the loader", () => {
+  const p = trustedProject();
+  symlinkSync(join(p.root, "no-such-target"), join(p.adapter, "dangling"));
+  symlinkSync(p.root, join(p.adapter, "folder-link"));
+  symlinkSync(join(p.root, "no-such-target"), join(p.root, ".cuvette", "adapters", "y"));
+  expect(() => scanFolder(p.root)).not.toThrow();
+  const s = trustStatus(p.root);
+  expect(s.state).toBe("changed");
+  expect(s.changes.join("\n")).toContain("link");
+  expect(() => adapterDirs(p.root)).not.toThrow();
+  expect(() => findAdapter("y", p.root)).toThrow(/no adapter named/);
+});

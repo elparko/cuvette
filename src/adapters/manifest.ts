@@ -406,6 +406,14 @@ export function cuvetteHome(): string {
 
 export const CATALOG_DIR = join(ROOT, "catalog");
 
+function insideReal(p: string, base: string): boolean {
+  try {
+    return realpathSync(p).startsWith(realpathSync(base) + sep);
+  } catch {
+    return false;
+  }
+}
+
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   const found: Record<string, string> = Object.create(null);
   const project = folderTrusted(cwd) ? projectAdapterDirs(cwd) : [];
@@ -413,7 +421,7 @@ export function adapterDirs(cwd = process.cwd()): Record<string, string> {
     if (!existsSync(base) || (project.includes(base) && lstatSync(base).isSymbolicLink())) continue;
     for (const d of readdirSync(base)) {
       const p = join(base, d);
-      if (project.includes(base) && !resolve(realpathSync(p)).startsWith(realpathSync(base) + sep)) continue;
+      if (project.includes(base) && !insideReal(p, base)) continue;
       if (existsSync(join(p, "adapter.yaml")) && !(d in found)) found[d] = p;
     }
   }

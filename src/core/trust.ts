@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 
@@ -13,8 +13,9 @@ export const TRUST_OPTIONS = [
   { value: "once", label: "Trust once (this session)" },
   { value: "no", label: "Do not trust (the session runs with user settings only)" },
 ];
-const SKIP = new Set(["node_modules", "__pycache__", ".venv", ".git"]);
+const LISTED = new Set(["node_modules", ".venv"]);
 const MAX_FILES = 2000;
+const MAX_LISTED = 200_000;
 
 export type TrustChoice = "trust" | "once" | "no";
 
@@ -29,6 +30,7 @@ export interface FolderScan {
   adapters: { name: string; replaces?: string }[];
   methods: string[];
   linked: string[];
+  incomplete: string[];
   bypass: boolean;
 }
 
@@ -77,14 +79,96 @@ function parse(path: string): Record<string, unknown> {
   }
 }
 
-function walk(dir: string, out: string[]): void {
-  if (out.length >= MAX_FILES) return;
-  for (const name of readdirSync(dir).sort()) {
-    if (SKIP.has(name)) continue;
+interface WalkState {
+  files: Record<string, string>;
+  count: number;
+  incomplete: string[];
+}
+
+function readHash(p: string): string {
+  try {
+    return sha(readFileSync(p));
+  } catch (e) {
+    return `unreadable:${(e as NodeJS.ErrnoException).code ?? "error"}`;
+  }
+}
+
+function linkHash(p: string): string {
+  let target = "unreadable";
+  try {
+    target = readlinkSync(p);
+  } catch {}
+  let content = "dangling";
+  try {
+    content = statSync(p).isFile() ? readHash(p) : "folder";
+  } catch {}
+  return sha(`link:${target}:${content}`);
+}
+
+function listing(dir: string, key: string, st: WalkState): void {
+  const h = createHash("sha256");
+  let n = 0;
+  const stack = [dir];
+  while (stack.length) {
+    const d = stack.pop()!;
+    let names: string[] = [];
+    try {
+      names = readdirSync(d).sort();
+    } catch {}
+    for (const name of names) {
+      const p = join(d, name);
+      let l;
+      try {
+        l = lstatSync(p);
+      } catch {
+        continue;
+      }
+      if (++n > MAX_LISTED) {
+        st.incomplete.push(`too many files in ${relative(key, dir)}`);
+        st.files[`${relative(key, dir)} (listing)`] = "too many files";
+        return;
+      }
+      h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? "link" : ""}\n`);
+      if (l.isDirectory()) stack.push(p);
+    }
+  }
+  st.files[`${relative(key, dir)} (listing)`] = h.digest("hex");
+}
+
+function walk(dir: string, key: string, st: WalkState, found: string[]): void {
+  let names: string[] = [];
+  try {
+    names = readdirSync(dir).sort();
+  } catch {
+    st.files[`${relative(key, dir)} (unreadable folder)`] = "unreadable";
+    return;
+  }
+  for (const name of names) {
+    if (name === ".git") continue;
     const p = join(dir, name);
-    const st = lstatSync(p);
-    if (st.isDirectory()) walk(p, out);
-    else out.push(p);
+    const r = relative(key, p);
+    let l;
+    try {
+      l = lstatSync(p);
+    } catch {
+      continue;
+    }
+    if (l.isSymbolicLink()) {
+      st.files[`${r} (link)`] = linkHash(p);
+      continue;
+    }
+    if (l.isDirectory()) {
+      if (LISTED.has(name)) listing(p, key, st);
+      else walk(p, key, st, found);
+      continue;
+    }
+    if (st.count >= MAX_FILES) {
+      if (!st.incomplete.length) st.incomplete.push("too many files to check");
+      continue;
+    }
+    st.count++;
+    found.push(p);
+    st.files[r] = readHash(p);
   }
 }
 
@@ -122,13 +206,22 @@ function shadows(name: string): string | undefined {
   return undefined;
 }
 
+function safeNames(dir: string): string[] {
+  try {
+    return readdirSync(dir).sort();
+  } catch {
+    return [];
+  }
+}
+
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], linked: [], bypass: false };
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], linked: [], incomplete: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
   const methods: string[] = [];
   const linked: string[] = [];
+  const incomplete: string[] = [];
   for (const d of PROJECT_DIRS) {
     for (const f of SETTINGS_FILES) if (existsSync(join(key, d, f))) paths.push(join(key, d, f));
     for (const part of ["adapters", "methods", "skills"]) {
@@ -141,13 +234,13 @@ export function scanFolder(folder: string): FolderScan {
       }
       if (!st.isDirectory()) continue;
       const found: string[] = [];
-      walk(dir, found);
-      paths.push(...found);
+      const state: WalkState = { files, count: 0, incomplete };
+      walk(dir, key, state, found);
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }
   }
-  for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
-  for (const l of linked) files[`${l} (linked folder)`] = sha(readlinkSync(join(key, l)));
+  for (const p of paths) files[relative(key, p)] = readHash(p);
+  for (const l of linked) files[`${l} (linked folder)`] = linkHash(join(key, l));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
@@ -155,10 +248,10 @@ export function scanFolder(folder: string): FolderScan {
   const adapters: FolderScan["adapters"] = [];
   for (const dir of projectAdapterDirs(key))
     if (existsSync(dir) && !lstatSync(dir).isSymbolicLink())
-      for (const n of readdirSync(dir).sort())
+      for (const n of safeNames(dir))
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, bypass: values.permissionMode === "bypass" };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, incomplete: [...new Set(incomplete)], bypass: values.permissionMode === "bypass" };
 }
 
 export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
@@ -246,7 +339,7 @@ function changesSince(e: TrustEntry, s: FolderScan): string[] {
 
 export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
-  if (scan.linked.length) return { state: "changed", scan, changes: scan.linked.map((p) => `a linked folder: ${p}. Cuvette does not load adapters, methods or skills from a linked folder.`) };
+  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `a linked folder: ${p}. Cuvette does not load adapters, methods or skills from a linked folder.`), ...scan.incomplete.map((r) => `${r}. Cuvette cannot check the folder, so it does not trust it.`)] };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
   if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);
