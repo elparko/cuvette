@@ -2661,8 +2661,8 @@ export class Session {
         title: `Change ${f.label}?`,
         text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Reason: ${spec.reason}`,
         options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
-        recommendation: { value, reason: spec.reason },
         evidence: "",
+        ...(current === undefined ? {} : { default: current }),
       });
       this.bus.emit({ type: "question", question: q });
     }

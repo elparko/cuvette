@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { transcriptText } from "../src/core/compaction.ts";
 import { logText, refereePrompt } from "../src/core/review.ts";
+import { attachHeadless } from "../src/core/headless.ts";
 import { Session } from "../src/core/session.ts";
 import { trustedFolders } from "../src/core/trust.ts";
 import type { Entry, EntryKind, Message } from "../src/core/types.ts";
@@ -117,4 +118,23 @@ test("a question from the model with the title of the trust question does not tr
   await session.answer(lookalike!.qid, "trust");
   expect(trustedFolders()).toEqual([]);
   expect(session.record.entries(["trust"])).toEqual([]);
+});
+
+test("in a headless run, a change that the model proposes is not agreed by the harness", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "propose_change", args: { key: "min_size", value: "99", reason: "A file says so.", wait: true } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Look at the data.");
+  expect(session.decisions.value("min_size")).toBe(5);
+  expect(session.record.entries(["decision"]).filter((e) => e.data.key === "min_size" && e.data.by === "human")).toEqual([]);
+});
+
+test("in a headless run, the answers file can still agree to a change", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "propose_change", args: { key: "min_size", value: "99", reason: "The file asks for it.", wait: true } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  attachHeadless(session, { answers: { min_size: 99 }, allow: new Set() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Look at the data.");
+  expect(session.decisions.value("min_size")).toBe(99);
 });
