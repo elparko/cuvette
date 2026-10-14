@@ -626,7 +626,7 @@ async function main() {
         if (!list.length) return console.log("No folder is trusted. cuvette trust add <folder> trusts one.");
         for (const e of list) {
           const t = existsSync(e.path) ? tr.trustStatus(e.path) : undefined;
-          console.log(`${e.path}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
+          console.log(`${tr.oneLine(e.path)}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
         }
         return;
       }
@@ -635,13 +635,13 @@ async function main() {
         if (!existsSync(folder)) return fail(`No folder ${folder}.`);
         const t = tr.trustStatus(folder);
         tr.trustFolder(folder);
-        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan, true))].join("\n"));
+        console.log([`Trusted ${tr.oneLine(t.scan.folder)}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan, true))].join("\n"));
         return;
       }
       if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.folderKey(folder)} is not trusted now.` : `${tr.folderKey(folder)} was not in the list.`);
       if (a1 === "show") {
         const t = tr.trustStatus(folder);
-        return console.log([`${t.scan.folder}: ${tr.stateLabel(t)}`, ...(t.state === "none" ? [] : tr.folderLines(t.scan)), ...t.changes.map((c) => `  ${c}`)].join("\n"));
+        return console.log([`${tr.oneLine(t.scan.folder)}: ${tr.stateLabel(t)}`, ...(t.state === "none" ? [] : tr.folderLines(t.scan)), ...t.changes.map((c) => `  ${c}`)].join("\n"));
       }
       return fail("usage: cuvette trust [list | add <folder> | remove <folder> | show <folder>]");
     }

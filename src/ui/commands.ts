@@ -432,7 +432,7 @@ const base: Command[] = [
         return;
       }
       const t = tr.trustStatus(cwd);
-      const lines = [`Folder: ${t.scan.folder}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? ["Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
+      const lines = [`Folder: ${tr.oneLine(t.scan.folder)}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? ["Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
       ctx.print(lines.join("\n"), "Folder trust");
       if ((t.state === "new" || t.state === "changed") && ctx.session.askTrust) {
         const q = await ctx.session.askTrust();

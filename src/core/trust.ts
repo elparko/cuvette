@@ -254,6 +254,11 @@ export function labDisplayText(text: string): string {
   });
 }
 
+export function oneLine(text: string): string {
+  const t = labDisplayText(text);
+  return t.includes("\n") ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
+}
+
 export const LAB_MAX_BYTES = 64 * 1024;
 export const LAB_CARD_LINES = 60;
 export const LAB_CARD_CHARS = 8000;
@@ -403,18 +408,18 @@ export function untrustFolder(folder: string): boolean {
 
 function changesSince(e: TrustEntry, s: FolderScan): string[] {
   const out: string[] = [];
-  for (const k of s.keys) if (!e.keys?.includes(k)) out.push(`new settings key: ${k}`);
-  for (const h of s.hooks) if (!e.hooks?.includes(h)) out.push(`new hook: ${h}`);
-  for (const a of s.adapters) if (!e.adapters?.includes(a.name)) out.push(`new adapter: ${a.name}`);
-  for (const [p, h] of Object.entries(s.files)) if (!e.files?.[p]) out.push(`new file: ${p}`);
-  else if (e.files[p] !== h) out.push(`changed file: ${p}`);
-  for (const p of Object.keys(e.files ?? {})) if (!(p in s.files)) out.push(`removed file: ${p}`);
+  for (const k of s.keys) if (!e.keys?.includes(k)) out.push(`new settings key: ${oneLine(k)}`);
+  for (const h of s.hooks) if (!e.hooks?.includes(h)) out.push(`new hook: ${oneLine(h)}`);
+  for (const a of s.adapters) if (!e.adapters?.includes(a.name)) out.push(`new adapter: ${oneLine(a.name)}`);
+  for (const [p, h] of Object.entries(s.files)) if (!e.files?.[p]) out.push(`new file: ${oneLine(p)}`);
+  else if (e.files[p] !== h) out.push(`changed file: ${oneLine(p)}`);
+  for (const p of Object.keys(e.files ?? {})) if (!(p in s.files)) out.push(`removed file: ${oneLine(p)}`);
   return out;
 }
 
 export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
-  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${p}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${r}. Cuvette cannot check the folder, so it does not trust it.`)] };
+  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${oneLine(p)}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${oneLine(r)}. Cuvette cannot check the folder, so it does not trust it.`)] };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
   if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);
@@ -424,7 +429,7 @@ export function trustStatus(folder: string): TrustStatus {
 }
 
 export function untrustable(scan: FolderScan): string | undefined {
-  const reasons = [...scan.linked.map((p) => `the linked folder ${p}`), ...scan.incomplete];
+  const reasons = [...scan.linked.map((p) => `the linked folder ${oneLine(p)}`), ...scan.incomplete.map(oneLine)];
   return reasons.length ? `Cuvette cannot trust this folder: ${reasons.join("; ")}. Remove the link or the extra files, then try again.` : undefined;
 }
 
@@ -446,42 +451,37 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
 
 const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
 
-const show = (v: unknown) => {
-  const t = labDisplayText(typeof v === "string" ? v : JSON.stringify(v));
-  if (t.length <= 200) return t;
-  const cut = /[\ud800-\udbff]/.test(t[198]!) ? 198 : 199;
-  return t.slice(0, cut) + "…";
-};
+const show = (v: unknown) => oneLine(typeof v === "string" ? v : JSON.stringify(v));
 
 export function folderLines(s: FolderScan, trusted = false): string[] {
   const out: string[] = [];
-  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${labDisplayText(k)}: ${show(s.values[k])}`));
+  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${oneLine(k)}: ${show(s.values[k])}`));
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
-  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${labDisplayText(h)}`));
-  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${labDisplayText(a.name)}${a.replaces ? `: replaces ${labDisplayText(a.replaces)}` : ""}`));
-  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${labDisplayText(m)}`));
-  const labPath = labDisplayText(join(s.folder, LAB_FILE));
+  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${oneLine(h)}`));
+  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${oneLine(a.name)}${a.replaces ? `: replaces ${oneLine(a.replaces)}` : ""}`));
+  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${oneLine(m)}`));
+  const labPath = oneLine(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
-  if (s.labProblem) out.push(`LAB.md could not be read: ${labDisplayText(s.labProblem)}. Cuvette ignores it.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${labDisplayText(shellQuote(s.folder))}`}`);
+  if (s.labProblem) out.push(`LAB.md could not be read: ${oneLine(s.labProblem)}. Cuvette ignores it.`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${oneLine(shellQuote(s.folder))}`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
 
 export function trustText(t: TrustStatus): string {
   return t.state === "changed"
-    ? `The Cuvette files in ${t.scan.folder} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
-    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
+    ? `The Cuvette files in ${oneLine(t.scan.folder)} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
+    : `The folder ${oneLine(t.scan.folder)} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
 }
 
 export function trustEvidence(t: TrustStatus): string {
   const lines = folderLines(t.scan);
-  if (t.changes.length) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${labDisplayText(c)}`));
+  if (t.changes.length) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`));
   return lines.join("\n");
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${shellQuote(t.scan.folder)}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
+  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${oneLine(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {
