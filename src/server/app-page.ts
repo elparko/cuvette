@@ -481,7 +481,7 @@ function show(p) {
 async function boot() {
   state = await call("api/state");
   $("modewrap").classList.toggle("hidden", !state.session);
-  setWhere(state.session ? (state.session.folderLine || state.session.folder) + " · " + state.session.model : "No session open");
+  setWhere(state.session ? (state.session.folderLine || state.session.folderShown) + " · " + state.session.model : "No session open");
   if (state.session) show(OWN_PAGES.includes(page) ? page : "session");
   else if (state.setup || page === "setup") { show("setup"); if (!fstate) setupPage(); }
   else {
@@ -976,7 +976,7 @@ async function afterSetup() {
   $("checkpanel").classList.remove("hidden");
   $("samplepanel").classList.remove("hidden");
   doctor($("doctorbody"));
-  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder; }
+  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder.replace(/[\u202a-\u202e\u2066-\u2069]/g, ""); }
 }
 
 let progStart = "";

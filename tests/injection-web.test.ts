@@ -5,6 +5,11 @@ import { afterAll, expect, test } from "vitest";
 import { cardHtml, decisionsHtml, doctorHtml, fileLink, programsHtml, imageHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
 import { sessionsJson } from "../src/server/app-json.ts";
+import { WebView } from "../src/server/app-view.ts";
+import { FakeSession } from "../src/ui/fake-session.ts";
+import { folderChoices } from "../src/ui-web/lib/folders.ts";
+
+const BIDI = /[\u202a-\u202e\u2066-\u2069]/;
 import type { Item } from "../src/ui/items.ts";
 import type { Question } from "../src/core/types.ts";
 
@@ -173,4 +178,23 @@ test("the Show in folder button keeps a path that holds a text direction control
   expect(JSON.stringify({ ...list[0], folder: "" })).not.toMatch(/[\u202a-\u202e\u2066-\u2069]/);
   expect(list[0]!.folderShown).toBe("/data/ab");
   expect(list[0]!.folderName).toBe("ab");
+});
+
+test("the folder filter, the header and the tooltip show a folder name without text direction controls, and the actions keep the real path", async () => {
+  const real = "/data/run‮1/plots";
+  const s = new FakeSession();
+  (s as { cwd: string }).cwd = real;
+  (s as { folderLine?: string }).folderLine = "~/run‮1/plots";
+  const view = new WebView(s as never, { token: "t", env: {}, url: (p: string) => p, quit: async () => {} });
+  const header = view.header() as { folder: string; folderShown: string; folderLine: string };
+  expect(header.folder).toBe(real);
+  expect(header.folderShown).toBe("/data/run1/plots");
+  expect(header.folderLine).not.toMatch(BIDI);
+  expect((view.statusMsg() as { where: string }).where).not.toMatch(BIDI);
+  view.close();
+  const list = sessionsJson([{ id: "a", cwd: real, used: Date.now(), ask: "x" }, { id: "b", cwd: "/other/run‮1", used: Date.now(), ask: "y" }] as never, "t");
+  const options = folderChoices(list);
+  expect(options.map((o) => o.value).sort()).toEqual([real, "/other/run‮1"].sort());
+  for (const o of options) expect(o.label).not.toMatch(BIDI);
+  expect(options.map((o) => o.label).join("|")).toContain("plots");
 });

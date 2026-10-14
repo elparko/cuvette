@@ -4,7 +4,7 @@ import type { AppCtx } from "../App.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Select } from "../components/ui/select.tsx";
-import { foldText, folderLabels } from "../lib/folders.ts";
+import { foldText, folderChoices } from "../lib/folders.ts";
 import { SessionGrid, type Sessions } from "./sessions.tsx";
 
 export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }) {
@@ -12,8 +12,7 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
   const [folder, setFolder] = useState("all");
   const [moved, setMoved] = useState(false);
   const movedCount = sessions.list.filter((s) => s.moved).length;
-  const folders = useMemo(() => [...new Set(sessions.list.map((s) => s.folder).filter(Boolean))].sort(), [sessions.list]);
-  const labels = useMemo(() => folderLabels(folders), [folders]);
+  const folderOptions = useMemo(() => folderChoices(sessions.list), [sessions.list]);
   const shown = sessions.list.filter((s) => {
     const words = foldText(q).split(/\s+/).filter(Boolean);
     const text = foldText(`${s.title} ${s.text} ${s.folderName}`);
@@ -35,7 +34,7 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search titles, requests and folders" aria-label="Search sessions" className="pl-9" />
           </div>
-          <Select value={folder} onValueChange={setFolder} label="Folder" className="min-w-[180px]" options={[{ value: "all", label: "All folders" }, ...folders.map((f) => ({ value: f, label: labels.get(f) ?? f }))]} />
+          <Select value={folder} onValueChange={setFolder} label="Folder" className="min-w-[180px]" options={[{ value: "all", label: "All folders" }, ...folderOptions]} />
           {movedCount > 0 && (
             <Button variant="ghost" onClick={() => setMoved(!moved)} aria-pressed={moved}>
               {moved ? "Hide the moved sessions" : `Show the moved sessions (${movedCount})`}
