@@ -32,8 +32,10 @@ function sha256File(path: string): string {
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 // A damaged line can hold valid JSON that is not an entry. The record skips it, so that no reader gets a wrong shape.
+const validId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
 function intact(e: unknown): e is Entry {
-  if (!isObject(e) || typeof e.kind !== "string" || !Number.isFinite(e.id) || !isObject(e.data)) return false;
+  if (!isObject(e) || typeof e.kind !== "string" || !validId(e.id) || !isObject(e.data)) return false;
   const d = e.data;
   if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
   if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
@@ -125,7 +127,7 @@ export class AnalysisRecord {
       }
       if (!intact(e)) {
         const bad: unknown = e;
-        if (isObject(bad) && Number.isFinite(bad.id)) this.lastId = Math.max(this.lastId, bad.id as number);
+        if (isObject(bad) && validId(bad.id)) this.lastId = Math.max(this.lastId, bad.id);
         this.skipped++;
         continue;
       }

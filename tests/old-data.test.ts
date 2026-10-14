@@ -15,7 +15,7 @@ import { changeSetting } from "../src/core/settings.ts";
 import { readSpend, recordSpend, totalSpend } from "../src/core/spend.ts";
 import { moveOldHome } from "../src/core/old-names.ts";
 import { readInstalled, saveInstalled, type InstalledEntry } from "../src/adapters/source.ts";
-import { trustFolder } from "../src/core/trust.ts";
+import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import { credentialsPath, removeClaudeKey, saveClaudeKey, saveClaudeWorkspace, saveElabftw, removeElabftw, claudeKey } from "../src/core/credentials.ts";
 import { openRecord as openBookRecord, projectSessions as bookSessions } from "../src/core/databook.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
@@ -1095,4 +1095,19 @@ test("a cut last line gives one notice about the stop, and the next resume does 
   const b = await resume(first!.id);
   expect(text(b).filter((t) => t.includes("was cut when the app stopped")).length).toBe(1);
   expect(text(b).some((t) => t.includes("cannot read"))).toBe(false);
+});
+
+test("damaged lines with an id that is huge, negative, a fraction or a text do not set the next id", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  const top = idsOf(first!.folder).at(-1)!;
+  const bad = [1e308, -4, 2.5, "9"].map((id) => JSON.stringify({ id, ts: "2027-01-01T00:00:00.000Z", session: first!.id, kind: "note", data: { text: "x" } }));
+  appendFileSync(file, bad.join("\n") + "\n");
+  const s = await resume(first!.id);
+  await s.send("Thanks.");
+  const ids = s.record.entries().map((e) => e.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(Math.max(...ids)).toBeLessThan(top + 100);
+  expect(s.record.entries().at(-1)!.id).toBeGreaterThan(top);
 });
