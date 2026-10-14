@@ -530,6 +530,12 @@ export class Session {
         }
       }
       this.history = this.record.messages();
+      const unknown = this.record.unknownKinds();
+      const said = (text: string) => this.record.entries(["notice"]).some((n) => n.data.text === text);
+      const kindsText = unknown.length ? `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}. This version does not know them. Cuvette keeps them in the file as they are.` : "";
+      if (kindsText && !said(kindsText)) this.record.append("notice", { text: kindsText, warn: true });
+      const linesText = "Some lines of the record are in a form that this version of Cuvette cannot read. Cuvette keeps them in the file as they are.";
+      if (this.record.skipped && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;

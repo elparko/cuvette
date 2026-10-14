@@ -4,7 +4,7 @@ import { extname, isAbsolute, join, relative } from "node:path";
 import { COPY_LIMIT_BYTES, local, portable } from "./places.ts";
 import { extractNumbers } from "./claims.ts";
 import type { EnvLock } from "./envlock.ts";
-import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
+import { ENTRY_KINDS, type Entry, type EntryKind, type Message, type Node, type NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
@@ -63,6 +63,7 @@ export class AnalysisRecord {
   private nextNode = 1;
   private cutTail = false;
   private lastId = 0;
+  skipped = 0;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
@@ -113,9 +114,13 @@ export class AnalysisRecord {
       try {
         e = local(JSON.parse(line), this.project) as Entry;
       } catch {
+        if (end < buf.length) this.skipped++;
         continue;
       }
-      if (!intact(e)) continue;
+      if (!intact(e)) {
+        this.skipped++;
+        continue;
+      }
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.lastId = Math.max(this.lastId, e.id);
@@ -160,6 +165,11 @@ export class AnalysisRecord {
     } else if (e.kind === "rewind") {
       this.asideRanges.push([Number(e.data.upTo), e.id]);
     }
+  }
+
+  unknownKinds(): string[] {
+    const known = new Set<string>(ENTRY_KINDS);
+    return [...new Set(this.log.map((e) => e.kind).filter((k) => !known.has(k)))].sort();
   }
 
   setAside(id: number): boolean {

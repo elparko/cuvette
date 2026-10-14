@@ -53,8 +53,11 @@ export function lockAlive(lock: OpenLock | undefined, startOf: (pid: number) => 
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "EPERM") return false;
   }
-  if (typeof lock.procStart !== "number") return true;
   const real = startOf(lock.pid);
+  if (typeof lock.procStart !== "number") {
+    const wrote = Date.parse(lock.started ?? "");
+    return real === undefined || !Number.isFinite(wrote) || real <= wrote + START_SLACK_MS;
+  }
   return real === undefined || Math.abs(real - lock.procStart) <= START_SLACK_MS;
 }
 
@@ -109,6 +112,7 @@ const alive = (dir: string) => !!openLock(dir);
 
 interface Parsed {
   first: any;
+  owner?: string;
   ask: any;
   title?: { title: string; description: string };
   figures: string[];
@@ -124,6 +128,7 @@ function parseLog(log: string): Parsed {
   const hit = parsed.get(log);
   if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino) return hit.p;
   let first: any;
+  let owner: string | undefined;
   let ask: any;
   let title: { title: string; description: string } | undefined;
   const figures: string[] = [];
@@ -142,6 +147,7 @@ function parseLog(log: string): Parsed {
     if (!e || typeof e !== "object") continue;
     const d = e.data && typeof e.data === "object" ? e.data : {};
     if (!first && e.kind === "session") first = e;
+    if (e.kind === "fork" && typeof e.session === "string") owner = e.session;
     else if (!ask && e.kind === "user" && !d.during) ask = e;
     else if (e.kind === "title") title = { title: String(d.title ?? ""), description: String(d.description ?? "") };
     if (e.kind === "assistant" && d.final) answered = lastFinal = true;
@@ -153,17 +159,17 @@ function parseLog(log: string): Parsed {
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
     else if (figures.length < 20 && e.kind === "node" && !d.sensitivityOf) figures.push(...((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).filter((p) => IMAGE.test(p)));
   }
-  const p = { first, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal };
+  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal };
   parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, p });
   return p;
 }
 
 export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string } {
-  const { first, ask, title, figures, answered, waiting, lastFinal } = parseLog(log);
+  const { first, owner, ask, title, figures, answered, waiting, lastFinal } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
   const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : "not started";
-  return { first, ask, title, status, figure, owner: first?.session };
+  return { first, ask, title, status, figure, owner };
 }
 
 function firstFigure(folder: string | undefined): string | undefined {

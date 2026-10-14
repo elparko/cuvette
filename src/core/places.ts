@@ -88,7 +88,7 @@ export function saveIndexRow(p: Place, named?: { title: string; description: str
   if (p.legacy) return;
   const all = readIndex();
   const old = all.find((r) => r.id === p.id);
-  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
+  const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
   writeIndex([...all.filter((r) => r.id !== p.id), row]);
 }
 
