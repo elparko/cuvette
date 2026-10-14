@@ -162,6 +162,73 @@ test("the same failing call ten times: the third call gets the stop text and the
   expect(s.endedBy).toBe("answer");
 });
 
+const STOP_TEXT = "ERROR: you called poll with the same input three times in a row. Stop. Give your final answer now, from the results you have.";
+
+function pollTool(s: Session, results: (n: number) => ToolOutput) {
+  let n = 0;
+  addTool(s, "poll", () => results(n++));
+  return () => n;
+}
+
+test("three identical calls with a changing result do not trigger the loop guard", async () => {
+  const { provider, session: s } = await start([...Array.from({ length: 5 }, () => call("poll", {})), { text: "The job is done." }]);
+  const ran = pollTool(s, (n) => ({ ok: true, summary: `Job status: running ${n * 20} percent.` }));
+  const answer = await s.send("go");
+  expect(ran()).toBe(5);
+  expect(texts(provider).every((x) => !x.includes("three times"))).toBe(true);
+  expect(notices(s).some((x) => x.includes("three times"))).toBe(false);
+  expect(provider.requests.at(-1)!.tools.length).toBeGreaterThan(0);
+  expect(answer).toBe("The job is done.");
+});
+
+test("a changing metric or a changing data field is a changing result, and a changing time field is not", async () => {
+  const changing = await start([...Array.from({ length: 4 }, () => call("poll", {})), { text: "ok" }]);
+  pollTool(changing.session, (n) => ({ ok: true, summary: "Status.", metrics: { done: n } }));
+  await changing.session.send("go");
+  expect(texts(changing.provider).every((x) => !x.includes("three times"))).toBe(true);
+  await changing.session.close();
+  const timed = await start([...Array.from({ length: 4 }, () => call("poll", {})), { text: "ok" }]);
+  pollTool(timed.session, (n) => ({ ok: true, summary: "Status.", metrics: { done: 3 }, data: { duration_s: 1 + n, started: "t" } }));
+  await timed.session.send("go");
+  expect(texts(timed.provider)[2]).toBe(STOP_TEXT);
+});
+
+test("three identical calls with identical results stop with the same text as before", async () => {
+  const { provider, session: s } = await start([...Array.from({ length: 6 }, () => call("poll", {})), { text: "The job is still running." }]);
+  const ran = pollTool(s, () => ({ ok: true, summary: "Job status: running 40 percent." }));
+  const answer = await s.send("go");
+  const t = texts(provider);
+  expect(t[0]).toContain("running 40 percent");
+  expect(t[1]).toContain("running 40 percent");
+  expect(t[2]).toBe(STOP_TEXT);
+  expect(ran()).toBe(3);
+  expect(notices(s).filter((n) => n === "The agent called poll with the same input three times. The harness asks for the final answer.")).toHaveLength(4);
+  expect(provider.requests[3]!.tools).toEqual([]);
+  expect(answer).toBe("The job is still running.");
+});
+
+test("three failing identical calls stop before the third call runs", async () => {
+  const { provider, session: s } = await start([...Array.from({ length: 4 }, () => call("poll", {})), { text: "The job failed." }]);
+  const ran = pollTool(s, (n) => ({ ok: false, error: `The job failed with code ${n}.` }));
+  await s.send("go");
+  const t = texts(provider);
+  expect(t[0]).toContain("code 0");
+  expect(t[1]).toContain("code 1");
+  expect(t[2]).toBe(STOP_TEXT);
+  expect(ran()).toBe(2);
+});
+
+test("a different call, or a failure between the calls, resets the count", async () => {
+  const { provider, session: s } = await start([call("poll", {}), call("poll", {}), call("poll", { id: 2 }), call("poll", {}), call("poll", {}), call("poll", {}), { text: "ok" }]);
+  let n = 0;
+  addTool(s, "poll", () => (n++ === 5 ? { ok: false, error: "The server did not answer." } : { ok: true, summary: "Job status: running." }));
+  await s.send("go");
+  const t = texts(provider);
+  expect(t).toHaveLength(6);
+  expect(t.every((x) => !x.includes("three times"))).toBe(true);
+  expect(n).toBe(6);
+});
+
 test("calls that change each time do not trigger the loop guard: the step limit ends the turn", async () => {
   const steps = Array.from({ length: 30 }, (_, i) => call("read_file", { path: `missing-${i % 2}.txt` }));
   const { provider, session: s } = await start(steps, { maxSteps: 6 });

@@ -1107,7 +1107,8 @@ export class Session {
     let revised = false;
     let nudges = 0;
     let lastSig = "";
-    let repeats = 0;
+    let streak: CallOutcome[] = [];
+    let stuckSig = "";
     let forceAnswer = false;
     let stopBlocks = 0;
     let stopHooked = false;
@@ -1252,14 +1253,31 @@ export class Session {
         results = [];
         this.callOrder.clear();
         let together: number[] = [];
+        const sigs: string[] = [];
+        const record = (i: number) => {
+          const part = results[i] as Extract<Part, { type: "tool_result" }>;
+          const seen = this.outcomes.get(calls[i]!.id);
+          this.outcomes.delete(calls[i]!.id);
+          if (sigs[i] === lastSig) streak.push(seen ?? { ok: !part.isError, key: createHash("sha1").update(part.text).digest("hex") });
+        };
+        const stopLoop = (i: number) => {
+          const call = calls[i]!;
+          forceAnswer = true;
+          stuckSig = sigs[i]!;
+          this.record.append("notice", { text: `The agent called ${call.name} with the same input three times. The harness asks for the final answer.` });
+          results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true };
+        };
         const runTogether = async () => {
           const list = together;
           together = [];
           const parts = await Promise.all(list.map((i) => this.runCall(calls[i]!, signal)));
           list.forEach((i, k) => (results[i] = parts[k]!));
+          list.forEach(record);
         };
         for (const [i, call] of calls.entries()) {
-          const parallel = this.parallelSafe(call);
+          const sig = `${call.name}:${JSON.stringify(call.args)}`;
+          sigs[i] = sig;
+          const parallel = this.parallelSafe(call) && sig !== lastSig;
           if (!parallel && together.length) await runTogether();
           if (signal.aborted || this.stopTurn || this.endTurn) {
             results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: not run. ${this.endTurn && !signal.aborted && !this.stopTurn ? this.endTurn : "The scientist stopped the turn."}`, isError: true };
@@ -1269,17 +1287,23 @@ export class Session {
             results[i] = { type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true };
             continue;
           }
-          const sig = `${call.name}:${JSON.stringify(call.args)}`;
-          repeats = sig === lastSig ? repeats + 1 : 0;
+          if (sig !== lastSig) {
+            streak = [];
+            stuckSig = "";
+          }
           lastSig = sig;
-          if (repeats >= 2) {
-            forceAnswer = true;
-            this.record.append("notice", { text: `The agent called ${call.name} with the same input three times. The harness asks for the final answer.` });
-            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true };
+          if (sig === stuckSig || (streak.length >= 2 && streak.slice(-2).every((o) => !o.ok))) {
+            streak.push({ ok: false, key: "" });
+            stopLoop(i);
             continue;
           }
           if (parallel) together.push(i);
-          else results[i] = await this.runCall(call, signal);
+          else {
+            results[i] = await this.runCall(call, signal);
+            record(i);
+            const last = streak.slice(-3);
+            if (last.length === 3 && last.every((o) => o.ok && o.key === last[0]!.key)) stopLoop(i);
+          }
         }
         if (together.length) await runTogether();
         const pending = this.drainNotes();
@@ -2119,6 +2143,7 @@ export class Session {
     return rule !== "deny" && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
   }
 
+  private outcomes = new Map<string, CallOutcome>();
   private callSeq = 0;
   private callOrder = new Map<string, number>();
   private inspectionOrder = 0;
@@ -2132,6 +2157,7 @@ export class Session {
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     this.useTools([tool.name]);
     const r = await this.pipeline(tool, this.callArgs(tool, call.args), call.id, signal);
+    this.outcomes.set(call.id, { ok: !r.isError, key: r.output ? resultKey(r.output) : createHash("sha1").update(r.text).digest("hex") });
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     const earlier = tool.readOnly && !r.isError && !r.images?.length && r.text.length > 400 ? this.sameEarlierResult(call, r.text) : undefined;
     if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: pointerText(earlier) };
@@ -4567,6 +4593,18 @@ export function coerceArgs(args: Args, schema: Record<string, unknown>): Args {
     }
   }
   return args;
+}
+
+interface CallOutcome {
+  ok: boolean;
+  key: string;
+}
+
+const TIMING_KEY = /duration|elapsed|timing|timestamp|runtime|wall_?time|^ts$/i;
+
+function resultKey(o: ToolOutput): string {
+  const body = JSON.stringify({ ok: o.ok, error: o.error, summary: o.summary, text: o.text, metrics: o.metrics, data: o.data, table: o.table, outputs: o.outputs?.map((f) => f.name) }, (k, v) => (TIMING_KEY.test(k) ? undefined : v));
+  return createHash("sha1").update(body).digest("hex");
 }
 
 function realPath(p: string): string {
