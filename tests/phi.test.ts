@@ -617,3 +617,20 @@ test("groupHits of 50000 hits in one group is fast", () => {
   expect(Date.now() - t0).toBeLessThan(1000);
   expect(g).toHaveLength(1);
 });
+
+test("a stray quote in a CSV cell, such as 5\" for inches, does not join the rows after it", () => {
+  const csv = 'id,patient name,dob,notes\n1,Jane Doe,1980-01-02,5" pipe\n2,John Smith,1975-03-04,ok\n3,Mary Jones,1990-05-06,ok\n';
+  const names = scanContent(csv, "t.csv").filter((h) => h.column === "patient name");
+  expect(names.map((h) => [h.value, h.line])).toEqual([["Jane Doe", 2], ["John Smith", 3], ["Mary Jones", 4]]);
+});
+
+test("the Masker with more than 1000 values gives the same text as with few values", () => {
+  const hits = (names: string[]) => names.map((value) => ({ kind: "name" as const, value, where: "t" }));
+  const few = new Masker();
+  few.add(hits(["Ann Lee", "Lee Roe Kim", "Roe Kim Xu"]));
+  const many = new Masker();
+  many.add(hits([...Array.from({ length: 998 }, (_, i) => `Fill${i.toString(36)} Zed`), "Ann Lee", "Lee Roe Kim", "Roe Kim Xu"]));
+  const text = "Ann Lee Roe Kim Xu, and Lee Roe Kim.";
+  expect(few.text(text)).toBe("[NAME 1] [NAME 3], and [NAME 2].");
+  expect(many.text(text)).toBe("[NAME 999] [NAME 1001], and [NAME 1000].");
+});

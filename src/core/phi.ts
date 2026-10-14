@@ -274,7 +274,13 @@ function delimited(text: string): { columns: string[]; rows: string[][]; lines: 
       l += `\n${lines[++i]}`;
       open = (quotes(lines[i]!) % 2 === 1) !== open;
     }
-    const r = splitRow(l, d);
+    let r = splitRow(l, d);
+    // A quote that does not start a cell, such as 5" for inches, does not join lines.
+    if (i > first && (open || Math.abs(r.length - columns.length) > 1)) {
+      i = first;
+      l = lines[i]!;
+      r = splitRow(l, d);
+    }
     if (!l.trim() || Math.abs(r.length - columns.length) > 1) break;
     rows.push(r);
     at.push(first + 1);
@@ -445,15 +451,22 @@ export class Masker {
     if (!this.map.size) return s;
     const { all, res } = this.matcher();
     if (res.length === 1) return s.replace(res[0]!, (m) => all.get(m) ?? m);
-    const found = res.flatMap((re) => [...s.matchAll(re)].map((m) => ({ a: m.index, b: m.index + m[0].length })));
-    found.sort((x, y) => x.a - y.a || y.b - x.b);
+    const next: (RegExpExecArray | null | undefined)[] = res.map(() => undefined);
     let out = "";
     let at = 0;
-    for (const f of found) {
-      if (f.a < at) continue;
-      const m = s.slice(f.a, f.b);
-      out += s.slice(at, f.a) + (all.get(m) ?? m);
-      at = f.b;
+    for (;;) {
+      let best: RegExpExecArray | undefined;
+      res.forEach((re, k) => {
+        if (next[k] === undefined || (next[k] && next[k]!.index < at)) {
+          re.lastIndex = at;
+          next[k] = re.exec(s);
+        }
+        const m = next[k];
+        if (m && (!best || m.index < best.index || (m.index === best.index && m[0].length > best[0].length))) best = m;
+      });
+      if (!best) break;
+      out += s.slice(at, best.index) + (all.get(best[0]) ?? best[0]);
+      at = best.index + Math.max(1, best[0].length);
     }
     return out + s.slice(at);
   }
