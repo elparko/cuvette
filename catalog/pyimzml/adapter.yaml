@@ -80,7 +80,7 @@ decisions:
       - { tool: get_ion_image, arg: normalization }
       - { tool: get_mean_spectrum, arg: normalization }
       - { tool: find_top_peaks, arg: normalization }
-    help: How each pixel is scaled before images and spectra are made. none keeps raw intensities, like pyimzML. tic divides by the sum of the pixel. rms divides by the root mean square of the pixel. This choice can create or remove a difference between regions.
+    help: How each pixel is scaled before images and spectra are made. none keeps raw intensities, like pyimzML. tic divides by the sum of the pixel. rms divides by the root mean square of the pixel. An ion image then multiplies each pixel by the mean of that factor over all pixels, so it stays in intensity units. A mean spectrum does not, so its pixels add to 1 for tic. The two scales differ by the mean factor. This choice can create or remove a difference between regions.
     sensitivity:
       tool: get_ion_image
       options: [none, tic, rms]
@@ -436,7 +436,7 @@ tools:
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
-      normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. }
+      normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. The tool divides each pixel by its sum and gives fractions of 1. }
       bin_width: { type: number, minimum: 0, description: "Bin width in m/z. 0 uses the file axis of a continuous file, and 0.01 for a processed file." }
       max_pixels: { type: integer, minimum: 0, description: "Pixels read, evenly spaced. 0 reads all. The decision sample_pixels sets it." }
       name: { type: string, description: File name stem of the output. }
