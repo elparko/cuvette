@@ -632,7 +632,8 @@ export class Session {
       } finally {
         dir.closeSync();
       }
-      return folderListNote(entries, more);
+      const hidden = isCloud(this.provider.info) && this.runtimes.some((rt) => rt.adapter.manifest.data_rules.cloud_visibility === "summaries");
+      return folderListNote(entries, more) + (hidden ? "\nAdapter tools do not send table rows to a cloud model. To see the column names of a small CSV file, call read_file on it in the same reply as inspect_table." : "");
     } catch {
       return undefined;
     }
