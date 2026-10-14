@@ -109,7 +109,7 @@ function damage(m: Record<string, unknown>): string | undefined {
     ["reference", a.reference === undefined || isObject(a.reference)],
     ["data", a.data === undefined || (isObject(a.data) && listOf(a.data.files, (x) => typeof x === "string"))],
     ["steps", objectsWith(a.steps, "step")],
-    ["settings", (a.steps as Record<string, unknown>[]).every((s) => objectsWith(s.decisions, "label") && text(s.method) && text(s.tool) && text(s.reason))],
+    ["settings", (a.steps as unknown[]).every((s) => isObject(s) && objectsWith(s.decisions, "label") && text(s.method) && text(s.tool) && text(s.reason))],
   ];
   return checks.find(([, ok]) => !ok)?.[0];
 }

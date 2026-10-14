@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { exportMethod, fillFromMethod, importMethod, listMethods, loadMethod, methodNote, methodsDir, methodText, readMethod, saveMethod, type Method } from "../src/core/methods.ts";
+import { deleteMethod, exportMethod, fillFromMethod, importMethod, listMethods, loadMethod, methodNote, methodsDir, methodText, readMethod, saveMethod, type Method } from "../src/core/methods.ts";
 import type { AnalysisPlan } from "../src/core/plan.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
 
@@ -35,7 +35,7 @@ function plan(r: Rng): AnalysisPlan {
       step: word(),
       status: r.pick(["todo", "done"]),
       ...(r.bool() ? { tool: "count" } : {}),
-      decisions: some(3, (j) => ({ label: word(), key: `k${i}${j}`, value: r.pick([1, "Otsu", true, 2.5, [1, 2], { a: 1 }, 0, "", false]) })),
+      decisions: some(3, (j) => ({ label: `l${i}x${j} ${word()}`, key: `k${i}${j}`, value: r.pick([1, "Otsu", true, 2.5, [1, 2], { a: 1 }, 0, "", false]) })),
     })),
     outputs: some(2, word),
     checks: some(2, () => ({ check: word() })),
@@ -78,8 +78,9 @@ describe("fuzz: methods", () => {
       const copy = join(root, `export-${seed}.json`);
       exportMethod(m.name, copy);
       expect(readMethod(readFileSync(copy, "utf8")).analysis).toEqual(plain(m.analysis));
-      const rows = listMethods().filter((x) => x.name === m.name);
-      expect(rows.length).toBe(1);
+      expect(listMethods().filter((x) => x.name === m.name).length).toBe(1);
+      deleteMethod(m.name);
+      expect(listMethods().filter((x) => x.name === m.name).length).toBe(0);
     }
   });
 
@@ -104,6 +105,7 @@ describe("fuzz: methods", () => {
       expect(basename(path)).toBe(`${name.trim()}.json`);
       expect(loadMethod(name.trim()).name).toBe(name);
       expect(listMethods().some((x) => x.name === name.trim())).toBe(true);
+      deleteMethod(name.trim());
     }
     expect(new Set(readdirSync(root))).toEqual(before);
   });
