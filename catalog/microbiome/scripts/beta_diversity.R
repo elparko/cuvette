@@ -66,10 +66,10 @@ run_tool(function() {
   disp <- NULL
   v1 <- vars[1]
   if (is.factor(md[[v1]]) && nlevels(md[[v1]]) > 1 && all(table(md[[v1]]) > 0)) {
-    bd <- betadisper(d, md[[v1]])
+    bd <- betadisper(d, md[[v1]], type = "median")
     set.seed(seed)
     pt <- permutest(bd, permutations = nperm)
-    disp <- list(variable = v1, f = pt$tab[1, "F"], p = pt$tab[1, "Pr(>F)"])
+    disp <- list(variable = v1, center = "spatial median", f = pt$tab[1, "F"], p = pt$tab[1, "Pr(>F)"])
   }
   out <- out_path("table")
   write.csv(df, out, row.names = FALSE)
@@ -83,10 +83,10 @@ run_tool(function() {
   if (!is.null(disp)) { metrics$dispersion_f <- disp$f; metrics$dispersion_p <- disp$p }
   emit(list(
     ok = TRUE,
-    summary = sprintf("PERMANOVA %s on %d samples, %s distance after %s, %d permutations, seed %d: %s R2 %.4f, F %.3f, p %.4f.%s", rhs, nrow(m), distance, norm, nperm, seed, first$term, first$R2, first$F, first$p, if (!is.null(disp)) sprintf(" Dispersion test of %s: F %.3f, p %.4f.", disp$variable, disp$f, disp$p) else "", if (length(below_depth)) sprintf(" %d samples have fewer reads than the rarefaction depth and are left out: %s.", length(below_depth), paste(head(below_depth, 10), collapse = ", ")) else ""),
+    summary = sprintf("PERMANOVA %s on %d samples, %s distance after %s, %d permutations, seed %d: %s R2 %.4f, F %.3f, p %.4f.%s", rhs, nrow(m), distance, norm, nperm, seed, first$term, first$R2, first$F, first$p, if (!is.null(disp)) sprintf(" Dispersion test of %s (distances to the %s): F %.3f, p %.4f.", disp$variable, disp$center, disp$f, disp$p) else "", if (length(below_depth)) sprintf(" %d samples have fewer reads than the rarefaction depth and are left out: %s.", length(below_depth), paste(head(below_depth, 10), collapse = ", ")) else ""),
     metrics = metrics,
     data = list(formula = rhs, distance = distance, normalization = norm, by = by, strata = strata, seed = seed, min_p_possible = 1 / (nperm + 1), dispersion = disp, vegan_version = as.character(packageVersion("vegan"))),
     table = table_of(df, out, 20),
-    manualRoute = sprintf("set.seed(%d); d <- vegdist(x, \"%s\"%s); adonis2(d ~ %s, data = md, permutations = %d, by = \"%s\"); permutest(betadisper(d, md$%s))", seed, distance, if (distance == "jaccard") ", binary = TRUE" else "", rhs, nperm, by, v1)
+    manualRoute = sprintf("set.seed(%d); d <- vegdist(x, \"%s\"%s); adonis2(d ~ %s, data = md, permutations = %d, by = \"%s\"); permutest(betadisper(d, md$%s, type = \"median\"))", seed, distance, if (distance == "jaccard") ", binary = TRUE" else "", rhs, nperm, by, v1)
   ))
 })
