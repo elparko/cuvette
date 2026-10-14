@@ -431,21 +431,21 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
 const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
 
 const show = (v: unknown) => {
-  const t = plainText(typeof v === "string" ? v : JSON.stringify(v));
+  const t = labDisplayText(typeof v === "string" ? v : JSON.stringify(v));
   return t.length > 200 ? t.slice(0, 199) + "…" : t;
 };
 
 export function folderLines(s: FolderScan, trusted = false): string[] {
   const out: string[] = [];
-  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${k}: ${show(s.values[k])}`));
+  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${labDisplayText(k)}: ${show(s.values[k])}`));
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
-  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
-  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
-  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
-  const labPath = join(s.folder, LAB_FILE);
+  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${labDisplayText(h)}`));
+  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${labDisplayText(a.name)}${a.replaces ? `: replaces ${labDisplayText(a.replaces)}` : ""}`));
+  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${labDisplayText(m)}`));
+  const labPath = labDisplayText(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
-  if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}`}`);
+  if (s.labProblem) out.push(`LAB.md could not be read: ${labDisplayText(s.labProblem)}. Cuvette ignores it.`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${labDisplayText(shellQuote(s.folder))}`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
@@ -458,7 +458,7 @@ export function trustText(t: TrustStatus): string {
 
 export function trustEvidence(t: TrustStatus): string {
   const lines = folderLines(t.scan);
-  if (t.changes.length) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`));
+  if (t.changes.length) lines.push("Changes since you trusted the folder:", ...t.changes.map((c) => `  ${labDisplayText(c)}`));
   return lines.join("\n");
 }
 

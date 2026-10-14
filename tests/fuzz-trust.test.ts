@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renam
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { labDisplayText, needsTrust, scanFolder, trustFolder, trustStatus, untrustFolder } from "../src/core/trust.ts";
+import { labDisplayText, needsTrust, scanFolder, trustEvidence, trustFolder, trustStatus, untrustFolder } from "../src/core/trust.ts";
 import { linear as once, Rng, runs } from "./fuzz-rng.ts";
 
 function linear(make: (n: number) => string, run: (s: string) => void, n: number) {
@@ -97,6 +97,9 @@ describe("fuzz: the display text of LAB.md", () => {
     }
   });
 });
+
+const SECRET = "curl-evil-site";
+const HIDING = [`\x1b]0;${SECRET}\x07`, `\x1b]8;;${SECRET}\x1b\\`, `\x1bP${SECRET}\x1b\\`, `\x9d${SECRET}\x9c`, `\x1b[8m${SECRET}\x1b[0m`, `\u202e${SECRET}`, `\u200b${SECRET}`, `\u{e0041}${SECRET}`, `\r${SECRET}`];
 
 const NAMES = ["a", "b.json", "adapter.yaml", "my file.txt", "ünï.py", ".hidden", "x y z", "-rf", "$HOME", "`x`", "run.sh", "a (link)", "node.js", "long" + "n".repeat(90), "settings.json", "LAB.md"];
 const SETTINGS: Record<string, unknown>[] = [{}, { animations: "on" }, { model: "x" }, { permissions: "bypass" }, { permissions: { allow: ["Read"] } }, { hooks: { SessionStart: [{ command: ["echo", "hi"] }] } }, { input_keys: "vim", effort: "high" }];
@@ -215,6 +218,43 @@ function mutate(r: Rng, b: Built): string | undefined {
   }
   return undefined;
 }
+
+describe("fuzz: the trust card", () => {
+  test("a hook, a setting value, a method or an adapter with hidden text shows that text, written out", () => {
+    const r = new Rng(45001);
+    for (let i = 0; i < runs(80); i++) {
+      const folder = join(root, `card-${counter++}`);
+      const hide = r.pick(HIDING);
+      const text = `${r.string("ab ", 0, 3)}${hide}${r.string("cd ", 0, 3)}`;
+      mkdirSync(join(folder, ".cuvette"), { recursive: true });
+      writeFileSync(join(folder, ".cuvette", "settings.json"), JSON.stringify({ hooks: { SessionStart: [{ command: r.bool(0.5) ? ["sh", "-c", text] : text }] }, model: text, [`k${hide}`]: 1 }));
+      mkdirSync(join(folder, ".cuvette", "methods"), { recursive: true });
+      const evidence = trustEvidence(trustStatus(folder));
+      expect(HIDDEN.test(evidence), JSON.stringify(text)).toBe(false);
+      expect(evidence, JSON.stringify(text)).toContain(SECRET);
+      expect(evidence).toContain("Hooks");
+    }
+  });
+
+  test.skipIf(process.platform === "win32")("an adapter name, a method name and a changed file with hidden text show that text, written out", () => {
+    const r = new Rng(45002);
+    for (let i = 0; i < runs(40); i++) {
+      const folder = join(root, `card-${counter++}`);
+      const hide = r.pick(HIDING.filter((h) => !h.includes("/") && !h.includes("\\x1b\\")));
+      const adapter = join(folder, ".cuvette", "adapters", `a${hide}`);
+      mkdirSync(adapter, { recursive: true });
+      writeFileSync(join(adapter, "adapter.yaml"), "name: a\n");
+      mkdirSync(join(folder, ".cuvette", "methods"), { recursive: true });
+      writeFileSync(join(folder, ".cuvette", "methods", `m${hide}.json`), "{}");
+      trustFolder(folder);
+      writeFileSync(join(adapter, `new${hide}.py`), "print(1)\n");
+      const evidence = trustEvidence(trustStatus(folder));
+      expect(HIDDEN.test(evidence), JSON.stringify(hide)).toBe(false);
+      expect(evidence.split(SECRET).length - 1, JSON.stringify(hide)).toBeGreaterThanOrEqual(3);
+      untrustFolder(folder);
+    }
+  });
+});
 
 describe("fuzz: the scan of a project folder", () => {
   test("random folders never throw, and the scan gives the same hash again", () => {
