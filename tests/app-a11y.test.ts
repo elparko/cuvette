@@ -558,6 +558,32 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     expect([...new Set(out)]).toEqual([]);
   }, LONG);
 
+  test("with the wide text spacing of WCAG 1.4.12, no text is cut off and no control covers another", async () => {
+    await openSession();
+    const out: string[] = [];
+    const states: [string, () => Promise<void>][] = [
+      ["analysis", async () => await goPage("Analysis")],
+      ["cards", async () => { await goPage("Analysis"); await showCards(numbered([])); }],
+      ["sessions", async () => await goPage("Sessions")],
+      ["programs", programsPage],
+      ["settings", async () => await goPage("Settings")],
+    ];
+    await page.eval(`(() => { const s = document.createElement("style"); s.id = "wide-spacing"; s.textContent = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }"; document.head.append(s); })()`);
+    try {
+      for (const width of WIDTHS) {
+        await setView(width, "light");
+        for (const [name, go] of states) {
+          await go();
+          await wait(250);
+          for (const f of await layoutFindings(page)) if (!/\(ellipsis\) \(has a title\)/.test(f.detail)) out.push(`${name} ${width}: ${f.where}: ${f.detail}`);
+        }
+      }
+    } finally {
+      await page.eval(`document.getElementById("wide-spacing").remove()`);
+    }
+    expect([...new Set(out)]).toEqual([]);
+  }, LONG);
+
   test("with a browser minimum font size of 20 px, no text is cut off and no control covers another", async () => {
     await openSession();
     const big = await openChrome(["--blink-settings=minimumFontSize=20"]);
@@ -665,5 +691,24 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     await send({ t: "live", reset: true });
     await send({ t: "append", html: '<div class="msg agent"><p>The groups differ in size.</p></div>' });
     expect(await until(page, `document.querySelector('[role="log"] .item .msg.agent')?.textContent.includes("size.")`)).toBe(true);
+
+    await send({ t: "status", state: "busy", text: "Running step 2", since: Date.now() - 3000 });
+    expect(await until(page, `document.querySelector('[role="status"]')?.textContent.startsWith("Running step 2")`)).toBe(true);
+    await page.eval(`(() => {
+      window.__status = [];
+      new MutationObserver((ms) => { for (const m of ms) { const t = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (!t.closest("[aria-hidden=true]")) window.__status.push(t.textContent); } }).observe(document.querySelector('[role="status"]'), { childList: true, subtree: true, characterData: true });
+      window.__think = [];
+      new MutationObserver((ms) => { for (const m of ms) { const t = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (t.closest("div.border-dashed")) window.__think.push(t.closest("[aria-live]")?.getAttribute("aria-live") ?? "none"); } }).observe(document.querySelector('[role="log"]'), { childList: true, subtree: true, characterData: true });
+    })()`);
+    for (const word of ["Let me", " look at", " the groups."]) {
+      await send({ t: "think", text: word });
+      await wait(60);
+    }
+    expect(await until(page, `document.querySelector("div.border-dashed")?.textContent.includes("groups.")`)).toBe(true);
+    await wait(2500);
+    expect(await page.eval<string[]>(`window.__status`)).toEqual([]);
+    const thought = await page.eval<string[]>(`window.__think`);
+    expect(thought.length).toBeGreaterThan(0);
+    expect([...new Set(thought)]).toEqual(["off"]);
   }, LONG);
 });

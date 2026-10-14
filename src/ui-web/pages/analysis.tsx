@@ -83,7 +83,7 @@ function Thinking({ text, done }: { text: string; done: boolean }) {
     if (done) setManual(null);
   }, [done]);
   return (
-    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground">
+    <div aria-live="off" className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground">
       <button type="button" onClick={() => setManual(!open)} aria-expanded={open} className="flex w-full items-center gap-2 text-left font-medium text-foreground">
         <BrainIcon className={cn("size-4 shrink-0 text-accent-brand", !done && "pulse-dot")} /> {done ? "Thought" : "Thinking"}
         {seconds > 0 && ` · ${seconds}s`}
@@ -514,9 +514,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   }, [fitInput]);
 
   const waitText = (n: number) => `${n} ${n === 1 ? "decision waits" : "decisions wait"} for you`;
-  let line = busy ? (status.text ?? "Working") : status.openQuestions ? waitText(status.openQuestions) + "." : "Ready.";
-  if (busy && status.since) line += " · " + elapsed(Math.max(0, Math.floor((Date.now() - status.since) / 1000)));
-  if (busy && status.openQuestions) line += " · " + waitText(status.openQuestions);
+  const line = busy ? (status.text ?? "Working") : status.openQuestions ? waitText(status.openQuestions) + "." : "Ready.";
+  const time = busy && status.since ? elapsed(Math.max(0, Math.floor((Date.now() - status.since) / 1000))) : "";
+  const waits = busy && status.openQuestions ? " · " + waitText(status.openQuestions) : "";
   const showQ = !!status.openQuestions && !/data-type="(question|plan|clarify)"/.test(stream.cards);
   const folderName = session.folder.split("/").filter(Boolean).pop() || session.folder;
 
@@ -637,7 +637,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
             <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
               <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
-              <span title={line} className={cn("line-clamp-2 min-w-0 flex-1 break-words sm:line-clamp-1", busy && "text-foreground")}>{line}</span>
+              <span title={line + (time ? " · " + time : "") + waits} className={cn("line-clamp-2 min-w-0 flex-1 break-words sm:line-clamp-1", busy && "text-foreground")}>
+                {line}
+                {time && <span aria-hidden="true"> · {time}</span>}
+                {waits}
+              </span>
               {showQ && (
                 <Button variant="link" size="sm" onClick={() => send("/questions")}>
                   Show the open decisions
