@@ -514,7 +514,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
                           </div>
                         )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5 pt-1 sm:pt-0">
+                      <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
                         {j ? (
                           <Button size="sm" variant="outline" onClick={() => show(r, j)}>
                             <LoaderCircleIcon className="animate-spin" /> Show the progress

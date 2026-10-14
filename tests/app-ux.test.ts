@@ -105,7 +105,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     const q = `document.querySelector('[data-card][data-type="question"]')`;
     const key = (k: string) => page.eval<boolean>(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
     await page.eval(`[...${q}.querySelectorAll(".btn")].find((b) => b.textContent === "Answer later").focus()`);
-    expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).boxShadow : "not visible"`)).not.toBe("none");
+    expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).outlineStyle + " " + getComputedStyle(document.activeElement).outlineWidth : "not visible"`)).toBe("solid 2px");
     expect(await key("Enter")).toBe(true);
     await wait(300);
     expect(await page.eval(`!!${q}`)).toBe(true);

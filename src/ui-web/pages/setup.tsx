@@ -113,7 +113,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                 say("");
                 if (c.id === "local") void load();
               }}
-              className={cn("flex flex-col gap-1 rounded-xl border bg-card p-3.5 text-left transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 focus-visible:ring-[3px] focus-visible:ring-ring/40", choice === c.id && "border-accent-brand ring-[3px] ring-ring/20")}
+              className={cn("flex flex-col gap-1 rounded-xl border bg-card p-3.5 text-left transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 focus-visible:ring-[3px] focus-visible:ring-ring", choice === c.id && "border-accent-brand ring-[3px] ring-ring/20")}
             >
               <span className="flex items-center gap-2 font-medium">
                 {c.id === "claude" ? <CloudIcon className="size-4" /> : <CpuIcon className="size-4" />}

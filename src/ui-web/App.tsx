@@ -32,6 +32,8 @@ const NAV: { page: Page; label: string; icon: LucideIcon }[] = [
   { page: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
+const PAGE_TITLE: Record<Page, string> = { session: "Analysis", start: "Start", setup: "Welcome", settings: "Settings", sessions: "Sessions", programs: "Programs" };
+
 export interface AppCtx {
   state: AppState;
   go: (p: Page) => void;
@@ -95,6 +97,10 @@ export function App() {
   useEffect(() => {
     void boot();
   }, [boot]);
+
+  useEffect(() => {
+    document.title = `${PAGE_TITLE[page]} - Cuvette`;
+  }, [page]);
 
   const go = useCallback(
     (p: Page) => {
@@ -224,7 +230,7 @@ export function App() {
                   onClick={() => go(n.page)}
                   aria-current={current(n.page) ? "page" : undefined}
                   aria-label={rail ? n.label : undefined}
-                  className={cn("flex h-8 items-center gap-2.5 rounded-lg text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", rail ? "justify-center" : "px-2.5", current(n.page) && "bg-card font-medium text-foreground shadow-card")}
+                  className={cn("flex h-8 items-center gap-2.5 rounded-lg text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", rail ? "justify-center" : "px-2.5", current(n.page) && "bg-card font-medium text-foreground shadow-card")}
                 >
                   <n.icon className="size-4" />
                   {!rail && n.label}
@@ -245,7 +251,7 @@ export function App() {
                       title={`${s.title}\n${s.folder}`}
                       onClick={() => sessions.open(s.id, opened)}
                       onContextMenu={(e) => e.stopPropagation()}
-                      className={cn("flex w-full min-w-0 flex-col overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", state.session?.id === s.id && "bg-muted")}
+                      className={cn("flex w-full min-w-0 flex-col overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", state.session?.id === s.id && "bg-muted")}
                     >
                       <span className="line-clamp-2 min-w-0 text-[13px] leading-snug break-words">{s.title}</span>
                       <span className="block min-w-0 truncate text-xs text-muted-foreground">{s.hasRequest === false ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
@@ -271,7 +277,7 @@ export function App() {
                   </ContextMenuContent>
                 </ContextMenu>
               ))}
-              <button type="button" onClick={() => go("sessions")} className="mt-1 flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50">
+              <button type="button" onClick={() => go("sessions")} className="mt-1 flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 All sessions
               </button>
             </div>

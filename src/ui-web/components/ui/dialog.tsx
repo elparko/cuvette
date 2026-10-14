@@ -3,11 +3,18 @@ import { Dialog as D } from "radix-ui";
 import type * as React from "react";
 import { cn } from "../../lib/utils.ts";
 
+let before: HTMLElement | null = null;
+if (typeof document !== "undefined")
+  document.addEventListener("focusin", (e) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest?.('[role="dialog"], [role="menu"], [role="alertdialog"]')) before = t;
+  });
+
 export const Dialog = D.Root;
 export const DialogTrigger = D.Trigger;
 export const DialogClose = D.Close;
 
-export function DialogContent({ className, children, wide, ...props }: React.ComponentProps<typeof D.Content> & { wide?: boolean }) {
+export function DialogContent({ className, children, wide, onCloseAutoFocus, ...props }: React.ComponentProps<typeof D.Content> & { wide?: boolean }) {
   return (
     <D.Portal>
       <D.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
@@ -17,10 +24,17 @@ export function DialogContent({ className, children, wide, ...props }: React.Com
           wide ? "max-w-[min(1100px,96vw)]" : "max-w-lg",
           className,
         )}
+        onCloseAutoFocus={(e) => {
+          onCloseAutoFocus?.(e);
+          const now = document.activeElement;
+          if (e.defaultPrevented || !before?.isConnected || (now && now !== document.body)) return;
+          e.preventDefault();
+          before.focus();
+        }}
         {...props}
       >
         {children}
-        <D.Close className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="Close">
+        <D.Close className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring" aria-label="Close">
           <XIcon className="size-4" />
         </D.Close>
       </D.Content>

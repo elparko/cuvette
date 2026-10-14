@@ -2,6 +2,7 @@ import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, Networ
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { IMAGE_PASTE_HELP, pastedImageOnly } from "../lib/drop.ts";
+import { patchCards } from "../lib/cards.ts";
 import { onTableCopy } from "../lib/table-copy.ts";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
@@ -246,6 +247,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (!openRuns.current.size) return;
     for (const d of scrollRef.current?.querySelectorAll<HTMLDetailsElement>("details[data-run]") ?? []) if (openRuns.current.has(d.dataset.run!)) d.open = true;
   }, [stream.items, stream.pending]);
+
+  // A card that did not change stays in the page, so that a screen reader does not read it again.
+  const cardText = useRef(new Map<string, string>());
+  useLayoutEffect(() => {
+    if (cardsRef.current) patchCards(cardsRef.current, stream.cards, cardText.current);
+  }, [stream.cards]);
 
   // Cards: put the keyboard focus on the card that waits for an answer.
   useLayoutEffect(() => {
@@ -516,18 +523,18 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b bg-background/80 px-4 py-2 backdrop-blur sm:px-5 sm:py-2.5">
-        <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 max-sm:basis-full">
           <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <div className="truncate font-semibold tracking-tight" title={session.folder}>
+            <h1 className="truncate font-semibold tracking-tight" title={session.folder}>
               {folderName}
-            </div>
+            </h1>
             <div className="truncate text-xs text-muted-foreground max-sm:hidden" title={status.where ?? session.folderLine}>
               {midText(session.folderLine || session.folder, 90)}
             </div>
           </div>
         </div>
-        <div className="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:basis-full">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-none">
           {status.bypass && (
             <Badge tone="warn">
               <ShieldAlertIcon /> <span className="max-sm:sr-only">bypass permissions</span>
@@ -590,6 +597,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
       <div ref={gridRef} style={{ "--side": `${sideWidth}px`, ...(gridH ? { "--grid-h": `${gridH}px` } : {}) } as React.CSSProperties} className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_var(--side)]")}>
         <section aria-label="Conversation" className="flex h-[var(--grid-h,calc(100dvh-150px))] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
+          <h2 className="sr-only">Conversation</h2>
           <div
             ref={scrollRef}
             onScroll={() => {
@@ -606,6 +614,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
             <div role="log" aria-label="Messages" className={cn("srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4", !notes && "hide-notes")} onClick={onClick} onChange={onChange} onCopy={onTableCopy}>
+              <h3 className="sr-only">Messages</h3>
               {itemsHtml}
               {sent && (
                 <div className="msg user">
@@ -621,7 +630,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
                 </div>
               )}
-              <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
+              <div ref={cardsRef} />
             </div>
 
           <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background from-75% to-transparent pt-8">
@@ -641,7 +650,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               )}
             </div>
             <form
-              className="relative rounded-2xl border bg-card shadow-card transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:ring-[3px] focus-within:ring-ring/20"
+              className="relative rounded-2xl border border-input bg-card shadow-card transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
@@ -726,24 +735,35 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
         {side && (
           <aside aria-label="Analysis details" className="relative flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
-            <div role="separator" aria-orientation="vertical" aria-label="Drag to resize the side panel" onPointerDown={dragSide} onDoubleClick={() => {
+            <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize the side panel" aria-valuemin={300} aria-valuemax={900} aria-valuenow={Math.min(sideWidth, 900)} onPointerDown={dragSide} onKeyDown={(e) => {
+              const w = { ArrowLeft: sideWidth + 24, ArrowRight: sideWidth - 24, Home: 300, End: 900 }[e.key];
+              if (w === undefined) return;
+              e.preventDefault();
+              const next = Math.min(Math.max(w, 300), 900);
+              setSideWidth(next);
+              try {
+                localStorage.setItem("cuvette.sideWidth", String(next));
+              } catch {}
+            }} onDoubleClick={() => {
               setSideWidth(480);
               try {
                 localStorage.setItem("cuvette.sideWidth", "480");
               } catch {}
             }} className="absolute inset-y-0 -left-1 z-10 hidden w-2 cursor-col-resize transition-colors hover:bg-ring/40 active:bg-ring/60 lg:block" />
+            <h2 className="sr-only">Analysis details</h2>
             <div className="flex items-center gap-2 px-4 pt-3 pb-2">
               <Tabs value={tab} onValueChange={setTab} className="min-w-0 flex-1">
-                <TabsList className="w-full">
+                <TabsList className="h-auto w-full flex-wrap">
                   {TABS.map((t) => (
-                    <TabsTrigger key={t.id} value={t.id}>
+                    <TabsTrigger key={t.id} value={t.id} aria-controls="analysis-panel" className="min-h-7 py-1">
                       {t.label}
                     </TabsTrigger>
                   ))}
                 </TabsList>
               </Tabs>
             </div>
-            <div ref={tabRef} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} onCopy={onTableCopy} dangerouslySetInnerHTML={{ __html: tabHtml }} />
+            <h3 className="sr-only">{TABS.find((t) => t.id === tab)?.label}</h3>
+            <div ref={tabRef} id="analysis-panel" role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} onCopy={onTableCopy} dangerouslySetInnerHTML={{ __html: tabHtml }} />
           </aside>
         )}
       </div>
