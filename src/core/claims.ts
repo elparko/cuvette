@@ -1,5 +1,6 @@
 import type { AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
+import { outOfDateNodes } from "./status.ts";
 import type { Claim } from "./types.ts";
 
 interface Found {
@@ -302,7 +303,7 @@ function designConstant(text: string, f: Found): boolean {
 export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const nodes = record.nodes?.() ?? [];
   const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
-  const stale = record.stale?.() ?? new Set<string>();
+  const stale = outOfDateNodes(record);
   const order = new Map(nodes.map((n, i) => [n.id, i]));
   const rank = (id: string) => Number(comparison.has(id)) * 2 + Number(stale.has(id));
   const logged = record.numbers().sort((a, b) => rank(a.node) - rank(b.node) || (order.get(b.node) ?? 0) - (order.get(a.node) ?? 0));

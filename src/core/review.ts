@@ -4,6 +4,7 @@ import { approvedPlan, currentPlan, definitionFindings, planFindings, planText }
 import type { AnalysisRecord } from "./record.ts";
 import { powerFindings } from "./power.ts";
 import { stepNumbers as nodeStepNumbers } from "./housekeeping.ts";
+import { outOfDateNodes } from "./status.ts";
 import { checkText, summary } from "./ste.ts";
 import { latestValue, testRows } from "./testcount.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
@@ -175,14 +176,16 @@ function unsourcedNumbers(ctx: ReviewContext): FindingIn[] {
 }
 
 function staleUsed(ctx: ReviewContext): FindingIn[] {
-  const stale = ctx.record.stale();
-  const nodes = [...new Set(ctx.claims.filter((c) => c.label === "measured" && c.node && stale.has(c.node)).map((c) => c.node!))];
+  const measured = ctx.claims.filter((c) => c.label === "measured" && c.node);
+  if (!measured.length) return [];
+  const stale = outOfDateNodes(ctx.record);
+  const nodes = [...new Set(measured.filter((c) => stale.has(c.node!)).map((c) => c.node!))];
   if (!nodes.length) return [];
   return [
     {
       check: "stale_used",
       severity: "error",
-      message: `The answer uses numbers from stale results: ${nodes.join(", ")}. A decision changed after these ran. Run them again.`,
+      message: `The answer uses numbers from stale results: ${nodes.join(", ")}. These steps are out of date. Run them again.`,
       nodes,
     },
   ];

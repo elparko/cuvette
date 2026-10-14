@@ -144,6 +144,16 @@ export function stepStatus(record: AnalysisRecord, opts: { live?: Map<string, Re
   return [...states.values()];
 }
 
+export function outOfDateNodes(record: AnalysisRecord): Set<string> {
+  const out = new Set<string>(record.stale?.() ?? []);
+  if (typeof record.staleMarks !== "function") return out;
+  const rewound = record.rewound();
+  for (const s of stepStatus(record)) if (!s.current) out.add(s.node);
+  for (const n of record.nodes()) if (record.replacedBy(n.id)) out.add(n.id);
+  for (const id of rewound) out.delete(id);
+  return out;
+}
+
 export function statusText(states: StepState[], next = "Type /rerun to run the out-of-date steps again."): string {
   if (!states.length) return "No steps yet.";
   const out = states.filter((s) => !s.current);

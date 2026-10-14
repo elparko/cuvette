@@ -3,10 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { lockHash, type EnvLock } from "../src/core/envlock.ts";
+import { checkAnswer } from "../src/core/claims.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook } from "../src/core/results.ts";
+import { runChecks } from "../src/core/review.ts";
 import { Session } from "../src/core/session.ts";
-import { changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
+import { outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, rerunText } from "../src/ui/commands.ts";
@@ -166,4 +168,73 @@ test("a rerun after /change replaces the old step, records the before and after 
   expect(last).toMatchObject({ old: "n2", step: 3, reasons: ["The input file a.tif changed after this step ran."], changed: 0 });
   expect(rerunBody(last)).toContain("No number changed.");
   expect((await session.checkStatus()).every((s) => s.current)).toBe(true);
+});
+
+function chainNode(record: AnalysisRecord, parents: string[], extra: Partial<NodeIn> = {}) {
+  return record.addNode({
+    entry: 1, adapter: "biostats", adapterVersion: "1.0.0", programVersion: "0.30.3", tool: "fit", args: {}, decisions: {}, codeHash: "c",
+    inputHashes: [], inputFiles: [], outputs: [], result: { ok: true, metrics: { effect_size: 0.5 } }, parents, summary: "A step.", model: "fake", manualRoute: "", fidelity: "none", ...extra,
+  });
+}
+
+const staleFindings = async (record: AnalysisRecord, node: string) => {
+  const claims = [{ text: "The effect is 0.5.", value: 0.5, label: "measured" as const, node }];
+  const out = await runChecks({ record, decisions: { values: () => ({}) } as never, adapters: [], answer: "The effect is 0.5.", claims });
+  return out.filter((f) => f.check === "stale_used");
+};
+
+test("an answer that uses a child of a stale step gives the stale_used finding", async () => {
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
+  const a = chainNode(record, [], { decisions: { alpha: 0.05 } });
+  const b = chainNode(record, [a.id]);
+  const c = chainNode(record, [b.id]);
+  expect(await staleFindings(record, c.id)).toHaveLength(0);
+  record.append("stale", { key: "alpha", reason: "changed", nodes: [a.id] });
+  expect([...record.stale()]).toEqual([a.id]);
+  const found = await staleFindings(record, c.id);
+  expect(found).toHaveLength(1);
+  expect(found[0]!.nodes).toEqual([c.id]);
+  expect((await staleFindings(record, a.id))[0]!.nodes).toEqual([a.id]);
+});
+
+test("an answer that uses a step that a rerun replaced gives the stale_used finding", async () => {
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
+  const a = chainNode(record, []);
+  const b = chainNode(record, [a.id]);
+  const a2 = chainNode(record, []);
+  record.append("rerun", { old: a.id, node: a2.id });
+  expect((await staleFindings(record, a.id))[0]!.nodes).toEqual([a.id]);
+  expect((await staleFindings(record, b.id))[0]!.nodes).toEqual([b.id]);
+  expect(await staleFindings(record, a2.id)).toHaveLength(0);
+});
+
+test("a step that a rewind set aside does not count as stale", async () => {
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
+  const a = chainNode(record, [], { decisions: { alpha: 0.05 } });
+  const mark = record.append("stale", { key: "alpha", reason: "changed", nodes: [a.id] });
+  const b = chainNode(record, [a.id]);
+  record.append("rewind", { upTo: mark.id - 1 });
+  expect(outOfDateNodes(record.liveView()).size).toBe(0);
+  expect(await staleFindings(record.liveView(), b.id)).toHaveLength(0);
+  expect(outOfDateNodes(record).has(b.id)).toBe(false);
+});
+
+test("a clean chain gives no stale_used finding", async () => {
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
+  const a = chainNode(record, []);
+  const b = chainNode(record, [a.id]);
+  const c = chainNode(record, [b.id]);
+  expect(outOfDateNodes(record).size).toBe(0);
+  expect(await staleFindings(record, c.id)).toHaveLength(0);
+});
+
+test("the answer check reads the step status once for a record with 500 steps", () => {
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
+  let prev: string[] = [];
+  for (let i = 0; i < 500; i++) prev = [chainNode(record, prev, { result: { ok: true, metrics: { effect_size: i + 0.5 } } }).id];
+  const text = Array.from({ length: 40 }, (_, i) => `The effect is ${i + 0.5}.`).join(" ");
+  const start = Date.now();
+  const claims = checkAnswer(text, record);
+  expect(claims.length).toBeGreaterThan(0);
+  expect(Date.now() - start).toBeLessThan(20_000);
 });
