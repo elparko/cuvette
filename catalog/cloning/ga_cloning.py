@@ -444,9 +444,10 @@ def align_sanger_read(read, reference, trim=True):
         return _fail("trim is true, but %s has no base qualities (%s). Use an .ab1 or FASTQ file, or ask the scientist to change the decision quality_trim to false." % (read, rfmt))
     elif trim:
         q = np.array(rec.letter_annotations["phred_quality"])
-        score = np.cumsum(0.05 - 10 ** (-q / 10.0))
-        end = int(np.argmax(score)) + 1
-        start = int(np.argmin(np.concatenate([[0], score[:end]])))
+        prefix = np.concatenate([[0.0], np.cumsum(0.05 - 10 ** (-q / 10.0))])
+        gain = prefix[1:] - np.minimum.accumulate(prefix)[:-1]
+        end = int(np.argmax(gain)) + 1
+        start = int(np.argmin(prefix[:end]))
         rec = rec[start:end]
     qual = rec.letter_annotations.get("phred_quality")
     aligner = PairwiseAligner(mode="local", match_score=5, mismatch_score=-4, open_gap_score=-10, extend_gap_score=-0.5)

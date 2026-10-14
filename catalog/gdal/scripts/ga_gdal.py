@@ -57,8 +57,11 @@ def raster_facts(path, band=1, stats=True):
     b = info["bands"][band - 1]
     if "noDataValue" in b:
         m["nodata"] = b["noDataValue"]
-    for k, name in (("minimum", "min"), ("maximum", "max"), ("mean", "mean"), ("stdDev", "stddev")):
-        if k in b:
+    full = b.get("metadata", {}).get("", {})
+    for k, key, name in (("minimum", "STATISTICS_MINIMUM", "min"), ("maximum", "STATISTICS_MAXIMUM", "max"), ("mean", "STATISTICS_MEAN", "mean"), ("stdDev", "STATISTICS_STDDEV", "stddev")):
+        if key in full:
+            m[name] = float(full[key])
+        elif k in b:
             m[name] = b[k]
     data = {"crs_name": info.get("coordinateSystem", {}).get("wkt", "").split('"')[1] if info.get("coordinateSystem") else None,
             "driver": info.get("driverShortName"), "type": b.get("type"), "corner_ul": info["cornerCoordinates"]["upperLeft"],

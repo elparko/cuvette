@@ -254,7 +254,7 @@ decisions:
     label: Rectangle gate, first channel maximum
     kind: float
     group: Rectangle gate
-    help: Upper limit on the first axis, in the units after compensation and transform.
+    help: Upper limit on the first axis, in the units after compensation and transform. Events below it are inside. An event on the limit is outside.
     owner: human
     stage: when_needed
     links:
@@ -275,7 +275,7 @@ decisions:
     label: Rectangle gate, second channel minimum
     kind: float
     group: Rectangle gate
-    help: Lower limit on the second axis, in the units after compensation and transform.
+    help: Lower limit on the second axis, in the units after compensation and transform. Events at or above it are inside.
     owner: human
     stage: when_needed
     links:
@@ -285,7 +285,7 @@ decisions:
     label: Rectangle gate, second channel maximum
     kind: float
     group: Rectangle gate
-    help: Upper limit on the second axis, in the units after compensation and transform.
+    help: Upper limit on the second axis, in the units after compensation and transform. Events below it are inside. An event on the limit is outside.
     owner: human
     stage: when_needed
     links:
