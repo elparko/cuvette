@@ -1123,6 +1123,7 @@ export class Session {
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.stepWithRecovery(forceAnswer, signal);
+        this.uniqueCallIds(res.message);
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
@@ -1352,9 +1353,9 @@ export class Session {
         if (e instanceof ProviderError && e.overflow && !signal.aborted) {
           if (!compacted) {
             compacted = true;
-            if (await this.maybeCompact(signal, true)) {
+            if (await this.maybeCompact(signal, true, true)) {
               dropStreamed();
-              this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
+              this.record.append("notice", { text: "The context was too long for the model. The harness made the context shorter and tries again." });
               continue;
             }
           }
@@ -1508,6 +1509,21 @@ export class Session {
       this.push({ role: "user", parts: calls.map((c) => ran(c.id) ?? { type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true }) });
   }
 
+  // A local model server gives no call ids, so its provider counts the calls that it sees in the context.
+  // After a summary or a rewind the count can start again and reuse an id from the record.
+  private callIds?: Set<string>;
+
+  private uniqueCallIds(m: Message) {
+    if (Array.isArray(m.raw)) return;
+    const used = (this.callIds ??= new Set(this.record.entries(["message"]).flatMap((e) => (e.data.message as unknown as Message).parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])))));
+    for (const p of m.parts) {
+      if (p.type !== "tool_call") continue;
+      const base = p.id;
+      for (let k = 2; used.has(p.id); k++) p.id = `${base}-${k}`;
+      used.add(p.id);
+    }
+  }
+
   private push(m: Message) {
     this.history.push(m);
     this.record.append("message", { message: m as unknown as Record<string, unknown> });
@@ -1530,17 +1546,20 @@ export class Session {
   private request?: Message;
   private summaryFailed = false;
 
-  private async maybeCompact(signal: AbortSignal, force = false): Promise<boolean> {
-    const win = this.provider.info.contextWindow;
+  // After a context error, the real window of the model is smaller than the window that the provider reports, so the summary also shortens the recent messages.
+  private async maybeCompact(signal: AbortSignal, force = false, tooLong = false): Promise<boolean> {
     const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
+    const win = tooLong ? Math.min(this.provider.info.contextWindow, Math.floor(size() * 0.8)) : this.provider.info.contextWindow;
+    let shortened = false;
     if (!force && size() <= win * ELIDE_AT) return false;
-    if (!force) {
+    if (!force || tooLong) {
       const { messages, elided } = elideOld(this.history, win);
       if (elided) {
+        shortened = tooLong;
         this.history = messages;
         this.record.append("notice", { text: `The harness shortened ${elided} older tool output(s) in the context. The record keeps the full output.`, elided });
       }
-      if (this.summaryFailed || size() <= win * SUMMARIZE_AT) return false;
+      if (!force && (this.summaryFailed || size() <= win * SUMMARIZE_AT)) return false;
     }
     let res: Awaited<ReturnType<typeof summarizeOld>>;
     try {
@@ -1549,16 +1568,16 @@ export class Session {
       if (signal.aborted) throw e;
       this.summaryFailed = true;
       this.record.append("notice", { text: `The harness could not summarize the older messages: ${(e as Error).message} The turn continues with the full context.` });
-      return false;
+      return shortened;
     }
-    if (!res) return false;
+    if (!res) return shortened;
     if (!res.summary.trim()) {
       this.summaryFailed = true;
       this.record.append("notice", { text: "The summary of the older messages was empty. The turn continues with the full context." });
-      return false;
+      return shortened;
     }
-    const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
-    const summary = summaryMessage(`${steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary}\n## Folders\n${this.foldersText()}`);
+    const facts = this.summaryFacts(res.request);
+    const summary = summaryMessage(facts ? `${res.summary}\n${facts}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
     const rest = [...(res.request ? [res.request] : []), ...res.kept];
     this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo, kept: rest as unknown as Record<string, unknown>[] });
@@ -1566,6 +1585,19 @@ export class Session {
     this.phiFrom = this.history.length;
     this.contextWarned = false;
     return true;
+  }
+
+  // The summary gets the facts that the harness knows from the session, as the model wrote them or as they stand now.
+  // A block that the kept request of the turn already holds is not written again.
+  private summaryFacts(request?: Message): string {
+    const sent = (request?.parts ?? []).flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n");
+    const plan = this.plan?.steps.length ? [planText(this.plan, { view: "compact" }), ...(this.plan.exclusions?.length ? [planText({ exclusions: this.plan.exclusions }, { view: "details" })] : [])].join("\n\n") : "";
+    const blocks: [string, string][] = [
+      ["Current plan", plan],
+      ...(this.settings.guidance ? ([["Decisions", this.decisions.brief()], ...(this.mode === "watch" ? [] : [["Mode", MODE_NOTE[this.mode]]]), ...(this.pilotOn() ? [["Pilot", PILOT_NOTE]] : [])] as [string, string][]) : []),
+      ["Folders", this.foldersText()],
+    ];
+    return blocks.filter(([head, body]) => body && (head === "Current plan" || !sent.includes(body))).map(([head, body]) => `## ${head}\n${body}`).join("\n");
   }
 
   // ------------------------------------------------------------- patient identifiers
