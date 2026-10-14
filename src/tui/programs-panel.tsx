@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, useInput } from "ink";
+import { Text } from "./text.tsx";
 import { CardRows, Fit } from "./fit.tsx";
 import { Field } from "./input-box.tsx";
 import { lastUseText, listPrograms, sizeText, stateText, originText, type Action, type Plan, type ProgramRow } from "../core/programs.ts";

@@ -56,7 +56,7 @@ export function useFolderPick(onOpened: () => void) {
 
 export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending; busy: boolean; open: (folder: string, adapter?: string) => void; cancel: () => void }) {
   const [best, ...rest] = pending.matches;
-  const name = pending.folder.split("/").filter(Boolean).pop() || pending.folder;
+  const name = pending.folder.replace(/[\u202a-\u202e\u2066-\u2069]/g, "").split("/").filter(Boolean).pop() || pending.folder;
   if (!best)
     return (
       <div className="flex w-full flex-col gap-3 rounded-xl border bg-card p-4" role="group" aria-label="Empty folder">

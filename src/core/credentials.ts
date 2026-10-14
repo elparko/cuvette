@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
@@ -9,15 +9,45 @@ export function credentialsPath(): string {
   return join(cuvetteHome(), "credentials.json");
 }
 
+let known: { path: string; at: number; stat: import("node:fs").BigIntStats; real: string } | undefined;
+
+function credentialsInfo() {
+  const path = credentialsPath();
+  if (known && known.path === path && Date.now() - known.at < 250) return known;
+  try {
+    known = { path, at: Date.now(), stat: statSync(path, { bigint: true }), real: realpathSync(path) };
+    return known;
+  } catch {
+    known = undefined;
+    return undefined;
+  }
+}
+
 export function isCredentialsFile(path: string): boolean {
-  const real = (p: string) => {
+  const cred = credentialsInfo();
+  if (!cred) {
     try {
-      return realpathSync(p);
+      return realpathSync(path) === resolve(credentialsPath());
     } catch {
-      return resolve(p);
+      return resolve(path) === resolve(credentialsPath());
     }
-  };
-  return real(path) === real(credentialsPath());
+  }
+  if (resolve(path) === cred.real || resolve(path) === resolve(cred.path)) return true;
+  try {
+    const a = statSync(path, { bigint: true });
+    return a.ino !== 0n && a.dev === cred.stat.dev && a.ino === cred.stat.ino;
+  } catch {
+    return resolve(path) === cred.real || resolve(path) === resolve(cred.path);
+  }
+}
+
+const SECRET_FOLDERS = new Set([".ssh", ".aws", ".gnupg", ".kube", ".azure", ".docker", "keychains"]);
+const SECRET_NAMES = /^(id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|\.netrc|_netrc|\.git-credentials|\.npmrc|\.pypirc|\.env(\..+)?|.+\.(pem|p12|pfx|kdbx))$/i;
+
+export function isSecretFile(path: string): boolean {
+  if (isCredentialsFile(path)) return true;
+  const parts = resolve(path).split(/[\\/]/);
+  return parts.slice(0, -1).some((d) => SECRET_FOLDERS.has(d.toLowerCase())) || SECRET_NAMES.test(parts.at(-1) ?? "");
 }
 
 export const KEY_REMOVED = "[API key removed]";

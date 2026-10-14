@@ -1,7 +1,8 @@
 import React, { useContext, useRef, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
-import { Box, Text, useInput } from "ink";
+import { Box, useInput } from "ink";
+import { Text } from "./text.tsx";
 import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";

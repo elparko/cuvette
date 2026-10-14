@@ -47,7 +47,13 @@ const UNIT_IN_NAME = /\(([^()]+)\)\s*$|\[([^\[\]]+)\]\s*$|[ _](mm|cm|um|µm|nm|m
 
 export const isMissing = (v: string) => MISSING.has(v.trim().toLowerCase());
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const quote = (s: string) => `'${s}'`;
+const flat = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
+const quote = (s: string) => {
+  let head = s.slice(0, 200);
+  if (s.length > 200 && /[\ud800-\udbff]$/.test(head)) head = head.slice(0, 199);
+  const body = /[\x00-\x1f\x7f\u0085\u2028\u2029']/.test(head) ? JSON.stringify(head) : `'${head}'`;
+  return s.length > 200 ? `${body} (${s.length} characters)` : body;
+};
 const listOf = (xs: string[], max = 4) => (xs.length > max ? `${xs.slice(0, max).join(", ")} and ${xs.length - max} more` : xs.join(", "));
 const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 
@@ -186,7 +192,7 @@ export function checkTable(t: Table, source: string): DataCheck {
     items.push({ id: "multiline_cells", check: "quotes", level: "note", text: `${plural(lines.length, "cell")} that ${lines.length === 1 ? "starts" : "start"} on ${lines.length === 1 ? "line" : "lines"} ${listOf(lines.map(String), 6)} ${lines.length === 1 ? "goes" : "go"} over more than one line. If the file has no such cells, a quote mark with no partner joins rows. Then the table has fewer rows than the file.` });
   }
   const dupNames = [...nameCount].filter(([, k]) => k > 1).map(([c]) => c);
-  if (dupNames.length) items.push({ id: "duplicate_columns", check: "duplicate_columns", level: "note", text: `${dupNames.length === 1 ? "The column name" : "The column names"} ${dupNames.map((c) => quote(c || "(no name)")).join(", ")} ${dupNames.length === 1 ? "is" : "are"} on more than one column. A step that finds a column by its name can read the wrong column.` });
+  if (dupNames.length) items.push({ id: "duplicate_columns", check: "duplicate_columns", level: "note", text: `${dupNames.length === 1 ? "The column name" : "The column names"} ${listOf(dupNames.map((c) => quote(c || "(no name)")))} ${dupNames.length === 1 ? "is" : "are"} on more than one column. A step that finds a column by its name can read the wrong column.` });
   if (t.encoding) items.push({ id: "encoding", check: "encoding", level: "note", text: `The file uses the ${t.encoding.toUpperCase()} text encoding, not UTF-8. The harness reads it as ${t.encoding.toUpperCase()}. Other programs can show letters such as µ incorrectly.` });
 
   const commas = cols.filter((c) => c.numeric && c.kinds.comma.length);
@@ -567,7 +573,7 @@ export function dataCheckText(c: DataCheck): string {
   if (c.groups) out.push(`Groups in ${quote(c.groups.column)}: ${c.groups.sizes.map(([g, n]) => `${g} ${n}`).join(", ")}.`);
   if (c.units?.length) out.push(`Units in the column names: ${c.units.map(([col, u]) => `${col.replace(UNIT_IN_NAME, "").trim() || col} (${u})`).join(", ")}.`);
   if (!c.items.length) out.push(c.kind === "table" ? "No missing values, copies, mixed columns or extreme values." : "No missing channels, name problems or odd files.");
-  return out.join("\n");
+  return out.map((l) => flat(l)).join("\n");
 }
 
 export function existsTable(p: string): boolean {

@@ -1,3 +1,39 @@
+const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>|\[(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\]/gi;
+
+// A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
+export function defang(text: string): string {
+  return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
+}
+
+const MARKER_AT = new RegExp(SPECIAL_TOKENS.source, "iy");
+
+// The model copies a marker with its zero-width space into a tool call. The tool must get the marker as it is in the file.
+export function refang(text: string): string {
+  return text.replace(/([<[])\u200b/g, (m, c: string, at: number, whole: string) => {
+    MARKER_AT.lastIndex = 0;
+    const rest = c + whole.slice(at + 2, at + 80);
+    return MARKER_AT.test(rest) ? c : m;
+  });
+}
+
+export function refangDeep<T>(v: T): T {
+  if (typeof v === "string") return refang(v) as T;
+  if (Array.isArray(v)) return v.map(refangDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, refangDeep(x)])) as T;
+  return v;
+}
+
+export function defangDeep<T>(v: T): T {
+  if (typeof v === "string") return defang(v) as T;
+  if (Array.isArray(v)) return v.map(defangDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, defangDeep(x)])) as T;
+  return v;
+}
+
+export function wrapperText(text: string): string {
+  return defang(text.replace(/<(\s*\/?\s*)(tool_result|tool_call|tool_response)/gi, "<$1_$2"));
+}
+
 export function splitThink(raw: string): { text: string; thinking: string } {
   const thoughts: string[] = [];
   let text = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {

@@ -481,7 +481,7 @@ function show(p) {
 async function boot() {
   state = await call("api/state");
   $("modewrap").classList.toggle("hidden", !state.session);
-  setWhere(state.session ? (state.session.folderLine || state.session.folder) + " · " + state.session.model : "No session open");
+  setWhere(state.session ? (state.session.folderLine || state.session.folderShown) + " · " + state.session.model : "No session open");
   if (state.session) show(OWN_PAGES.includes(page) ? page : "session");
   else if (state.setup || page === "setup") { show("setup"); if (!fstate) setupPage(); }
   else {
@@ -714,7 +714,7 @@ document.addEventListener("click", async (e) => {
   const thumb = t.closest(".thumb");
   if (thumb) { $("lightimg").src = thumb.dataset.full; $("lightimg").alt = thumb.title; $("lightbox").showModal(); return; }
   const rev = t.closest("[data-reveal]");
-  if (rev) { try { await bridge.reveal(rev.dataset.reveal); } catch (err) { toast(err.message); } return; }
+  if (rev) { try { await bridge.reveal(decodeURIComponent(rev.dataset.reveal)); } catch (err) { toast(err.message); } return; }
   const dl = t.closest("a[download]");
   if (dl && bridge.saveFile) { e.preventDefault(); bridge.saveFile(dl.getAttribute("href"), dl.getAttribute("download")); return; }
   const tb = t.closest("[data-tab]");
@@ -976,7 +976,7 @@ async function afterSetup() {
   $("checkpanel").classList.remove("hidden");
   $("samplepanel").classList.remove("hidden");
   doctor($("doctorbody"));
-  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder; }
+  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder.replace(/[\u202a-\u202e\u2066-\u2069]/g, ""); }
 }
 
 let progStart = "";

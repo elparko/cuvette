@@ -1,3 +1,4 @@
+import { noBidi } from "../core/markdown.ts";
 import type { ServerResponse } from "node:http";
 import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
@@ -128,7 +129,7 @@ export class WebView {
 
   header(): Record<string, unknown> {
     const s = this.session;
-    return { id: s.id, folder: s.cwd ?? "", folderLine: s.folderLine ?? "", model: s.model.model, programs: s.adapterInfo.map((a) => a.title || a.name), details: this.details };
+    return { id: s.id, folder: s.cwd ?? "", folderShown: noBidi(s.cwd ?? ""), folderLine: noBidi(s.folderLine ?? ""), model: s.model.model, programs: s.adapterInfo.map((a) => a.title || a.name), details: this.details };
   }
 
   statusMsg(): Record<string, unknown> {
@@ -145,7 +146,7 @@ export class WebView {
       placeholder: inputPlaceholder(s, this.busy),
       queueMode: s.settings?.messages === "queue" || !s.steer,
       details: this.details,
-      where: `${s.folderLine || s.cwd || ""} · ${s.model.model}`,
+      where: noBidi(`${s.folderLine || s.cwd || ""} · ${s.model.model}`),
       model: s.model.model,
       ...usageFields(s),
     };

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { moveOldHome, readOldEnv } from "./core/old-names.ts";
+import { plainText } from "./core/plain.ts";
 import type { Mode } from "./core/types.ts";
 
 readOldEnv();
@@ -102,6 +103,7 @@ Usage
   --trust-folder                       trust the project folder for this run only (for scripts and -p)
 
   WARNING: The settings, hooks and adapters in <folder>/.ga or <folder>/.cuvette can run programs.
+  A <folder>/LAB.md file goes into the instructions of the agent.
   Cuvette ignores them until you trust the folder. A session shows a card with what the folder
   contains. If a trusted file changes, the card shows again.
 
@@ -248,18 +250,18 @@ async function headless(prompt: string) {
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
   const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, trustFolder, method: str(o.method), settings: { headless: true, ...bypass(), ...planSetting() } });
-  if (s.trustNotice) process.stderr.write(`Note: ${s.trustNotice}\n`);
+  if (s.trustNotice) process.stderr.write(`Note: ${plainText(s.trustNotice)}\n`);
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
-    if (out !== "stream-json" && e.type === "entry" && (e.entry.kind === "error" || e.entry.kind === "notice")) process.stderr.write(`${e.entry.kind === "error" ? "Error" : "Note"}: ${e.entry.data.message ?? e.entry.data.text}\n`);
-    if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool}\n`);
+    if (out !== "stream-json" && e.type === "entry" && (e.entry.kind === "error" || e.entry.kind === "notice")) process.stderr.write(`${e.entry.kind === "error" ? "Error" : "Note"}: ${plainText(String(e.entry.data.message ?? e.entry.data.text))}\n`);
+    if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${plainText(String(e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool))}\n`);
   });
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
   if (s.endedBy !== "answer") process.exitCode = 1;
   if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list() }, null, 1));
-  else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nFolder: ${s.workDir}\nRecord: ${join(s.dir, "log.jsonl")}`);
+  else if (out === "text") console.log(`${plainText(answer)}\n\nSession: ${s.id}\nFolder: ${plainText(s.workDir)}\nRecord: ${plainText(join(s.dir, "log.jsonl"))}`);
   await s.close();
 }
 
@@ -633,7 +635,7 @@ async function main() {
         if (!existsSync(folder)) return fail(`No folder ${folder}.`);
         const t = tr.trustStatus(folder);
         tr.trustFolder(folder);
-        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan))].join("\n"));
+        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan, true))].join("\n"));
         return;
       }
       if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.folderKey(folder)} is not trusted now.` : `${tr.folderKey(folder)} was not in the list.`);

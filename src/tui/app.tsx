@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Static, Text, render, useApp, useInput, usePaste, useStdout, useWindowSize } from "ink";
+import { Box, Static, render, useApp, useInput, usePaste, useStdout, useWindowSize } from "ink";
+import { Text } from "./text.tsx";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";

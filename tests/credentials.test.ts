@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { claudeKey, credentialsPath, elabftwConfig, elabftwProblem, hideKeys, removeElabftw, saveClaudeWorkspace, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
+import { claudeKey, credentialsPath, isCredentialsFile, elabftwConfig, elabftwProblem, hideKeys, removeElabftw, saveClaudeWorkspace, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
 
 const old = process.env.CUVETTE_HOME;
 beforeEach(() => {
@@ -88,4 +88,26 @@ test("hideKeys removes pasted keys and the saved keys, and keeps normal text", (
   expect(hideKeys("token OTHERENVSECRET-value-1234", { MY_TOKEN: "OTHERENVSECRET-value-1234" }).text).toBe("token [API key removed]");
   const plain = "Run sk-learn-pipeline-results-and-plots on task-1234 at https://elab.example.org with /Users/me/data.csv";
   expect(hideKeys(plain, { HOME_KEYS_DIR: "/Users/me/data.csv" })).toEqual({ text: plain, found: 0 });
+});
+
+test("the key file is found by its identity: a hard link and a name in other capitals are the same file", () => {
+  saveClaudeKey(KEY);
+  const project = mkdtempSync(join(tmpdir(), "cuvette-cred-proj-"));
+  expect(isCredentialsFile(credentialsPath())).toBe(true);
+  expect(isCredentialsFile(join(project, "other.txt"))).toBe(false);
+  expect(isCredentialsFile(join(process.env.CUVETTE_HOME!, "missing.json"))).toBe(false);
+  const upper = join(process.env.CUVETTE_HOME!, "CREDENTIALS.JSON");
+  if (existsSync(upper)) expect(isCredentialsFile(upper)).toBe(true);
+  if (process.platform === "win32") return;
+  linkSync(credentialsPath(), join(project, "notes.txt"));
+  expect(isCredentialsFile(join(project, "notes.txt"))).toBe(true);
+});
+
+test("a key file that is replaced by a new file inside the cache time is still found by its path", () => {
+  saveClaudeKey(KEY);
+  expect(isCredentialsFile(credentialsPath())).toBe(true);
+  saveClaudeKey(`${KEY}-second`);
+  rmSync(credentialsPath());
+  writeFileSync(credentialsPath(), JSON.stringify({ anthropic_api_key: KEY }));
+  expect(isCredentialsFile(credentialsPath())).toBe(true);
 });
