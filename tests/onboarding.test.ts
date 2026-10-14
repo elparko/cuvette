@@ -119,6 +119,12 @@ describe("checker", () => {
     expect(pythonSignature('def run(x: Literal["a=b"]): pass', "run")).toEqual({ names: ["x"], required: ["x"], kwargs: false });
   });
 
+  test("pythonSignature reads a triple-quoted default that holds a quote", () => {
+    expect(pythonSignature('def f(a, b="""x"y""", c=1): pass', "f")).toEqual({ names: ["a", "b", "c"], required: ["a"], kwargs: false });
+    expect(pythonSignature("def f(a, b='''it's''', c): pass", "f")).toEqual({ names: ["a", "b", "c"], required: ["a", "c"], kwargs: false });
+    expect(pythonSignature('def f(a, b="", c): pass', "f")).toEqual({ names: ["a", "b", "c"], required: ["a", "c"], kwargs: false });
+  });
+
   test("scriptReads does not report properties of a js value that is not the params", () => {
     expect([...scriptReads("const p = args.path;\nrun(p.length);", "run.mjs")]).toEqual([]);
     expect([...scriptReads("const p = input.params;\nrun(p.folder);", "run.mjs")]).toEqual(["folder"]);

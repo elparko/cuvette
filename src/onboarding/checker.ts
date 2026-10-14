@@ -241,11 +241,19 @@ export function pythonSignature(source: string, fn: string): { names: string[]; 
     const ch = source[i];
     if (quote) {
       if (ch === "\\") cur += source[i++];
-      else if (ch === quote) quote = "";
+      else if (source.startsWith(quote, i)) {
+        cur += quote.slice(1);
+        i += quote.length - 1;
+        quote = "";
+      }
     } else if (ch === "#") {
       while (i + 1 < source.length && source[i + 1] !== "\n") i++;
       continue;
-    } else if (ch === '"' || ch === "'") quote = ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = source.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch;
+      cur += quote.slice(1);
+      i += quote.length - 1;
+    }
     else if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch)) {
       if (depth === 0) break;
