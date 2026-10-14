@@ -7,13 +7,25 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^${body}$`, "s");
 }
 
+const WRAPPERS = new Set(["env", "command", "exec", "nohup", "sudo", "xargs"]);
+
+function programName(p: string): string {
+  return p.split(/[\\/]/).pop()!.replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
+}
+
 function joinedArgv(args: Args): string[] {
   const v = args.argv ?? args.command;
   if (!Array.isArray(v)) return [String(v ?? "")];
-  const joined = v.join(" ");
-  const first = String(v[0] ?? "");
-  const name = first.split(/[\\/]/).pop()!.replace(/\.(exe|cmd|bat|com)$/i, "");
-  return name === first ? [joined] : [joined, [name, ...v.slice(1)].join(" ")];
+  const list = v.map(String);
+  const out = [list.join(" ")];
+  let rest = list;
+  for (let n = 0; n < 4; n++) {
+    out.push([programName(rest[0] ?? ""), ...rest.slice(1)].join(" "));
+    if (!WRAPPERS.has(programName(rest[0] ?? ""))) break;
+    rest = rest.slice(1);
+    while (rest.length && (rest[0]!.startsWith("-") || /^[A-Za-z_]\w*=/.test(rest[0]!))) rest = rest.slice(1);
+  }
+  return [...new Set(out)];
 }
 
 export class Permissions {

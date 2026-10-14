@@ -43,6 +43,20 @@ test("a deny or ask rule for a program also covers the program by its full path,
   expect(p.check(rc, { argv: ["/tmp/evil/git", "status"] })).toBe("ask");
 });
 
+test("a deny rule looks through env, command, exec, nohup, sudo and xargs, and ignores the capitals of the program name", () => {
+  const p = new Permissions({ "run_command:rm *": "deny", "run_command:git *": "allow" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  for (const argv of [["RM.EXE", "-rf", "x"], ["env", "FOO=1", "rm", "-rf", "x"], ["sudo", "-n", "/bin/rm", "x"], ["nohup", "rm", "x"], ["command", "rm", "x"], ["exec", "rm", "x"], ["xargs", "-0", "rm", "x"], ["env", "sudo", "RM", "x"]]) expect(p.check(rc, { argv }), argv.join(" ")).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "git", "status"] })).toBe("ask");
+});
+
+test("a deny rule does not catch a shell command, a renamed copy or a script, and an allow rule does not look through a wrapper", () => {
+  const p = new Permissions({ "run_command:rm *": "deny" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  expect(p.check(rc, { argv: ["sh", "-c", "rm x"] })).toBe("ask");
+  expect(p.check(rc, { argv: ["/tmp/my_remove", "x"] })).toBe("ask");
+});
+
 test("mode hook", () => {
   let mode: Mode = "plan";
   const h = modeHook(() => mode, (t) => t === "ro");
