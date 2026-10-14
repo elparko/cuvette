@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { CATALOG, openAdapter, programOf, rJson, type OpenAdapter } from "./independent.ts";
@@ -88,6 +89,33 @@ describe.skipIf(!rscript)("vegan against hand computations in base R", () => {
     const median = await vegan.run("test_dispersion", { community, environment, variable: "Management", distance: "bray", permutations: 99, seed: 1 });
     expect(Math.abs(median.metrics!.f - hand.median)).toBeLessThan(0.001);
     expect(median.metrics!.f).not.toBeCloseTo(centroid.metrics!.f, 1);
+  });
+
+  // Shannon (1948): H = -sum(p ln p). Simpson (1949): 1 - sum(p^2). Pielou (1966) evenness: H / ln(richness).
+  // Hurlbert (1971) rarefaction: E(S_n) = sum over species of 1 - choose(N - x, n) / choose(N, n).
+  test("the diversity indices and the rarefied richness of every site agree with the hand formulas", { timeout: slow }, async () => {
+    const hand = await rJson<{ shannon: number[]; simpson: number[]; invsimpson: number[]; evenness: number[]; rarefied: number[] }>(
+      rscript!,
+      `${baseR}
+      p <- comm / rowSums(comm)
+      h <- -rowSums(ifelse(comm > 0, p * log(p), 0))
+      richness <- rowSums(comm > 0)
+      sq <- rowSums(p^2)
+      hurlbert <- function(x, n) { x <- x[x > 0]; sum(1 - choose(sum(x) - x, n) / choose(sum(x), n)) }
+      list(shannon = unname(h), simpson = unname(1 - sq), invsimpson = unname(1 / sq), evenness = unname(h / log(richness)), rarefied = unname(apply(comm, 1, hurlbert, n = 10)))`,
+    );
+    const div = await vegan.run("diversity_indices", { community, environment, group_by: "Management", index: "shannon" });
+    const rows = (await readFile(div.table!.path!, "utf8")).trim().split("\n").slice(1).map((l) => l.split(",").map(Number));
+    expect(rows.length).toBe(hand.shannon.length);
+    rows.forEach((r, i) => {
+      expect(Math.abs(r[2] - hand.shannon[i])).toBeLessThan(1e-6);
+      expect(Math.abs(r[3] - hand.simpson[i])).toBeLessThan(1e-6);
+      expect(Math.abs(r[4] - hand.invsimpson[i])).toBeLessThan(1e-6);
+      expect(Math.abs(r[5] - hand.evenness[i])).toBeLessThan(1e-6);
+    });
+    const rare = await vegan.run("rarefy_richness", { community, sample_size: 10 });
+    const rareRows = (await readFile(rare.table!.path!, "utf8")).trim().split("\n").slice(1).map((l) => Number(l.split(",")[3]));
+    rareRows.forEach((v, i) => expect(Math.abs(v - hand.rarefied[i])).toBeLessThan(1e-6));
   });
 
   // RDA by least squares: project the centred Hellinger table on the centred model matrix. R2adj = 1 - (1 - R2)(n - 1)/(n - m - 1).
