@@ -100,7 +100,32 @@ export class ThinkSplitter {
   }
 }
 
+function stackObjects(s: string): { start: number; end: number }[] {
+  const stack: number[] = [];
+  const pairs: { start: number; end: number }[] = [];
+  let inStr = false;
+  for (let j = 0; j < s.length; j++) {
+    const c = s[j];
+    if (inStr) {
+      if (c === "\\") j++;
+      else if (c === '"') inStr = false;
+    } else if (c === '"' && stack.length) inStr = true;
+    else if (c === "{") stack.push(j);
+    else if (c === "}" && stack.length) pairs.push({ start: stack.pop()!, end: j + 1 });
+  }
+  const found: { start: number; end: number }[] = [];
+  let last = 0;
+  for (const p of pairs.sort((x, y) => x.start - y.start)) {
+    if (p.start < last) continue;
+    found.push(p);
+    last = p.end;
+  }
+  return found;
+}
+
 function balancedObjects(s: string): { start: number; end: number }[] {
+  const quick = stackObjects(s);
+  if (quick.length) return quick;
   const found: { start: number; end: number }[] = [];
   let budget = 8 * s.length + 10_000;
   for (let i = 0; i < s.length; i++) {

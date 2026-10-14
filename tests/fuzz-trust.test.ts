@@ -236,6 +236,19 @@ describe("fuzz: the trust card", () => {
     }
   });
 
+  test("a new line in a hook or in a value cannot make a second line on the card", () => {
+    const folder = join(root, `card-${counter++}`);
+    mkdirSync(join(folder, ".cuvette"), { recursive: true });
+    const fake = "Bypass permissions: not set.";
+    writeFileSync(join(folder, ".cuvette", "settings.json"), JSON.stringify({ model: `x\n${fake}\nHooks (none)`, hooks: { SessionStart: [{ command: ["sh", "-c", `echo a\n  Adapters (none)`] }] } }));
+    const lines = trustEvidence(trustStatus(folder)).split("\n");
+    expect(lines.filter((l) => l === fake)).toHaveLength(1);
+    expect(lines.filter((l) => l.startsWith("Bypass permissions"))).toHaveLength(1);
+    expect(lines.filter((l) => l.startsWith("Hooks"))).toHaveLength(1);
+    expect(lines.filter((l) => l.trim().startsWith("Adapters"))).toHaveLength(0);
+    expect(lines.some((l) => l.includes('"x\\nBypass permissions: not set.\\nHooks (none)"'))).toBe(true);
+  });
+
   test.skipIf(process.platform === "win32")("an adapter name, a method name and a changed file with hidden text show that text, written out", () => {
     const r = new Rng(45002);
     for (let i = 0; i < runs(40); i++) {

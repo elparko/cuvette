@@ -137,23 +137,30 @@ describe.skipIf(process.platform === "win32")("fuzz: the cache of an environment
   });
 });
 
-const python = process.platform === "win32" ? undefined : spawnSync("python3", ["-c", "import site;print(site.getusersitepackages())"], { encoding: "utf8" });
-const rscript = process.platform === "win32" ? undefined : spawnSync("Rscript", ["--vanilla", "-e", 'cat(Sys.getenv("R_LIBS_USER"))'], { encoding: "utf8" });
+let python: ReturnType<typeof spawnSync> | undefined;
+let rscript: ReturnType<typeof spawnSync> | undefined;
+beforeAll(() => {
+  if (process.platform === "win32") return;
+  python = spawnSync("python3", ["-c", "import site;print(site.getusersitepackages())"], { encoding: "utf8" });
+  rscript = spawnSync("Rscript", ["--vanilla", "-e", 'cat(Sys.getenv("R_LIBS_USER"))'], { encoding: "utf8" });
+});
 
 describe("the folders that a real interpreter reports", () => {
   const stamps = (key: string): string[] => Object.keys(JSON.parse(readFileSync(join(process.env.CUVETTE_HOME!, "cache", "env-locks.json"), "utf8"))[key].stamps);
 
-  test.skipIf(python?.status !== 0)("Python reports the folder of the user packages, also if it does not exist", async () => {
+  test("Python reports the folder of the user packages, also if it does not exist", async (ctx) => {
+    if (python?.status !== 0) return ctx.skip();
     clearEnvCache();
     const path = spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
     await captureEnv({ kind: "python", path });
-    expect(stamps(`python:${path}`)).toContain(python!.stdout.trim());
+    expect(stamps(`python:${path}`)).toContain(String(python.stdout).trim());
   });
 
-  test.skipIf(rscript?.status !== 0 || !rscript?.stdout.trim())("R reports the folder of the user packages, also if it does not exist", async () => {
+  test("R reports the folder of the user packages, also if it does not exist", async (ctx) => {
+    if (rscript?.status !== 0 || !String(rscript.stdout).trim()) return ctx.skip();
     clearEnvCache();
     const path = spawnSync("sh", ["-c", "command -v Rscript"], { encoding: "utf8" }).stdout.trim();
     await captureEnv({ kind: "r", path });
-    expect(stamps(`r:${path}`)).toContain(rscript!.stdout.trim().split(":")[0]);
+    expect(stamps(`r:${path}`)).toContain(String(rscript.stdout).trim().split(":")[0]);
   });
 });
