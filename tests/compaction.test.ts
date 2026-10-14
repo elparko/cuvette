@@ -302,3 +302,29 @@ test("a tool result that quotes the shortening mark in its middle is still short
   expect(elided).toBe(4);
   expect((messages[2]!.parts[0] as { text: string }).text.length).toBeLessThan(700);
 });
+
+test("a provider that numbers its calls again after a summary does not reuse a call id from the record", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-compact-proj-"));
+  const file = join(cwd, "a.csv");
+  writeFileSync(file, "a,b\n1,2\n");
+  let n = 0;
+  const provider = new FakeProvider({ steps: () => (n++ < 4 ? { calls: [{ name: "read_file", args: { path: file, n } }] } : { text: "done" }) });
+  const step = provider.step.bind(provider);
+  provider.step = async (req) => {
+    const res = await step(req);
+    for (const p of res.message.parts) if (p.type === "tool_call") p.id = "call_1";
+    return res;
+  };
+  const session = await Session.create({ adapters: [], provider, cwd, settings: { phi_check: false } as never });
+  session.decisions.applySetup({});
+  await session.send("read it");
+  const ids = session.record.entries(["tool_call"]).map((e) => String(e.data.callId));
+  expect(ids).toEqual(["call_1", "call_1-2", "call_1-3", "call_1-4"]);
+  const last = session["history"];
+  const called = last.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
+  const answered = last.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_result" ? [p.callId] : [])));
+  expect(called).toEqual(ids);
+  expect(answered).toEqual(ids);
+  await session.close();
+});

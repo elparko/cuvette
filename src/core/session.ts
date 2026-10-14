@@ -1123,6 +1123,7 @@ export class Session {
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.stepWithRecovery(forceAnswer, signal);
+        this.uniqueCallIds(res.message);
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
@@ -1506,6 +1507,21 @@ export class Session {
     const ran = (id: string) => done.find((p) => p?.type === "tool_result" && p.callId === id);
     if (calls.length)
       this.push({ role: "user", parts: calls.map((c) => ran(c.id) ?? { type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true }) });
+  }
+
+  // A local model server gives no call ids, so its provider counts the calls that it sees in the context.
+  // After a summary or a rewind the count can start again and reuse an id from the record.
+  private callIds?: Set<string>;
+
+  private uniqueCallIds(m: Message) {
+    if (Array.isArray(m.raw)) return;
+    const used = (this.callIds ??= new Set(this.record.entries(["tool_call"]).map((e) => String(e.data.callId))));
+    for (const p of m.parts) {
+      if (p.type !== "tool_call") continue;
+      const base = p.id;
+      for (let k = 2; used.has(p.id); k++) p.id = `${base}-${k}`;
+      used.add(p.id);
+    }
   }
 
   private push(m: Message) {
