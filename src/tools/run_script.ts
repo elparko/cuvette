@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { addOldEnv } from "../core/old-names.ts";
@@ -167,7 +168,7 @@ function probeSandbox(): Promise<void> {
 export function describeLimits(network: boolean, state: SandboxState = sandbox, platform: NodeJS.Platform = process.platform): string {
   const net = network ? "The script can use the network." : "The script cannot use the network.";
   const open = `The script can read and write any file that your user account can, also the saved key file. ${network ? net : "The network is not blocked."}`;
-  const limited = `It can read files on this computer, but not the saved key file. It can write only in the project folder, in the session folder and in temporary folders. ${net}`;
+  const limited = `It can read files on this computer, but not the saved key file. It can write only in the project folder, in the session folder and in temporary folders. It cannot change the record of a session or the .cuvette and .ga folders of the project. ${net}`;
   if (platform === "darwin") return state === "off" ? `The operating system sandbox is not available. ${open}` : `The script runs in an operating system sandbox. ${limited}`;
   if (platform === "linux") {
     if (state === "bwrap") return `The script runs in a bubblewrap sandbox. ${limited}`;
@@ -177,12 +178,13 @@ export function describeLimits(network: boolean, state: SandboxState = sandbox, 
   return `The script runs as your user account. The operating system does not limit it on Windows. ${open}`;
 }
 
-export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string; held?: string[] }): string[] {
+export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string; held?: string[]; steps?: WriteStep[] }): string[] {
   const hide = existsSync(o.cred) ? [...new Set([o.cred, realpathSync(o.cred)])] : [];
   if (state === "bwrap") {
     const binds = [...new Set(o.writable.filter((p) => existsSync(p)))].flatMap((p) => ["--bind", p, p]);
     const held = [...new Set((o.held ?? []).filter((p) => existsSync(p)).flatMap((p) => [p, realpathSync(p)]))].flatMap((p) => (statSync(p).isDirectory() ? ["--tmpfs", p] : ["--ro-bind", "/dev/null", p]));
-    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
+    const locks = (o.steps ?? []).flatMap((x) => (existsSync(x.path) ? [x.allow ? "--bind" : "--ro-bind", x.path, x.path] : []));
+    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...locks, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
   }
   if (state === "unshare") {
     const flags = o.network ? "-rm" : "-rmn";
@@ -191,6 +193,51 @@ export function linuxWrap(state: SandboxState, argv: string[], o: { network: boo
     return ["unshare", flags, "sh", "-c", cover, "sh", hide.at(-1)!, ...argv];
   }
   return argv;
+}
+
+export interface WriteStep {
+  path: string;
+  allow: boolean;
+}
+
+const within = (p: string, root: string) => {
+  const rel = relative(root, p);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+};
+
+const both = (paths: string[]) => [...new Set(paths.flatMap((p) => [p, existsSync(p) ? realpathSync(p) : p]))];
+
+function folderNames(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).slice(0, 5000).filter((e) => e.isDirectory()).map((e) => join(dir, e.name));
+  } catch {
+    return [];
+  }
+}
+
+export function recordFolders(dirs: Dirs): string[] {
+  const found = [dirs.sessionDir];
+  const own = join(dirs.workDir, ".record");
+  const bases = [dirs.workDir, ...(dirs.projectDir ? [dirs.projectDir] : []), ...(existsSync(own) ? folderNames(dirname(dirs.workDir)) : [])];
+  for (const base of bases) {
+    const rec = join(base, ".record");
+    if (existsSync(join(rec, "log.jsonl")) || existsSync(join(rec, "meta.json"))) found.push(rec);
+  }
+  return both(found);
+}
+
+export function settingsFolders(dirs: Dirs): string[] {
+  return dirs.projectDir ? both([".cuvette", ".ga"].map((n) => join(dirs.projectDir!, n))) : [];
+}
+
+export function writeSteps(dirs: Dirs): WriteStep[] {
+  const locked = both([...recordFolders(dirs), ...settingsFolders(dirs)]).filter((p) => !both([dirs.workDir]).includes(p));
+  const keep = both([dirs.workDir]);
+  const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
+  const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
+  steps.push(...reopened.map((path) => ({ path, allow: true })));
+  if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
+  return steps;
 }
 
 function sbString(s: string): string {
@@ -203,8 +250,12 @@ export function heldReadRules(held: string[]): string {
   return paths.length ? `(deny file-read-data ${paths.map((p) => `(subpath ${sbString(p)})`).join("")})` : "";
 }
 
-function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = []): string[] {
-  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), held, writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
+export function writeRules(steps: WriteStep[]): string {
+  return steps.map((x) => `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`).join("");
+}
+
+function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = [], steps: WriteStep[] = []): string[] {
+  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), held, steps, writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
@@ -214,10 +265,60 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
     const cred = credentialsPath();
     const credPaths = [cred, ...(existsSync(cred) ? [realpathSync(cred)] : [])];
     const secrets = `(deny file-read* file-write* ${credPaths.map((p) => `(literal ${sbString(p)})`).join("")})`;
-    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
+    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${writeRules(steps)}${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
   return argv;
+}
+
+const limitsWrites = () => (process.platform === "darwin" && sandbox === "on") || (process.platform === "linux" && sandbox === "bwrap");
+
+function hashBytes(path: string, limit = Infinity): string {
+  const h = createHash("sha256");
+  const buf = Buffer.alloc(1 << 20);
+  const fd = openSync(path, "r");
+  try {
+    for (let done = 0; done < limit; ) {
+      const n = readSync(fd, buf, 0, Math.min(buf.length, limit - done), null);
+      if (!n) break;
+      h.update(buf.subarray(0, n));
+      done += n;
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return h.digest("hex");
+}
+
+function filesUnder(dir: string, out: string[] = []): string[] {
+  try {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (out.length >= 2000) break;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) filesUnder(p, out);
+      else if (e.isFile()) out.push(p);
+    }
+  } catch {}
+  return out;
+}
+
+export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
+  const settings = new Map<string, string>();
+  const settingsNow = () => new Map(settingsFolders(dirs).flatMap((d) => filesUnder(d)).flatMap((p) => { try { return statSync(p).size <= 5_000_000 ? [[p, hashBytes(p)] as const] : []; } catch { return []; } }));
+  for (const [p, h] of settingsNow()) settings.set(p, h);
+  const logPath = () => join(dirs.sessionDir, "log.jsonl");
+  const logSize = withLog && existsSync(logPath()) ? statSync(logPath()).size : 0;
+  const logHash = logSize ? hashBytes(logPath(), logSize) : "";
+  return {
+    changed() {
+      const out: string[] = [];
+      const now = settingsNow();
+      for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
+      const log = logPath();
+      if (logSize && (!existsSync(log) || statSync(log).size < logSize || hashBytes(log, logSize) !== logHash)) out.push(log);
+      return out;
+    },
+  };
 }
 
 function snapshot(dir: string, skip: string): Map<string, string> {
@@ -284,7 +385,8 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(join(scriptDir, "cuvette.mplstyle"), STYLE_FILE);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
-      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? []);
+      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? [], writeSteps(dirs));
+      const guard = fingerprint(dirs, !limitsWrites());
 
       const child = spawn(argv[0], argv.slice(1), {
         cwd: existsSync(project) ? project : dirs.workDir,
@@ -361,9 +463,12 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
         outputs.push({ path: p, kind, name: basename(p) });
         if (/\.(png|jpe?g)$/i.test(p)) images.push(p);
       }
+      const changed = guard.changed();
+      for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: "The script changed the record or the settings of Cuvette.", by: "integrity check" });
       for (const path of sandboxDenials(`${stdout}\n${stderr}`)) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: BLIND_REASON, by: "sandbox" });
       const text = cap(stdout, 50_000) + (stderr.trim() ? `\n[stderr]\n${cap(stderr, 50_000)}` : "");
       const base = { text, outputs, images: images.length ? images : undefined, fidelity: "code_only" as const, manualRoute: `Run the Python code in ${script}`, data: { script, duration_s: (Date.now() - started) / 1000 } };
+      if (changed.length) return { ok: false, error: `the script changed the record or the settings of Cuvette: ${changed.join(", ")}. A script must not write there. Check these files.`, ...base };
       if (aborted) return { ok: false, error: "the script was cancelled", ...base };
       if (timedOut) return { ok: false, error: `the script timed out after ${timeoutS} s`, ...base };
       if (code !== 0) return { ok: false, error: `the script exited with code ${code}: ${tail(withoutBootFrames(stderr).trim(), 2000)}`, ...base };

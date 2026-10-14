@@ -1,11 +1,12 @@
+import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { genericTools } from "../src/tools/generic.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { describeLimits, linuxWrap, runScriptTool, scriptPython, withoutBootFrames } from "../src/tools/run_script.ts";
+import { describeLimits, fingerprint, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -291,4 +292,120 @@ test("a script error shows the frames of the script, not the frames of the harne
   expect(r.error).not.toContain("import sys,runpy");
   const trace = 'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\n    import sys,runpy\n    ~~~^^^\n  File "<frozen runpy>", line 88, in _run_code\n  File "/w/script.py", line 1, in <module>\n    1/0\nZeroDivisionError: division by zero';
   expect(withoutBootFrames(trace)).toBe('Traceback (most recent call last):\n  File "/w/script.py", line 1, in <module>\n    1/0\nZeroDivisionError: division by zero');
+});
+
+
+function layout() {
+  const project = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-")));
+  const out = join(project, "cuvette", "2026-10-14-mine");
+  const other = join(project, "cuvette", "2026-10-13-other");
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  for (const d of [out, other]) {
+    mkdirSync(join(d, ".record"), { recursive: true });
+    writeFileSync(join(d, ".record", "log.jsonl"), '{"id":1}\n');
+    writeFileSync(join(d, ".record", "meta.json"), "{}");
+  }
+  mkdirSync(join(project, ".cuvette"));
+  writeFileSync(join(project, ".cuvette", "settings.json"), '{"permissions":"ask"}');
+  mkdirSync(join(project, "data", ".record"), { recursive: true });
+  return { project, out, other, dirs, ownLog: join(out, ".record", "log.jsonl"), otherLog: join(other, ".record", "log.jsonl"), settings: join(project, ".cuvette", "settings.json") };
+}
+
+test("write steps lock the records and the settings folders, and keep the work folder open", () => {
+  const l = layout();
+  const steps = writeSteps(l.dirs);
+  const locked = steps.filter((x) => !x.allow).map((x) => x.path);
+  expect(locked).toEqual(expect.arrayContaining([join(l.out, ".record"), join(l.other, ".record"), join(l.project, ".cuvette")]));
+  expect(locked).not.toContain(l.out);
+  expect(locked).not.toContain(join(l.project, "data", ".record"));
+  expect(steps.some((x) => x.allow)).toBe(false);
+  expect(recordFolders(l.dirs)).toContain(join(l.other, ".record"));
+});
+
+test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
+  const record = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-legacy-")));
+  const work = join(record, "work");
+  mkdirSync(join(work, ".record"), { recursive: true });
+  writeFileSync(join(work, ".record", "meta.json"), "{}");
+  const steps = writeSteps({ workDir: work, sessionDir: record });
+  expect(steps.map((x) => [x.allow, x.path])).toEqual([[false, record], [false, join(work, ".record")], [true, work], [false, join(work, ".record")]]);
+});
+
+test("Linux wrap: bubblewrap mounts a locked folder read-only after the writable folders", () => {
+  const l = layout();
+  const b = linuxWrap("bwrap", ["true"], { network: false, writable: [l.out, l.project], cred: join(l.project, "none.json"), steps: writeSteps(l.dirs) }).join(" ");
+  expect(b.indexOf(`--bind ${l.project} ${l.project}`)).toBeGreaterThan(-1);
+  expect(b.indexOf(`--ro-bind ${join(l.project, ".cuvette")} ${join(l.project, ".cuvette")}`)).toBeGreaterThan(b.indexOf(`--bind ${l.project} ${l.project}`));
+  expect(b).toContain(`--ro-bind ${join(l.other, ".record")} ${join(l.other, ".record")}`);
+});
+
+test("the check after the script finds a change of the settings or of the old part of the log", () => {
+  const l = layout();
+  const quiet = fingerprint(l.dirs, true);
+  appendFileSync(l.ownLog, '{"id":2}\n');
+  expect(quiet.changed()).toEqual([]);
+  writeFileSync(join(l.project, "data", "results.csv"), "a\n1\n");
+  expect(quiet.changed()).toEqual([]);
+
+  const settings = fingerprint(l.dirs, true);
+  writeFileSync(l.settings, '{"permissions":"bypass"}');
+  writeFileSync(join(l.project, ".cuvette", "hooks.json"), "{}");
+  expect(settings.changed().sort()).toEqual([join(l.project, ".cuvette", "hooks.json"), l.settings].sort());
+  writeFileSync(l.settings, '{"permissions":"ask"}');
+  rmSync(join(l.project, ".cuvette", "hooks.json"));
+  expect(settings.changed()).toEqual([]);
+
+  const log = fingerprint(l.dirs, true);
+  writeFileSync(l.ownLog, '{"id":9}\n{"id":2}\n');
+  expect(log.changed()).toEqual([l.ownLog]);
+  const short = fingerprint(l.dirs, true);
+  truncateSync(l.ownLog, 3);
+  expect(short.changed()).toEqual([l.ownLog]);
+  expect(fingerprint(l.dirs, false).changed()).toEqual([]);
+});
+
+const sandboxWorks = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
+
+test.skipIf(!sandboxWorks)("a script cannot write the record or the settings, and the record stays the same", async () => {
+  const l = layout();
+  const logged: string[] = [];
+  const tool = runScriptTool(l.dirs, { network: false });
+  const run = (code: string) =>
+    tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: (k) => (logged.push(k), {} as never), callTool: async () => ({ ok: true }) });
+  const before = [l.ownLog, l.otherLog, l.settings, join(l.out, ".record", "meta.json")].map((p) => readFileSync(p, "utf8"));
+  const attempts: [string, string][] = [
+    ["own log", `open(${JSON.stringify(l.ownLog)}, 'a').write('{"id":99}\\n')`],
+    ["own log rewrite", `open(${JSON.stringify(l.ownLog)}, 'w').write('')`],
+    ["other log", `open(${JSON.stringify(l.otherLog)}, 'a').write('x')`],
+    ["settings", `open(${JSON.stringify(l.settings)}, 'w').write('{"permissions":"bypass"}')`],
+    ["new hook", `open(${JSON.stringify(join(l.project, ".ga", "hooks.json"))}, 'w').write('{}')`],
+    ["new settings folder", `import os\nos.makedirs(${JSON.stringify(join(l.project, ".ga", "adapters"))})`],
+  ];
+  for (const [name, code] of attempts) {
+    const r = await run(code);
+    expect(r.ok, name).toBe(false);
+    expect(r.error, name).toMatch(/Operation not permitted|PermissionError|exited with code 1/);
+  }
+  expect([l.ownLog, l.otherLog, l.settings, join(l.out, ".record", "meta.json")].map((p) => readFileSync(p, "utf8"))).toEqual(before);
+  expect(existsSync(join(l.project, ".ga"))).toBe(false);
+  expect(logged).toEqual([]);
+});
+
+test.skipIf(!sandboxWorks)("a script still writes its results in the work folder, the project folder and folders named .record or .ga deeper in the tree", async () => {
+  const l = layout();
+  const tool = runScriptTool(l.dirs, { network: false });
+  const code = [
+    "import os",
+    `p = ${JSON.stringify(l.project)}`,
+    "for rel in ['results.csv', 'data/table.csv', 'output/fit.txt', 'data/.record/note.txt', 'data/.ga/note.txt', 'cuvette/2026-10-14-mine/extra.txt', 'cuvette/2026-10-14-mine/sub/a.txt']:",
+    "    os.makedirs(os.path.dirname(os.path.join(p, rel)), exist_ok=True)",
+    "    open(os.path.join(p, rel), 'w').write('ok')",
+    "open('relative.txt', 'w').write('ok')",
+    "print('done')",
+  ].join("\n");
+  const r = await tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => { throw new Error("no log"); }, callTool: async () => ({ ok: true }) });
+  expect(r.error).toBeUndefined();
+  expect(r.ok).toBe(true);
+  for (const rel of ["results.csv", "data/table.csv", "output/fit.txt", "data/.record/note.txt", "data/.ga/note.txt", "cuvette/2026-10-14-mine/extra.txt", "cuvette/2026-10-14-mine/sub/a.txt"]) expect(existsSync(join(l.project, rel)), rel).toBe(true);
+  expect(readFileSync(l.ownLog, "utf8")).toBe('{"id":1}\n');
 });
