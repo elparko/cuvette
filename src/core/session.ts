@@ -2908,6 +2908,7 @@ export class Session {
       this.permissionMode = "bypass";
     }
     this.index = undefined;
+    this.system = this.buildSystem();
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
     const start = (project.hooks as Settings["hooks"] | undefined)?.SessionStart;
     if (start?.length) {

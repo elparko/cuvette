@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
+export const LAB_FILE = "LAB.md";
 export const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 export const SAFE_KEYS = new Set(["animations", "input_keys", "openImages", "databook_paper", "databook_author"]);
 export const MODEL_KEYS = ["think", "numCtx", "effort"];
@@ -29,6 +30,7 @@ export interface FolderScan {
   adapters: { name: string; replaces?: string }[];
   methods: string[];
   bypass: boolean;
+  lab?: string;
 }
 
 export interface TrustEntry {
@@ -123,9 +125,11 @@ function shadows(name: string): string | undefined {
 
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
+  const labPath = join(key, LAB_FILE);
+  const lab = existsSync(labPath) && lstatSync(labPath).isFile() ? readFileSync(labPath, "utf8").trim() : "";
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
   const files: Record<string, string> = {};
-  const paths: string[] = [];
+  const paths: string[] = lab ? [labPath] : [];
   const methods: string[] = [];
   for (const d of PROJECT_DIRS) {
     for (const f of SETTINGS_FILES) if (existsSync(join(key, d, f))) paths.push(join(key, d, f));
@@ -149,10 +153,10 @@ export function scanFolder(folder: string): FolderScan {
       for (const n of readdirSync(dir).sort())
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass" };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}) };
 }
 
-export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
+export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0 || !!s.lab;
 
 function userFile(): string {
   return join(cuvetteHome(), "settings.json");
@@ -273,13 +277,14 @@ export function folderLines(s: FolderScan): string[] {
   if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
   if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
   if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
+  if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").slice(0, 8).map((l) => `  ${show(l)}`), ...(s.lab.split("\n").length > 8 ? ["  ..."] : []));
   return out;
 }
 
 export function trustText(t: TrustStatus): string {
   return t.state === "changed"
     ? `The Cuvette files in ${t.scan.folder} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
-    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks or adapters. They can run programs on this computer. Cuvette ignores them until you trust the folder.`;
+    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
 }
 
 export function trustEvidence(t: TrustStatus): string {
@@ -289,7 +294,7 @@ export function trustEvidence(t: TrustStatus): string {
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${t.scan.folder}.`;
+  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${t.scan.folder}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {

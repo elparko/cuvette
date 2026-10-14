@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { KnownAnswerTest, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter, Manifest } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
+import { folderTrusted } from "./trust.ts";
 
 export interface LabChange {
   pid: string;
@@ -137,7 +138,7 @@ export function applyOverlay(adapter: LoadedAdapter): LoadedAdapter {
 }
 
 export function labText(cwd: string): string {
-  const files = [join(cuvetteHome(), "LAB.md"), join(cwd, "LAB.md")];
+  const files = [join(cuvetteHome(), "LAB.md"), ...(folderTrusted(cwd) ? [join(cwd, "LAB.md")] : [])];
   return files
     .filter((f) => existsSync(f))
     .map((f) => readFileSync(f, "utf8").trim())

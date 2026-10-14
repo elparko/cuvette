@@ -315,9 +315,10 @@ Rules:
 - `loadSettings` (`config.ts`), `layers` (`settings.ts`) and `adapterDirs` (`manifest.ts`) use the project files only if `folderTrusted` is true. Without trust, only `SAFE_KEYS` apply. These are settings for how the UI looks, with no effect on code.
 - `findAdapter` does not load a path in a project adapter folder without trust. It loads the adapter with the same name from the user or catalog folder.
 - The harness trusts a folder if its entry in `trusted_folders` has the same hash as the files now. A new or changed file, key, hook or adapter sets the state to `changed`.
-- A folder with only `SAFE_KEYS` has the state `none`. It needs no card.
+- The `LAB.md` file of the project folder goes into the system prompt, so the trust check covers it. `labText` reads it only if `folderTrusted` is true. A folder with a `LAB.md` file has a state other than `none`.
+- A folder with only `SAFE_KEYS` and no `LAB.md` has the state `none`. It needs no card.
 - `Session.init` checks the trust before the `SessionStart` hooks. An interactive session asks a question with the title `Trust this folder?` and no decision key. Other sessions write one `notice` entry, and `session.trustNotice` holds the text.
-- `Session.answer` sends an answer to that question to `setTrust`. `setTrust` writes a `trust` entry.
+- `Session.answer` sends an answer to that question to `setTrust`. It compares the id of the question, not the title, because the model can write a question with the same title. `setTrust` writes a `trust` entry.
   On trust, `applyProjectFiles` loads the settings again.
   It sets the permission rules and command hooks.
   It turns on bypass if a file sets it.

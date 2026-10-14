@@ -102,6 +102,7 @@ Usage
   --trust-folder                       trust the project folder for this run only (for scripts and -p)
 
   WARNING: The settings, hooks and adapters in <folder>/.ga or <folder>/.cuvette can run programs.
+  A <folder>/LAB.md file goes into the instructions of the agent.
   Cuvette ignores them until you trust the folder. A session shows a card with what the folder
   contains. If a trusted file changes, the card shows again.
 
