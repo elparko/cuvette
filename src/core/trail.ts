@@ -837,7 +837,7 @@ function which(cmd: string): boolean {
 
 function printWithChrome(chrome: string, profile: string, html: string, out: string): boolean {
   rmSync(out, { force: true });
-  spawnSync(chrome, ["--headless", "--disable-gpu", `--user-data-dir=${profile}`, "--no-pdf-header-footer", `--print-to-pdf=${out}`, html], {
+  spawnSync(chrome, ["--headless", "--disable-gpu", "--use-mock-keychain", "--password-store=basic", `--user-data-dir=${profile}`, "--no-pdf-header-footer", `--print-to-pdf=${out}`, html], {
     timeout: 30000,
     stdio: "ignore",
   });
