@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { harnessWrite } from "./harness-writes.ts";
 import { basename, dirname, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { assertUserFileSound, folderKey } from "./trust.ts";
@@ -550,7 +551,7 @@ export function setFolderNoPatientData(folder: string, on: boolean): void {
   if (list.length) data[NO_PHI_KEY] = list;
   else delete data[NO_PHI_KEY];
   mkdirSync(dirname(userFile()), { recursive: true });
-  writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n");
+  harnessWrite(userFile(), () => writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n"));
 }
 
 export const phiOn = (v: unknown) => v !== false && v !== "off";

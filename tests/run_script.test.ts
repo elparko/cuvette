@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
-import { noteHarnessWrite } from "../src/core/harness-writes.ts";
+import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -342,47 +342,70 @@ test("Linux wrap: bubblewrap mounts a locked folder read-only after the writable
   expect(b).toContain(`--ro-bind ${join(l.other, ".record")} ${join(l.other, ".record")}`);
 });
 
-test("an output folder next to the work folder opens, and one inside a record, the settings or the code folders does not", () => {
+test("an output folder next to the work folder opens, and one inside a record, the settings or the code folders gets no allow step", () => {
   const l = layout();
-  const opens = (dirs: { workDir: string; sessionDir: string; projectDir?: string; outputDir: string }) => writeSteps(dirs).some((x) => x.allow && x.path === dirs.outputDir);
   const base = { workDir: l.out, sessionDir: join(l.out, ".record"), projectDir: l.project };
   mkdirSync(join(l.out, ".record", "sub"), { recursive: true });
   mkdirSync(join(l.project, ".cuvette", "adapters", "x"), { recursive: true });
-  expect(opens({ ...base, outputDir: join(l.out, ".record", "sub") })).toBe(false);
-  expect(opens({ ...base, outputDir: join(l.other, ".record") })).toBe(false);
-  expect(opens({ ...base, outputDir: join(l.other, ".record", "sub") })).toBe(false);
-  expect(opens({ ...base, outputDir: join(l.project, ".cuvette") })).toBe(false);
-  expect(opens({ ...base, outputDir: join(l.project, ".cuvette", "adapters", "x") })).toBe(false);
-  expect(opens({ ...base, outputDir: l.other })).toBe(false);
+  const inside = (p: string, root: string) => p === root || p.startsWith(`${root}/`);
+  const view = (dirs: { workDir: string; sessionDir: string; projectDir?: string; outputDir: string }, lock: string) => {
+    const steps = writeSteps(dirs);
+    const at = (x: { path: string }) => x.path === lock;
+    return {
+      locked: steps.some((x) => !x.allow && !x.fixed && at(x)),
+      opened: steps.some((x) => x.allow && x.path === dirs.outputDir),
+      covered: steps.some((x) => x.allow && inside(dirs.outputDir, x.path)),
+      lockLast: steps.findLastIndex((x) => !x.allow && !x.fixed && at(x)) > steps.findLastIndex((x) => x.allow && inside(lock, x.path)),
+    };
+  };
   const flat = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-flat-")));
   mkdirSync(join(flat, "out"));
   writeFileSync(join(flat, "log.jsonl"), "{}\n");
   const own = { workDir: join(flat, "work"), sessionDir: flat };
-  expect(opens({ ...own, outputDir: join(flat, "out") })).toBe(true);
-  expect(opens({ ...own, outputDir: flat })).toBe(false);
+  expect(view({ ...own, outputDir: join(flat, "out") }, flat)).toMatchObject({ locked: true, opened: true });
+  const same = view({ ...own, outputDir: flat }, flat);
+  expect(same).toMatchObject({ locked: true, opened: false, covered: false });
+  for (const [outputDir, lock] of [
+    [join(l.out, ".record", "sub"), join(l.out, ".record")],
+    [join(l.other, ".record"), join(l.other, ".record")],
+    [join(l.other, ".record", "sub"), join(l.other, ".record")],
+    [join(l.project, ".cuvette"), join(l.project, ".cuvette")],
+    [join(l.project, ".cuvette", "adapters", "x"), join(l.project, ".cuvette")],
+    [l.other, join(l.other, ".record")],
+  ] as const) {
+    expect(view({ ...base, outputDir }, lock), outputDir).toMatchObject({ locked: true, covered: false });
+  }
 });
 
-test("the check ignores a change of the settings if the harness wrote a settings file or an index during the script, and ignores temp files of the index", () => {
+test("the check skips a changed settings file only if it has the content that the harness wrote, and does not check the global index", () => {
   const l = layout();
   const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-home-")));
   const oldHome = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = home;
   try {
-  const quiet = fingerprint(l.dirs, true);
-  writeFileSync(join(home, `sessions-index.json.${process.pid}.tmp`), "[]");
-  expect(quiet.changed()).toEqual([]);
-  rmSync(join(home, `sessions-index.json.${process.pid}.tmp`));
-  const overlap = fingerprint(l.dirs, true);
-  writeFileSync(l.settings, '{"effort":"high"}');
-  noteHarnessWrite();
-  expect(overlap.changed()).toEqual([]);
-  const alone = fingerprint(l.dirs, true);
-  writeFileSync(l.settings, '{"effort":"low"}');
-  expect(alone.changed()).toEqual([l.settings]);
-  const log = fingerprint(l.dirs, true);
-  noteHarnessWrite();
-  writeFileSync(l.ownLog, '{"id":9}\n');
-  expect(log.changed()).toEqual([l.ownLog]);
+    const index = join(home, "sessions-index.json");
+    writeFileSync(index, "[]");
+    writeFileSync(join(home, "settings.json"), "{}");
+    const quiet = fingerprint(l.dirs, true);
+    writeFileSync(join(home, `sessions-index.json.${process.pid}.tmp`), "[]");
+    writeFileSync(index, '[{"from":"a second Cuvette session"}]');
+    expect(quiet.changed()).toEqual([]);
+
+    const indexOnly = fingerprint(l.dirs, true);
+    harnessWrite(index, () => writeFileSync(index, '[{"n":2}]'));
+    writeFileSync(l.settings, '{"permissions":"bypass"}');
+    expect(indexOnly.changed()).toEqual([l.settings]);
+    writeFileSync(l.settings, '{"permissions":"ask"}');
+
+    const own = fingerprint(l.dirs, true);
+    harnessWrite(l.settings, () => writeFileSync(l.settings, '{"effort":"high"}'));
+    expect(own.changed()).toEqual([]);
+    writeFileSync(l.settings, '{"effort":"low"}');
+    expect(own.changed()).toEqual([l.settings]);
+
+    const log = fingerprint(l.dirs, true);
+    writeFileSync(l.ownLog, '{"id":9}\n');
+    expect(log.changed()).toEqual([l.ownLog]);
   } finally {
     if (oldHome === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = oldHome;
