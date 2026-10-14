@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpat
 import { opendir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { namesValue } from "./asked.ts";
 import { refangDeep } from "../providers/text.ts";
 import { hideKeys, isCredentialsFile, isSecretFile } from "./credentials.ts";
 import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
@@ -2681,14 +2682,7 @@ export class Session {
 
   private askedFor(f: { key: string; label: string; choices?: unknown[] }, value: unknown): boolean {
     if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
-    const plain = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
-    const asked = plain(this.scientistAsked);
-    if (![f.key, f.label].some((n) => plain(n).trim() !== "" && asked.includes(plain(n)))) return false;
-    if (typeof value === "number") return (this.scientistAsked.match(/-?\d+(?:[.,]\d+)?/g) ?? []).some((x) => Number(x.replace(",", ".")) === value);
-    const choice = (f.choices ?? []).find((c) => String(c !== null && typeof c === "object" && "value" in c ? (c as { value: unknown }).value : c) === String(value));
-    const names = [String(value), ...(choice !== null && typeof choice === "object" && "label" in choice ? [String((choice as { label: unknown }).label)] : [])];
-    if (typeof value === "boolean") names.push(...(value ? ["on", "yes", "enable"] : ["off", "no", "disable"]));
-    return names.some((n) => plain(n).trim() !== "" && asked.includes(plain(n)));
+    return namesValue(this.scientistAsked, f, value);
   }
 
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {

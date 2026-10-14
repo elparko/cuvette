@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { transcriptText } from "../src/core/compaction.ts";
 import { checkTable, dataCheckText } from "../src/core/datacheck.ts";
+import { namesValue } from "../src/core/asked.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { designChecks } from "../src/core/samples.ts";
 import { titleInput } from "../src/core/titles.ts";
@@ -404,4 +405,33 @@ test("the trust card quotes a folder path with a space, and the trust command do
   const before = folderLines(scan).join("\n");
   expect(before).toMatch(/Then run: cuvette trust add ".*my data"/);
   expect(folderLines(scan, true).join("\n")).not.toContain("Then run");
+});
+
+test("a number or a boolean word counts as the value only when it is tied to the name of the setting", () => {
+  const num = { key: "min_size", label: "Minimum size" };
+  const bool = { key: "remove_outliers", label: "Remove outliers" };
+  expect(namesValue("Use a min size of 20 pixels", num, 20)).toBe(true);
+  expect(namesValue("Set min_size=20", num, 20)).toBe(true);
+  expect(namesValue("Use 20 as minimum size", num, 20)).toBe(true);
+  expect(namesValue("Look at CD45 and use plate_30.csv", { key: "min_size", label: "Minimum size" }, 30)).toBe(false);
+  expect(namesValue("Look at CD45 and use plate_30.csv for the min size", num, 30)).toBe(false);
+  expect(namesValue("Use 2 groups and a min size of 20", num, 2)).toBe(false);
+  expect(namesValue("Look at plate 7 now. Then do other work for a while and later think about the min size", num, 7)).toBe(false);
+  expect(namesValue("Use alpha .05", { key: "alpha", label: "Alpha" }, 0.05)).toBe(true);
+  expect(namesValue("Use alpha .05", { key: "alpha", label: "Alpha" }, 5)).toBe(false);
+  expect(namesValue("Explain remove_outliers based on the data", bool, true)).toBe(false);
+  expect(namesValue("Explain remove_outliers based on the data", bool, false)).toBe(false);
+  expect(namesValue("Turn remove_outliers off", bool, false)).toBe(true);
+  expect(namesValue("Turn remove_outliers off", bool, true)).toBe(false);
+  expect(namesValue("Turn on remove outliers", bool, true)).toBe(true);
+  expect(namesValue("Disable remove_outliers", bool, false)).toBe(true);
+  expect(namesValue("Enable the remove outliers option", bool, true)).toBe(true);
+  expect(namesValue("remove_outliers is no", bool, false)).toBe(true);
+  expect(namesValue("remove_outliers = true", bool, true)).toBe(true);
+});
+
+test("a request that says on or no near a setting name still gets a card from the real flow", async () => {
+  const r = await change("Explain min_size based on the data. Then tell me about method no matter what.", [["min_size", "20"], ["method", "Otsu"]]);
+  expect(r.done()).toEqual([]);
+  expect(r.open()).toEqual(expect.arrayContaining(["min_size", "method"]));
 });
