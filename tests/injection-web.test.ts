@@ -167,6 +167,10 @@ test("the Show in folder button keeps a path that holds a text direction control
   dirs.push(out);
   const results = resultsHtml(ctxFor(BENIGN), out, undefined);
   expect(decodeURIComponent(/data-reveal="([^"]*)"/.exec(results)![1]!)).toBe(out);
-  const list = sessionsJson([{ id: "s1", cwd: "/data/a‮b", used: Date.now(), ask: "x‮y", name: "n⁧m", description: "d‮e" } as never], "tok");
-  expect(JSON.stringify(list)).not.toMatch(/[‪-‮⁦-⁩]/);
+  const path0 = "/data/a\u202eb";
+  const list = sessionsJson([{ id: "s1", cwd: path0, used: Date.now(), ask: "x‮y", name: "n⁧m", description: "d‮e" } as never], "tok");
+  expect(list[0]!.folder).toBe(path0);
+  expect(JSON.stringify({ ...list[0], folder: "" })).not.toMatch(/[\u202a-\u202e\u2066-\u2069]/);
+  expect(list[0]!.folderShown).toBe("/data/ab");
+  expect(list[0]!.folderName).toBe("ab");
 });

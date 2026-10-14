@@ -13,6 +13,7 @@ export interface SessionCard {
   text: string;
   folder: string;
   folderName: string;
+  folderShown: string;
   age: string;
   status: string;
   moved: boolean;
@@ -102,7 +103,7 @@ export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions
               <span className="line-clamp-2 font-medium [overflow-wrap:anywhere]">{s.title}</span>
               {s.text && <span className="line-clamp-2 text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{s.text}</span>}
               <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-1.5 text-xs text-muted-foreground">
-                <span className="inline-flex min-w-0 items-center gap-1 truncate" title={s.folder}>
+                <span className="inline-flex min-w-0 items-center gap-1 truncate" title={s.folderShown}>
                   <FolderOpenIcon className="size-3.5 shrink-0" />
                   {s.folderName}
                 </span>
