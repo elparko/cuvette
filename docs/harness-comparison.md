@@ -928,14 +928,14 @@ Run 2 has the median wall time, 12.1 s.
    (`src/core/review.ts`). Before, it also wrote findings for checks that passed.
 4. The biostats adapter imports scipy, pingouin, statsmodels, lifelines and matplotlib inside
    the tools that use them (`catalog/biostats/ga_biostats.py`).
-5. The Python worker imports the preload modules in a background thread. The preload reply
-   returns at once. A call can fail with an import deadlock or a circular-import error while the
-   thread runs. Then the worker waits for the thread and runs the call again
-   (`src/adapters/kinds/python_worker.py`).
+5. An earlier version of this branch imported the preload modules in a background thread.
+   A later commit removed it. It broke the start time limit of the module import, and the import
+   of `ga_biostats` now takes about 0.2 s. The import ends during the first model call.
 6. Two calls that ask for the same package scan share one scan (`src/core/envlock.ts`).
 
-Before changes 4 and 5, the first adapter call waited 0.6 to 3.5 s for the imports. After the
-changes, it took 16 to 56 ms in mock runs with a 1.5 s model delay.
+Before change 4, the first adapter call waited 0.6 to 3.5 s for the imports. With changes 4
+and 5, it took 16 to 56 ms in mock runs with a 1.5 s model delay. The measured runs above
+used the background thread.
 
 ### Benchmark subset
 

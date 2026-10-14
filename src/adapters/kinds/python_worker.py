@@ -3,7 +3,6 @@ import json
 import math
 import os
 import sys
-import threading
 import traceback
 
 proto = os.fdopen(os.dup(1), "w", buffering=1, encoding="utf-8")
@@ -112,43 +111,18 @@ def find(spec):
     return obj
 
 
-def _import_all(names):
+def preload(names):
     for name in names:
         try:
             importlib.import_module(name)
         except Exception as e:
             print("cuvette: preload of %s failed: %s" % (name, e), file=sys.stderr)
-
-
-preload_thread = None
-
-
-def preload(names):
-    global preload_thread
-    preload_thread = threading.Thread(target=_import_all, args=(names,), daemon=True)
-    preload_thread.start()
     return {"result": None, "files": [], "metrics": {}}
-
-
-def import_race(e):
-    return type(e).__name__ == "_DeadlockError" or (isinstance(e, ImportError) and "circular import" in str(e))
 
 
 def handle_request(req):
     if "preload" in req:
         return preload(req["preload"])
-    thread = preload_thread
-    was_alive = thread is not None and thread.is_alive()
-    try:
-        return run_call(req)
-    except Exception as e:
-        if thread is None or not import_race(e) or not (was_alive or thread.is_alive()):
-            raise
-        thread.join()
-        return run_call(req)
-
-
-def run_call(req):
     out_dir = req.get("out_dir") or os.getcwd()
     os.makedirs(out_dir, exist_ok=True)
     os.chdir(out_dir)

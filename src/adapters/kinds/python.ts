@@ -153,7 +153,7 @@ export function startPython(c: KindContext): AdapterRuntime {
 
   const modules = [...new Set(c.adapter.manifest.tools.filter((d) => d.function.includes(":")).map((d) => d.function.split(":")[0]!.replace(/\.py$/, "")))];
 
-  // The preload reply returns at once. A background thread in the worker imports the modules of the adapter. A failed start shows at the first call.
+  // The first call finds a started worker with the modules of the adapter imported. A failed start shows at the first call.
   const warm = (load: boolean) => {
     if (closed || child || warming) return;
     const w: { error?: unknown } = {};
