@@ -363,6 +363,41 @@ test("a new file in __pycache__, .venv or node_modules under a project adapter m
   }
 });
 
+test("a cache folder that a tool writes in a project adapter keeps the folder trusted", () => {
+  const p = trustedProject();
+  mkdirSync(join(p.adapter, "node_modules", "pkg"), { recursive: true });
+  writeFileSync(join(p.adapter, "node_modules", "pkg", "index.js"), "one");
+  mkdirSync(join(p.adapter, ".venv", "lib"), { recursive: true });
+  writeFileSync(join(p.adapter, ".venv", "pyvenv.cfg"), "home = /a");
+  trustFolder(p.root);
+  expect(trustStatus(p.root).state).toBe("trusted");
+  mkdirSync(join(p.adapter, "node_modules", ".cache", "babel"), { recursive: true });
+  writeFileSync(join(p.adapter, "node_modules", ".cache", "babel", "a.json"), "one");
+  mkdirSync(join(p.adapter, ".pytest_cache", "v", "cache"), { recursive: true });
+  writeFileSync(join(p.adapter, ".pytest_cache", "v", "cache", "lastfailed"), "{}");
+  mkdirSync(join(p.adapter, ".venv", ".pytest_cache"), { recursive: true });
+  writeFileSync(join(p.adapter, ".venv", ".pytest_cache", "x"), "x");
+  expect(trustStatus(p.root).state).toBe("trusted");
+  writeFileSync(join(p.adapter, "node_modules", ".cache", "babel", "a.json"), "three");
+  expect(trustStatus(p.root).state).toBe("trusted");
+});
+
+test("a .cache folder that is not directly in node_modules, and the code folders, still change the trust state", () => {
+  for (const [folder, name] of [[join("sub", ".cache"), "m.py"], [join("node_modules", "pkg", ".cache"), "evil.js"], [join(".venv", "pyvenv.cfg"), "x"], ["__pycache__", "m.pyc"]] as const) {
+    const p = trustedProject();
+    expect(trustStatus(p.root).state).toBe("trusted");
+    if (name === "x") {
+      mkdirSync(join(p.adapter, ".venv"), { recursive: true });
+      writeFileSync(join(p.adapter, ".venv", "pyvenv.cfg"), "home = /a");
+    } else {
+      mkdirSync(join(p.adapter, folder), { recursive: true });
+      writeFileSync(join(p.adapter, folder, name), "x");
+    }
+    expect(trustStatus(p.root).state, folder).toBe("changed");
+    cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+  }
+});
+
 test("a change of the size of a file in node_modules makes the folder changed, and an unchanged listing stays trusted", () => {
   const p = trustedProject();
   mkdirSync(join(p.adapter, "node_modules", "pkg"), { recursive: true });
