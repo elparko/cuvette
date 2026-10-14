@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { resultKey } from "./loopkey.ts";
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { opendir, rename, stat, writeFile } from "node:fs/promises";
@@ -4598,13 +4599,6 @@ export function coerceArgs(args: Args, schema: Record<string, unknown>): Args {
 interface CallOutcome {
   ok: boolean;
   key: string;
-}
-
-const TIMING_KEY = /duration|elapsed|timing|timestamp|runtime|wall_?time|^ts$/i;
-
-function resultKey(o: ToolOutput): string {
-  const body = JSON.stringify({ ok: o.ok, error: o.error, summary: o.summary, text: o.text, metrics: o.metrics, data: o.data, table: o.table, outputs: o.outputs?.map((f) => f.name) }, (k, v) => (TIMING_KEY.test(k) ? undefined : v));
-  return createHash("sha1").update(body).digest("hex");
 }
 
 function realPath(p: string): string {

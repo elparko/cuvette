@@ -229,6 +229,22 @@ test("a different call, or a failure between the calls, resets the count", async
   expect(n).toBe(6);
 });
 
+test("three identical run_script calls with identical output stop, also though each run has a new folder", async () => {
+  const code = { purpose: "Test", does: "Prints a number.", code: "print(2 + 2)" };
+  const { provider, session: s } = await start([call("run_script", code), call("run_script", code), call("run_script", code), { text: "The answer is 4." }]);
+  await s.send("go");
+  const t = texts(provider);
+  expect(t[0]).toContain("4");
+  expect(t[2]).toBe("ERROR: you called run_script with the same input three times in a row. Stop. Give your final answer now, from the results you have.");
+});
+
+test("three identical run_script calls with a changing output do not stop", async () => {
+  const code = { purpose: "Test", does: "Prints the time.", code: "import time\nprint(time.time_ns())" };
+  const { provider, session: s } = await start([call("run_script", code), call("run_script", code), call("run_script", code), { text: "ok" }]);
+  await s.send("go");
+  expect(texts(provider).every((x) => !x.includes("three times"))).toBe(true);
+});
+
 test("calls that change each time do not trigger the loop guard: the step limit ends the turn", async () => {
   const steps = Array.from({ length: 30 }, (_, i) => call("read_file", { path: `missing-${i % 2}.txt` }));
   const { provider, session: s } = await start(steps, { maxSteps: 6 });
