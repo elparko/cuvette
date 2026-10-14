@@ -1,3 +1,14 @@
+const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos)>/gi;
+
+// A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
+export function defang(text: string): string {
+  return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
+}
+
+export function wrapperText(text: string): string {
+  return defang(text).replace(/<(\s*\/?\s*)(tool_result|tool_call)/gi, "<$1_$2");
+}
+
 export function splitThink(raw: string): { text: string; thinking: string } {
   const thoughts: string[] = [];
   let text = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {

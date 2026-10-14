@@ -1,7 +1,7 @@
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, Usage } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { estimateTokens } from "../core/compaction.ts";
-import { ThinkSplitter, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
+import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { hideKeys } from "../core/credentials.ts";
 import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
@@ -91,8 +91,8 @@ export class OpenAIProvider implements Provider {
       for (const p of m.parts) {
         if (p.type === "tool_result") {
           const body = (p.text || "(no output)") + (p.images?.length ? "\n(image not shown to this model)" : "");
-          out.push({ role: "tool", tool_call_id: p.callId, content: p.isError ? errorBody(body) : body });
-        } else if (p.type === "text") texts.push(p.text);
+          out.push({ role: "tool", tool_call_id: p.callId, content: defang(p.isError ? errorBody(body) : body) });
+        } else if (p.type === "text") texts.push(defang(p.text));
         else if (p.type === "image") texts.push("(image not shown to this model)");
       }
       if (texts.length) out.push({ role: "user", content: texts.join("\n\n") });

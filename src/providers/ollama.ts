@@ -2,7 +2,7 @@ import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
+import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
 import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
@@ -149,9 +149,9 @@ export class OllamaProvider implements Provider {
               if (images.length) body += `\n[${images.length} image(s) follow in the next message]`;
             } else body += `\n(image not shown to this model)`;
           }
-          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${(p.isError ? errorBody(body) : body).replace(/<(\/?)(tool_result|tool_call)/gi, "<$1_$2")}\n</tool_result>`);
-          else out.push({ role: "tool", tool_name: p.name, content: p.isError ? errorBody(body) : body });
-        } else if (p.type === "text") texts.push(p.text);
+          if (this.promptedTools) texts.push(`<tool_result name="${p.name.replace(/[^\w.:-]/g, "_")}">\n${wrapperText(p.isError ? errorBody(body) : body)}\n</tool_result>`);
+          else out.push({ role: "tool", tool_name: p.name, content: defang(p.isError ? errorBody(body) : body) });
+        } else if (p.type === "text") texts.push(defang(p.text));
         else if (p.type === "image") {
           if (this.info.vision) pics.push(...budget.pick([p.path]).images.map((i) => i.data));
           else texts.push("(image not shown to this model)");
