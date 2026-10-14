@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { appendFileSync, existsSync, utimesSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, statSync, utimesSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { genericTools } from "../src/tools/generic.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -557,7 +557,7 @@ test.skipIf(!sandboxWorks)("a script writes under the adapters folder of the pro
   expect((await run(`open(${JSON.stringify(l.settings)}, 'a').write('x')`)).ok).toBe(false);
 });
 
-test("the log check reads a same-size change in the old part, in the middle or at the edges", () => {
+test("the check finds a change in the middle of the log or of a settings file, also when the size and the time are restored", () => {
   const l = layout();
   const body = `${"a".repeat(200_000)}\n`;
   writeFileSync(l.ownLog, body);
@@ -572,6 +572,21 @@ test("the log check reads a same-size change in the old part, in the middle or a
   writeFileSync(l.ownLog, "b" + body.slice(1));
   utimesSync(l.ownLog, t, t);
   expect(edge.changed()).toEqual([l.ownLog]);
+  writeFileSync(l.ownLog, body);
+  const hidden = fingerprint(l.dirs, true);
+  const stamp = statSync(l.ownLog).mtime;
+  writeFileSync(l.ownLog, body.slice(0, 100_000) + "b" + body.slice(100_001));
+  utimesSync(l.ownLog, stamp, stamp);
+  expect(statSync(l.ownLog).size).toBe(body.length);
+  expect(hidden.changed()).toEqual([l.ownLog]);
+  const text = '{"permissions":"ask","hooks":{"a":"safe-command"}}';
+  writeFileSync(l.settings, text);
+  const file = fingerprint(l.dirs, true);
+  const was = statSync(l.settings).mtime;
+  writeFileSync(l.settings, text.replace("safe-command", "evil-command"));
+  utimesSync(l.settings, was, was);
+  expect(statSync(l.settings).size).toBe(text.length);
+  expect(file.changed()).toEqual([l.settings]);
 });
 
 test("Linux: the command wrap uses the real devices and the read-only mounts", () => {

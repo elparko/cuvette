@@ -365,17 +365,9 @@ function hashBytes(path: string, from = 0, limit = Infinity): string {
   return h.digest("hex");
 }
 
-const fileHashes = new Map<string, { size: number; mtime: number; hash: string }>();
-
 function fileHash(path: string): string {
   try {
-    const st = statSync(path);
-    if (st.size > 5_000_000) return "";
-    const hit = fileHashes.get(path);
-    if (hit && hit.size === st.size && hit.mtime === st.mtimeMs) return hit.hash;
-    const hash = hashBytes(path);
-    fileHashes.set(path, { size: st.size, mtime: st.mtimeMs, hash });
-    return hash;
+    return statSync(path).size > 5_000_000 ? "" : hashBytes(path);
   } catch {
     return "";
   }
@@ -394,12 +386,6 @@ function filesUnder(dir: string, skip: string[], out: string[] = []): string[] {
   return out;
 }
 
-const WINDOW = 65536;
-
-function edges(path: string, size: number): string {
-  return hashBytes(path, 0, Math.min(size, WINDOW)) + hashBytes(path, Math.max(0, size - WINDOW), Math.min(size, WINDOW));
-}
-
 export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
   const scope = settingsScope(dirs);
   const skip = both(scope.open);
@@ -410,9 +396,7 @@ export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[]
   };
   const settings = settingsNow();
   const logPath = () => join(dirs.sessionDir, "log.jsonl");
-  const first = withLog && existsSync(logPath()) ? statSync(logPath()) : undefined;
-  const logSize = first?.size ?? 0;
-  const logEdges = logSize ? edges(logPath(), logSize) : "";
+  const logSize = withLog && existsSync(logPath()) ? statSync(logPath()).size : 0;
   const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
   return {
     changed() {
@@ -421,9 +405,7 @@ export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[]
       for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
       const log = logPath();
       if (logSize) {
-        const st = existsSync(log) ? statSync(log) : undefined;
-        const same = st && st.size === logSize && st.mtimeMs === first!.mtimeMs;
-        if (!st || st.size < logSize || edges(log, logSize) !== logEdges || (!same && hashBytes(log, 0, logSize) !== logHash)) out.push(log);
+        if (!existsSync(log) || statSync(log).size < logSize || hashBytes(log, 0, logSize) !== logHash) out.push(log);
       }
       return out;
     },
