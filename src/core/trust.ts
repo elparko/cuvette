@@ -126,10 +126,11 @@ function shadows(name: string): string | undefined {
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
   const labPath = join(key, LAB_FILE);
-  const lab = existsSync(labPath) && lstatSync(labPath).isFile() ? readFileSync(labPath, "utf8").trim() : "";
+  const labBytes = existsSync(labPath) && lstatSync(labPath).isFile() ? readFileSync(labPath) : undefined;
+  const lab = labBytes ? labBytes.toString("utf8").trim() : "";
   if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
   const files: Record<string, string> = {};
-  const paths: string[] = lab ? [labPath] : [];
+  const paths: string[] = [];
   const methods: string[] = [];
   for (const d of PROJECT_DIRS) {
     for (const f of SETTINGS_FILES) if (existsSync(join(key, d, f))) paths.push(join(key, d, f));
@@ -142,6 +143,7 @@ export function scanFolder(folder: string): FolderScan {
     paths.push(...found);
     methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
   }
+  if (labBytes) files[LAB_FILE] = sha(labBytes);
   for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
