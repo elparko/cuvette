@@ -487,6 +487,7 @@ map:
     params:
       - { arg: distance, label: "vegdist() method", ui_default: bray }
       - { arg: permutations, label: "permutations of permutest()", ui_default: 999 }
+      - { arg: type, label: "type of betadisper()", ui_default: median }
     fidelity: close
     difference: A person has not run the route and compared the numbers.
     evidence:
@@ -611,6 +612,21 @@ tests:
     expect:
       - { path: metrics.f, approx: 1.9506, abs: 0.001 }
       - { path: metrics.p, min: 0.1 }
+
+  - id: dispersion_dune_centroid
+    description: >
+      The same test with distances to the centroid, as Anderson (2006) describes. F is 3.8687
+      with 3 and 16 degrees of freedom. A hand computation in base R gives the same F. The p value
+      is below 0.05, so the groups differ in spread. The default median gives F 1.9506 and no
+      difference.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: test_dispersion
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", variable: Management, distance: bray, permutations: 999, seed: 1, type: centroid }
+    expect:
+      - { path: metrics.f, approx: 3.8687, abs: 0.001 }
+      - { path: metrics.p, max: 0.06 }
+      - { path: data.center, equals: centroid }
 
   - id: rda_dune_hellinger
     description: >
@@ -865,9 +881,10 @@ tools:
   - name: test_dispersion
     title: Test the dispersion of groups
     description: >
-      Test if the groups have the same spread around their centroid (betadisper and permutest). A
-      difference in spread can make PERMANOVA significant without a difference in centre. Returns
-      F, p, the mean distance to the centroid of each group, and a plot.
+      Test if the groups have the same spread (betadisper and permutest). The spread is the
+      distance of each site to the spatial median of its group, or to the centroid if type is
+      centroid. A difference in spread can make PERMANOVA significant without a difference in
+      centre. Returns F, p, the mean distance of each group, and a plot.
     params:
       community: { type: string, description: Path of the community table (CSV). }
       environment: { type: string, description: Path of the site table (CSV). }
@@ -877,10 +894,11 @@ tools:
       permutations: { type: integer, minimum: 99, maximum: 99999, description: "Leave out. The harness sets it from the decision record. Number of permutations." }
       seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
       strata: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the site table that defines the blocks." }
+      type: { type: string, enum: [median, centroid], default: median, description: "Point that the distances run to. median is the spatial median (the vegan default). centroid is the mean that Anderson (2006) describes." }
     required: [community, environment]
     read_only: true
     outputs:
-      plot: { kind: image, ext: .png, description: Sites and centroids in the principal coordinate space. }
+      plot: { kind: image, ext: .png, description: Sites and group centres in the principal coordinate space. }
     script: scripts/test_dispersion.R
     parse: json
     citations:
