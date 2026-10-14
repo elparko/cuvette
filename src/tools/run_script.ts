@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { addOldEnv } from "../core/old-names.ts";
@@ -183,7 +183,7 @@ export function linuxWrap(state: SandboxState, argv: string[], o: { network: boo
   if (state === "bwrap") {
     const binds = [...new Set(o.writable.filter((p) => existsSync(p)))].flatMap((p) => ["--bind", p, p]);
     const held = [...new Set((o.held ?? []).filter((p) => existsSync(p)).flatMap((p) => [p, realpathSync(p)]))].flatMap((p) => (statSync(p).isDirectory() ? ["--tmpfs", p] : ["--ro-bind", "/dev/null", p]));
-    const locks = (o.steps ?? []).flatMap((x) => (existsSync(x.path) ? [x.allow ? "--bind" : "--ro-bind", x.path, x.path] : []));
+    const locks = bwrapLocks(o.steps ?? []);
     return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...locks, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
   }
   if (state === "unshare") {
@@ -198,6 +198,7 @@ export function linuxWrap(state: SandboxState, argv: string[], o: { network: boo
 export interface WriteStep {
   path: string;
   allow: boolean;
+  fixed?: boolean;
 }
 
 const within = (p: string, root: string) => {
@@ -205,7 +206,17 @@ const within = (p: string, root: string) => {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 };
 
-const both = (paths: string[]) => [...new Set(paths.flatMap((p) => [p, existsSync(p) ? realpathSync(p) : p]))];
+function realish(p: string): string {
+  const rest: string[] = [];
+  let at = p;
+  while (!existsSync(at) && dirname(at) !== at) {
+    rest.unshift(basename(at));
+    at = dirname(at);
+  }
+  return join(existsSync(at) ? realpathSync(at) : at, ...rest);
+}
+
+const both = (paths: string[]) => [...new Set(paths.flatMap((p) => [p, realish(p)]))];
 
 function folderNames(dir: string): string[] {
   try {
@@ -237,6 +248,16 @@ export function writeSteps(dirs: Dirs): WriteStep[] {
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
+  const top = dirs.projectDir ? both([dirs.projectDir]) : [];
+  const fixed = new Set(keep);
+  for (const l of locked) {
+    const root = top.find((t) => within(l, t));
+    for (let at = dirname(l); ; at = dirname(at)) {
+      fixed.add(at);
+      if (!root || at === root || dirname(at) === at) break;
+    }
+  }
+  steps.push(...[...fixed].map((path) => ({ path, allow: false, fixed: true })));
   return steps;
 }
 
@@ -251,7 +272,28 @@ export function heldReadRules(held: string[]): string {
 }
 
 export function writeRules(steps: WriteStep[]): string {
-  return steps.map((x) => `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`).join("");
+  return steps.map((x) => (x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
+}
+
+function bwrapLocks(steps: WriteStep[]): string[] {
+  return steps.filter((x) => !x.fixed).flatMap((x) => (existsSync(x.path) ? [x.allow ? "--bind" : "--ro-bind", x.path, x.path] : []));
+}
+
+function programExists(cmd: string | undefined): boolean {
+  if (!cmd) return false;
+  if (isAbsolute(cmd) || cmd.includes("/")) return existsSync(cmd);
+  return (process.env.PATH ?? "").split(delimiter).some((d) => d && existsSync(join(d, cmd)));
+}
+
+export async function guardCommand(argv: string[], dirs: Dirs): Promise<{ argv: string[]; changed(): string[] }> {
+  await probeSandbox();
+  const steps = writeSteps(dirs);
+  const guard = fingerprint(dirs, true);
+  if (!programExists(argv[0])) return { argv, changed: guard.changed };
+  const blind = blindPolicy();
+  if (process.platform === "darwin" && sandbox === "on") return { argv: ["/usr/bin/sandbox-exec", "-p", `(version 1)(allow default)${writeRules(steps)}${blind ? sandboxReadRules(agentRules(blind)) : ""}`, ...argv], changed: guard.changed };
+  if (process.platform === "linux" && sandbox === "bwrap") return { argv: ["bwrap", "--bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv], changed: guard.changed };
+  return { argv, changed: guard.changed };
 }
 
 function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = [], steps: WriteStep[] = []): string[] {
@@ -270,8 +312,6 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
   }
   return argv;
 }
-
-const limitsWrites = () => (process.platform === "darwin" && sandbox === "on") || (process.platform === "linux" && sandbox === "bwrap");
 
 function hashBytes(path: string, limit = Infinity): string {
   const h = createHash("sha256");
@@ -386,7 +426,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
       const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? [], writeSteps(dirs));
-      const guard = fingerprint(dirs, !limitsWrites());
+      const guard = fingerprint(dirs, true);
 
       const child = spawn(argv[0], argv.slice(1), {
         cwd: existsSync(project) ? project : dirs.workDir,

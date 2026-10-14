@@ -1,7 +1,8 @@
 import { createServer, type Server } from "node:http";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { afterAll, expect, test } from "vitest";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
@@ -483,4 +484,39 @@ test("readFields joins an error that comes as a list of messages", () => {
   expect(readFields({ ok: false, error: ["step failed on a.fcs. R says: x", "step failed on b.fcs. R says: x"] }).error).toBe("step failed on a.fcs. R says: x; step failed on b.fcs. R says: x");
   expect(readFields({ ok: false, error: ["same", "same"] }).error).toBe("same");
   expect(readFields({ ok: false, error: [1, 2] }).error).toBeUndefined();
+});
+
+
+const sandboxWorks = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
+
+test.skipIf(!sandboxWorks)("a program of a command-line adapter writes in the project folder, and cannot write the record or the settings", async () => {
+  const project = realpathSync(mkdtempSync(join(root, "project-")));
+  const out = join(project, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  writeFileSync(join(out, ".record", "log.jsonl"), '{"id":1}\n');
+  mkdirSync(join(project, ".cuvette"));
+  writeFileSync(join(project, ".cuvette", "settings.json"), "{}");
+  mkdirSync(join(project, "data"));
+  const dir = adapter(`${head("cli", "  call_timeout_s: 20\n")}tools:
+  - name: append
+    description: Append to a file.
+    params: { target: { type: string } }
+    required: [target]
+    command: ["{node}", "-e", "try { require('fs').appendFileSync(process.argv[1], 'x'); } catch (e) { console.error(e.code); } console.log('{}')", "{target}"]
+    parse: json
+map:
+  - tool: append
+    route: x
+`);
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "append")!;
+  const run = (target: string) => tool.execute({ target }, ctx(out, dirs.sessionDir));
+  expect((await run(join(project, "data", "result.txt"))).ok).toBe(true);
+  expect(readFileSync(join(project, "data", "result.txt"), "utf8")).toBe("x");
+  for (const target of [join(out, ".record", "log.jsonl"), join(project, ".cuvette", "settings.json")]) {
+    await run(target);
+    expect(readFileSync(target, "utf8")).not.toContain("x");
+  }
 });

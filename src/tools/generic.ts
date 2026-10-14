@@ -5,6 +5,7 @@ import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { cap, commandLine, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
 import { isCredentialsFile } from "../core/credentials.ts";
+import { guardCommand } from "./run_script.ts";
 
 const below = (root: string, p: string) => {
   const rel = relative(root, p);
@@ -115,7 +116,13 @@ export function genericTools(dirs: Dirs): Tool[] {
         const argv = a.argv as string[];
         const route = commandLine(argv);
         const cwd = a.cwd ? here(String(a.cwd)) : project;
-        const r = await runProcess(argv, { cwd, env: withoutSecrets(), signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
+        const guarded = await guardCommand(argv, dirs);
+        const r = await runProcess(guarded.argv, { cwd, env: withoutSecrets(), signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
+        const changed = guarded.changed();
+        if (changed.length) {
+          for (const path of changed) ctx.log("blocked", { callId: ctx.callId, tool: "run_command", path, reason: "The command changed the record or the settings of Cuvette.", by: "integrity check" });
+          return { ok: false, error: `the command changed the record or the settings of Cuvette: ${changed.join(", ")}. A command must not write there. Check these files.`, manualRoute: route };
+        }
         const text = cap([r.stdout, r.stderr && `[stderr]\n${r.stderr}`].filter(Boolean).join("\n"), 20000);
         const failure = processFailure(r, argv[0], Number(a.timeout_s));
         return failure ? { ok: false, error: failure, text, manualRoute: route } : { ok: true, text, summary: `Ran ${argv[0]} in ${cwd}; exit code 0.`, manualRoute: route };
