@@ -364,7 +364,8 @@ export class Session {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
     const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
-    const settings = loadSettings(cwd, overrides);
+    const notes: string[] = [];
+    const settings = loadSettings(cwd, overrides, notes);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
@@ -380,6 +381,7 @@ export class Session {
       throw e;
     }
     if (opts.method) s.startMethod(opts.method);
+    for (const text of notes) s.record.append("notice", { text, warn: true });
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
   }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { folderTrusted, projectSettings, safeOnly } from "./trust.ts";
+import { folderTrusted, projectSettingFiles, safeOnly } from "./trust.ts";
 import type { HookEvent, Mode } from "./types.ts";
 
 export interface Settings {
@@ -83,7 +83,62 @@ export function thinkingShown(s: Pick<Settings, "show_thinking">): boolean {
   return s.show_thinking !== false && s.show_thinking !== "off";
 }
 
-function readJson(path: string): Partial<Settings> {
+const ENUMS: Record<string, readonly string[]> = {
+  mode: ["watch", "follow", "teach", "plan"],
+  promptCache: ["off", "5m", "1h"],
+  toolExposure: ["all", "search", "auto"],
+  permissionMode: ["ask", "bypass"],
+  messages: ["after-step", "queue"],
+  effort: ["auto", "low", "medium", "high", "xhigh", "max"],
+  input_keys: ["mac", "emacs", "vim", "classic"],
+  text_style: ["ste", "plain"],
+  referenceMode: ["compare", "blind"],
+  openImages: ["on", "off"],
+  animations: ["on", "off"],
+  footer_hints: ["full", "short", "off"],
+};
+const SWITCHES = ["export_xlsx", "show_thinking", "phi_check", "planFirst", "pilot"];
+const NUMBERS = ["maxSteps", "numCtx", "maxResultChars"];
+const TEXTS = ["model", "referee", "figure_formats", "output_folder", "local_model"];
+const enumOf = (name: string): readonly string[] | undefined => (Object.hasOwn(ENUMS, name) ? ENUMS[name] : undefined);
+const RULES = ["allow", "ask", "deny"];
+
+const defaultOf = (name: string): unknown => (Object.hasOwn(DEFAULTS, name) ? (DEFAULTS as unknown as Record<string, unknown>)[name] : undefined);
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+function expected(name: string): string | undefined {
+  const d = defaultOf(name);
+  const choices = enumOf(name);
+  if (choices) return `one of: ${choices.join(", ")}`;
+  if (SWITCHES.includes(name)) return "on, off, true or false";
+  if (NUMBERS.includes(name)) return "a number above 0";
+  if (TEXTS.includes(name)) return "a text that is not empty";
+  if (typeof d === "boolean") return "true or false";
+  if (Array.isArray(d)) return "a list of texts";
+  if (typeof d === "object") return "an object";
+  return undefined;
+}
+
+export function settingFits(name: string, v: unknown): boolean {
+  if (v === undefined) return true;
+  const choices = enumOf(name);
+  if (choices) return typeof v === "string" && choices.includes(v);
+  if (SWITCHES.includes(name)) return typeof v === "boolean" || v === "on" || v === "off";
+  if (NUMBERS.includes(name)) return typeof v === "number" && Number.isFinite(v) && v > 0;
+  if (TEXTS.includes(name)) return typeof v === "string" && v.trim() !== "";
+  const d = defaultOf(name);
+  if (d === undefined) return true;
+  if (Array.isArray(d)) return Array.isArray(v) && v.every((x) => typeof x === "string");
+  if (typeof d === "object") return isObject(v);
+  return typeof v === typeof d;
+}
+
+function shown(v: unknown): string {
+  const t = JSON.stringify(v) ?? String(v);
+  return t.length > 40 ? `${t.slice(0, 39)}…` : t;
+}
+
+function readJson(path: string, notes?: string[]): Partial<Settings> {
   if (!existsSync(path)) return {};
   let s: Partial<Settings> & { permissions?: unknown };
   const text = readFileSync(path, "utf8");
@@ -97,24 +152,25 @@ function readJson(path: string): Partial<Settings> {
   if (typeof s.permissions === "string") {
     if (s.permissions !== "bypass" && s.permissions !== "ask") throw new Error(`settings file ${path}: "permissions" must be "bypass", "ask" or an object of rules`);
     const { permissions, ...rest } = s;
-    return wellTyped({ ...rest, permissionMode: permissions });
+    return wellTyped({ ...rest, permissionMode: permissions }, notes, path);
   }
-  return wellTyped(s as Partial<Settings>);
+  return wellTyped(s as Partial<Settings>, notes, path);
 }
 
-// The loader ignores a value of the wrong type (a number for a folder name, a list for the rules) and uses the default.
-function wellTyped(s: Partial<Settings>): Partial<Settings> {
+// The loader ignores a value of the wrong type or outside its choices, and uses the value of the layer before. It adds a note for each value that it ignores.
+export function wellTyped(s: Partial<Settings>, notes?: string[], file = "a settings file"): Partial<Settings> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(s)) {
-    const d = (DEFAULTS as unknown as Record<string, unknown>)[k];
-    const either = k === "export_xlsx" || k === "phi_check";
-    const ok =
-      d === undefined || v === undefined ? true
-      : either ? typeof v === "string" || typeof v === "boolean"
-      : Array.isArray(d) ? Array.isArray(v) && v.every((x) => typeof x === "string")
-      : typeof d === "object" ? !!v && typeof v === "object" && !Array.isArray(v)
-      : typeof v === typeof d;
-    if (ok) out[k] = v;
+    if (k === "__proto__") continue;
+    if (k === "permissions" && isObject(v)) {
+      const rules: Record<string, unknown> = {};
+      for (const [pattern, rule] of Object.entries(v)) {
+        if (typeof rule === "string" && RULES.includes(rule)) rules[pattern] = rule;
+        else notes?.push(`${file}: the rule for ${pattern} must be allow, ask or deny, not ${shown(rule)}. Cuvette ignores this rule.`);
+      }
+      out[k] = rules;
+    } else if (settingFits(k, v)) out[k] = v;
+    else notes?.push(`${file}: ${k} must be ${expected(k)}, not ${shown(v)}. Cuvette ignores this value.`);
   }
   return out as Partial<Settings>;
 }
@@ -129,10 +185,12 @@ function merge(a: Settings, b: Partial<Settings>): Settings {
   };
 }
 
-export function loadSettings(cwd: string, overrides: Partial<Settings> = {}): Settings {
-  let s = merge(DEFAULTS, readJson(join(cuvetteHome(), "settings.json")));
+export function loadSettings(cwd: string, overrides: Partial<Settings> = {}, notes?: string[]): Settings {
+  const userFile = join(cuvetteHome(), "settings.json");
+  const user = readJson(userFile, notes);
+  let s = merge(DEFAULTS, user);
   const trusted = folderTrusted(cwd);
-  for (const layer of projectSettings(cwd)) s = merge(s, wellTyped((trusted ? layer : safeOnly(layer)) as Partial<Settings>));
-  s = { ...s, phi_check: readJson(join(cuvetteHome(), "settings.json")).phi_check ?? DEFAULTS.phi_check };
+  for (const f of projectSettingFiles(cwd)) s = merge(s, wellTyped((trusted ? f.layer : safeOnly(f.layer)) as Partial<Settings>, notes, f.path));
+  s = { ...s, phi_check: user.phi_check ?? DEFAULTS.phi_check };
   return merge(s, Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)));
 }

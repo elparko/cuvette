@@ -4,7 +4,7 @@ import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
 import { CLAUDE_MODELS } from "../providers/index.ts";
-import { DEFAULTS } from "./config.ts";
+import { DEFAULTS, settingFits, wellTyped } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
 import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
@@ -536,7 +536,7 @@ async function changeTrust(ctx: SettingCtx, raw: unknown): Promise<{ old: unknow
 export function permissionRules(cwd: string): { pattern: string; rule: string; source: Source }[] {
   const out = new Map<string, { pattern: string; rule: string; source: Source }>();
   for (const [source, layer] of layers(cwd))
-    for (const [pattern, rule] of Object.entries((layer.permissions as Record<string, string>) ?? {})) out.set(pattern, { pattern, rule, source });
+    for (const [pattern, rule] of Object.entries(wellTyped({ permissions: layer.permissions } as never).permissions ?? {})) out.set(pattern, { pattern, rule, source });
   return [...out.values()];
 }
 
@@ -553,7 +553,7 @@ function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source
   let source: Source = "default";
   let file: string | undefined;
   for (const [s, layer, p] of layers(cwd))
-    if (d.name in layer && (s === "user" || d.name !== "phi_check")) {
+    if (d.name in layer && settingFits(d.name, layer[d.name]) && (s === "user" || d.name !== "phi_check")) {
       value = layer[d.name];
       source = s;
       file = p;
