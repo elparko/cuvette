@@ -590,7 +590,8 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     tableNames.set(n.id, names);
     for (const [k, v] of Object.entries(result.metrics ?? {})) metricRows.push([step, k, typeof v === "number" ? v : show(v)]);
     const said = [n.args.does, n.args.purpose].find((v): v is string => typeof v === "string" && v.trim() !== "");
-    const plain = said?.trim() ?? w.toolText?.[n.tool] ?? (n.adapter ? methodsSentence(adapters, n) : n.summary);
+    const methods = n.adapter ? methodsSentence(adapters, n) : n.summary;
+    const plain = said?.trim() ?? w.toolText?.[n.tool] ?? (/\{[\w.]+\}/.test(methods) ? n.summary || n.tool : methods);
     const inputs = inputsOf(record, n);
     stepRows.push([
       step,

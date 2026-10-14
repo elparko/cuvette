@@ -105,6 +105,21 @@ test("resume rebuilds the history from the log", async () => {
   expect(session.history.length).toBe(2);
 });
 
+test("resume keeps the settings that the scientist saved for this session", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "hello" }]), cwd, settings: { guidance: false } });
+  await session.send("hi");
+  session.record.append("setting", { name: "effort", old: "auto", new: "low", scope: "session" });
+  session.record.append("setting", { name: "show_thinking", old: false, new: true, scope: "session" });
+  session.record.append("setting", { name: "promptCache", old: "5m", new: "off", scope: "session" });
+  session.record.append("setting", { name: "promptCache", old: "off", new: "1h", scope: "user" });
+  const id = session.id;
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.settings).toMatchObject({ effort: "low", show_thinking: true });
+  expect(session.settings.promptCache).not.toBe("off");
+});
+
 test("a deleted folder gives a plain error on send and on resume", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "hello" }]), cwd, settings: { guidance: false } });
@@ -1593,6 +1608,56 @@ test("Stop on the card ends the turn and keeps the finished steps", async () => 
   expect(toolCalls(session)).toHaveLength(1);
   expect(session.record.entries(["error"]).map((e) => String(e.data.message))).toEqual(["Cannot reach the Claude API. Check the network."]);
   expect(session.record.entries(["tool_result"])).toHaveLength(1);
+});
+
+test("the card names the tries and a hint that matches a rate limit or a server error", async () => {
+  const cards: { text: string; reason: string }[] = [];
+  for (const message of ["The Claude API refused the request because of a rate limit (HTTP 429). It asks for a wait of 90 s.", "The Claude API had a server error (529).", "The Claude API refused the request because of a rate limit (HTTP 429)."]) {
+    const provider = new FakeProvider([{ text: "ok" }]);
+    const step = provider.step.bind(provider);
+    let n = 0;
+    provider.step = async (req) => {
+      if (n++ === 0) throw new ProviderError(message, true);
+      return step(req);
+    };
+    const s = await recoverySession(provider, { guidance: false });
+    s.bus.on((e) => {
+      if (e.type !== "question") return;
+      cards.push({ text: e.question.text, reason: e.question.recommendation?.reason ?? "" });
+      setTimeout(() => s.answer(e.question.qid, "resume"), 0);
+    });
+    await s.send("go");
+    await s.close();
+  }
+  expect(cards[0]!.text).toContain("The model gave no answer after one try in 0 s.");
+  expect(cards[0]!.reason).toBe("Wait for the time that the text gives, then press Resume.");
+  expect(cards[1]!.reason).toBe("The server is busy or the network failed. Press Resume to try again.");
+  expect(cards[1]!.text).not.toContain("Retry in a moment");
+  expect(cards[2]!.reason).toBe("Wait one minute, then press Resume.");
+});
+
+test("the status shows thinking after the scientist presses Resume, and the retry status shows the reason and the wait", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    if (n++ === 0) {
+      req.onRetry?.({ attempt: 1, of: 3, waitMs: 25_000, reason: "rate limit" });
+      throw new ProviderError("Cannot reach the Claude API. Check the network.", true);
+    }
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  const states: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "status") states.push(`${e.state}|${e.purpose ?? ""}`);
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+  });
+  await session.send("go");
+  expect(states).toContain("thinking|Waiting to retry (1 of 3): rate limit. The next try is in 25 s.");
+  const waiting = states.indexOf("waiting|");
+  expect(waiting).toBeGreaterThan(-1);
+  expect(states[waiting + 1]).toBe("thinking|");
 });
 
 test("Answer later on the card ends the wait and closes the card question", async () => {

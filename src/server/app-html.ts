@@ -546,7 +546,7 @@ export function stepsHtml(c: Ctx): string {
   const changes = new Map(reruns(r).map((d) => [d.node, d]));
   const rewound = r.rewound();
   const main = nodes.filter((n) => steps.has(n.id));
-  if (!main.length) return `<p class="empty">No steps yet. The Record tab also shows the calls that failed.</p>`;
+  if (!main.length) return `<p class="empty">No steps yet. The Record tab also shows the calls that failed.</p>${failedCallsHtml(r)}`;
   return `<ol class="steps">${main
     .map((n) => {
       const img = n.outputs.find((o) => o.kind === "image" || IMG.test(o.path));
@@ -558,7 +558,15 @@ export function stepsHtml(c: Ctx): string {
       const change = changes.get(n.id);
       return `<li class="${rewound.has(n.id) ? "rewound" : newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path, undefined, `Step ${steps.get(n.id)}: ${n.summary || n.tool.replace(/_/g, " ")}`.slice(0, 160))}</div>` : ""}</li>`;
     })
-    .join("")}</ol>`;
+    .join("")}</ol>${failedCallsHtml(r)}`;
+}
+
+function failedCallsHtml(r: Ctx["session"]["record"]): string {
+  const results = r.entries(["tool_result"]);
+  const blocked = new Set(r.entries(["blocked"]).map((e) => String(e.data.callId)));
+  const failed = [...new Set(results.filter((e, i) => e.data.ok === false && !e.node && !blocked.has(String(e.data.callId)) && !results.slice(i + 1).some((x) => x.data.tool === e.data.tool && x.data.ok !== false)).map((e) => String(e.data.tool)))];
+  if (!failed.length) return "";
+  return `<p class="small warn">${failed.length === 1 ? "1 call failed" : `${failed.length} calls failed`}: ${esc(failed.join(", "))}. See the Record tab.</p>`;
 }
 
 export function listFiles(dir: string, filter: (name: string) => boolean = () => true): string[] {
@@ -566,7 +574,7 @@ export function listFiles(dir: string, filter: (name: string) => boolean = () =>
   return readdirSync(dir)
     .filter((n) => !n.startsWith(".") && filter(n))
     .map((n) => join(dir, n))
-    .filter((p) => statSync(p).isFile())
+    .filter((p) => statSync(p, { throwIfNoEntry: false })?.isFile())
     .sort();
 }
 
@@ -612,7 +620,7 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
       const wide = s.columns.length > 3 ? `<div class="row end">${btn("Open full width", `data-wide="1"`, "quiet")}</div>` : "";
       parts.push(`<details${s.name.toLowerCase() === "summary" ? " open" : ""}><summary>${esc(s.name)} <span class="dim small">${s.rows.length} ${s.rows.length === 1 ? "row" : "rows"}</span></summary>${wide}<div class="sheet">${table}</div>${s.rows.length > rows.length ? `<p class="dim small">The first ${rows.length} rows. The file has all rows.</p>` : ""}</details>`);
     }
-  } else parts.push(`<p class="empty">No results.xlsx yet. It appears after the first analysis step.</p>`);
+  } else parts.push(`<p class="empty">No results yet. The tables appear after the first analysis step.</p>`);
   const raster = figures.filter((f) => SHOWN.test(f) && !(/\.svg$/i.test(f) && figures.some((g) => g !== f && g.replace(/\.[^.]+$/, "") === f.replace(/\.[^.]+$/, ""))));
   if (figures.length) parts.push(`<h4>Figures</h4><div class="images">${raster.map((f) => imageHtml(c, f)).join("")}</div><ul class="files">${figures.map((f) => `<li>${fileLink(c, f)}</li>`).join("")}</ul>`);
   const pictures = files.filter((f) => SHOWN.test(f));

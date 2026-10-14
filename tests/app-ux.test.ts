@@ -554,4 +554,114 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart") && m.part !== "api/doctor")`);
     await goPage("Analysis");
   });
+  test("on a 320 px phone, a title with no spaces, the Programs buttons and the Start page folder name stay in the window", async () => {
+    await page.eval(`(() => {
+      const card = (i, title) => ({ id: "s" + i, title, text: title, folder: "/lab/f" + i, folderName: title, age: "1 h ago", status: "answered", moved: false, thumb: "" });
+      window.__mocks.push({ part: "api/sessions.json", reply: () => ({ body: [card(1, "C:/Users/lab/Documents/Experiment_12/Plate_3/results_" + "x".repeat(300) + ".xlsx"), card(2, "Short")] }) });
+    })()`);
+    await page.size(320, 640);
+    await goPage("Sessions");
+    expect(await until(page, `document.querySelectorAll('main ul[aria-label="Sessions"] li').length === 2`)).toBe(true);
+    expect(await page.eval(`document.querySelector("main").scrollWidth <= document.querySelector("main").clientWidth`)).toBe(true);
+    expect(await overflow(page, "main")).toEqual({ page: 320, wide: [] });
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json")`);
+    await goPage("Programs");
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent.includes("Check all again"))`)).toBe(true);
+    expect(await page.eval(`document.querySelector("main").scrollWidth <= document.querySelector("main").clientWidth`)).toBe(true);
+    expect(await overflow(page, "main")).toEqual({ page: 320, wide: [] });
+    await page.eval(`window.__mocks.push({ part: "api/suggest", reply: () => ({ body: { scanned: 0, matches: [] } }) })`);
+    await page.eval(`[...document.querySelectorAll("aside button")].find((b) => b.textContent.includes("Open a folder"))?.click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"] input[aria-label="Folder"]')`)).toBe(true);
+    await page.eval(`(() => { const i = document.querySelector('[role="dialog"] input[aria-label="Folder"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, "/tmp/2024-10-12_Experiment12_Plate3_Replicate2_GFP_Day7_final_version_that_goes_on"); i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    await page.eval(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === "Analyze this folder").click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"] [aria-label="Empty folder"]')`)).toBe(true);
+    expect(await page.eval(`(() => { const d = document.querySelector('[role="dialog"]'); return d.scrollWidth <= d.clientWidth && d.querySelector('[aria-label="Empty folder"] p').getBoundingClientRect().right <= innerWidth; })()`)).toBe(true);
+    await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/suggest")`);
+    await page.size(1280, 900);
+    await goPage("Analysis");
+  });
+
+  test("the message box follows a new window width, and the buttons under it stay inside it while the agent works", async () => {
+    await page.size(1280, 900);
+    await goPage("Analysis");
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
+    const height = () => page.eval<number>(`Math.round(document.querySelector("#msg").getBoundingClientRect().height)`);
+    const wide = await height();
+    await page.size(320, 640);
+    await wait(200);
+    const narrow = await height();
+    expect(narrow).toBeGreaterThan(wide);
+    const t = new URL(url).searchParams.get("t");
+    await page.eval(`fetch("api/send?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ text: "Write a long note" }) })`);
+    await setText("#msg", "next");
+    const buttons = await page.eval<{ right: number; box: number }[]>(`[...document.querySelectorAll("#msg")].flatMap((m) => [...m.closest("form").querySelectorAll("button")].map((b) => ({ right: Math.round(b.getBoundingClientRect().right), box: Math.round(m.closest("form").getBoundingClientRect().right) })))`);
+    for (const b of buttons) expect(b.right).toBeLessThanOrEqual(b.box);
+    expect(await until(page, `document.querySelector('[role="status"]').textContent.startsWith("Ready")`)).toBe(true);
+    await page.size(1280, 900);
+  });
+
+  test("the model menu fits a short window and scrolls", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { ollama: { reachable: true, models: ["a1:8b", "a2:8b", "a3:8b", "a4:8b", "a5:8b", "a6:8b"] } } }) })`);
+    await page.size(720, 390);
+    await page.eval(`document.querySelector('header button[aria-label^="Model:"]').dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }))`);
+    expect(await until(page, `document.querySelector('[role="menu"]')`)).toBe(true);
+    await wait(300);
+    const menu = await page.eval<{ top: number; bottom: number; scroll: boolean }>(`(() => { const m = document.querySelector('[role="menu"]'); const r = m.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, scroll: m.scrollHeight > m.clientHeight }; })()`);
+    expect(menu.bottom).toBeLessThanOrEqual(390);
+    expect(menu.top).toBeGreaterThanOrEqual(0);
+    expect(menu.scroll).toBe(true);
+    await page.eval(`document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/firststart")`);
+    await page.size(1280, 900);
+  });
+
+  test("the folder dialog on a 320 by 568 phone shows its whole list and the folder names", async () => {
+    await page.size(320, 568);
+    await page.eval(`[...document.querySelectorAll("aside button")].find((b) => b.textContent.includes("Open a folder"))?.click()`);
+    expect(await until(page, `document.querySelector('[role="dialog"]') && document.body.textContent.includes("Up one folder")`)).toBe(true);
+    const r = await page.eval<{ fit: boolean; cut: string[] }>(`(() => { const d = document.querySelector('[role="dialog"]'); const rows = [...d.querySelectorAll("li button > span:nth-child(2)")]; return { fit: d.scrollHeight <= d.clientHeight + 1, cut: rows.filter((s) => s.scrollWidth > s.clientWidth + 1 && s.clientWidth < 40).map((s) => s.textContent) }; })()`);
+    expect(r).toEqual({ fit: true, cut: [] });
+    await page.eval(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    await page.size(1280, 900);
+  });
+
+  test("a copied table keeps its header and its columns when the table is stacked, and a pasted image shows a message", async () => {
+    await page.size(1280, 900);
+    await goPage("Analysis");
+    const copied = (width: number) =>
+      page.eval<{ text: string; html: string; stacked: boolean }>(`(() => {
+        const log = document.querySelector('[role="log"]');
+        log.style.maxWidth = "${width}px";
+        const box = document.createElement("div");
+        box.innerHTML = '<table class="stack" role="table"><thead><tr><th>Group</th><th>n</th><th>Mean</th></tr></thead><tbody><tr><td data-label="Group">Control</td><td data-label="n">12</td><td data-label="Mean">4.1</td></tr><tr><td data-label="Group">Treated</td><td data-label="n">11</td><td data-label="Mean">5.2</td></tr></tbody></table>';
+        log.appendChild(box);
+        const table = box.firstChild;
+        const sel = getSelection();
+        const range = document.createRange();
+        range.selectNode(table);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        const data = new DataTransfer();
+        table.dispatchEvent(new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: data }));
+        const out = { text: data.getData("text/plain"), html: data.getData("text/html"), stacked: getComputedStyle(table.querySelector("thead")).display === "none" };
+        box.remove();
+        log.style.maxWidth = "";
+        return out;
+      })()`);
+    for (const width of [400, 768]) {
+      const c = await copied(width);
+      expect(c.text).toBe("Group\tn\tMean\nControl\t12\t4.1\nTreated\t11\t5.2");
+      expect(c.html).toBe("<table><thead><tr><th>Group</th><th>n</th><th>Mean</th></tr></thead><tbody><tr><td>Control</td><td>12</td><td>4.1</td></tr><tr><td>Treated</td><td>11</td><td>5.2</td></tr></tbody></table>");
+    }
+    expect((await copied(400)).stacked).toBe(true);
+    const before = await page.eval<string>(`document.querySelector("#msg").value`);
+    await page.eval(`(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(["x"], "shot.png", { type: "image/png" }));
+      document.querySelector("#msg").dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: dt }));
+    })()`);
+    expect(await until(page, `document.body.textContent.includes("Cuvette cannot take a pasted image.")`)).toBe(true);
+    expect(await page.eval(`document.querySelector("#msg").value`)).toBe(before);
+  });
 });

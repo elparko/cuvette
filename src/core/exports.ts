@@ -123,7 +123,7 @@ export function stepLines(adapters: LoadedAdapter[], n: Node): string[] {
 export function methodsSentence(adapters: LoadedAdapter[], n: Node): string {
   const me = adapterOf(adapters, n)?.mapEntry(n.tool, n.args);
   const r = me ? describeRoute(me, n.args) : undefined;
-  if (me?.summary) return fillTemplate(me.summary, n.args).replace(/\.?$/, ".");
+  if (me?.summary) return fillTemplate(fillTemplate(me.summary, n.args), (n.result ?? {}) as Record<string, unknown>).replace(/\.?$/, ".");
   const name = r ? lastRouteSegment(r.route).replace(/\.\.\.$/, "") : n.tool;
   const withParams = r?.params.length ? ` with ${r.params.join(", ")}` : "";
   return `${name} was applied${withParams}.`;

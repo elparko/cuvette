@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -574,6 +574,55 @@ test("the Analysis tab has a status line with the reason and the rerun button; t
   const decisions = await (await c.get("api/tab?name=decisions")).text();
   expect(decisions).toContain("Changes after a step ran again");
   expect(decisions).toContain(">131<");
+});
+
+test("the Results tab builds the tables from the record when results.xlsx is gone, and skips a broken link", async () => {
+  const s = new FakeSession();
+  const base = { entry: 1, adapter: "msi", adapterVersion: "1.0", programVersion: "2.0", tool: "find_peaks", args: {}, codeHash: "c", inputHashes: [], outputs: [], parents: [], model: "fake", manualRoute: "", fidelity: "none" as const };
+  s.record.addNode({ ...base, decisions: {}, result: { ok: true, metrics: { peaks: 120 } }, summary: "Found 120 peaks." });
+  mkdirSync(s.workDir, { recursive: true });
+  writeFileSync(join(s.workDir, "keep.csv"), "a\n1\n");
+  symlinkSync(join(s.workDir, "none.csv"), join(s.workDir, "broken.csv"));
+  app = await startApp({ session: s, env });
+  const res = await client(app).get("api/tab?name=results");
+  expect(res.status).toBe(200);
+  const html = await res.text();
+  expect(html).toContain("keep.csv");
+  expect(html).not.toContain("broken.csv");
+  expect(html).not.toContain("No results");
+  expect(html).toContain("<summary>Summary");
+});
+
+test("a message over 256 KB gets a plain error, and a message of 100 KB goes through", async () => {
+  const s = new FakeSession();
+  app = await startApp({ session: s, env });
+  const c = client(app);
+  const big = await c.post("api/send", { text: "x".repeat(300 * 1024) });
+  expect(big.status).toBe(413);
+  expect((await big.json()).error).toBe("The message is too long. The limit is 256 KB. Save the text in a file in the data folder instead.");
+  expect((await c.post("api/send", { text: "y".repeat(100 * 1024) })).status).toBe(200);
+});
+
+test("the Analysis tab names a failed call that has no step", async () => {
+  const s = new FakeSession();
+  const base = { entry: 1, adapter: "msi", adapterVersion: "1.0", programVersion: "2.0", tool: "find_peaks", args: {}, codeHash: "c", inputHashes: [], outputs: [], parents: [], model: "fake", manualRoute: "", fidelity: "none" as const };
+  s.record.addNode({ ...base, decisions: {}, result: { ok: true, metrics: { peaks: 120 } }, summary: "Found 120 peaks." });
+  s.record.append("tool_result", { callId: "x1", tool: "boom", ok: false, error: "exit code 3" });
+  app = await startApp({ session: s, env });
+  const html = await (await client(app).get("api/tab?name=analysis")).text();
+  expect(html).toContain("1 call failed: boom. See the Record tab.");
+});
+
+test("the Analysis tab names a failed call when there is no step, and leaves out a blocked call", async () => {
+  const s = new FakeSession();
+  s.record.append("tool_result", { callId: "x1", tool: "boom", ok: false, error: "exit code 3" });
+  s.record.append("blocked", { callId: "x2", tool: "read_file" });
+  s.record.append("tool_result", { callId: "x2", tool: "read_file", ok: false, error: "held back" });
+  app = await startApp({ session: s, env });
+  const html = await (await client(app).get("api/tab?name=analysis")).text();
+  expect(html).toContain("No steps yet.");
+  expect(html).toContain("1 call failed: boom. See the Record tab.");
+  expect(html).not.toContain("read_file");
 });
 
 test("the view streams the thinking text, and a tool call clears it", () => {

@@ -92,11 +92,16 @@ export function saveIndexRow(p: Place, named?: { title: string; description: str
   writeIndex([...all.filter((r) => r.id !== p.id), row]);
 }
 
+export function cutText(s: string, n: number): string {
+  const t = s.slice(0, n);
+  return /[\ud800-\udbff]$/.test(t) ? t.slice(0, -1) : t;
+}
+
 export function renameIndexRow(id: string, custom: string): boolean {
   const rows = readIndex();
   const row = rows.find((r) => r.id === id);
   if (!row) return false;
-  row.custom = custom.replace(/\s+/g, " ").trim().slice(0, 60) || undefined;
+  row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
   writeIndex(rows);
   return true;
 }

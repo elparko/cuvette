@@ -1,6 +1,8 @@
 import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ScrollTextIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { IMAGE_PASTE_HELP, pastedImageOnly } from "../lib/drop.ts";
+import { onTableCopy } from "../lib/table-copy.ts";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
 import { ModeMenu } from "../components/mode-menu.tsx";
@@ -13,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
 import { Tooltip } from "../components/ui/tooltip.tsx";
 import { askNotify, bridge, call, midText, post, withT } from "../lib/api.ts";
 import type { StreamState } from "../lib/stream.ts";
-import { liveHtml } from "../lib/markdown.ts";
+import { LiveReply } from "../components/live-reply.tsx";
 import { useStored } from "../lib/stored.ts";
 import { cn } from "../lib/utils.ts";
 
@@ -281,7 +283,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (quiet && box && box.contains(document.activeElement) && document.activeElement !== box) return;
       try {
         setTabHtml(await call<string>("api/tab?name=" + tab));
-      } catch {}
+      } catch {
+        if (!quiet) setTabHtml(`<p class="empty">This tab could not load. Choose the tab again in a moment.</p>`);
+      }
     },
     [tab, side],
   );
@@ -484,15 +488,23 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   // An empty box takes the height of its placeholder, so that a long placeholder does not go under the buttons.
   const placeholder = status.placeholder || "Ask for an analysis, or type / for commands";
-  useLayoutEffect(() => {
+  const fitInput = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
+    const typed = el.value;
     el.style.height = "auto";
-    if (!el.value) el.value = placeholder;
+    if (!typed) el.value = placeholder;
     const h = el.scrollHeight;
-    if (!text) el.value = "";
+    if (!typed) el.value = "";
     el.style.height = Math.min(h, window.innerHeight * 0.4) + "px";
-  }, [text, placeholder]);
+  }, [placeholder]);
+  useLayoutEffect(() => {
+    fitInput();
+  }, [text, fitInput]);
+  useEffect(() => {
+    window.addEventListener("resize", fitInput);
+    return () => window.removeEventListener("resize", fitInput);
+  }, [fitInput]);
 
   const waitText = (n: number) => `${n} ${n === 1 ? "decision waits" : "decisions wait"} for you`;
   let line = busy ? (status.text ?? "Working") : status.openQuestions ? waitText(status.openQuestions) + "." : "Ready.";
@@ -593,7 +605,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             }}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <div role="log" aria-label="Messages" className={cn("srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4", !notes && "hide-notes")} onClick={onClick} onChange={onChange}>
+            <div role="log" aria-label="Messages" className={cn("srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4", !notes && "hide-notes")} onClick={onClick} onChange={onChange} onCopy={onTableCopy}>
               {itemsHtml}
               {sent && (
                 <div className="msg user">
@@ -602,9 +614,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               )}
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
               {stream.think && <Thinking text={stream.think} done={!!stream.live || !busy} />}
-              {stream.live && (
-                <div className="msg agent" aria-live="off" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
-              )}
+              {stream.live && <LiveReply text={stream.live} />}
               {working && (
                 <div className="msg agent working" aria-live="off">
                   <span className="caret working" aria-hidden="true" />
@@ -663,6 +673,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 value={text}
                 placeholder={placeholder}
                 onChange={(e) => onInput(e.target.value)}
+                onPaste={(e) => {
+                  if (!pastedImageOnly(e.clipboardData)) return;
+                  e.preventDefault();
+                  toast.error(IMAGE_PASTE_HELP);
+                }}
                 onBlur={() => setSugg([])}
                 onKeyDown={(e) => {
                   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -687,9 +702,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 }}
                 className="block max-h-[40vh] min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] outline-none placeholder:text-muted-foreground"
               />
-              <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 pb-2.5">
                 <span className={cn("line-clamp-2 min-w-0 pl-1.5 text-xs leading-snug break-words text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
-                <div className="flex shrink-0 gap-1.5">
+                <div className="flex min-w-0 flex-wrap justify-end gap-1.5">
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">
                       <Button variant="outline" size="sm" onClick={() => submit(true)} disabled={!text.trim()}>
@@ -728,7 +743,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </TabsList>
               </Tabs>
             </div>
-            <div ref={tabRef} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
+            <div ref={tabRef} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} onCopy={onTableCopy} dangerouslySetInnerHTML={{ __html: tabHtml }} />
           </aside>
         )}
       </div>

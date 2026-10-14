@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { dropFolder } from "../src/ui-web/lib/drop.ts";
+import { dropFolder, pastedImageOnly } from "../src/ui-web/lib/drop.ts";
 
 test("a dropped folder is the folder", () => {
   expect(dropFolder([{ path: "/Users/a/data", dir: true }])).toBe("/Users/a/data");
@@ -20,4 +20,12 @@ test("bad input gives null", () => {
   expect(dropFolder([])).toBeNull();
   expect(dropFolder([{ path: "", dir: true }])).toBeNull();
   expect(dropFolder([{ path: "s1.fcs", dir: false }])).toBeNull();
+});
+
+test("a paste with an image and no text is an image paste", () => {
+  expect(pastedImageOnly({ files: [{ type: "image/png" }], types: ["Files"] })).toBe(true);
+  expect(pastedImageOnly({ files: [{ type: "image/png" }], types: ["text/plain", "Files"] })).toBe(false);
+  expect(pastedImageOnly({ files: [{ type: "application/pdf" }], types: ["Files"] })).toBe(false);
+  expect(pastedImageOnly({ files: [], types: ["text/plain"] })).toBe(false);
+  expect(pastedImageOnly(null)).toBe(false);
 });

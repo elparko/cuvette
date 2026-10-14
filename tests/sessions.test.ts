@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
-import { ageText, claimLock, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
+import { ageText, claimLock, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
@@ -191,6 +191,8 @@ test("a custom name wins over the automatic title, and a removed session leaves 
   try {
     expect(renameIndexRow("a1", "  Oct  11 ")).toBe(true);
     expect(listSessions(h)[0]?.name).toBe("Oct 11");
+    expect(renameIndexRow("a1", "a".repeat(59) + "😀 and more")).toBe(true);
+    expect(() => encodeURIComponent(listSessions(h)[0]?.name!)).not.toThrow();
     renameIndexRow("a1", "");
     expect(listSessions(h)[0]?.name).toBe("Auto title");
     expect(removeIndexRow("a1")).toBe(true);
@@ -234,3 +236,9 @@ test("of many processes that claim one lock at the same time, exactly one gets i
   expect(results.filter((r) => r === "won").length).toBe(1);
   expect(results.filter((r) => r === "lost").length).toBe(5);
 }, 30_000);
+
+test("a clip does not cut an emoji in two", () => {
+  expect(() => encodeURIComponent(clip("a".repeat(78) + "😀 and more text", 80))).not.toThrow();
+  expect(() => encodeURIComponent(clipStart("😀".repeat(5), 4))).not.toThrow();
+  expect(clip("short", 80)).toBe("short");
+});

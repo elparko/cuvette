@@ -121,7 +121,20 @@ describe("runChecks", () => {
     ];
     const out = await runChecks(ctx(makeRecord(seed), "done"));
     expect(out).toHaveLength(1);
-    expect(out[0].message).toContain("Step 1 (load) failed and was not repeated");
+    expect(out[0].message).toContain("The call to load failed and was not repeated");
+  });
+
+  test("a failed call has no step number, and the step number of a later call is the one that the views show", async () => {
+    const seed: any[] = [
+      { kind: "tool_call", data: { callId: "a", tool: "count" } },
+      { kind: "tool_result", data: { callId: "a", tool: "count", ok: true }, node: "n1" },
+      { kind: "tool_call", data: { callId: "b", tool: "boom" } },
+      { kind: "tool_result", data: { callId: "b", tool: "boom", ok: false, error: "exit code 3" } },
+      { kind: "tool_call", data: { callId: "c", tool: "plot" } },
+      { kind: "tool_result", data: { callId: "c", tool: "plot", ok: false } , node: "n2" },
+    ];
+    const out = await runChecks(ctx(makeRecord(seed, [{ id: "n1", entry: 2 }, { id: "n2", entry: 6 }]), "done"));
+    expect(out.map((f) => f.message.split(" failed")[0])).toEqual(["The call to boom", "Step 2 (plot)"]);
   });
 
   test("deviation not mentioned", async () => {

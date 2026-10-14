@@ -16,3 +16,8 @@ export function dropFolder(items: unknown): string | null {
 export const dropZones = { n: 0, dragging: false };
 
 export const hasFiles = (e: { dataTransfer: DataTransfer | null }) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
+export const IMAGE_PASTE_HELP = "Cuvette cannot take a pasted image. Save the image in the data folder and write its file name in your message.";
+
+export const pastedImageOnly = (data: { files: ArrayLike<{ type: string }>; types: ArrayLike<string> } | null) =>
+  !!data && Array.from(data.files).some((f) => f.type.startsWith("image/")) && !Array.from(data.types).includes("text/plain");
