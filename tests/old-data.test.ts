@@ -106,6 +106,9 @@ describe.each(PROJECT_FORMATS)("session folder written by %s", (format) => {
     const after = logLines(first!.folder);
     expect(after.startsWith(before)).toBe(true);
     expect(after.length).toBeGreaterThan(before.length);
+    await s.close();
+    open.splice(open.indexOf(s), 1);
+    expect(readFileSync(join(first!.folder, "index.html"), "utf8")).toContain("Thanks.");
   });
 
   test("status, tests and trail commands print for the old record", async () => {
@@ -125,6 +128,9 @@ describe.each(PROJECT_FORMATS)("session folder written by %s", (format) => {
       expect(statSync(path).size).toBeGreaterThan(0);
     }
     expect(JSON.parse(readFileSync(join(first!.folder, "analysis.ipynb"), "utf8")).cells.length).toBeGreaterThan(0);
+    const saved = s.saveResults(0, true);
+    expect(statSync(saved!.xlsx!).size).toBeGreaterThan(0);
+    expect(statSync(await s.exportAs("eln")).size).toBeGreaterThan(0);
   });
 
   test("a session found by its folder, its record folder and its id is the same session", () => {
@@ -828,5 +834,67 @@ describe("a home session folder that sits in another place", () => {
     await s.send("Thanks.");
     expect(readFileSync(join(elsewhere, "log.jsonl"), "utf8").startsWith(before)).toBe(true);
     expect(existsSync(join(root, "home", "sessions", id))).toBe(false);
+  });
+});
+
+describe.each([...HOME_FORMATS, ...PROJECT_FORMATS])("the commands that only read, on the record of %s", (format) => {
+  test("each one prints or gives a plain notice, and none stops with an error", async () => {
+    install(format);
+    const legacy = HOME_FORMATS.includes(format);
+    const id = legacy ? readdirSync(join(root, "home", "sessions"))[0]! : projectSessions()[0]!.id;
+    const s = await resume(id);
+    const reads = ["decisions", "status", "graph", "tests", "power", "trail", "branches", "method", "findings", "usage", "plan", "proposal", "pilot", "questions", "samples", "cite", "adapters", "programs", "trust", "mode", "permissions", "compact"];
+    for (const name of reads) {
+      const out: string[] = [];
+      const ctx = printCtx(s, out);
+      await commands.find((c) => c.name === name)!.run([], ctx);
+      expect(out.join("\n").split("\n").filter((l) => !l.includes("Received undefined")).join("\n"), name).not.toMatch(/\bundefined\b|\[object Object\]|NaN/);
+    }
+  });
+});
+
+test("a branch of a session with a byte order mark in its log keeps the first entry", async () => {
+  install("v7-agent-loop");
+  const [first] = projectSessions();
+  const file = join(first!.folder, ".record", "log.jsonl");
+  writeFileSync(file, "\uFEFF" + readFileSync(file, "utf8"));
+  const s = await resume(first!.id);
+  const b = s.branch("with a mark");
+  const lines = readFileSync(join(b.folder, ".record", "log.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  expect(lines[0].kind).toBe("session");
+  const child = await Session.resume(b.folder, { provider: new FakeProvider([{ text: "Noted." }]) });
+  open.push(child);
+  expect(child.adapters.length).toBe(1);
+});
+
+describe.each(["v5-rewind-branch-method", "v6-cuvette-rename", "v7-agent-loop"])("a method and a branch that %s wrote", (format) => {
+  beforeEach(() => install(format));
+
+  test("a new session starts from the saved method, and the cuvette command lists and shows it", async () => {
+    const fresh = join(root, "fresh-project");
+    mkdirSync(fresh, { recursive: true });
+    const s = await Session.create({ adapters: [LAB], provider: new FakeProvider([{ text: "Here is the plan." }]), cwd: fresh, method: "count-particles", interactive: true });
+    open.push(s);
+    expect(s.record.entries(["method"]).at(-1)!.data).toMatchObject({ action: "started", name: "count-particles" });
+    expect(s.method?.name).toBe("count-particles");
+    const env = { ...process.env, CUVETTE_HOME: join(root, "home"), HOME: root, USERPROFILE: root };
+    const list = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "method", "list"], { cwd: fresh, env, encoding: "utf8", timeout: 60_000 });
+    expect(list.stdout).toContain("count-particles");
+    const show = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "method", "show", "count-particles"], { cwd: fresh, env, encoding: "utf8", timeout: 60_000 });
+    expect(show.stdout).toContain("Questions and answers");
+    expect(show.stdout).toContain("Count the particles");
+  });
+
+  test("the parent and the branch compare side by side", async () => {
+    const rows = readIndex();
+    const parent = rows.find((r) => !r.name)!;
+    const s = await resume(parent.id);
+    const cmp = s.compareBranches("this", "triangle branch");
+    expect(cmp.a.id).toBe(parent.id);
+    expect(cmp.b.name).toBe("triangle branch");
+    expect(cmp.rows.length).toBeGreaterThan(0);
+    const out: string[] = [];
+    await commands.find((c) => c.name === "compare")!.run(["this", "triangle branch"], printCtx(s, out));
+    expect(out.join("\n")).not.toContain("ERROR");
   });
 });
