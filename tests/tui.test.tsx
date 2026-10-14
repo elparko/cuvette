@@ -71,7 +71,7 @@ describe("transcript", () => {
     await until(() => h.all().includes("Which AUC cutoff do you want?"));
     await type(h, "1");
     try {
-      await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ export_table") && /open\s+with\s+\/open 1/.test(h.all()));
+      await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ export_table") && /open\s+with\s+\/open\s+1/.test(h.all()));
     } catch (e) {
       throw new Error(`${(e as Error).message}\n--- last screen text ---\n${h.all().slice(-2500)}`);
     }
@@ -82,7 +82,7 @@ describe("transcript", () => {
     expect(text).toContain("⚠ Deviation: tolerance ppm 10 (setup says 5)");
     expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
     expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
-    expect(text).toMatch(/image:\s*[\s\S]*\.png[\s\S]*\(open\s+with\s+\/open 1\)/);
+    expect(text).toMatch(/image:\s*[\s\S]*\.png[\s\S]*\(open\s+with\s+\/open\s+1\)/);
     expect(text).toContain("✗ export_table  Folder is read-only");
     expect(text).not.toContain("Step 4");
     expect(text).toContain("· Looked at 1 folder (msi); Read 2 files (endo_epi.imzML, samples.csv)");
