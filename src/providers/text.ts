@@ -6,7 +6,7 @@ const MARKER_OR_FANGED = new RegExp(`${tokens((c) => c)}|${tokens(FANGED)}`, "gi
 const FANGED_ONLY = new RegExp(tokens(FANGED), "gi");
 
 // A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
-// A marker that has zero-width spaces already gets one more, and a marker inside a marker gets its own, so that refang gives back the same text.
+// A marker that has zero-width spaces already gets one more. A marker inside a marker gets its own. Then refang gives back the same text.
 export function defang(text: string): string {
   return text.replace(MARKER_OR_FANGED, (m) => `${m[0]}\u200b${defang(m.slice(1))}`);
 }

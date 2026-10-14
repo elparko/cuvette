@@ -241,7 +241,7 @@ const LAB_ESCAPE_LOOKALIKE = "x[0-9a-f]{2}|u[0-9a-f]{4}|u\\{[0-9A-F]{5,6}\\}";
 const LAB_CONTROL = new RegExp(`(?<!\\\\)(\\\\+)(?=${LAB_ESCAPE_LOOKALIKE}|${LAB_HIDDEN})|${LAB_HIDDEN}`, "gu");
 
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
-// A backslash in front of text that looks like one of these escapes is doubled, so two different texts never show the same.
+// The function doubles a backslash in front of text that looks like one of these escapes. Then two different texts never show the same.
 export function labDisplayText(text: string): string {
   return text.replace(LAB_CONTROL, (c, run?: string) => {
     if (run !== undefined) return run + run;
