@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
 
@@ -85,6 +85,7 @@ function parse(path: string): Record<string, unknown> {
 }
 
 interface WalkState {
+  root: string;
   files: Record<string, string>;
   count: number;
   incomplete: string[];
@@ -111,6 +112,16 @@ function linkHash(p: string): string {
   return sha(`link:${target}:${content}`);
 }
 
+function leavesRoot(p: string, root: string): boolean {
+  try {
+    const real = realpathSync(p);
+    const rel = relative(root, real);
+    return statSync(real).isDirectory() && (rel.startsWith("..") || isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
 function listing(dir: string, key: string, st: WalkState): void {
   const h = createHash("sha256");
   let n = 0;
@@ -134,6 +145,7 @@ function listing(dir: string, key: string, st: WalkState): void {
         st.files[`(listing) ${relative(key, dir)}`] = "too many files";
         return;
       }
+      if (l.isSymbolicLink() && leavesRoot(p, st.root)) st.linked.push(relative(key, p));
       h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? "link" : ""}\n`);
       if (l.isDirectory()) stack.push(p);
     }
@@ -289,7 +301,7 @@ export function scanFolder(folder: string): FolderScan {
       }
       if (!st.isDirectory()) continue;
       const found: string[] = [];
-      const state: WalkState = { files, count: 0, incomplete, linked };
+      const state: WalkState = { root: realpathSync(dir), files, count: 0, incomplete, linked };
       walk(dir, key, state, found);
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }

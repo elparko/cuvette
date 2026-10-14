@@ -424,6 +424,28 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
     expect(scanFolder(folder).hash).not.toBe(second);
   });
 
+  test("a link to a folder outside the adapter folder is linked also inside node_modules, .venv and .git", () => {
+    const outside = join(root, "outside-listed");
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "code.py"), "print(1)\n");
+    for (const listed of ["node_modules", ".venv", ".git"]) {
+      const folder = join(root, `listed-${counter++}`);
+      const base = join(folder, ".cuvette", "adapters", "tool");
+      mkdirSync(join(base, listed, "lib"), { recursive: true });
+      writeFileSync(join(base, "adapter.yaml"), "name: tool\n");
+      writeFileSync(join(base, listed, "lib", "a.py"), "a\n");
+      symlinkSync("lib", join(base, listed, "lib64"));
+      symlinkSync(join(base, "adapter.yaml"), join(base, listed, "file-link"));
+      expect(scanFolder(folder).linked, listed).toEqual([]);
+      trustFolder(folder);
+      expect(trustStatus(folder).state, listed).toBe("trusted");
+      symlinkSync(outside, join(base, listed, "escape"));
+      expect(scanFolder(folder).linked, listed).toEqual([join(".cuvette", "adapters", "tool", listed, "escape")]);
+      expect(trustStatus(folder).state, listed).toBe("changed");
+      untrustFolder(folder);
+    }
+  });
+
   test("a link loop and a link that points at its own folder do not stop the scan", () => {
     const folder = join(root, "loops");
     const base = join(folder, ".cuvette", "adapters");
