@@ -251,6 +251,11 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   const project = dirs.projectDir ? realish(dirs.projectDir) : undefined;
   const homes = [...new Set([cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")].map(realish))];
   const inside = (h: string) => !!project && within(h, project);
+  for (const home of homes) {
+    const parts = OPEN_PARTS.map((n) => join(home, n));
+    out.locked.push(...parts);
+    out.open.push(...parts);
+  }
   for (const home of homes.filter((h) => inside(h) || h === realish(cuvetteHome()))) {
     let index: string[] = [];
     try {

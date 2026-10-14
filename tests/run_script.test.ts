@@ -787,3 +787,83 @@ test.skipIf(!sandboxWorks)("a model command cannot write the settings of the Cuv
     else process.env.CUVETTE_HOME = old;
   }
 });
+
+function outsideHome() {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-")));
+  for (const d of ["envs/x", "cache", "adapters/x", "adapters/y", "methods", "skills"]) mkdirSync(join(home, ...d.split("/")), { recursive: true });
+  writeFileSync(join(home, "adapters", "x", "adapter.yaml"), "a: 1");
+  return home;
+}
+
+async function withHomeEnv<T>(home: string, body: () => Promise<T> | T): Promise<T> {
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    return await body();
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
+}
+
+test("the profile and the bubblewrap arguments lock the adapters, methods and skills folders of the home folder, and not envs or cache", async () => {
+  const l = layout();
+  const home = outsideHome();
+  await withHomeEnv(home, () => {
+    const steps = writeSteps(l.dirs);
+    const rules = writeRules(steps);
+    for (const n of ["adapters", "methods", "skills"]) expect(rules).toContain(`(deny file-write* (subpath "${join(home, n)}"))`);
+    expect(rules).not.toContain(join(home, "envs"));
+    expect(rules).not.toContain(join(home, "cache"));
+    expect(steps.some((x) => x.allow)).toBe(false);
+    const args = bwrapCommand(["tool"], steps).join(" ");
+    for (const n of ["adapters", "methods", "skills"]) expect(args).toContain(`--ro-bind ${join(home, n)} ${join(home, n)}`);
+    expect(args).not.toContain(join(home, "envs"));
+    const own = writeSteps(l.dirs, { adapterRoot: join(home, "adapters", "x") }).filter((x) => x.allow).map((x) => x.path);
+    expect(own).toEqual([join(home, "adapters", "x")]);
+    expect(bwrapCommand(["tool"], writeSteps(l.dirs, { adapterRoot: join(home, "adapters", "x") })).join(" ")).toContain(`--bind ${join(home, "adapters", "x")} ${join(home, "adapters", "x")}`);
+  });
+});
+
+test.skipIf(!sandboxWorks)("run_command and run_script cannot write the adapters, methods or skills of the home folder, and write envs and cache there", async () => {
+  const l = layout();
+  const home = outsideHome();
+  await withHomeEnv(home, async () => {
+    const ctx = { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
+    const command = genericTools(l.dirs).find((t) => t.name === "run_command")!;
+    const script = runScriptTool(l.dirs, { network: false });
+    const targets = [join(home, "adapters", "new", "adapter.yaml"), join(home, "adapters", "x", "evil.py"), join(home, "methods", "m.json"), join(home, "skills", "s.md")];
+    for (const t of targets) {
+      const cmd = `mkdir -p "$(dirname ${JSON.stringify(t)})" && echo x > ${JSON.stringify(t)}`;
+      expect((await command.execute({ purpose: "Test", does: "Runs a test.", argv: ["/bin/sh", "-c", cmd] }, ctx)).ok, `command ${t}`).toBe(false);
+      const code = `import os\nos.makedirs(os.path.dirname(${JSON.stringify(t)}), exist_ok=True)\nopen(${JSON.stringify(t)}, 'w').write('x')`;
+      expect((await script.execute({ purpose: "Test", does: "Runs a test.", code }, ctx)).ok, `script ${t}`).toBe(false);
+      expect(existsSync(t), t).toBe(false);
+    }
+    expect(readFileSync(join(home, "adapters", "x", "adapter.yaml"), "utf8")).toBe("a: 1");
+    expect(existsSync(join(home, "adapters", "new"))).toBe(false);
+    for (const t of [join(home, "envs", "x", "file"), join(home, "cache", "f")]) {
+      expect((await command.execute({ purpose: "Test", does: "Runs a test.", argv: ["/bin/sh", "-c", `echo ok > ${JSON.stringify(t)}`] }, ctx)).error, `command ${t}`).toBeUndefined();
+      expect((await script.execute({ purpose: "Test", does: "Runs a test.", code: `open(${JSON.stringify(t)}, 'w').write('ok')` }, ctx)).error, `script ${t}`).toBeUndefined();
+      expect(readFileSync(t, "utf8").trim()).toBe("ok");
+    }
+  });
+});
+
+test.skipIf(!sandboxWorks)("an adapter program writes its own home adapter folder and not the folder of another adapter", async () => {
+  const l = layout();
+  const home = outsideHome();
+  await withHomeEnv(home, async () => {
+    const own = join(home, "adapters", "x");
+    const run = async (target: string) => {
+      const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(target)}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterRoot: own });
+      return spawnSync(g.argv[0]!, g.argv.slice(1)).status;
+    };
+    expect(await run(join(own, "cache.txt"))).toBe(0);
+    expect(readFileSync(join(own, "cache.txt"), "utf8")).toBe("ok\n");
+    expect(await run(join(home, "adapters", "y", "evil.txt"))).not.toBe(0);
+    expect(await run(join(home, "methods", "m.json"))).not.toBe(0);
+    expect(await run(join(home, "adapters", "new.txt"))).not.toBe(0);
+    expect(await run(join(home, "envs", "x", "lib"))).toBe(0);
+  });
+});
