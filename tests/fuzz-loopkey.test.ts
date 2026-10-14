@@ -148,6 +148,15 @@ describe("fuzz: the key of a tool result", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  test("a web address with a tmp folder is not a temporary path", () => {
+    const k = (text: string) => key({ ok: true, text }, "/p/out");
+    expect(k("https://h/tmp/a.csv")).not.toBe(k("https://h/tmp/b.csv"));
+    expect(k("see ftp://host/Temp/a.csv")).not.toBe(k("see ftp://host/Temp/b.csv"));
+    expect(k("s://h/tmp/a.csv")).not.toBe(k("s://h/tmp/b.csv"));
+    expect(k("saved C:\\Users\\u\\AppData\\Local\\Temp\\a.csv")).toBe(k("saved C:\\Users\\u\\AppData\\Local\\Temp\\b.csv"));
+    expect(k("saved (D:/temp/a.csv)")).toBe(k("saved (D:/temp/b.csv)"));
+  });
+
   test("each kind of noise alone is removed from a text", () => {
     const r = new Rng(61004);
     for (const name of Object.keys(NOISE)) {

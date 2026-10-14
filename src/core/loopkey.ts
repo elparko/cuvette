@@ -8,7 +8,7 @@ const quoted = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TEMP_ROOTS = [...new Set(["/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp", "/var/folders", "/private/var/folders", "/dev/shm", tmpdir()])].map(quoted).join("|");
 const PATH_CHAR = "[^\\s\"'`,;)\\]}]";
 const WINDOWS_CHAR = "[^\\s\"'`,;)\\]}:]";
-const TEMP_PATH = new RegExp(`(?<![\\w./~-])(?:${TEMP_ROOTS})/${PATH_CHAR}+|[A-Za-z]:[\\\\/](?:${WINDOWS_CHAR}*[\\\\/])?[Tt](?:emp|mp)[\\\\/]${WINDOWS_CHAR}+`, "g");
+const TEMP_PATH = new RegExp(`(?<![\\w./~-])(?:${TEMP_ROOTS})/${PATH_CHAR}+|(?<![\\w])[A-Za-z]:(?![\\\\/]{2})[\\\\/](?:${WINDOWS_CHAR}*[\\\\/])?[Tt](?:emp|mp)[\\\\/]${WINDOWS_CHAR}+`, "g");
 
 const RULES: [RegExp, string][] = [
   [/\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:?\d\d)?/g, "<time>"],
