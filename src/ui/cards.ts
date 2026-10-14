@@ -423,7 +423,7 @@ export function setupValues(fields: DecisionFieldLike[], card: Extract<Card, { t
 
 export function numberProblem(f: DecisionFieldLike, raw: string): string | undefined {
   const n = Number(raw);
-  if (raw.trim() === "" || Number.isNaN(n)) return "Type a number.";
+  if (raw.trim() === "" || !Number.isFinite(n)) return "Type a number.";
   if (f.lo !== undefined && n < f.lo) return `The minimum is ${f.lo}.`;
   if (f.hi !== undefined && n > f.hi) return `The maximum is ${f.hi}.`;
   return undefined;
@@ -666,7 +666,7 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
       return itemCount(card) ? to("pick") : { state: st };
     case "item": {
       const i = act.n - 1;
-      if (i < 0 || i >= itemCount(card)) return to(after);
+      if (!Number.isInteger(i) || i < 0 || i >= itemCount(card)) return to(after);
       if (i < ndefs) return to("definition", { defIndex: i });
       const nset = (card.settings ?? []).length;
       if (i < ndefs + nset) return to("setting", { setIndex: i - ndefs });
@@ -674,6 +674,7 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
     }
     case "setValue": {
       const v = typeof act.value === "string" ? act.value.trim() : act.value;
+      if (st.setIndex < 0) return { state: st };
       if (v === "" || v === undefined) return to(after);
       return respond({ action: "set", index: st.setIndex, value: v });
     }
@@ -734,7 +735,7 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
       if (s === "confirm") return respond({ action: "confirm" });
       if (s === "another") return respond({ action: "another" });
       if (s === "change") return to("change");
-      return respond({ action: "change", text: s });
+      return s.trim() ? respond({ action: "change", text: s.trim() }) : { state: st };
     }
   }
 }
