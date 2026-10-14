@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -232,8 +232,10 @@ describe("the app server under random requests", () => {
   });
 
   test("many parallel requests all end", async () => {
-    const all = await Promise.all(Array.from({ length: runs(150) }, (_, i) => get(withToken(["/api/state", "/api/commands", "/api/tab?name=analysis", "/api/dirs?p=/", "/api/sessions.json", "/nope"][i % 6]!))));
-    expect(all.every((r) => r.status > 0 && r.closed)).toBe(true);
+    const targets = ["/api/state", "/api/commands", "/api/tab?name=analysis", "/api/dirs?p=/", "/api/sessions.json", "/nope"];
+    const all: Reply[] = [];
+    for (let round = 0; round < runs(1); round++) all.push(...(await Promise.all(Array.from({ length: 150 }, (_, i) => get(withToken(targets[i % targets.length]!))))));
+    expect(all.filter((r) => !(r.status > 0 && r.closed)).map((r) => r.head.slice(0, 80))).toEqual([]);
     expect(all.filter((r) => r.status >= 500)).toEqual([]);
   });
 });
@@ -360,6 +362,91 @@ describe("the step graph routes", () => {
       expect(errors).toEqual([]);
     } finally {
       w.close();
+    }
+  });
+});
+
+describe("files that the app serves", () => {
+  test("a broken image, a folder, an empty file and a file without read access get a clear status", async () => {
+    const dir = session.cwd;
+    writeFileSync(join(dir, "broken.png"), "not a png");
+    writeFileSync(join(dir, "empty.png"), "");
+    writeFileSync(join(dir, "closed.txt"), "closed");
+    mkdirSync(join(dir, "folder.png"), { recursive: true });
+    chmodSync(join(dir, "closed.txt"), 0);
+    const file = (name: string, q = "") => get(withToken(`/api/file?p=${encodeURIComponent(join(dir, name))}${q}`));
+    try {
+      for (const [name, q] of [["broken.png", "&w=100"], ["empty.png", "&w=100"], ["broken.png", "&w=1e9"], ["broken.png", "&w=-5"], ["broken.png", "&download=1"], ["folder.png", ""], ["folder.png", "&w=100"], ["closed.txt", ""], ["nothing.png", "&w=100"]] as const) {
+        const r = await file(name, q);
+        expect(r.status, name + q).toBeLessThan(500);
+        expect(r.closed).toBe(true);
+        expect(r.body).not.toMatch(/\n\s+at .*(\.ts|\.js):\d+/);
+        expect(r.body).not.toContain(dir);
+      }
+    } finally {
+      chmodSync(join(dir, "closed.txt"), 0o644);
+    }
+    await alive();
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("the app server while sessions open and close", () => {
+  test("parallel open, close, send and stream requests never crash the server", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "cuvette-fuzz-app-folder-"));
+    const made: FakeSession[] = [];
+    const other = await startApp({
+      env: { ANTHROPIC_API_KEY: "sk-ant-test-0000000000000000000000" },
+      makeSession: async () => {
+        await new Promise((d) => setTimeout(d, 5));
+        const s = new FakeSession();
+        made.push(s);
+        return s;
+      },
+    });
+    const base = `http://127.0.0.1:${other.port}`;
+    const call = (path: string, body?: unknown) => fetch(`${base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { "x-token": other.token }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10000) }).then(async (r) => ({ status: r.status, text: await r.text() }));
+    try {
+      const rng = new Rng(23);
+      const ops: (() => Promise<{ status: number; text: string }>)[] = [
+        () => call("/api/open", { folder }),
+        () => call("/api/open", { folder: folder + "/" }),
+        () => call("/api/close", {}),
+        () => call("/api/send", { text: "hello" }),
+        () => call("/api/stop", {}),
+        () => call("/api/mode", { mode: "plan" }),
+        () => call("/api/state"),
+        () => call("/api/tab?name=analysis"),
+        () => call("/api/tab?name=results"),
+        () => call("/api/tab?name=decisions"),
+        () => call("/api/tab?name=record"),
+        () => call("/api/act", { id: 1, act: "answer", value: "0" }),
+        async () => {
+          const ac = new AbortController();
+          const r = await fetch(`${base}/events`, { headers: { "x-token": other.token }, signal: ac.signal });
+          const reader = r.body!.getReader();
+          await reader.read();
+          ac.abort();
+          return { status: r.status, text: "" };
+        },
+      ];
+      const bad: string[] = [];
+      for (let round = 0; round < runs(40); round++) {
+        const batch = Array.from({ length: rng.int(2, 8) }, () => rng.pick(ops)());
+        for (const r of await Promise.allSettled(batch)) {
+          if (r.status === "rejected") {
+            if (!/abort/i.test(String(r.reason))) bad.push(String(r.reason));
+          } else if (r.value.status >= 500 || /\n\s+at .*(\.ts|\.js):\d+/.test(r.value.text)) bad.push(`${r.value.status} ${r.value.text.slice(0, 100)}`);
+        }
+        await new Promise((d) => setTimeout(d, rng.int(0, 15)));
+      }
+      expect(bad).toEqual([]);
+      expect(errors).toEqual([]);
+      expect((await call("/api/state")).status).toBe(200);
+    } finally {
+      await other.close();
+      for (const s of made) rmSync(s.dir, { recursive: true, force: true });
+      rmSync(folder, { recursive: true, force: true });
     }
   });
 });
