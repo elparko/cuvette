@@ -126,13 +126,13 @@ function shadows(name: string): string | undefined {
   return undefined;
 }
 
-const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g;
+const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
 
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
 export function labDisplayText(text: string): string {
   return text.replace(LAB_CONTROL, (c) => {
-    const n = c.charCodeAt(0);
-    return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : `\\u${n.toString(16).padStart(4, "0")}`;
+    const n = c.codePointAt(0)!;
+    return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
   });
 }
 
@@ -168,7 +168,7 @@ export const labLong = (s: FolderScan) => !!s.lab && (s.lab.split("\n").length >
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
   const { bytes: labBytes, big: labBig, problem: labProblem } = readLab(join(key, LAB_FILE));
-  const lab = labBytes ? labDisplayText(labBytes.toString("utf8").trim()) : "";
+  const lab = labBytes ? labDisplayText(labBytes.toString("utf8").replace(/\r\n?/g, "\n").trim()) : "";
   if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab && !labBig && !labProblem) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
