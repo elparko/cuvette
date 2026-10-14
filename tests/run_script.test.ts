@@ -615,3 +615,54 @@ test("the lock rules use the true case of a path", () => {
   const locked = writeSteps({ ...l.dirs, projectDir: variant }).filter((x) => !x.allow && !x.fixed).map((x) => x.path);
   expect(locked).toContain(join(l.project, ".cuvette"));
 });
+
+
+test("the settings files of a home folder inside the project are locked and hashed, also for a home that is not named .cuvette and for the old name", async () => {
+  const h = fakeHome();
+  const elsewhere = join(h.home, "lab", "cv");
+  mkdirSync(elsewhere, { recursive: true });
+  writeFileSync(join(elsewhere, "settings.json"), '{"trusted_folders":[]}');
+  const old = join(h.home, ".guided-analysis");
+  mkdirSync(old);
+  writeFileSync(join(old, "settings.json"), '{"hooks":{}}');
+  const oldHome = process.env.HOME;
+  process.env.HOME = h.home;
+  try {
+    await withHome(elsewhere, () => {
+      const scope = settingsScope(h.dirs);
+      expect(scope.locked).toEqual(expect.arrayContaining([join(elsewhere, "settings.json"), join(elsewhere, "settings.local.json"), join(old, "settings.json"), join(h.cuvette, "settings.json"), join(elsewhere, "sessions")]));
+      expect(scope.roots).toEqual([join(h.home, ".ga")]);
+      const guard = fingerprint(h.dirs, true);
+      mkdirSync(join(elsewhere, "envs"));
+      writeFileSync(join(elsewhere, "envs", "pkg"), "1");
+      expect(guard.changed()).toEqual([]);
+      writeFileSync(join(old, "settings.json"), '{"hooks":{"x":1}}');
+      writeFileSync(join(elsewhere, "settings.json"), '{"trusted_folders":[{"path":"/x"}]}');
+      expect(guard.changed().sort()).toEqual([join(elsewhere, "settings.json"), join(old, "settings.json")].sort());
+    });
+  } finally {
+    if (oldHome === undefined) delete process.env.HOME;
+    else process.env.HOME = oldHome;
+  }
+});
+
+test.skipIf(!sandboxWorks)("a script cannot write the settings of a home folder inside the project, but writes the other files of it", async () => {
+  const h = fakeHome();
+  const elsewhere = join(h.home, "lab", "cv");
+  mkdirSync(elsewhere, { recursive: true });
+  writeFileSync(join(elsewhere, "settings.json"), '{"trusted_folders":[]}');
+  const oldHome = process.env.HOME;
+  process.env.HOME = h.home;
+  try {
+    await withHome(elsewhere, async () => {
+      const tool = runScriptTool(h.dirs, { network: false });
+      const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: h.out, sessionDir: h.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+      expect((await run(`open(${JSON.stringify(join(elsewhere, "cache.txt"))}, 'w').write('ok')`)).error).toBeUndefined();
+      expect((await run(`open(${JSON.stringify(join(elsewhere, "settings.json"))}, 'a').write('x')`)).ok).toBe(false);
+      expect(readFileSync(join(elsewhere, "settings.json"), "utf8")).toBe('{"trusted_folders":[]}');
+    });
+  } finally {
+    if (oldHome === undefined) delete process.env.HOME;
+    else process.env.HOME = oldHome;
+  }
+});
