@@ -228,7 +228,7 @@ test("locate: a version command that runs longer than the time limit gives the m
   expect(r.how).toContain("longer than 0.3 s");
 });
 
-function napPythonAdapter(delayS: number): string {
+function napPythonAdapter(delayS: number, connectionExtra = ""): string {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-nappy-"));
   const exe = join(dir, "python");
   writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; *) exec python3 "$@";; esac\n`);
@@ -239,7 +239,7 @@ function napPythonAdapter(delayS: number): string {
     [
       "adapter: { name: nappy }",
       'program: { name: openpyxl, version: "from the manifest" }',
-      'connection: { kind: python, interpreter: ["{program_path}"] }',
+      `connection: { kind: python, interpreter: ["{program_path}"]${connectionExtra} }`,
       "locate:",
       `  paths: [${JSON.stringify(exe)}]`,
       '  version_command: ["{program_path}", "-W", "ignore", "-c", "print(1)"]',
@@ -441,5 +441,42 @@ test("start: the start timer does not kill a process id after the worker has sto
   } finally {
     kill.mockRestore();
     await rt.close();
+  }
+}, 20000);
+
+test("warm: an import of the adapter modules that does not end stops at the start time limit", async () => {
+  if (process.platform === "win32") return;
+  const dir = warmPythonAdapter(40, 'exec python3 "$@"', "", 2);
+  const { rt, call } = await quickStart(dir);
+  rt.warm!(true);
+  await until(() => existsSync(join(dir, "imported")));
+  const pid = Number(readFileSync(join(dir, "imported"), "utf8"));
+  const t0 = Date.now();
+  const out = await call();
+  expect(out.ok).toBe(false);
+  expect(out.error).toMatch(/did not end within 2 s/);
+  expect(Date.now() - t0).toBeLessThan(4000);
+  await until(() => !alive(pid));
+  await rt.close();
+}, 20000);
+
+test("a call after a call that timed out starts a new worker", async () => {
+  if (process.platform === "win32") return;
+  const home = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  try {
+    const a = loadAdapter(napPythonAdapter(0, ", call_timeout_s: 1"));
+    const d = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
+    const rt = await startAdapter(a, d);
+    const nap = (await rt.tools()).find((t) => t.name === "nap")!;
+    const slow = nap.execute({ seconds: 5 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
+    const next = nap.execute({ seconds: 0 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
+    expect((await slow).error).toMatch(/timed out after 1 s/);
+    const out = await next;
+    expect(out.error).toBeUndefined();
+    expect(out.ok).toBe(true);
+    await rt.close();
+  } finally {
+    process.env.CUVETTE_HOME = home;
   }
 }, 20000);
