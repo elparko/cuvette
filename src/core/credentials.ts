@@ -107,8 +107,8 @@ export const WORKSPACE_HELP =
 
 export function removeClaudeKey(): boolean {
   const path = credentialsPath();
-  if (!existsSync(path)) return false;
   const rest = readFile();
+  if (!rest.anthropic_api_key) return false;
   delete rest.anthropic_api_key;
   if (Object.keys(rest).length) writeFileSync(path, JSON.stringify(rest, null, 1) + "\n", { mode: 0o600 });
   else rmSync(path);

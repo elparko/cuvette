@@ -35,7 +35,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 function intact(e: unknown): e is Entry {
   if (!isObject(e) || typeof e.kind !== "string" || !Number.isFinite(e.id) || !isObject(e.data)) return false;
   const d = e.data;
-  if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
+  if (e.kind === "node") return typeof d.id === "string" && typeof d.tool === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
   if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
   if (e.kind === "stale") return Array.isArray(d.nodes ?? []);
   if (e.kind === "compaction") return Array.isArray(d.kept ?? []);

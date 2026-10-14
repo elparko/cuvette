@@ -110,7 +110,7 @@ test("a wrong key fails and records no push", async () => {
 
 test("push without setup says how to set up", async () => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-eln-none-"));
-  await expect(s.elnPush()).rejects.toThrow(/not set up/);
+  await expect(s.elnPush()).rejects.toThrow(/no saved address or key/);
 });
 
 test("link reads the experiment and its items and proposes setup values without applying them", async () => {

@@ -217,7 +217,7 @@ export class Mapper {
       case "method":
         return line("▸", d.action === "saved" ? `Saved the method ${String(d.name)}: ${String(d.path ?? "")}` : `Started from the method ${String(d.name)}. The questions come with the saved answers.`, "cyan");
       case "stale":
-        return line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow");
+        return ((d.nodes as string[]) ?? []).length ? line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow") : [];
       case "note":
         return line("▸", String(d.text ?? ""), undefined, true);
       case "phi": {

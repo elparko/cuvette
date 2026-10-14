@@ -66,13 +66,20 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
       headers["Content-Type"] = "application/json";
       payload = JSON.stringify(body);
     }
-    const res = await fetchImpl(root + path, { method, headers, body: payload });
+    const res = await fetchImpl(root + path, { method, headers, body: payload }).catch(() => {
+      throw new ElabftwError(`Cuvette cannot reach the eLabFTW server ${baseUrl(cfg.url)}. Check the network and the address. Type /eln status to see the address.`, 0);
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new ElabftwError(`eLabFTW answered ${res.status} to ${method} ${path}${text ? `: ${text.slice(0, 200)}` : ""}`, res.status);
     }
     return res;
   }
+
+  const json = async (res: Response): Promise<unknown> =>
+    res.json().catch(() => {
+      throw new ElabftwError(`The server ${baseUrl(cfg.url)} did not answer like eLabFTW. Check the address. Type /eln status to see it.`, res.status);
+    });
 
   const idFrom = (res: Response): number => {
     const m = /\/(\d+)\/?$/.exec(res.headers.get("location") ?? "");
@@ -104,7 +111,7 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
 
     async readEntity(type: "experiments" | "items", id: number): Promise<ElabEntity> {
       id = entityId(id);
-      const j = (await (await call("GET", `/${type}/${id}`)).json()) as Record<string, unknown>;
+      const j = (await json(await call("GET", `/${type}/${id}`))) as Record<string, unknown>;
       return {
         id: Number(j.id ?? id),
         title: String(j.title ?? ""),
@@ -116,12 +123,12 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
     },
 
     async listItemLinks(id: number): Promise<ElabLink[]> {
-      const list = (await (await call("GET", `/experiments/${entityId(id)}/items_links`)).json()) as ElabLink[];
+      const list = (await json(await call("GET", `/experiments/${entityId(id)}/items_links`))) as ElabLink[];
       return Array.isArray(list) ? list.filter((l) => Number.isInteger(Number(l?.entityid)) && Number(l.entityid) > 0) : [];
     },
 
     async listRevisions(id: number): Promise<{ id: number; created_at: string }[]> {
-      return (await (await call("GET", `/experiments/${entityId(id)}/revisions`)).json()) as { id: number; created_at: string }[];
+      return (await json(await call("GET", `/experiments/${entityId(id)}/revisions`))) as { id: number; created_at: string }[];
     },
 
     async importEln(name: string, data: Buffer, entityType: "experiments" | "items" = "experiments"): Promise<number> {
