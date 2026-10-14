@@ -7,7 +7,7 @@ import type { AdapterRuntime } from "../runtime.ts";
 import { expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 import { blindArgv, blindPolicy } from "../blind.ts";
-import { fingerprint, guardCommand } from "../../tools/run_script.ts";
+import { fingerprint, guardCommand, logFingerprint } from "../../tools/run_script.ts";
 import { ROOT } from "../../root.ts";
 
 const WORKER = join(ROOT, "src/adapters/kinds/python_worker.py");
@@ -68,7 +68,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let ready: Promise<void> | undefined;
   let spawnedWith = "";
   let profile = "";
-  let baseline: { changed(): string[] } | undefined;
+  let logBase: { changed(): string[] } | undefined;
   let closed = false;
   let generation = 0;
   let warming: { error?: unknown } | undefined;
@@ -100,7 +100,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     const env = childEnv(c, { PYTHONIOENCODING: "utf-8", MPLBACKEND: "Agg" });
     const guarded = await guardCommand([...interpreter(), "-u", WORKER, c.adapter.root], c.dirs, { cwd: c.dirs.workDir, env, adapterRoot: c.adapter.root });
     if (closed || mine !== generation) throw new Error("the adapter process stopped before it started");
-    baseline = guarded;
+    logBase = logFingerprint(c.dirs);
     const argv = blindArgv(guarded.argv);
     const p = spawn(argv[0], argv.slice(1), {
       cwd: c.dirs.workDir,
@@ -245,6 +245,7 @@ export function startPython(c: KindContext): AdapterRuntime {
           return { ok: false, error: `the import of the adapter modules did not end within ${conn.startup_timeout_s} s` };
         }
       }
+      const guard = fingerprint(c.dirs, false);
       const id = nextId;
       const reply = send({ function: fn, args, out_dir: outDir });
       const timeout = setTimeout(() => {
@@ -261,8 +262,8 @@ export function startPython(c: KindContext): AdapterRuntime {
       signal.addEventListener("abort", abort, { once: true });
       try {
         const r = await reply;
-        const changed = baseline?.changed() ?? [];
-        if (!changed.length) baseline = fingerprint(c.dirs, true);
+        const changed = [...guard.changed(), ...(logBase?.changed() ?? [])];
+        if (!changed.length) logBase = logFingerprint(c.dirs);
         if (changed.length) return { ok: false, error: `the program changed the record or the settings of Cuvette: ${changed.join(", ")}. A program must not write there. Check these files.` };
         return r;
       } finally {

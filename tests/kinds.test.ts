@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -7,6 +7,7 @@ import { afterAll, expect, test } from "vitest";
 import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
+import { noteHarnessWrite } from "../src/core/harness-writes.ts";
 import { interruptTarget } from "../src/adapters/kinds/python.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
@@ -768,29 +769,97 @@ test.skipIf(!sandboxWorks)("under the real sandbox a python adapter writes, rena
 });
 
 
-test("a change of the settings between two calls is reported at the next call and again until the file is as before", async () => {
+async function integrityAdapter(extra = "") {
+  const oldHome = process.env.CUVETTE_HOME;
+  const home = realpathSync(mkdtempSync(join(root, "home-")));
+  process.env.CUVETTE_HOME = home;
   const project = realpathSync(mkdtempSync(join(root, "project-")));
   const out = join(project, "cuvette", "mine");
   mkdirSync(join(out, ".record"), { recursive: true });
   mkdirSync(join(project, ".cuvette"), { recursive: true });
   const settings = join(project, ".cuvette", "settings.json");
+  const index = join(home, "sessions-index.json");
+  const log = join(out, ".record", "log.jsonl");
   writeFileSync(settings, "{}");
-  const dir = pythonWriter(project, "pz", "");
+  writeFileSync(index, "[]");
+  writeFileSync(log, '{"id":1}\n');
+  const dir = adapter(`${head("python", "  call_timeout_s: 30\n")}tools:\n  - { name: ok, description: d, function: "m:ok" }\n  - { name: wait, description: d, function: "m:wait", params: { flag: { type: string }, started: { type: string } }, required: [flag, started] }\n`, {
+    "m.py": "import os, time\ndef ok():\n    return {'metrics': {'v': 1}}\ndef wait(flag, started):\n    open(started, 'w').write('1')\n    for _ in range(400):\n        if os.path.exists(flag):\n            break\n        time.sleep(0.05)\n    return {'metrics': {'v': 1}}\n",
+  });
   const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
   const rt = await startAdapter(loadAdapter(dir), dirs);
   started.push(rt);
-  const tool = (await rt.tools()).find((t) => t.name === "append")!;
-  const run = () => tool.execute({ target: join(out, "free.txt") }, ctx(out, dirs.sessionDir));
-  expect((await run()).ok).toBe(true);
-  writeFileSync(settings, '{"permissions":"bypass"}');
-  for (let i = 0; i < 2; i++) {
-    const r = await run();
-    expect(r.ok).toBe(false);
-    expect(r.error).toContain(settings);
+  const tools = Object.fromEntries((await rt.tools()).map((t) => [t.name, t]));
+  const c = ctx(out, dirs.sessionDir);
+  const restore = () => {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+  };
+  return { tools, c, settings, index, log, home, out, restore };
+}
+
+const untilFile = async (p: string) => {
+  for (let i = 0; i < 400 && !existsSync(p); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(existsSync(p)).toBe(true);
+};
+
+test("the harness writes the settings and the index between calls: the next calls have no integrity error", async () => {
+  const t = await integrityAdapter();
+  try {
+    expect((await t.tools.ok!.execute({}, t.c)).ok).toBe(true);
+    writeFileSync(t.settings, '{"effort":"high"}');
+    writeFileSync(t.index, '[{"id":"x"}]');
+    writeFileSync(`${t.index}.12345.tmp`, "[]");
+    for (let i = 0; i < 2; i++) {
+      const r = await t.tools.ok!.execute({}, t.c);
+      expect(r.error).toBeUndefined();
+      expect(r.ok).toBe(true);
+    }
+  } finally {
+    t.restore();
   }
-  writeFileSync(settings, "{}");
-  expect((await run()).ok).toBe(true);
-  expect((await run()).ok).toBe(true);
+});
+
+test("a write to the settings during a call without a harness write is an error, and with a harness write it is not", async () => {
+  const t = await integrityAdapter();
+  try {
+    for (const harness of [false, true]) {
+      const flag = join(t.out, `flag-${harness}`);
+      const mark = join(t.out, `started-${harness}`);
+      const run = t.tools.wait!.execute({ flag, started: mark }, t.c);
+      await untilFile(mark);
+      writeFileSync(t.settings, `{"n":${harness ? 1 : 2}}`);
+      writeFileSync(t.index, `[{"n":${harness ? 1 : 2}}]`);
+      if (harness) noteHarnessWrite();
+      writeFileSync(flag, "1");
+      const r = await run;
+      if (harness) {
+        expect(r.error).toBeUndefined();
+        expect(r.ok).toBe(true);
+      } else {
+        expect(r.ok).toBe(false);
+        expect(r.error).toContain(t.settings);
+        expect(r.error).toContain(t.index);
+      }
+    }
+  } finally {
+    t.restore();
+  }
+});
+
+test("a change in the old part of the log between calls is an error, and an append is not", async () => {
+  const t = await integrityAdapter();
+  try {
+    expect((await t.tools.ok!.execute({}, t.c)).ok).toBe(true);
+    appendFileSync(t.log, '{"id":2}\n');
+    expect((await t.tools.ok!.execute({}, t.c)).ok).toBe(true);
+    writeFileSync(t.log, '{"id":9}\n{"id":2}\n');
+    const r = await t.tools.ok!.execute({}, t.c);
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain(t.log);
+  } finally {
+    t.restore();
+  }
 });
 
 test("the python worker starts again when the blind policy turns on after it started", async () => {

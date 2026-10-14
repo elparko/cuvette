@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { noteHarnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -339,6 +340,33 @@ test("Linux wrap: bubblewrap mounts a locked folder read-only after the writable
   expect(b.indexOf(`--bind ${l.project} ${l.project}`)).toBeGreaterThan(-1);
   expect(b.indexOf(`--ro-bind ${join(l.project, ".cuvette")} ${join(l.project, ".cuvette")}`)).toBeGreaterThan(b.indexOf(`--bind ${l.project} ${l.project}`));
   expect(b).toContain(`--ro-bind ${join(l.other, ".record")} ${join(l.other, ".record")}`);
+});
+
+test("the check ignores a change of the settings if the harness wrote a settings file or an index during the script, and ignores temp files of the index", () => {
+  const l = layout();
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-home-")));
+  const oldHome = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+  const quiet = fingerprint(l.dirs, true);
+  writeFileSync(join(home, `sessions-index.json.${process.pid}.tmp`), "[]");
+  expect(quiet.changed()).toEqual([]);
+  rmSync(join(home, `sessions-index.json.${process.pid}.tmp`));
+  const overlap = fingerprint(l.dirs, true);
+  writeFileSync(l.settings, '{"effort":"high"}');
+  noteHarnessWrite();
+  expect(overlap.changed()).toEqual([]);
+  const alone = fingerprint(l.dirs, true);
+  writeFileSync(l.settings, '{"effort":"low"}');
+  expect(alone.changed()).toEqual([l.settings]);
+  const log = fingerprint(l.dirs, true);
+  noteHarnessWrite();
+  writeFileSync(l.ownLog, '{"id":9}\n');
+  expect(log.changed()).toEqual([l.ownLog]);
+  } finally {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+  }
 });
 
 test("the check after the script finds a change of the settings or of the old part of the log", () => {
