@@ -19,7 +19,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function openChrome(): Promise<Page> {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-chrome-"));
-  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
+  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
   let port = "";
   for (let i = 0; i < 100 && !port; i++) {
     await wait(100);
