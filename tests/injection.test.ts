@@ -510,3 +510,13 @@ test("a very long file with hostile text is cut before it reaches the model, and
   expect(x.s.record.entries(["tool_result"])[0]!.data.ok).toBe(true);
   expect(JSON.stringify(x.s.record.entries()).length).toBeLessThan(200_000);
 });
+
+test("no tool of the model can change the mode, the permissions, the trust, the settings or the installed adapters", async () => {
+  const x = await start({ mode: "ask" });
+  const names = [...(x.s["tools"] as Map<string, unknown>).keys()];
+  expect(names.length).toBeGreaterThan(8);
+  expect(names.filter((n) => /install|trust|permission|approve|respond|mode|setting|config|bypass|credential|adapter_add|finding|resolve/i.test(n))).toEqual([]);
+  expect(names).toContain("run_script");
+  const unknown = ["set_mode", "set_permissions", "approve_permission", "respond_permission", "trust_folder", "install_adapter", "write_settings", "resolve_finding", "dismiss_finding"];
+  expect(unknown.filter((n) => names.includes(n))).toEqual([]);
+});
