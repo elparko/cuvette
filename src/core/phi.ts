@@ -97,9 +97,11 @@ function staffLine(lines: string[], i: number): boolean {
 }
 
 // A long line is read in parts of 4000 characters. The parts overlap, and a match that starts in the overlap belongs to the next part.
+// Each part also reads a few characters before it, so that a "\b" or a look-behind at the start of the part sees the true text.
 const PART = 4000;
-const STEP = 3800;
-const SPAN_RULES = TEXT_RULES.map((r) => ({ ...r, re: new RegExp(r.re.source, `${r.re.flags}d`) }));
+const STEP = 3000;
+const LEAD = 16;
+const SPAN_RULES = TEXT_RULES.map((r) => ({ ...r, re: new RegExp(r.re.source, `${r.re.flags}d`), whole: new RegExp(r.re.source, `${r.re.flags.replace("g", "")}yd`) }));
 
 // Two hits that overlap, such as a street and a city with the same word, become one hit. Else the mask of one hit leaves a part of the other.
 export function scanText(text: string, where: string): PhiHit[] {
@@ -109,20 +111,33 @@ export function scanText(text: string, where: string): PhiHit[] {
     let staff: boolean | undefined;
     const spans: { kind: PhiKind; a: number; b: number }[] = [];
     for (let at = 0; at === 0 || at + PART - STEP < full.length; at += STEP) {
-      const line = full.length > PART ? full.slice(at, at + PART) : full;
+      const from = Math.max(0, at - LEAD);
+      const lead = at - from;
+      const line = full.length > PART ? full.slice(from, at + PART) : full;
       const last = at + PART >= full.length;
       if (!QUICK.test(line)) continue;
       for (const r of SPAN_RULES) {
         r.re.lastIndex = 0;
         for (const m of line.matchAll(r.re)) {
-          if (!last && (m.index >= STEP || m.index + m[0].length >= line.length)) continue;
-          let [a, b] = (m.indices![1] ?? m.indices![0])!;
-          while (a < b && /\s/.test(line[a]!)) a++;
-          while (b > a && /\s/.test(line[b - 1]!)) b--;
-          if (b > a && /[.,]/.test(line[b - 1]!)) b--;
-          if (r.check && !r.check(line.slice(a, b), line)) continue;
+          if (m.index < lead || (!last && m.index - lead >= STEP)) continue;
+          let hit: RegExpMatchArray | null = m;
+          let src = line;
+          let base = from;
+          // A match that reaches the end of a part can go on after it. The scan reads it again in the full line, from the same start.
+          if (!last && m.index + m[0].length >= line.length) {
+            r.whole.lastIndex = from + m.index;
+            hit = r.whole.exec(full);
+            if (!hit) continue;
+            src = full;
+            base = 0;
+          }
+          let [a, b] = (hit.indices![1] ?? hit.indices![0])!;
+          while (a < b && /\s/.test(src[a]!)) a++;
+          while (b > a && /\s/.test(src[b - 1]!)) b--;
+          if (b > a && /[.,]/.test(src[b - 1]!)) b--;
+          if (r.check && !r.check(src.slice(a, b), full)) continue;
           if (STAFF_KINDS.has(r.kind) && (staff ??= staffLine(lines, i))) continue;
-          spans.push({ kind: r.kind, a: at + a, b: at + b });
+          spans.push({ kind: r.kind, a: base + a, b: base + b });
         }
       }
     }
