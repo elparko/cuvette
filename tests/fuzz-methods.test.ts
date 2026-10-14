@@ -207,6 +207,21 @@ describe("fuzz: methods", () => {
       return { back, loaded, notes };
     };
 
+    test("a record that has the older text of the notice gets no second notice", async () => {
+      const project = projectWith("old-notice");
+      const elsewhere = write(join(root, `elsewhere-${n++}`, "m.json"), "m");
+      const first = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd: project });
+      first.record.append("method", { action: "started", name: "rec", path: elsewhere });
+      first.record.append("notice", { text: `Cuvette did not load the saved method rec, because its file is not in your methods folder or in the methods folder of a trusted project: ${elsewhere}. To use it, type /method ${elsewhere}.`, warn: true });
+      const id = first.id;
+      await first.close();
+      const back = await Session.resume(id, { provider: new FakeProvider([{ text: "ok" }]), cwd: project });
+      const notes = back.record.entries(["notice"]).map((e) => String(e.data.text)).filter((t) => /did not load the saved method/.test(t));
+      await back.close();
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toContain("because its file");
+    });
+
     test("an explicit load works in a project with no .cuvette folder", async () => {
       const project = projectWith("plain");
       const file = write(join(project, "m.json"), "m");

@@ -567,7 +567,8 @@ export class Session {
           } catch {}
         else {
           const text = `Cuvette did not load the saved method ${String(used.data.name)}. Its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
-          if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+          const first = `Cuvette did not load the saved method ${String(used.data.name)}`;
+          if (!this.record.entries(["notice"]).some((n) => String(n.data.text).startsWith(first) && String(n.data.text).includes(file))) this.record.append("notice", { text, warn: true });
         }
       }
       this.history = this.record.messages();
