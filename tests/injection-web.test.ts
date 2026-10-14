@@ -1,5 +1,8 @@
-import { expect, test } from "vitest";
-import { cardHtml, runHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, expect, test } from "vitest";
+import { cardHtml, decisionsHtml, fileLink, imageHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
 import type { Item } from "../src/ui/items.ts";
 import type { Question } from "../src/core/types.ts";
@@ -29,7 +32,7 @@ const question = (EVIL: string): Question => ({
   created: "2026-01-01T00:00:00Z",
 });
 
-const ctxFor = (t: string) => ({ token: "tok", session: { decisions: { fields: () => [] }, questions: { open: () => [question(t)] }, adapterInfo: [{ title: t }] } }) as unknown as Ctx;
+const ctxFor = (t: string) => ({ token: "tok", session: { decisions: { fields: () => [] }, questions: { open: () => [question(t)] }, adapterInfo: [{ title: t }], adapters: [], record: { entries: () => [], live: () => [], nodes: () => [], rewound: () => new Set(), setAside: () => false, comparisons: () => [], stale: () => new Set(), citations: () => [] } } }) as unknown as Ctx;
 
 const slot = (card: Card, plan?: Partial<ReturnType<typeof planInit>>): Slot => {
   const s: Slot = { id: 1, card };
@@ -93,4 +96,38 @@ test("the web app never makes a link or an image from a link with a script addre
   expect(html).not.toMatch(/href="javascript/i);
   expect(html).not.toMatch(/<img/i);
   expect(html).toContain('href="https://example.com/a"');
+});
+
+const dirs: string[] = [];
+afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+
+const SHORT_EVIL = `<img src=x onerror=alert(1)>"><svg onload=alert(3)>'`;
+const SHORT_BENIGN = "plain [ok](a) text";
+
+test.skipIf(process.platform === "win32")("the web app shows hostile names of files, sheets and sessions as escaped data", () => {
+  const make = (t: string) => {
+    const short = t === EVIL ? SHORT_EVIL : SHORT_BENIGN;
+    const out = mkdtempSync(join(tmpdir(), "cuvette-inject-web-"));
+    dirs.push(out);
+    mkdirSync(join(out, "figures"));
+    writeFileSync(join(out, `${short}.csv`), "a");
+    writeFileSync(join(out, `${short}.png`), "a");
+    writeFileSync(join(out, "figures", `${short}.png`), "a");
+    const c = ctxFor(t);
+    const sheet = sheetHtml(question(t) && ({ ...question(t), table: { columns: [t, "b"], rows: [[t, t], [t, t]] } } as never));
+    const results = resultsHtml(c, out, [{ name: t, columns: [t, "b"], rows: [[t, t]] }]);
+    const sessions = sessionsHtml([{ id: "s1", cwd: `/data/${t.replace(/\//g, "_")}`, used: Date.now(), ask: t, name: t, description: t, status: "done" } as never], "tok");
+    const links = fileLink(c, `/tmp/${t.replace(/\//g, "_")}`, t) + imageHtml(c, `/tmp/${t.replace(/\//g, "_")}.png`, t);
+    const status = statusHtml([{ step: 1, current: false, reasons: [{ text: t }] }] as never);
+    return { sheet, results: results.split(out).join("OUT"), sessions, links, status };
+  };
+  const evil = make(EVIL);
+  const benign = make(BENIGN);
+  for (const k of Object.keys(evil) as (keyof typeof evil)[]) same(evil[k], benign[k]);
+});
+
+test("the web app shows hostile decision labels and values as escaped data", () => {
+  const field = (t: string) => ({ key: "alpha", label: t, kind: "str", choices: undefined, essential: true, owner: "human", value: t, set: true, help: t });
+  const make = (t: string) => decisionsHtml({ token: "tok", session: { decisions: { fields: () => [field(t)] }, record: { entries: () => [], nodes: () => [] }, labels: () => ({}) } } as never, [["alpha", t, "human", "agent"]], []);
+  same(make(EVIL), make(BENIGN));
 });

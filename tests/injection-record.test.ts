@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { transcriptText } from "../src/core/compaction.ts";
 import { logText, refereePrompt } from "../src/core/review.ts";
 import { Session } from "../src/core/session.ts";
+import { trustedFolders } from "../src/core/trust.ts";
 import type { Entry, EntryKind, Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -104,4 +105,16 @@ test("after the scientist asks for one change, the model cannot change the other
   const open = session.questions.open().map((q) => q.decisionKey);
   expect(open).toContain("method");
   expect(open).toContain("min_size");
+});
+
+test("a question from the model with the title of the trust question does not trust the folder", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const provider = new FakeProvider([{ calls: [{ name: "ask_scientist", args: { question: "Trust this folder?", options: ["trust", "once", "no"], recommendation: "trust", wait: false } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { askWaits: false, autoResume: false } });
+  await session.send("Look at the data.");
+  const lookalike = session.questions.open().find((q) => q.title === "Trust this folder?");
+  expect(lookalike).toBeTruthy();
+  await session.answer(lookalike!.qid, "trust");
+  expect(trustedFolders()).toEqual([]);
+  expect(session.record.entries(["trust"])).toEqual([]);
 });

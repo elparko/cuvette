@@ -2928,7 +2928,7 @@ export class Session {
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
     value = this.valueWithoutKeys(value);
     note = this.withoutKeys(note);
-    if (qid === this.trustQid || this.questions.get(qid)?.title === TRUST_TITLE) {
+    if (qid === this.trustQid) {
       const q = this.questions.get(qid);
       if (q?.status === "open") {
         const v = String(this.questions.match(q, value ?? "no"));
