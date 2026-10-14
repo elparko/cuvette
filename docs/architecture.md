@@ -446,9 +446,9 @@ take the first option of a list.
   values. Plan and teach mode deny a non-read-only tool before any hook runs.
 - **After an answer.** A call that the harness blocked runs again with the linked arguments set from the
   decision record, not with the value that the model proposed.
-- **Small models.** An adapter with more than 24 tools shows the model up to 16 of them. This applies when
-  `toolExposure` is `search`, or when it is `auto` and the model is small.
-  The harness chooses them by relevance to the request. The harness lists skills as procedures, not tools.
+- **Small models.** In search mode, the model sees fewer adapter tools at a time. Search mode applies when
+  `toolExposure` is `search`, or when it is `auto` with a small model and more than 24 adapter tools. The model uses `find_tools` for the rest.
+  The harness chooses the tools by relevance to the request. The harness lists skills as procedures, not tools.
   It removes null optional arguments. It reads a bare handle string such as `"h1"` as `{"handle": "h1"}`.
   An empty reply gets up to two retries. When the model produced tokens, the retry says that the
   call named a tool that does not exist (Ollama drops such calls without an error).

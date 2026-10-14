@@ -14,7 +14,8 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 - Your choice applies to the rest of the session. The record logs each decision as a `phi` entry, with masked values only.
 - A local model (Ollama, or an OpenAI-style server on this computer) gets no card. The record logs a notice.
 - A headless run has no one to answer the card. It masks the values and logs the decision.
-- The harness masks a result that goes to an MCP client. The harness stops a helper agent of the `task` tool when the check finds an identifier in its messages.
+- The harness masks a result that goes to an MCP client.
+- A helper agent of the `task` tool follows your choice. If you have not chosen, the harness stops the helper. A local model gets no check.
 - After "Mask", the harness does not send the record to a cloud referee or to the title model, because the record holds the values.
 - The `search_literature` tool sends only its query to api.sciencemadereadable.com. It sends no data file. It refuses a query that has a likely patient identifier. It asks you before each search, also in bypass mode.
 

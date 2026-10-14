@@ -51,7 +51,7 @@ the tool list and sends a tool list change notice.
 | `cuvette_export` | Write the trail, the protocol, a script, a notebook, a flow, an electronic lab notebook (ELN) file or an xlsx file. Returns the file path. |
 | `cuvette_eln_push` | Refuses to send data to eLabFTW. The scientist runs `cuvette eln push <session>` and approves the data. |
 
-The server also exposes shared tools, such as `list_adapters`, `use_adapter`, `calculate` and `read_file`.
+The server also exposes `calculate` and `read_file`. Without `--adapter`, it also exposes `list_adapters` and `use_adapter`.
 
 ## Use
 

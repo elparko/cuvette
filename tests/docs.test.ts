@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { parse } from "yaml";
 import { expect, test } from "vitest";
 import { COMMANDS } from "../src/ui/parity.ts";
 
@@ -65,18 +66,25 @@ test("relative links in the docs resolve to files and headings", () => {
   expect(broken).toEqual([]);
 });
 
+const TEST_SWITCHES = new Set(["CUVETTE_LIVE"]);
+
+const namesIn = (dirs: string[]) =>
+  new Set(
+    dirs
+      .flatMap((dir) => walk(join(ROOT, dir), (name) => CODE_EXT.test(name)))
+      .flatMap((file) => read(file).match(/\b[A-Z][A-Z0-9_]*[A-Z0-9]\b/g) ?? []),
+  );
+
 test("the docs name only environment variables that the code reads", () => {
-  const code = ["src", "bin", "scripts", "tests", "bench", "desktop"]
-    .flatMap((dir) => walk(join(ROOT, dir), (name) => CODE_EXT.test(name)))
-    .map(read)
-    .join("\n");
+  const product = namesIn(["src", "bin", "scripts", "bench", "desktop"]);
+  const tests = namesIn(["tests"]);
   const named = new Set<string>();
   for (const file of DOCS) {
     for (const match of read(file).matchAll(/\b(?:CUVETTE|GA|ANTHROPIC)_[A-Z][A-Z0-9_]*[A-Z0-9]\b/g)) named.add(match[0]);
   }
   const unknown = [...named].filter((name) => {
-    if (code.includes(name)) return false;
-    return !(name.startsWith("GA_") && code.includes(`CUVETTE_${name.slice(3)}`));
+    if (name.startsWith("GA_")) return !product.has(`CUVETTE_${name.slice(3)}`);
+    return !product.has(name) && !(TEST_SWITCHES.has(name) && tests.has(name));
   });
   expect(unknown).toEqual([]);
 });
@@ -86,4 +94,15 @@ test("the README adapter table lists every catalog adapter", () => {
   const listed = [...section.matchAll(/^\| `([^`]+)` \|/gm)].map((match) => match[1]!);
   const catalog = readdirSync(join(ROOT, "catalog")).filter((name) => statSync(join(ROOT, "catalog", name)).isDirectory());
   expect(listed.sort()).toEqual(catalog.sort());
+});
+
+test("each README adapter row names the connection of its kind", () => {
+  const section = read(join(ROOT, "README.md")).split("## Adapters")[1]!.split("## Benchmark")[0]!;
+  const rows = [...section.matchAll(/^\| `([^`]+)` \| [^|]* \| ([^|]*) \|/gm)].map((match) => [match[1]!, match[2]!.trim()]);
+  const wrong = rows.flatMap(([name, connection]) => {
+    const kind = parse(read(join(ROOT, "catalog", name, "adapter.yaml"))).connection?.kind;
+    const word = kind === "python" ? "Python" : kind === "cli" ? "command line" : undefined;
+    return word && !connection.includes(word) ? [`${name}: ${connection}`] : [];
+  });
+  expect(wrong).toEqual([]);
 });
