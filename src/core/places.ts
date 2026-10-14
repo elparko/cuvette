@@ -259,13 +259,22 @@ function findUp(start: string, outputFolder: string): Place | undefined {
   }
 }
 
+function inIndex(project: string): Place | undefined {
+  const rows = readIndex().filter((r) => resolve(r.project) === resolve(project)).sort((a, b) => b.date.localeCompare(a.date));
+  for (const r of rows) {
+    const p = placeAt(join(r.folder, ".record"));
+    if (p) return p;
+  }
+  return undefined;
+}
+
 export function findPlace(ref: string, opts: { cwd?: string; outputFolder?: string } = {}): Place | undefined {
   const cwd = opts.cwd ?? process.cwd();
   const path = resolve(cwd, ref.replace(/^~(?=\/|$)/, process.env.HOME ?? "~"));
   if (ref.includes("/") || ref === "." || ref === ".." || isAbsolute(ref) || (existsSync(path) && statSync(path).isDirectory())) {
     if (!existsSync(path)) return undefined;
     if (existsSync(join(path, "log.jsonl")) && !existsSync(join(path, "meta.json"))) return { ...legacyPlace(basename(path), cwd), recordDir: path, outDir: join(path, "work") };
-    const p = findUp(path, opts.outputFolder ?? "cuvette");
+    const p = findUp(path, opts.outputFolder ?? "cuvette") ?? inIndex(path);
     if (p) saveIndexRow(p);
     return p;
   }

@@ -934,3 +934,55 @@ describe("a session folder outside the project that moves with the home folder",
     await s.send("Thanks.");
   });
 });
+
+describe("a project whose output folder setting changed", () => {
+  test("cuvette open with the project folder finds the session in the earlier output folder", async () => {
+    install("v7-agent-loop");
+    const project = join(root, "project");
+    const [first] = projectSessions().filter((p) => p.folder.includes("count-particles"));
+    const found = findPlace(project, { cwd: root, outputFolder: "results" });
+    expect(found?.id).toBeDefined();
+    expect([first!.id, ...readIndex().map((r) => r.id)]).toContain(found!.id);
+    const s = await Session.resume(project, { provider: new FakeProvider([{ text: "Noted." }]), cwd: project, settings: { output_folder: "results" } });
+    open.push(s);
+    expect(readIndex().map((r) => r.id)).toContain(s.id);
+  });
+
+  test("a folder that is not a project of any session still gives no session", () => {
+    install("v7-agent-loop");
+    const other = join(root, "other");
+    mkdirSync(other, { recursive: true });
+    expect(findPlace(other, { cwd: root, outputFolder: "results" })).toBeUndefined();
+  });
+});
+
+describe("a record with its blob folder gone", () => {
+  test.each(["v6-cuvette-rename", "v7-agent-loop"])("%s: the session resumes and exports, and the missing files give no error", async (format) => {
+    install(format);
+    const [first] = projectSessions();
+    rmSync(join(first!.folder, ".record", "blobs"), { recursive: true, force: true });
+    const s = await resume(first!.id);
+    const missing = s.record.nodes().flatMap((n) => n.outputs).filter((o) => o.sha && !s.record.blobPath(o.sha));
+    expect(missing.length).toBeGreaterThan(0);
+    for (const fmt of ["protocol", "notebook", "html", "md"] as const) expect(statSync(await s.exportAs(fmt)).size).toBeGreaterThan(0);
+    expect(await run(s, "status")).toContain("Status");
+    s.saveResults(0, true);
+    await s.send("Thanks.");
+  });
+});
+
+describe("a branch from a rewound old session", () => {
+  test.each(["v5-rewind-branch-method", "v7-agent-loop"])("%s: it copies the rewind and lists with its parent", async (format) => {
+    install(format);
+    const parent = readIndex().find((r) => !r.name)!;
+    const s = await resume(parent.id);
+    expect(s.record.entries(["rewind"]).length).toBeGreaterThan(0);
+    const b = s.branch("after the rewind");
+    const child = await Session.resume(b.folder, { provider: new FakeProvider([{ text: "Noted." }]) });
+    open.push(child);
+    expect(child.record.entries(["rewind"]).length).toBe(s.record.entries(["rewind"]).length);
+    expect(child.record.rewound()).toEqual(s.record.rewound());
+    expect(child.branches().map((x) => x.role)).toEqual(["this", "parent"]);
+    expect(listSessions().map((x) => x.id)).toContain(b.id);
+  });
+});
