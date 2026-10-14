@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterAll, expect, test } from "vitest";
-import { statSync } from "node:fs";
 import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
@@ -545,10 +544,45 @@ test("a python adapter in a trusted project folder writes no __pycache__ there, 
     expect(r.ok).toBe(true);
     expect(existsSync(join(dir, "__pycache__"))).toBe(false);
     expect(trustStatus(project).state).toBe("trusted");
-    if (process.platform !== "win32") expect(statSync(join(home, "pycache")).mode & 0o077).toBe(0);
+    expect(existsSync(join(home, "pycache"))).toBe(false);
   } finally {
     if (oldHome === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = oldHome;
+  }
+});
+
+test("only an adapter in a project folder gets PYTHONDONTWRITEBYTECODE, and no adapter gets PYTHONPYCACHEPREFIX", async () => {
+  const oldHome = process.env.CUVETTE_HOME;
+  const oldPrefix = process.env.PYTHONPYCACHEPREFIX;
+  const home = realpathSync(mkdtempSync(join(root, "home-")));
+  process.env.CUVETTE_HOME = home;
+  delete process.env.PYTHONPYCACHEPREFIX;
+  try {
+    const project = realpathSync(mkdtempSync(join(root, "project-")));
+    const make = (base: string, name: string) => {
+      const dir = join(base, name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "adapter.yaml"), `${head("python", "  call_timeout_s: 20\n")}tools:\n  - { name: env, description: d, function: "m:env" }\n`);
+      writeFileSync(join(dir, "m.py"), "import os\ndef env():\n    return {'prefix': os.environ.get('PYTHONPYCACHEPREFIX'), 'nowrite': os.environ.get('PYTHONDONTWRITEBYTECODE'), 'flag': sys_flag()}\ndef sys_flag():\n    import sys\n    return sys.dont_write_bytecode\n");
+      return dir;
+    };
+    const seen: Record<string, { prefix: unknown; nowrite: unknown; flag: unknown }> = {};
+    for (const [label, dir] of [["project", make(join(project, ".cuvette", "adapters"), "pa")], ["home", make(join(home, "adapters"), "ha")], ["other", make(join(root, "elsewhere"), "oa")]] as const) {
+      const n = ++counter;
+      const dirs = { workDir: join(root, `work${n}`), sessionDir: join(root, `session${n}`), projectDir: project };
+      const rt = await startAdapter(loadAdapter(dir), dirs);
+      started.push(rt);
+      const r = await (await rt.tools()).find((t) => t.name === "env")!.execute({}, ctx(dirs.workDir, dirs.sessionDir));
+      expect(r.ok).toBe(true);
+      seen[label] = r.data as never;
+    }
+    expect(seen.project).toEqual({ prefix: null, nowrite: "1", flag: true });
+    expect(seen.home).toEqual({ prefix: null, nowrite: null, flag: false });
+    expect(seen.other).toEqual({ prefix: null, nowrite: null, flag: false });
+  } finally {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+    if (oldPrefix !== undefined) process.env.PYTHONPYCACHEPREFIX = oldPrefix;
   }
 });
 
