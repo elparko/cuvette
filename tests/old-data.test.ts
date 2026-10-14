@@ -102,6 +102,9 @@ describe.each(PROJECT_FORMATS)("session folder written by %s", (format) => {
     expect(s.id).toBe(first!.id);
     expect(s.history.length).toBeGreaterThan(0);
     expect(s.record.nodes().length).toBeGreaterThan(0);
+    expect(s.record.unknownKinds()).toEqual([]);
+    expect(s.record.skipped).toBe(0);
+    expect(s.record.entries(["notice"]).filter((n) => n.data.warn).length).toBe(0);
     await s.send("Thanks.");
     const after = logLines(first!.folder);
     expect(after.startsWith(before)).toBe(true);
@@ -155,6 +158,8 @@ describe.each(HOME_FORMATS)("home session written by %s", (format) => {
     const before = readFileSync(join(dir, "log.jsonl"), "utf8");
     const s = await resume(info!.id);
     expect(s.place.legacy).toBe(true);
+    expect(s.record.unknownKinds()).toEqual([]);
+    expect(s.record.skipped).toBe(0);
     expect(s.history.length).toBeGreaterThan(0);
     await s.send("Thanks.");
     expect(readFileSync(join(dir, "log.jsonl"), "utf8").startsWith(before)).toBe(true);
@@ -896,5 +901,36 @@ describe.each(["v5-rewind-branch-method", "v6-cuvette-rename", "v7-agent-loop"])
     const out: string[] = [];
     await commands.find((c) => c.name === "compare")!.run(["this", "triangle branch"], printCtx(s, out));
     expect(out.join("\n")).not.toContain("ERROR");
+  });
+});
+
+describe("a session folder outside the project that moves with the home folder", () => {
+  test("the home folder moves to another place, and the session opens by its folder and exports", async () => {
+    const project = join(root, "project");
+    mkdirSync(project, { recursive: true });
+    const share = join(root, "home", "projects", "lab");
+    const first = await Session.create({ adapters: [LAB], provider: new FakeProvider([{ calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: "Blurred." }]), cwd: project, settings: { output_folder: share, guidance: false, referee: "none" } });
+    open.push(first);
+    await first.send("Blur a.tif");
+    const id = first.id;
+    const folder = first.place.outDir;
+    expect(folder.startsWith(share)).toBe(true);
+    await first.close();
+    open.splice(open.indexOf(first), 1);
+    const disk2 = join(root, "disk2", "cuvette-home");
+    mkdirSync(join(root, "disk2"), { recursive: true });
+    renameSync(join(root, "home"), disk2);
+    process.env.CUVETTE_HOME = disk2;
+    const moved = join(disk2, "projects", "lab", folder.split("/").at(-1)!);
+    expect(listSessions().find((x) => x.id === id)?.moved).toBe(true);
+    const s = await resume(moved);
+    expect(s.id).toBe(id);
+    expect(s.cwd).toBe(project);
+    expect(listSessions().find((x) => x.id === id)?.moved).toBeFalsy();
+    for (const fmt of ["protocol", "notebook", "html"] as const) expect(statSync(await s.exportAs(fmt)).size).toBeGreaterThan(0);
+    const outputs = s.record.nodes().flatMap((n) => n.outputs);
+    expect(outputs.length).toBeGreaterThan(0);
+    for (const o of outputs) expect(s.record.blobPath(o.sha!)).toBeDefined();
+    await s.send("Thanks.");
   });
 });

@@ -16,6 +16,7 @@ The folders:
 - v5-rewind-branch-method: adds rewind, branch and method entries, and a saved method.
 - v6-cuvette-rename: the build after the rename from guided-analysis to Cuvette.
 - v7-agent-loop: the build before the second round of agent loop fixes.
+- v5-open-question and v7-open-question: a session that the app closed while a question card was open.
 
 Builds before v6 pass the old GA_ names to child programs. The lab adapter of the current repository reads the CUVETTE_ names. So the blur step fails in v1 to v5.
 The data is made up. No file holds private data.
