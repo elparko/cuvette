@@ -870,7 +870,7 @@ In the third run with `on`, the answer had no thinking. Thus its first text came
 
 ## Whole task after the first-step and referee changes
 
-This section repeats the whole task on the branch `perf/whole-task`. Measured on 14 October 2026.
+This section repeats the whole task on the branch `perf/whole-task`. The runs are from 14 October 2026.
 
 ### Method of this run
 
@@ -918,8 +918,8 @@ Run 2 has the median wall time, 12.1 s.
 
 ### Changes
 
-1. The first message says that adapter tools do not send table rows to a cloud model. If an
-   adapter has `inspect_table`, it also says to call `read_file` in the same reply. Before
+1. If the model is a cloud model and an adapter has `cloud_visibility: summaries`, the first
+   message says that adapter tools do not send table rows. If an adapter has `inspect_table`, it also says to call `read_file` in the same reply. Before
    this change, Haiku called `inspect_table` two times, and then `read_file`, in each run.
    The harness still sends no rows itself (`src/core/session.ts`, `folderList`).
 2. The cloud view of a table result has a note: the harness does not send the rows, and
@@ -929,8 +929,9 @@ Run 2 has the median wall time, 12.1 s.
 4. The biostats adapter imports scipy, pingouin, statsmodels, lifelines and matplotlib inside
    the tools that use them (`catalog/biostats/ga_biostats.py`).
 5. The Python worker imports the preload modules in a background thread. The preload reply
-   returns at once. If a call fails with an import deadlock while the thread runs, the worker
-   waits for the thread and runs the call again (`src/adapters/kinds/python_worker.py`).
+   returns at once. A call can fail with an import deadlock or a circular-import error while the
+   thread runs. Then the worker waits for the thread and runs the call again
+   (`src/adapters/kinds/python_worker.py`).
 6. Two calls that ask for the same package scan share one scan (`src/core/envlock.ts`).
 
 Before changes 4 and 5, the first adapter call waited 0.6 to 3.5 s for the imports. After the
@@ -953,11 +954,11 @@ The bench harness ran the six papers of "Benchmark subset" above, one run each, 
 
 - The referee is now the largest call: 2.3 to 6.2 s. Its output is mostly hidden thinking.
 - Run the referee while the answer streams. This is an owner decision.
-- A lower effort for routine steps only. These runs used effort low for all session calls.
+- Use a lower effort only for routine steps. These runs used effort low for all session calls.
 
 ### Limits
 
-- Three runs of each harness. The Haiku replies change from run to run.
+- Each harness ran three times. The Haiku replies change from run to run.
 - Cuvette used effort low and Claude Code used effort medium.
 - Other agents ran tests on the same computer during the runs.
 - The cost is an estimate from the token counts. It is not the invoice.
