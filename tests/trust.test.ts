@@ -428,3 +428,30 @@ test("trusting a folder without a linked folder still runs the SessionStart hook
 async function until(check: () => boolean) {
   for (let i = 0; i < 200 && !check(); i++) await new Promise((r) => setTimeout(r, 50));
 }
+
+test.skipIf(process.platform === "win32")("a link to a folder anywhere under a project adapter, method or skills folder makes the folder changed and untrustable", () => {
+  for (const place of [["adapters", "x", "lib"], ["adapters", "x", "deep", "lib"], ["methods", "m"], ["skills", "s"]]) {
+    cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+    const p = trustedProject();
+    mkdirSync(join(p.root, ".cuvette", ...place.slice(0, -1)), { recursive: true });
+    const target = mkdtempSync(join(tmpdir(), "cuvette-evil-"));
+    writeFileSync(join(target, "evil.py"), "x");
+    symlinkSync(target, join(p.root, ".cuvette", ...place));
+    const s = trustStatus(p.root);
+    expect(s.state, place.join("/")).toBe("changed");
+    expect(s.changes.join("\n")).toContain(`a linked folder: ${[".cuvette", ...place].join("/")}`);
+    expect(() => trustFolder(p.root)).toThrow(/cannot trust/);
+    expect(adapterDirs(p.root).x).toBeUndefined();
+  }
+});
+
+test.skipIf(process.platform === "win32")("a link to a file inside an adapter is hashed by its content and does not block trust", () => {
+  const p = trustedProject();
+  const target = join(mkdtempSync(join(tmpdir(), "cuvette-evil-")), "data.txt");
+  writeFileSync(target, "one");
+  symlinkSync(target, join(p.adapter, "data.txt"));
+  trustFolder(p.root);
+  expect(trustStatus(p.root).state).toBe("trusted");
+  writeFileSync(target, "two");
+  expect(trustStatus(p.root).state).toBe("changed");
+});

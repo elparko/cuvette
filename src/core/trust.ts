@@ -83,6 +83,7 @@ interface WalkState {
   files: Record<string, string>;
   count: number;
   incomplete: string[];
+  linked: string[];
 }
 
 function readHash(p: string): string {
@@ -155,6 +156,11 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
     }
     if (l.isSymbolicLink()) {
       st.files[`${r} (link)`] = linkHash(p);
+      let folder = false;
+      try {
+        folder = statSync(p).isDirectory();
+      } catch {}
+      if (folder) st.linked.push(r);
       continue;
     }
     if (l.isDirectory()) {
@@ -234,7 +240,7 @@ export function scanFolder(folder: string): FolderScan {
       }
       if (!st.isDirectory()) continue;
       const found: string[] = [];
-      const state: WalkState = { files, count: 0, incomplete };
+      const state: WalkState = { files, count: 0, incomplete, linked };
       walk(dir, key, state, found);
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }
