@@ -551,3 +551,32 @@ test("a python adapter in a trusted project folder writes no __pycache__ there, 
     else process.env.CUVETTE_HOME = oldHome;
   }
 });
+
+test.skipIf(!sandboxWorks)("a command-line adapter in the project settings writes in its own folder and not in the folder of another adapter", async () => {
+  const project = realpathSync(mkdtempSync(join(root, "project-")));
+  const out = join(project, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  const dir = join(project, ".cuvette", "adapters", "cx");
+  const other = join(project, ".cuvette", "adapters", "dx");
+  mkdirSync(dir, { recursive: true });
+  mkdirSync(other, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), `${head("cli", "  call_timeout_s: 20\n")}tools:
+  - name: append
+    description: Append to a file.
+    params: { target: { type: string } }
+    required: [target]
+    command: ["{node}", "-e", "try { require('fs').appendFileSync(process.argv[1], 'x'); } catch (e) { console.error(e.code); } console.log('{}')", "{target}"]
+    parse: json
+map:
+  - tool: append
+    route: x
+`);
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "append")!;
+  await tool.execute({ target: join(dir, "cache.txt") }, ctx(out, dirs.sessionDir));
+  expect(readFileSync(join(dir, "cache.txt"), "utf8")).toBe("x");
+  await tool.execute({ target: join(other, "evil.txt") }, ctx(out, dirs.sessionDir));
+  expect(existsSync(join(other, "evil.txt"))).toBe(false);
+});

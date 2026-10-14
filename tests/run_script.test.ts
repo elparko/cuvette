@@ -319,7 +319,7 @@ test("write steps lock the records and the settings folders, and keep the work f
   expect(locked).not.toContain(l.out);
   expect(locked).not.toContain(join(l.project, "data", ".record"));
   expect(steps.some((x) => x.allow)).toBe(false);
-  expect(writeSteps(l.dirs, { adapterFolders: true }).filter((x) => x.allow).map((x) => x.path)).toEqual([join(l.project, ".cuvette", "adapters"), join(l.project, ".cuvette", "methods"), join(l.project, ".cuvette", "skills"), join(l.project, ".ga", "adapters"), join(l.project, ".ga", "methods"), join(l.project, ".ga", "skills")]);
+  expect(writeSteps(l.dirs, { adapterRoot: join(l.project, ".cuvette", "adapters", "x") }).filter((x) => x.allow).map((x) => x.path)).toEqual([join(l.project, ".cuvette", "adapters", "x")]);
   expect(steps.filter((x) => x.fixed).map((x) => x.path)).toEqual(expect.arrayContaining([l.out, join(l.project, "cuvette"), l.project]));
   expect(recordFolders(l.dirs)).toContain(join(l.other, ".record"));
 });
@@ -685,14 +685,18 @@ test.skipIf(!sandboxWorks)("an adapter program through guardCommand writes in it
   const l = layout();
   const own = join(l.project, ".cuvette", "adapters", "x");
   mkdirSync(own, { recursive: true });
-  const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(own, "cache.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterFolders: true });
+  const g = await guardCommand(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(own, "cache.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterRoot: own });
   expect(g.argv[0]).toBe("/usr/bin/sandbox-exec");
   expect(spawnSync(g.argv[0]!, g.argv.slice(1)).status).toBe(0);
   expect(readFileSync(join(own, "cache.txt"), "utf8")).toBe("ok\n");
   expect(g.changed()).toEqual([]);
+  mkdirSync(join(l.project, ".cuvette", "adapters", "y"), { recursive: true });
+  const other = await guardCommand(["/bin/sh", "-c", `echo x > ${JSON.stringify(join(l.project, ".cuvette", "adapters", "y", "evil.txt"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterRoot: own });
+  expect(spawnSync(other.argv[0]!, other.argv.slice(1)).status).not.toBe(0);
+  expect(existsSync(join(l.project, ".cuvette", "adapters", "y", "evil.txt"))).toBe(false);
   const bad = await guardCommand(["/bin/sh", "-c", `echo x >> ${JSON.stringify(l.settings)}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" } });
   expect(spawnSync(bad.argv[0]!, bad.argv.slice(1)).status).not.toBe(0);
-  const move = await guardCommand(["/bin/sh", "-c", `mv ${JSON.stringify(join(l.project, ".cuvette", "adapters"))} ${JSON.stringify(join(l.project, "moved"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterFolders: true });
+  const move = await guardCommand(["/bin/sh", "-c", `mv ${JSON.stringify(join(l.project, ".cuvette", "adapters"))} ${JSON.stringify(join(l.project, "moved"))}`], l.dirs, { cwd: l.project, env: { PATH: "/usr/bin:/bin" }, adapterRoot: own });
   expect(spawnSync(move.argv[0]!, move.argv.slice(1)).status).not.toBe(0);
   expect(existsSync(own)).toBe(true);
   expect(existsSync(join(l.project, "moved"))).toBe(false);
@@ -725,8 +729,8 @@ test("the profile for a model command locks the adapters, methods and skills fol
   const model = writeRules(writeSteps(l.dirs));
   expect(model).toContain(`(deny file-write* (subpath "${join(l.project, ".cuvette")}"))`);
   expect(model).not.toContain(`(allow file-write* (subpath "${folder}"))`);
-  const adapter = writeRules(writeSteps(l.dirs, { adapterFolders: true }));
-  expect(adapter).toContain(`(allow file-write* (subpath "${folder}"))`);
+  const adapter = writeRules(writeSteps(l.dirs, { adapterRoot: join(l.project, ".cuvette", "adapters", "x") }));
+  expect(adapter).toContain(`(allow file-write* (subpath "${join(folder, "x")}"))`);
 });
 
 test.skipIf(!sandboxWorks)("run_command cannot create a file under the adapters folder, and writes results in the project folder", async () => {

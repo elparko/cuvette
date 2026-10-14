@@ -275,7 +275,7 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   return out;
 }
 
-export function writeSteps(dirs: Dirs, opts: { adapterFolders?: boolean } = {}): WriteStep[] {
+export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both([dirs.workDir]).includes(p));
   const keep = both([dirs.workDir]);
@@ -283,7 +283,10 @@ export function writeSteps(dirs: Dirs, opts: { adapterFolders?: boolean } = {}):
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
-  if (opts.adapterFolders) steps.push(...both(scope.open).map((path) => ({ path, allow: true })));
+  if (opts.adapterRoot) {
+    const own = both([opts.adapterRoot]);
+    if (own.some((r) => both(scope.open.filter((o) => basename(o) === "adapters")).some((o) => within(r, o) && r !== o))) steps.push(...own.map((path) => ({ path, allow: true })));
+  }
   const top = dirs.projectDir ? both([dirs.projectDir]) : [];
   const fixed = new Set([...keep, ...both(scope.open)]);
   for (const l of locked) {
@@ -325,9 +328,9 @@ export function bwrapCommand(argv: string[], steps: WriteStep[]): string[] {
   return ["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv];
 }
 
-export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined>; adapterFolders?: boolean } = {}): Promise<{ argv: string[]; changed(): string[] }> {
+export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined>; adapterRoot?: string } = {}): Promise<{ argv: string[]; changed(): string[] }> {
   await probeSandbox();
-  const steps = writeSteps(dirs, { adapterFolders: o.adapterFolders });
+  const steps = writeSteps(dirs, { adapterRoot: o.adapterRoot });
   const guard = fingerprint(dirs, true);
   if (!programExists(argv[0], o.cwd ?? process.cwd(), o.env ?? process.env)) return { argv, changed: guard.changed };
   const blind = blindPolicy();
