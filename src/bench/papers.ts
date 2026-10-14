@@ -22,6 +22,8 @@ export interface PaperRun {
   status: RunStatus;
   error?: string;
   durationS: number;
+  answerReadyMs?: number;
+  turnMs?: number;
   session?: string;
   dir?: string;
   answer?: string;
@@ -158,6 +160,8 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
     status,
     error: status === "answer" ? undefined : error,
     durationS,
+    answerReadyMs: session?.answerReadyMs,
+    turnMs: session?.turnMs,
     session: session?.id,
     dir: session?.dir,
     answer: final ? String(final.data.text ?? "") : undefined,

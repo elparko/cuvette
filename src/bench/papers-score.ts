@@ -197,7 +197,7 @@ export function processMetrics(record: Pick<AnalysisRecord, "entries" | "nodes">
     failedToolCalls: results.filter((e) => e.data.ok === false).length,
     nudges: harness.length - planReminders,
     planReminders,
-    revisions: messages.filter((m) => m.role === "user" && m.parts[0]?.text?.startsWith("[Review before the answer")).length,
+    revisions: messages.filter((m) => m.role === "user" && /^\[Review (before the answer|of your answer)/.test(m.parts[0]?.text ?? "")).length,
     findings,
     unsourced: Number(claims?.entry.data.unsourced ?? 0),
     deviations: devs.length,

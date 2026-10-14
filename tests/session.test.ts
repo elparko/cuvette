@@ -183,10 +183,12 @@ test("a turn that stops during the revision keeps the first answer", async () =>
   };
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, referee: "none" } });
   const answer = await session.send("go");
-  expect(answer).toBe("The fold change was 3.7 in group B.");
+  expect(answer).toMatch(/^The fold change was 3\.7 \[no source\] in group B\./);
   const final = session.record.entries(["assistant"]).filter((e) => e.data.final === true);
-  expect(final.map((e) => e.data.text)).toEqual(["The fold change was 3.7 in group B."]);
-  expect(session.record.entries(["notice"]).some((e) => /stopped during the revision/.test(String(e.data.text)))).toBe(true);
+  expect(final).toHaveLength(1);
+  expect(String(final[0]!.data.text)).toMatch(/^The fold change was 3\.7 in group B\./);
+  expect(session.record.entries(["notice"]).some((e) => /stopped during the correction/.test(String(e.data.text)))).toBe(true);
+  expect(session.findings.list().length).toBeGreaterThan(0);
 });
 
 test("after a forced final answer the harness does not ask for a tool call", async () => {

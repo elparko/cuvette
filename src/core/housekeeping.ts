@@ -4,7 +4,7 @@ export type Role = "analysis" | "housekeeping" | "failed" | "main";
 
 const NODE_TOOLS = new Set(["run_script", "calculate"]);
 const HARNESS_NOTICE = /^converted a tool call|same input three times|repeated the same text|^Comparing the options/i;
-const QUIET = new Set(["session", "message", "thinking", "tool_call", "node", "usage", "compaction", "claim_check", "correction"]);
+const QUIET = new Set(["session", "message", "thinking", "tool_call", "node", "usage", "compaction", "claim_check", "correction", "answer_ready"]);
 
 export function canMakeNode(d: Record<string, unknown>): boolean {
   return Boolean(d.adapter) || NODE_TOOLS.has(String(d.tool));
