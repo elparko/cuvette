@@ -1,5 +1,6 @@
 import React, { createContext, useEffect, useRef, useState } from "react";
-import { Box, Text, useBoxMetrics, useInput, type DOMElement } from "ink";
+import { Box, useBoxMetrics, useInput, type DOMElement } from "ink";
+import { Text } from "./text.tsx";
 
 export const CardRows = createContext(Infinity);
 

@@ -1,5 +1,6 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box } from "ink";
+import { Text } from "./text.tsx";
 import { padTo, textWidth, wrapLine } from "./width.ts";
 
 const INLINE = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\s][^*\n]*\*|\[no source\])/g;

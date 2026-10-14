@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, useStdout } from "ink";
+import { Text } from "./text.tsx";
 import type { Mode } from "../core/types.ts";
 import { fidelityLabel, type Item } from "../ui/items.ts";
 import { Markdown } from "./markdown.tsx";
