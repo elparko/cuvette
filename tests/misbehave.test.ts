@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
@@ -7,6 +7,7 @@ import { saveAccess } from "../src/adapters/access.ts";
 import { applyInstall, prepareAdd } from "../src/adapters/install.ts";
 import { CATALOG_DIR } from "../src/adapters/manifest.ts";
 import { Session, cleanText } from "../src/core/session.ts";
+import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
 import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
 
@@ -398,7 +399,7 @@ test.skipIf(windows)("a link inside the project folder that leads outside is ref
   const { provider, session: s } = await start([call("read_file", { path: "link/secret.txt" }), call("read_file", { path: "linkfile.txt" }), call("list_dir", { path: "link" }), call("read_file", { path: "plain.txt" }), { text: "ok" }], {}, cwd);
   await s.send("go");
   const t = texts(provider);
-  for (const x of t.slice(0, 3)) expect(x).toBe("ERROR: This path is a link that leads outside the folders of this analysis. Ask the scientist for the real path of the data.");
+  for (const x of t.slice(0, 3)) expect(x).toBe("ERROR: This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
   expect(t[3]).toContain("plain data");
 });
 
@@ -538,4 +539,160 @@ test("a model that gives an empty reply to the revision request keeps the first 
   expect(answer).toContain("999");
   expect(session.endedBy).toBe("answer");
   expect(session.busy).toBe(false);
+});
+
+const GUARD_TEXT = /belongs to the record or to the settings of Cuvette\. The agent cannot write there\./;
+
+test("write_file works in a new place and in a legacy place, and refuses the record in both", async () => {
+  for (const legacy of [false, true]) {
+    const cwd = mkdtempSync(join(work, "proj-"));
+    const steps: Bad[] = [{ text: "Ready." }];
+    const provider = new ScriptedProvider(steps);
+    session = await Session.create({ adapters: [], provider, cwd, home: legacy, settings: { guidance: false, askWaits: false, permissionMode: "bypass" } });
+    const s = session;
+    await s.send("go");
+    const log = join(s.record.dir, "log.jsonl");
+    steps.push(
+      call("write_file", { name: "notes/a.txt", text: "fine" }),
+      call("write_file", { name: log, text: "evil" }),
+      call("write_file", { name: join(s.record.dir, "meta.json"), text: "evil" }),
+      call("write_file", { name: join(s.record.dir, "blobs", "x"), text: "evil" }),
+      call("write_file", { name: join(s.workDir, ".RECORD", "log.jsonl"), text: "evil" }),
+      { text: "ok" },
+    );
+    const before = readFileSync(log, "utf8");
+    await s.send("write");
+    const t = texts(provider);
+    expect(t[0]).toContain("Wrote 4 bytes");
+    expect(readFileSync(join(s.workDir, "notes", "a.txt"), "utf8")).toBe("fine");
+    if (legacy) expect(t.slice(1, 4).every((x) => GUARD_TEXT.test(x))).toBe(true);
+    else for (const x of t.slice(1, 5)) expect(x).toMatch(GUARD_TEXT);
+    expect(readFileSync(log, "utf8").startsWith(before)).toBe(true);
+    await s.close();
+    session = undefined;
+  }
+});
+
+test.skipIf(windows)("a link to the record file does not open the record for writing", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  const log = join(s.record.dir, "log.jsonl");
+  symlinkSync(log, join(cwd, "shortcut.txt"));
+  symlinkSync(s.record.dir, join(cwd, "shortdir"));
+  steps.push(call("write_file", { name: join(cwd, "shortcut.txt"), text: "evil" }), call("write_file", { name: join(cwd, "shortdir", "log.jsonl"), text: "evil" }), { text: "ok" });
+  const before = readFileSync(log, "utf8");
+  await s.send("write");
+  for (const x of texts(provider).slice(0, 2)) expect(x).not.toContain("Wrote");
+  expect(readFileSync(log, "utf8").startsWith(before)).toBe(true);
+  expect(readFileSync(log, "utf8")).not.toBe("evil");
+});
+
+test("when the output falls back to a folder under .cuvette, the name check uses only the part under the session folder", async () => {
+  const project = mkdtempSync(join(work, "home-"));
+  const workDir = join(project, ".cuvette", "projects", "p", ".new-1");
+  const sessionDir = join(workDir, ".record");
+  mkdirSync(sessionDir, { recursive: true });
+  const write = genericTools({ workDir, sessionDir, projectDir: project }).find((t) => t.name === "write_file")!;
+  const ctx = { session: "s", callId: "c", workDir, sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
+  expect(await write.execute({ name: "a.txt", text: "fine" }, ctx)).toMatchObject({ ok: true });
+  expect(await write.execute({ name: join(workDir, "figures", "b.txt"), text: "fine" }, ctx)).toMatchObject({ ok: true });
+  expect(await write.execute({ name: join(workDir, ".cuvette", "settings.json"), text: "{}" }, ctx)).toMatchObject({ ok: false });
+  expect(await write.execute({ name: join(sessionDir, "log.jsonl"), text: "evil" }, ctx)).toMatchObject({ ok: false });
+  expect(readFileSync(join(workDir, "a.txt"), "utf8")).toBe("fine");
+  const outside = await write.execute({ name: join(project, ".cuvette", "settings.json"), text: "{}" }, ctx);
+  expect(outside.ok).toBe(false);
+  expect(existsSync(join(project, ".cuvette", "settings.json"))).toBe(false);
+});
+
+test("a tool that returns after Esc and the abandon time adds no record entry and no second result, and the next turn gets a note", async () => {
+  const steps: Bad[] = [call("slow", {}), { text: "never reached" }];
+  const { provider, session: s } = await start(steps);
+  s.abandonMs = 50;
+  let release: () => void = () => {};
+  let started = false;
+  let lateCall: ToolOutput | undefined;
+  (s["tools"] as Map<string, unknown>).set("slow", {
+    name: "slow",
+    description: "Slow.",
+    inputSchema: { type: "object", properties: {} },
+    source: "adapter",
+    adapter: "lab",
+    readOnly: true,
+    permission: "allow",
+    execute: async (_a: unknown, ctx: { log: (k: string, d: Record<string, unknown>) => unknown; callTool: (n: string, a: Record<string, unknown>) => Promise<ToolOutput> }) => {
+      started = true;
+      await new Promise<void>((r) => (release = r));
+      ctx.log("note", { text: "late entry" });
+      lateCall = await ctx.callTool("note", { text: "late call" });
+      return { ok: true, summary: "late result", text: "late" };
+    },
+  });
+  s["useTools"](["slow"]);
+  const run = s.send("go");
+  await until(() => started);
+  s.interrupt();
+  await run;
+  const before = s.record.entries().length;
+  release();
+  await until(() => lateCall !== undefined);
+  expect(lateCall).toMatchObject({ ok: false });
+  expect(s.record.entries().length).toBe(before);
+  expect(s.record.entries(["note"])).toEqual([]);
+  expect(results(s).filter((r) => r.tool === "slow")).toHaveLength(1);
+  steps.length = 0;
+  steps.push({ text: "Next." });
+  await s.send("again");
+  expect(provider.requests.at(-1)!.messages.flatMap((m) => m.parts).map((x) => (x.type === "text" ? x.text : "")).join("\n")).toContain("The tool slow did not stop after the scientist pressed Esc.");
+});
+
+test.skipIf(windows)("Esc during a script that started processes in new sessions leaves none", async () => {
+  const code = [
+    "import subprocess, os, time",
+    "apart = [subprocess.Popen(['sleep', '300'], start_new_session=True) for i in range(5)]",
+    "open(os.environ['WORK_DIR'] + '/pids.txt', 'w').write(' '.join(str(p.pid) for p in apart))",
+    "time.sleep(120)",
+  ].join("\n");
+  const { session: s } = await start([script(code, 100), { text: "ok" }]);
+  const run = s.send("go");
+  let pids: number[] = [];
+  await until(() => {
+    try {
+      pids = readFileSync(join(s.workDir, "pids.txt"), "utf8").split(" ").map(Number);
+      return pids.length === 5 && pids.every((p) => p > 0);
+    } catch {
+      return false;
+    }
+  });
+  s.interrupt();
+  await run;
+  try {
+    await until(() => pids.every((p) => !alive(p)), 20000);
+  } finally {
+    for (const p of pids) if (alive(p)) process.kill(p, "SIGKILL");
+  }
+});
+
+test("an empty reply that the output limit caused names the output limit", async () => {
+  const { session: s } = await start([{ stopReason: "max_tokens" }, { stopReason: "max_tokens" }, { stopReason: "max_tokens" }]);
+  expect(await s.send("go")).toBe("");
+  expect(notices(s).at(-1)).toBe('The output limit of the model cut its reply before any text or tool call. Type "continue" to ask again with a smaller step, or raise the output limit of the model.');
+});
+
+test("a recommendation of 0 is kept", async () => {
+  const { session: s } = await start([call("ask_scientist", { question: "How many outliers?", options: [0, 1, 2], recommendation: 0 }), { text: "ok" }]);
+  await s.send("go");
+  expect(s.questions.open()[0]!.recommendation?.value).toBe("0");
+});
+
+test("cleanText accepts a value that is not a string, and the cells of a table and the data are cleaned", async () => {
+  expect(cleanText(42)).toBe("42");
+  expect(cleanText(undefined)).toBe("undefined");
+  const { provider, session: s } = await start([call("tab", {}), { text: "ok" }]);
+  addTool(s, "tab", () => ({ ok: true, summary: "Ran.", table: { columns: ["a\x1b[31m"], rows: [["x\x1b[2Jy"]], n_rows: 1 } as never, data: { label: "\x1b]0;t\x07ok", list: ["\x07z"] } }));
+  await s.send("go");
+  expect(JSON.stringify(provider.requests.at(-1)!.messages)).not.toMatch(/\\u001b|\\u0007/);
+  expect(JSON.stringify(provider.requests.at(-1)!.messages)).toContain("xy");
+  expect(JSON.stringify(s.record.entries(["tool_result"]))).not.toMatch(/\\u001b|\\u0007/);
 });

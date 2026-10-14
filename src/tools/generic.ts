@@ -40,10 +40,16 @@ export function insideWorkDir(workDir: string, name: string): string | undefined
 const GUARDED_NAMES = new Set([".record", ".cuvette", ".ga"]);
 
 function guarded(target: string, dirs: Dirs): boolean {
-  const real = (p: string) => realpathSync(existingAncestor(p));
+  const real = (p: string) => realpathSync.native(existingAncestor(p));
   const inside = (root: string, p: string) => p === root || below(root, p);
-  if (inside(real(dirs.sessionDir), real(target))) return true;
-  return [dirs.workDir, dirs.projectDir].some((root) => root && below(resolve(root), resolve(target)) && relative(resolve(root), resolve(target)).split(/[\\/]/).some((part) => GUARDED_NAMES.has(part.toLowerCase())));
+  const record = real(dirs.sessionDir);
+  const realTarget = real(target);
+  const legacy = below(record, real(dirs.workDir));
+  if (inside(record, realTarget) && !(legacy && inside(real(dirs.workDir), realTarget))) return true;
+  const named = (root: string) => relative(root, target).split(/[\\/]/).some((part) => GUARDED_NAMES.has(part.toLowerCase()));
+  const work = resolve(dirs.workDir);
+  if (below(work, resolve(target))) return named(work);
+  return !!dirs.projectDir && below(resolve(dirs.projectDir), resolve(target)) && named(resolve(dirs.projectDir));
 }
 
 export function projectPath(projectDir: string, p: string): string {

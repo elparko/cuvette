@@ -645,8 +645,14 @@ export async function killWithChildren(pid: number | undefined): Promise<void> {
 }
 
 // A script can start a process in a new session. The process group kill does not reach it, so the children are listed first.
+// The group stops first, so the script starts no new process while the list is made.
 export async function killAll(pid: number | undefined): Promise<void> {
   if (!pid) return;
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-pid, "SIGSTOP");
+    } catch {}
+  }
   const kids = process.platform === "win32" ? [] : await descendants(pid).catch(() => []);
   killTree(pid);
   for (const n of kids) {

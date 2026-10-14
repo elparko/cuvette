@@ -167,7 +167,7 @@ export function coreTools(d: CoreDeps): Tool[] {
         d.ask({
           question: String(a.question),
           options: Array.isArray(a.options) ? a.options.map(String) : [],
-          recommendation: a.recommendation ? String(a.recommendation) : undefined,
+          recommendation: a.recommendation !== undefined && a.recommendation !== "" ? String(a.recommendation) : undefined,
           reason: a.reason ? String(a.reason) : undefined,
           wait: a.wait !== false,
         }),

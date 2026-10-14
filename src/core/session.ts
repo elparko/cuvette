@@ -1214,7 +1214,8 @@ export class Session {
           return answer;
         }
         if (!calls.length && !said) {
-          this.record.append("notice", { text: 'The model gave no answer. Its last replies had no text and no tool call. Type "continue" to ask again, or choose another model.', warn: true });
+          const cut = res.stopReason === "max_tokens";
+          this.record.append("notice", { text: cut ? 'The output limit of the model cut its reply before any text or tool call. Type "continue" to ask again with a smaller step, or raise the output limit of the model.' : 'The model gave no answer. Its last replies had no text and no tool call. Type "continue" to ask again, or choose another model.', warn: true });
           this.endedBy = "error";
           return "";
         }
@@ -2174,7 +2175,7 @@ export class Session {
     if (tool.source === "generic") {
       const place = this.pathPlace(args);
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
-      if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist for the real path of the data.");
+      if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
     }
     const gate = this.pilotGate(tool, args);
     if (gate) {
@@ -2266,8 +2267,9 @@ export class Session {
         workDir: this.workDir,
         sessionDir: this.dir,
         signal,
-        log: (kind, data) => this.record.append(kind, data),
+        log: (kind, data) => (abandoned ? ({ id: 0, ts: "", session: this.id, kind, data } as Entry) : this.record.append(kind, data)),
         callTool: async (name, a) => {
+          if (abandoned) return { ok: false, error: "the call was stopped" };
           const t = this.findTool(name);
           if (!t) return { ok: false, error: `no tool named ${name}` };
           const id = `${callId}.${++this.callCount}`;
@@ -2275,11 +2277,14 @@ export class Session {
           const r = await this.pipeline(t, a, id, signal);
           return r.output ?? { ok: false, error: r.text };
         },
-      }), signal, () => (abandoned = true));
+      }), signal, () => {
+        abandoned = true;
+        this.notes.push(`The tool ${tool.name} did not stop after the scientist pressed Esc. It can still run in the background and keep its program busy. Its late result is ignored. If the next call of this program fails or waits, tell the scientist.`);
+      });
     } catch (e) {
       output = { ok: false, error: signal.aborted ? `interrupted: the scientist stopped this tool${abandoned ? `. The tool did not stop within ${this.abandonMs / 1000} s, so Cuvette stopped waiting for it` : ""}` : `${(e as Error).name}: ${(e as Error).message}` };
     }
-    output = { ...output, ...(output.text === undefined ? {} : { text: cleanText(output.text) }), ...(output.summary === undefined ? {} : { summary: cleanText(output.summary) }), ...(output.error === undefined ? {} : { error: cleanText(output.error) }) };
+    output = { ...output, ...(output.text === undefined ? {} : { text: cleanText(output.text) }), ...(output.summary === undefined ? {} : { summary: cleanText(output.summary) }), ...(output.error === undefined ? {} : { error: cleanText(output.error) }), ...(output.table === undefined ? {} : { table: cleanDeep(output.table) as ToolOutput["table"] }), ...(output.data === undefined ? {} : { data: cleanDeep(output.data) }), ...(output.metrics === undefined ? {} : { metrics: cleanDeep(output.metrics) as ToolOutput["metrics"] }) };
     const durationS = (performance.now() - t0) / 1000;
     const adapter = this.adapterOf(tool);
     const remote = tool.remoteName ?? tool.name;
@@ -2752,7 +2757,7 @@ export class Session {
     const stateTool = adapter?.manifest.connection.state_tool ? this.findTool(adapter.manifest.connection.state_tool) : undefined;
     if (stateTool && stateTool.name !== tool.name) {
       try {
-        state = (await stateTool.execute({}, { session: this.id, callId: `${callId}.state`, workDir: this.workDir, sessionDir: this.dir, signal, log: (k, d) => this.record.append(k, d), callTool: async () => ({ ok: false }) })).data;
+        state = (await this.untilStopped(stateTool.execute({}, { session: this.id, callId: `${callId}.state`, workDir: this.workDir, sessionDir: this.dir, signal, log: (k, d) => this.record.append(k, d), callTool: async () => ({ ok: false }) }), signal, () => {})).data;
       } catch {}
     }
     const cmp = compareNote(done.note, out.output.metrics ?? {});
@@ -4487,11 +4492,19 @@ const CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/;
 const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]{0,200}(?:\x07|\x1b\\)?|\x1b[@-Z\\-_]/g;
 
 // Terminal escape codes and control characters in a tool result can change the screen of the scientist and fill the context of the model.
-export function cleanText(text: string): string {
+export function cleanText(value: unknown): string {
+  const text = String(value);
   if (!CONTROL.test(text)) return text;
   const head = text.slice(0, 8000);
   if (head.includes("\0") || (head.match(/\ufffd/g)?.length ?? 0) > head.length / 10) return `[binary output, ${text.length} characters. The harness did not send it to the model.]`;
   return text.replace(ESCAPES, "").replace(new RegExp(CONTROL.source, "g"), "");
+}
+
+function cleanDeep(v: unknown): unknown {
+  if (typeof v === "string") return cleanText(v);
+  if (Array.isArray(v)) return v.map(cleanDeep);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cleanDeep(x)]));
+  return v;
 }
 
 function dropNulls(args: Args, schema: Record<string, unknown>): Args {
