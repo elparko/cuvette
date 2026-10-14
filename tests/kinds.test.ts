@@ -864,25 +864,29 @@ test("a settings file that the harness wrote during a call is not an error, and 
   }
 });
 
-test("the real writers of the settings, the trust list, the access list, the patient data answer and the index during a call give no integrity error", async () => {
+test("each real writer of the settings, the trust list, the access list, the patient data answer and the index gives no integrity error during a call", async () => {
   const t = await integrityAdapter();
   try {
     const project = join(t.out, "..", "..");
     const other = realpathSync(mkdtempSync(join(root, "trusted-")));
     mkdirSync(join(other, ".cuvette", "adapters", "y"), { recursive: true });
     writeFileSync(join(other, ".cuvette", "adapters", "y", "adapter.yaml"), "adapter: { name: y }\n");
-    const r = await duringCall(t, "real", async () => {
-      await changeSetting({ cwd: project, env: {} }, "effort", "high", "user");
-      await changeSetting({ cwd: project, env: {} }, "effort", "low", "project");
-      saveAccess("some-program", { path: "/usr/bin/true" } as never);
-      setFolderNoPatientData(project, true);
-      trustFolder(other);
-      saveIndexRow({ id: "s1", recordDir: join(t.out, ".record"), outDir: t.out, project, title: "A title", created: "2026-10-14", legacy: false, fallback: false }, { title: "New", description: "d" });
-    });
-    expect(r.error).toBeUndefined();
-    expect(r.ok).toBe(true);
+    const place = { id: "s1", recordDir: join(t.out, ".record"), outDir: t.out, project, title: "A title", created: "2026-10-14", legacy: false, fallback: false };
+    const writers: [string, () => void | Promise<unknown>][] = [
+      ["user setting", () => changeSetting({ cwd: project, env: {} }, "effort", "high", "user")],
+      ["project setting", () => changeSetting({ cwd: project, env: {} }, "effort", "low", "project")],
+      ["access list", () => saveAccess("some-program", { path: "/usr/bin/true" } as never)],
+      ["trust list", () => trustFolder(other)],
+      ["patient data answer", () => setFolderNoPatientData(project, true)],
+      ["index", () => saveIndexRow(place, { title: "New", description: "d" })],
+    ];
+    for (const [name, write] of writers) {
+      const r = await duringCall(t, name.replace(/ /g, "-"), async () => void (await write()));
+      expect(r.error, name).toBeUndefined();
+      expect(r.ok, name).toBe(true);
+    }
     expect(readFileSync(t.settings, "utf8")).toContain("low");
-    expect(readFileSync(join(t.home, "settings.json"), "utf8")).toContain("some-program");
+    expect(readFileSync(join(t.home, "settings.json"), "utf8")).toContain("no_patient_data");
   } finally {
     t.restore();
   }
