@@ -1,13 +1,14 @@
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { CATALOG_DIR, findAdapter } from "../src/adapters/manifest.ts";
+import { CATALOG_DIR, adapterDirs, findAdapter } from "../src/adapters/manifest.ts";
 import { accessOf } from "../src/adapters/access.ts";
 import { runPapers } from "../src/bench/papers.ts";
 import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
+import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
 import { scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { commands } from "../src/ui/commands.ts";
@@ -257,4 +258,86 @@ test("the benchmark runner trusts its own checkout and passes think=true to the 
   expect(seen.find((s) => s.spec === "fake:")?.opts.think).toBe(true);
   expect(lines[0]).toContain("think=true");
   expect(trustStatus(checkout).state).toBe("new");
+});
+
+
+const sandboxWorks = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
+
+function trustedProject() {
+  const root = realpathSync(cwd);
+  const adapter = join(root, ".cuvette", "adapters", "x");
+  mkdirSync(adapter, { recursive: true });
+  writeFileSync(join(adapter, "adapter.yaml"), "adapter: { name: x }\n");
+  const out = join(root, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  trustFolder(root);
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: root };
+  const tool = runScriptTool(dirs, { network: false });
+  const run = (code: string) => tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: out, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+  return { root, adapter, run };
+}
+
+test("a normal adapter in a trusted project folder still loads", () => {
+  const p = trustedProject();
+  expect(trustStatus(p.root).state).toBe("trusted");
+  expect(adapterDirs(p.root).x).toBe(p.adapter);
+});
+
+test("a script that writes a new file under the adapters folder makes the folder changed", async () => {
+  const p = trustedProject();
+  const r = await p.run(`import os\nos.makedirs(${JSON.stringify(join(p.adapter, "skills"))}, exist_ok=True)\nopen(${JSON.stringify(join(p.adapter, "skills", "evil.md"))}, 'w').write('x')\nopen(${JSON.stringify(join(p.adapter, "run.sh"))}, 'w').write('x')`);
+  expect(r.error).toBeUndefined();
+  const s = trustStatus(p.root);
+  expect(s.state).toBe("changed");
+  expect(s.changes).toEqual(expect.arrayContaining([expect.stringContaining("new file: .cuvette/adapters/x/run.sh"), expect.stringContaining("new file: .cuvette/adapters/x/skills/evil.md")]));
+  expect(adapterDirs(p.root).x).toBeUndefined();
+});
+
+test("a new skills folder of the project settings counts in the trust hash", () => {
+  const p = trustedProject();
+  mkdirSync(join(p.root, ".cuvette", "skills"));
+  writeFileSync(join(p.root, ".cuvette", "skills", "s.md"), "x");
+  expect(trustStatus(p.root).state).toBe("changed");
+});
+
+test.skipIf(!sandboxWorks)("on the real macOS sandbox, a script cannot replace the adapters folder with a link", async () => {
+  const p = trustedProject();
+  const other = join(realpathSync(mkdtempSync(join(tmpdir(), "cuvette-evil-"))), "adapters");
+  mkdirSync(join(other, "evil"), { recursive: true });
+  writeFileSync(join(other, "evil", "adapter.yaml"), "adapter: { name: evil }\n");
+  const folder = join(p.root, ".cuvette", "adapters");
+  const move = `import os, shutil\nshutil.move(${JSON.stringify(folder)}, ${JSON.stringify(folder + "-old")})\nos.symlink(${JSON.stringify(other)}, ${JSON.stringify(folder)})`;
+  expect((await p.run(move)).ok).toBe(false);
+  expect(lstatSync(folder).isSymbolicLink()).toBe(false);
+  expect(trustStatus(p.root).state).toBe("trusted");
+  expect(adapterDirs(p.root).evil).toBeUndefined();
+  expect(adapterDirs(p.root).x).toBe(p.adapter);
+  const remove = `import os, shutil\nshutil.rmtree(${JSON.stringify(folder)})\nos.symlink(${JSON.stringify(other)}, ${JSON.stringify(folder)})`;
+  expect((await p.run(remove)).ok).toBe(false);
+  expect(lstatSync(folder).isSymbolicLink()).toBe(false);
+  expect(adapterDirs(p.root).evil).toBeUndefined();
+});
+
+test.skipIf(process.platform === "win32")("a linked adapters folder is not loaded and the folder is not trusted, where no sandbox stops the link", () => {
+  const p = trustedProject();
+  const other = join(realpathSync(mkdtempSync(join(tmpdir(), "cuvette-evil-"))), "adapters");
+  mkdirSync(join(other, "evil"), { recursive: true });
+  writeFileSync(join(other, "evil", "adapter.yaml"), "adapter: { name: evil }\n");
+  const folder = join(p.root, ".cuvette", "adapters");
+  mkdirSync(join(p.root, "moved"));
+  renameSync(folder, join(p.root, "moved", "adapters"));
+  symlinkSync(other, folder);
+  const s = trustStatus(p.root);
+  expect(s.state).toBe("changed");
+  expect(s.changes.join("\n")).toContain("a linked folder: .cuvette/adapters");
+  expect(adapterDirs(p.root).evil).toBeUndefined();
+  expect(adapterDirs(p.root).x).toBeUndefined();
+  expect(() => findAdapter("evil", p.root)).toThrow(/no adapter named/);
+});
+
+test.skipIf(process.platform === "win32")("a linked methods folder makes the folder changed", () => {
+  const p = trustedProject();
+  const other = mkdtempSync(join(tmpdir(), "cuvette-evil-"));
+  symlinkSync(other, join(p.root, ".cuvette", "methods"));
+  expect(trustStatus(p.root).state).toBe("changed");
 });

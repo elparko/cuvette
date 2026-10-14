@@ -280,7 +280,7 @@ export function writeSteps(dirs: Dirs): WriteStep[] {
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
   steps.push(...both(scope.open).map((path) => ({ path, allow: true })));
   const top = dirs.projectDir ? both([dirs.projectDir]) : [];
-  const fixed = new Set(keep);
+  const fixed = new Set([...keep, ...both(scope.open)]);
   for (const l of locked) {
     const root = top.find((t) => within(l, t));
     for (let at = dirname(l); ; at = dirname(at)) {

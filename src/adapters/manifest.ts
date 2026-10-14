@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseYaml } from "../core/yaml.ts";
@@ -408,10 +408,12 @@ export const CATALOG_DIR = join(ROOT, "catalog");
 
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   const found: Record<string, string> = Object.create(null);
-  for (const base of [...(folderTrusted(cwd) ? projectAdapterDirs(cwd) : []), join(cuvetteHome(), "adapters"), CATALOG_DIR]) {
-    if (!existsSync(base)) continue;
+  const project = folderTrusted(cwd) ? projectAdapterDirs(cwd) : [];
+  for (const base of [...project, join(cuvetteHome(), "adapters"), CATALOG_DIR]) {
+    if (!existsSync(base) || (project.includes(base) && lstatSync(base).isSymbolicLink())) continue;
     for (const d of readdirSync(base)) {
       const p = join(base, d);
+      if (project.includes(base) && !resolve(realpathSync(p)).startsWith(realpathSync(base) + sep)) continue;
       if (existsSync(join(p, "adapter.yaml")) && !(d in found)) found[d] = p;
     }
   }

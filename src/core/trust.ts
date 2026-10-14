@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 
@@ -28,6 +28,7 @@ export interface FolderScan {
   hooks: string[];
   adapters: { name: string; replaces?: string }[];
   methods: string[];
+  linked: string[];
   bypass: boolean;
 }
 
@@ -123,33 +124,41 @@ function shadows(name: string): string | undefined {
 
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], linked: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
   const methods: string[] = [];
+  const linked: string[] = [];
   for (const d of PROJECT_DIRS) {
     for (const f of SETTINGS_FILES) if (existsSync(join(key, d, f))) paths.push(join(key, d, f));
-    const a = join(key, d, "adapters");
-    if (existsSync(a) && lstatSync(a).isDirectory()) walk(a, paths);
-    const m = join(key, d, "methods");
-    if (!existsSync(m) || !lstatSync(m).isDirectory()) continue;
-    const found: string[] = [];
-    walk(m, found);
-    paths.push(...found);
-    methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
+    for (const part of ["adapters", "methods", "skills"]) {
+      const dir = join(key, d, part);
+      const st = lstatSync(dir, { throwIfNoEntry: false });
+      if (!st) continue;
+      if (st.isSymbolicLink()) {
+        linked.push(relative(key, dir));
+        continue;
+      }
+      if (!st.isDirectory()) continue;
+      const found: string[] = [];
+      walk(dir, found);
+      paths.push(...found);
+      if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
+    }
   }
   for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
+  for (const l of linked) files[`${l} (linked folder)`] = sha(readlinkSync(join(key, l)));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
   const keys = Object.keys(values).filter((k) => !SAFE_KEYS.has(k));
   const adapters: FolderScan["adapters"] = [];
   for (const dir of projectAdapterDirs(key))
-    if (existsSync(dir))
+    if (existsSync(dir) && !lstatSync(dir).isSymbolicLink())
       for (const n of readdirSync(dir).sort())
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass" };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, bypass: values.permissionMode === "bypass" };
 }
 
 export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
@@ -237,6 +246,7 @@ function changesSince(e: TrustEntry, s: FolderScan): string[] {
 
 export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
+  if (scan.linked.length) return { state: "changed", scan, changes: scan.linked.map((p) => `a linked folder: ${p}. Cuvette does not load adapters, methods or skills from a linked folder.`) };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
   if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);
