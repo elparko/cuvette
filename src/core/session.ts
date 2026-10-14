@@ -296,6 +296,7 @@ export class Session {
   private toolsHinted = false;
   private planStart = 0;
   private scientistAsked?: string;
+  private askedUsed = new Set<string>();
   inspection?: Inspection;
   reference?: Reference;
   private hidden: string[] = [];
@@ -2625,6 +2626,12 @@ export class Session {
     }
   }
 
+  private askedFor(f: { key: string; label: string }): boolean {
+    const plain = (t: string) => t.toLowerCase().replace(/[_-]+/g, " ");
+    const asked = this.scientistAsked === undefined ? "" : plain(this.scientistAsked);
+    return !this.askedUsed.has(f.key) && [f.key, f.label].some((n) => n.trim() !== "" && asked.includes(plain(n)));
+  }
+
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
     const fields = this.decisions.fields();
     const f = fields.find((x) => x.key === spec.key);
@@ -2638,8 +2645,9 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
-    if (this.scientistAsked !== undefined || (this.pilotStage && this.pilotPlan)) {
-      const asked = this.scientistAsked;
+    if (this.askedFor(f) || (this.pilotStage && this.pilotPlan)) {
+      const asked = this.askedFor(f) ? this.scientistAsked : undefined;
+      if (asked !== undefined) this.askedUsed.add(f.key);
       this.decisions.change(f.key, value, { by: asked !== undefined ? "human" : "agent", reason: asked !== undefined ? `the scientist asked: "${asked}"` : `changed during the demonstration: ${spec.reason}` });
       const t = this.pilotPlan ? settingsOf(this.pilotPlan.plan).find((x) => x.setting.key === f.key)?.setting : undefined;
       if (t) Object.assign(t, { value: this.decisions.value(f.key), by: asked !== undefined ? "you" : "agent" });
@@ -3430,7 +3438,8 @@ export class Session {
       }
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
       this.scientistAsked = r.text;
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. ${r.definition ? `The harness already put the new definition of ${r.definition.measure} in the proposed analysis.` : "If a definition changes, call plan with the new definition and the reason."}` };
+      this.askedUsed.clear();
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change. If the request names the setting, the harness applies it at once, with no second card, because the scientist asked for it. For another setting, the scientist answers a card. ${r.definition ? `The harness already put the new definition of ${r.definition.measure} in the proposed analysis.` : "If a definition changes, call plan with the new definition and the reason."}` };
     }
     return { ok: false, error: "unknown answer" };
   }
