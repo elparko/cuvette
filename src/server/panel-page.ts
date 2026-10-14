@@ -103,11 +103,11 @@ async function poll() {
     const log = $("log"), stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
     for (const e of f.entries) addEntry(e);
     since = f.next;
-    $("state").textContent = f.busy ? "Working" : "Ready";
+    { const st = f.busy ? "Working" : "Ready"; if ($("state").textContent !== st) $("state").textContent = st; }
     if (document.activeElement !== $("mode")) $("mode").value = f.mode;
     drawCards(f);
     if (stick) log.scrollTop = log.scrollHeight;
-  } catch { $("state").textContent = "Disconnected"; }
+  } catch { if ($("state").textContent !== "Disconnected") $("state").textContent = "Disconnected"; }
   setTimeout(poll, 1000);
 }
 $("f").onsubmit = async (ev) => {
