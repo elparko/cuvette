@@ -2,6 +2,8 @@ import { planInit, type Card } from "../src/ui/cards.ts";
 import { cardHtml, runHtml, statusHtml, type Ctx, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
 import type { Question } from "../src/core/types.ts";
+import { pathRefusalReason } from "../src/core/refusals.ts";
+import { TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustText } from "../src/core/trust.ts";
 
 const question = (qid: string, extra: Partial<Question> = {}): Question => ({
   qid,
@@ -28,6 +30,10 @@ const fields = [
   { key: "unit", label: "Unit", kind: "str", essential: false, owner: "human", value: "", set: false },
 ];
 
+const longReason = "Because the objects under 20 px are noise 😀 日本語. ".repeat(40);
+const linkedScan = { folder: "/Users/someone/Documents/a very long project folder name/with/many/parts/and-more", linked: [".cuvette/adapters"], incomplete: [], lab: "Use Welch.", files: {}, keys: [], values: {}, hooks: [], adapters: [], methods: [], hash: "", layers: [], bypass: false } as never;
+const linked = { state: "changed", scan: linkedScan, changes: [] } as never;
+
 const qs = [question("q1"), question("q2", { title: "Which second test?", table: { columns: ["sample", "group"], rows: [["a", "x"], ["b", "y"]] } })];
 
 const ctx = {
@@ -53,6 +59,9 @@ export const CARD_FIXTURES: { name: string; html: string }[] = (
     ["question sheet", slot({ t: "question", q: qs[1]! })],
     ["question change", slot({ t: "question", q: qs[0]!, act: { kind: "change", current: "t", note: "The answer changes the plan." } as never })],
     ["permission", slot({ t: "permission", rid: "r1", tool: "run_python", args: { path: "a.csv" }, code: "print(1)", touches: "Reads a.csv in the project folder." })],
+    ["permission long command", slot({ t: "permission", rid: "r4", tool: "run_command", args: { purpose: "Count the lines", does: "Counts the lines of a file.", argv: ["sh", "-c", `${"abcdefghij".repeat(200)}; echo ${"é😀".repeat(30)}`, "line1\nline2", "esc\u001b[31m"] }, touches: "Runs on this computer with your user permissions." })],
+    ["trust linked folder", slot({ t: "question", q: question("q3", { decisionKey: "", title: TRUST_TITLE, text: trustText(linked), options: TRUST_OPTIONS.filter((o) => o.value === "no"), recommendation: undefined, evidence: trustEvidence(linked) }) })],
+    ["change a setting", slot({ t: "question", q: question("q4", { decisionKey: "min_size", title: "Change Smallest particle?", text: `The agent asks to change "Smallest particle" from 5 to 20. Your message did not name this value. Reason: ${longReason}`, options: [{ value: 20, label: "Change to 20" }, { value: 5, label: "Keep 5" }], recommendation: undefined, default: 5, evidence: "" }) })],
     ["phi", slot({ t: "phi", rid: "r2", model: "claude", hits: [{ kind: "name", label: "Name", masked: "J*** D**", where: "a.csv row 2" }], more: 3 })],
     ["phi local", slot({ t: "phi", rid: "r3", model: "claude", hits: [{ kind: "name", label: "Name", masked: "J*** D**", where: "a.csv row 2" }], more: 0, local: "llama" })],
     ["instruction", slot({ t: "instruction", step: 2, tool: "imagej", text: "1. Open the image.\n2. Run Analyze Particles." })],
@@ -82,6 +91,7 @@ const ITEMS: Item[][] = [
   [{ key: "a2", t: "assistant", text: "Intro.\n\nDefinitions, from the confirmed analysis:\n\n- cell: a nucleus" }],
   ["red", "green", "yellow", "cyan", "magenta", ""].map((color, i) => ({ key: `l${i}`, t: "line" as const, sym: ["✗", "✓", "⚠", "→", "?", "·"][i]!, color, text: `A ${color || "plain"} line: it has text · /change x${i}`, change: i % 2 ? `x${i}` : undefined })),
   [{ key: "ld", t: "line", sym: "·", dim: true, text: "A dim line." }],
+  [{ key: "bl", t: "line", sym: "⚠", color: "yellow", text: `Blocked read file: ${pathRefusalReason("private", `/Users/someone/.cuvette/sessions/${"é😀".repeat(60)}/log.jsonl`)}` }],
   [{ key: "b", t: "block", title: "Tests in this session", text: "Test   p value\nt test  0.01\nWilcoxon  0.03" }],
   [step(1, true), step(2, false)],
   [1, 2, 3, 4, 5].map((n) => step(n, n !== 4, { why: "Segment cells: " + n + ".tif" })),
