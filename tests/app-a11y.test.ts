@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -26,8 +26,10 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
   const dirs: string[] = [];
 
   const startApp = async () => {
+    const project = join(home, "project");
+    mkdirSync(project, { recursive: true });
     const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: join(home, "spend.jsonl"), CUVETTE_NO_OPEN: "1", HOME: home };
-    const child = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:" + join(home, "fake.json")], { cwd: tmpdir(), env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:" + join(home, "fake.json")], { cwd: project, env, stdio: ["ignore", "pipe", "pipe"] });
     const where = await new Promise<string>((done, fail) => {
       let out = "";
       child.stdout!.on("data", (b) => {

@@ -7,6 +7,7 @@ import type { AdapterRuntime } from "../runtime.ts";
 import { expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 import { blindArgv } from "../blind.ts";
+import { fingerprint, guardCommand } from "../../tools/run_script.ts";
 import { ROOT } from "../../root.ts";
 
 const WORKER = join(ROOT, "src/adapters/kinds/python_worker.py");
@@ -53,6 +54,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let ready: Promise<void> | undefined;
   let spawnedWith = "";
   let closed = false;
+  let generation = 0;
   let warming: { error?: unknown } | undefined;
   let preloading: Promise<unknown> | undefined;
 
@@ -67,16 +69,21 @@ export function startPython(c: KindContext): AdapterRuntime {
     child = undefined;
     ready = undefined;
     preloading = undefined;
+    generation++;
   };
 
-  const spawnWorker = (): Promise<void> => {
+  const spawnWorker = async (): Promise<void> => {
+    const mine = generation;
     log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
     stderrTail = "";
     spawnedWith = JSON.stringify(interpreter());
-    const argv = blindArgv([...interpreter(), "-u", WORKER, c.adapter.root]);
+    const env = childEnv(c, { PYTHONIOENCODING: "utf-8", MPLBACKEND: "Agg" });
+    const guarded = await guardCommand([...interpreter(), "-u", WORKER, c.adapter.root], c.dirs, { cwd: c.dirs.workDir, env, adapterRoot: c.adapter.root });
+    if (closed || mine !== generation) throw new Error("the adapter process stopped before it started");
+    const argv = blindArgv(guarded.argv);
     const p = spawn(argv[0], argv.slice(1), {
       cwd: c.dirs.workDir,
-      env: childEnv(c, { PYTHONIOENCODING: "utf-8", MPLBACKEND: "Agg" }),
+      env,
       stdio: ["pipe", "pipe", "pipe"],
       detached: process.platform !== "win32",
       windowsHide: true,
@@ -130,9 +137,12 @@ export function startPython(c: KindContext): AdapterRuntime {
 
   const spawnOnce = () => {
     if (closed) throw new Error("the adapter is closed");
-    if (!child) {
-      ready = spawnWorker();
-      ready.catch(() => {});
+    if (!ready) {
+      const r = spawnWorker();
+      ready = r;
+      r.catch(() => {
+        if (ready === r && !child) ready = undefined;
+      });
     }
     return ready!;
   };
@@ -143,10 +153,10 @@ export function startPython(c: KindContext): AdapterRuntime {
     warming = undefined;
     await c.ready;
     if (w?.error && !child && spawnedWith === JSON.stringify(interpreter())) throw w.error;
-    if (child && spawnedWith !== JSON.stringify(interpreter())) {
+    if (ready && spawnedWith !== JSON.stringify(interpreter())) {
       const old = child;
       stopped("the version command found another interpreter");
-      killTree(old.pid);
+      killTree(old?.pid);
     }
     await spawnOnce();
   };
@@ -155,7 +165,7 @@ export function startPython(c: KindContext): AdapterRuntime {
 
   // The first call finds a started worker with the modules of the adapter imported. A failed start shows at the first call.
   const warm = (load: boolean) => {
-    if (closed || child || warming) return;
+    if (closed || ready || warming) return;
     const w: { error?: unknown } = {};
     warming = w;
     const started = (async () => {
@@ -209,6 +219,7 @@ export function startPython(c: KindContext): AdapterRuntime {
           return { ok: false, error: `the import of the adapter modules did not end within ${conn.startup_timeout_s} s` };
         }
       }
+      const guard = fingerprint(c.dirs, true);
       const id = nextId;
       const reply = send({ function: fn, args, out_dir: outDir });
       const timeout = setTimeout(() => {
@@ -224,7 +235,10 @@ export function startPython(c: KindContext): AdapterRuntime {
       };
       signal.addEventListener("abort", abort, { once: true });
       try {
-        return await reply;
+        const r = await reply;
+        const changed = guard.changed();
+        if (changed.length) return { ok: false, error: `the program changed the record or the settings of Cuvette: ${changed.join(", ")}. A program must not write there. Check these files.` };
+        return r;
       } finally {
         clearTimeout(timeout);
         signal.removeEventListener("abort", abort);

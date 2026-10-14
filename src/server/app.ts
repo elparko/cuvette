@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { noBidi } from "../core/markdown.ts";
 import { randomBytes } from "node:crypto";
 import { accessSync, constants, existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -403,7 +404,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         return send(res, 403, { error: cannotRead(at) });
       }
       const recent = [...new Set(listSessions().map((s) => s.cwd).filter((x) => x && existsSync(x)))].slice(0, 8);
-      return send(res, 200, { path: at, parent: dirname(at) === at ? null : dirname(at), dirs, recent, home: homedir() });
+      return send(res, 200, { path: at, parent: dirname(at) === at ? null : dirname(at), parentShown: dirname(at) === at ? null : noBidi(dirname(at)), dirs, shown: dirs.map(noBidi), recent, recentShown: recent.map(noBidi), home: homedir() });
     }
     if (get && p === "/api/suggest") {
       const at = resolve((url.searchParams.get("p") || "").replace(/^~(?=\/|$)/, homedir()));

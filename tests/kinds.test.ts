@@ -615,6 +615,61 @@ map:
   expect(existsSync(join(other, "evil.txt"))).toBe(false);
 });
 
+function pythonWriter(project: string, name: string, target: string) {
+  const dir = join(project, ".cuvette", "adapters", name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), `${head("python", "  call_timeout_s: 20\n")}tools:\n  - { name: append, description: d, function: "m:append", params: { target: { type: string } }, required: [target] }\n`);
+  writeFileSync(join(dir, "m.py"), "def append(target):\n    try:\n        open(target, 'a').write('x')\n        return {'metrics': {'wrote': 1}}\n    except OSError:\n        return {'metrics': {'wrote': 0}}\n");
+  return dir;
+}
+
+test.skipIf(!sandboxWorks)("a python adapter writes in its own folder and the project, and cannot write the record, the settings or another adapter", async () => {
+  const project = realpathSync(mkdtempSync(join(root, "project-")));
+  const out = join(project, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  writeFileSync(join(out, ".record", "log.jsonl"), '{"id":1}\n');
+  mkdirSync(join(project, ".cuvette"), { recursive: true });
+  writeFileSync(join(project, ".cuvette", "settings.json"), "{}");
+  mkdirSync(join(project, "data"));
+  const dir = pythonWriter(project, "px", "");
+  const other = join(project, ".cuvette", "adapters", "dx");
+  mkdirSync(other, { recursive: true });
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "append")!;
+  const run = (target: string) => tool.execute({ target }, ctx(out, dirs.sessionDir));
+  for (const target of [join(project, "data", "result.txt"), join(dir, "cache.txt")]) {
+    expect((await run(target)).metrics?.wrote).toBe(1);
+    expect(readFileSync(target, "utf8")).toBe("x");
+  }
+  for (const target of [join(out, ".record", "log.jsonl"), join(project, ".cuvette", "settings.json"), join(other, "evil.txt")]) {
+    const r = await run(target);
+    expect(r.ok).toBe(true);
+    expect(r.metrics?.wrote).toBe(0);
+    expect(existsSync(target) ? readFileSync(target, "utf8") : "").not.toContain("x");
+  }
+});
+
+test("a python adapter that changes the settings gets an error, or cannot write them", async () => {
+  const project = realpathSync(mkdtempSync(join(root, "project-")));
+  const out = join(project, "cuvette", "mine");
+  mkdirSync(join(out, ".record"), { recursive: true });
+  mkdirSync(join(project, ".cuvette"), { recursive: true });
+  const settings = join(project, ".cuvette", "settings.json");
+  writeFileSync(settings, "{}");
+  const dir = pythonWriter(project, "py", "");
+  const dirs = { workDir: out, sessionDir: join(out, ".record"), projectDir: project };
+  const rt = await startAdapter(loadAdapter(dir), dirs);
+  started.push(rt);
+  const tool = (await rt.tools()).find((t) => t.name === "append")!;
+  const r = await tool.execute({ target: settings }, ctx(out, dirs.sessionDir));
+  if (readFileSync(settings, "utf8") !== "{}") {
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/changed the record or the settings/);
+  }
+});
+
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);

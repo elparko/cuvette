@@ -880,9 +880,9 @@ async function chooser(box) {
       b.addEventListener("click", () => list(path));
       const li = document.createElement("li"); li.append(b); ul.append(li);
     };
-    if (d.parent) add("↑ Up", d.parent, "", d.parent);
-    for (const n of d.dirs.slice(0, 200)) add("▸ " + n, d.path.replace(/\/$/, "") + "/" + n);
-    if (d.recent.length) { const h = document.createElement("li"); h.className = "dim small"; h.textContent = "Recent project folders"; ul.append(h); for (const r of d.recent) add(r.split("/").filter(Boolean).pop() || r, r, "", r); }
+    if (d.parent) add("↑ Up", d.parent, "", d.parentShown);
+    d.dirs.slice(0, 200).forEach((n, i) => add("▸ " + d.shown[i], d.path.replace(/\/$/, "") + "/" + n));
+    if (d.recent.length) { const h = document.createElement("li"); h.className = "dim small"; h.textContent = "Recent project folders"; ul.append(h); d.recent.forEach((r, i) => { const t = d.recentShown[i]; add(t.split("/").filter(Boolean).pop() || t, r, "", t); }); }
   }
   list(start);
 }

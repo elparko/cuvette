@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -22,8 +22,10 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");
     const script = join(home, "fake.json");
     writeFileSync(script, JSON.stringify([{ calls: [{ name: "ask_scientist", args: { question: "Which test?", options: ["t test", "Wilcoxon"] } }] }, { text: "Done." }]));
+    const project = join(home, "project");
+    mkdirSync(project);
     const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: join(home, "spend.jsonl"), CUVETTE_NO_OPEN: "1", HOME: home };
-    proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:" + script], { cwd: tmpdir(), env, stdio: ["ignore", "pipe", "pipe"] });
+    proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:" + script], { cwd: project, env, stdio: ["ignore", "pipe", "pipe"] });
     url = await new Promise<string>((done, fail) => {
       let out = "";
       proc.stdout!.on("data", (b) => {

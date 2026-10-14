@@ -1,22 +1,61 @@
 interface Item {
   w: string;
   num?: number;
+  not?: boolean;
 }
 
 const NUMBER = /^[-+]?(?:\d+(?:[.,]\d+)?|\.\d+)$/;
 const FILLER = new Set(["to", "is", "as", "the", "set", "=", "at"]);
+const LEAD = new Set(["use", "set", "with", "using", "take", "run", "apply", "make", "give", "want", "need", "please", "try", "and", "or", "of", "about", "around", "to", "is", "as", "the", "a", "an", "at", "=", "for", "by", "from", "than"]);
+const SKIP = new Set([...FILLER, "of", "about", "around", "roughly", "equal", "equals", "be", "value", "a", "an", "than"]);
+const THOUSANDS = /(?<![\d.,])([1-9]\d{0,2})((?:[, \u00a0\u202f]\d{3})+)(?!\d)/g;
 const ON = new Set(["on", "true", "yes", "enable", "enabled"]);
 const OFF = new Set(["off", "false", "no", "disable", "disabled"]);
 
+const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?"]);
+
+function trimEnd(s: string): string {
+  let n = s.length;
+  while (n > 0 && TAIL.has(s[n - 1]!)) n--;
+  return s.slice(0, n);
+}
+
+function negates(out: Item[], k: number): boolean {
+  const w = out[k]!.w;
+  const before = out[k - 1]?.w;
+  return w === "not" || w === "no" || (w === "of" && before === "instead") || (w === "than" && before === "rather") || (w === "t" && !!before?.endsWith("n"));
+}
+
 function items(text: string): Item[] {
   const out: Item[] = [];
-  for (const raw of text.toLowerCase().split(/\s+|(=)/).filter(Boolean)) {
-    const token = raw.replace(/^[("'[]+/, "").replace(/[)"'\],;:!?]+$/, "").replace(/\.$/, "");
+  const merged = text.replace(THOUSANDS, (_, a: string, b: string) => a + b.replace(/\D/g, ""));
+  for (const raw of merged.toLowerCase().split(/\s+|(=)/).filter(Boolean)) {
+    const token = trimEnd(raw.replace(/^[("'[]+/, "")).replace(/\.$/, "");
     if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")) });
     else for (const w of raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean)) out.push({ w });
     if (raw === "=") out.push({ w: "=" });
   }
+  for (let i = 0; i < out.length; i++) {
+    if (out[i]!.num === undefined) continue;
+    for (let k = Math.max(0, i - 3); k < i; k++) if (negates(out, k)) out[i]!.not = true;
+  }
   return out;
+}
+
+function numberNamed(words: Item[], [b, e]: [number, number], value: number): boolean {
+  const same = (it: Item) => it.num === value && !it.not;
+  for (let i = e + 1; i <= Math.min(words.length - 1, e + 4); i++) {
+    const it = words[i]!;
+    if (it.num !== undefined) return same(it);
+    if (!SKIP.has(it.w) && words[i + 1]?.num !== undefined) return false;
+  }
+  for (let i = Math.max(0, b - 2); i < b; i++) {
+    const it = words[i]!;
+    if (it.num === undefined) continue;
+    const lead = words[i - 1];
+    if (lead === undefined || LEAD.has(lead.w)) return same(it);
+  }
+  return false;
 }
 
 function find(words: Item[], name: string): [number, number][] {
@@ -25,12 +64,6 @@ function find(words: Item[], name: string): [number, number][] {
   const hits: [number, number][] = [];
   for (let i = 0; i + parts.length <= words.length; i++) if (parts.every((p, k) => words[i + k]!.w === p && words[i + k]!.num === undefined)) hits.push([i, i + parts.length - 1]);
   return hits;
-}
-
-function near(words: Item[], [b, e]: [number, number], ok: (it: Item) => boolean, after: number, before: number): boolean {
-  for (let i = e + 1; i <= Math.min(words.length - 1, e + after); i++) if (ok(words[i]!)) return true;
-  for (let i = Math.max(0, b - before); i < b; i++) if (ok(words[i]!)) return true;
-  return false;
 }
 
 function boolNamed(words: Item[], [b, e]: [number, number], on: boolean): boolean {
@@ -48,7 +81,7 @@ export function namesValue(request: string, field: { key: string; label: string;
   const words = items(request);
   const spots = [...find(words, field.key), ...find(words, field.label)];
   if (!spots.length) return false;
-  if (typeof value === "number") return spots.some((s) => near(words, s, (it) => it.num === value, 4, 2));
+  if (typeof value === "number") return spots.some((s) => numberNamed(words, s, value));
   if (typeof value === "boolean") return spots.some((s) => boolNamed(words, s, value));
   const choice = (field.choices ?? []).find((c) => String(c !== null && typeof c === "object" && "value" in c ? (c as { value: unknown }).value : c) === String(value));
   const names = [String(value), ...(choice !== null && typeof choice === "object" && "label" in choice ? [String((choice as { label: unknown }).label)] : [])];
