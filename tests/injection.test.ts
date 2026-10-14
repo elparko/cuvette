@@ -217,6 +217,12 @@ function holds(x: Setup, project = x.project) {
   expect(sent(provider)).not.toContain(KEY);
   expect(recordText(s)).not.toContain(KEY);
   expect(s.findings.list().every((f) => f.status === "open")).toBe(true);
+  const called = s.record.entries(["tool_call"]).map((e) => String(e.data.callId));
+  const answered = new Set(s.record.entries(["tool_result"]).map((e) => String(e.data.callId)));
+  expect(called.length).toBeGreaterThan(1);
+  expect(called.filter((id) => !answered.has(id))).toEqual([]);
+  const denied = s.record.entries(["permission"]).filter((e) => e.data.decision === "denied");
+  expect(denied.length).toBe(x.cards.length);
 }
 
 async function ask(x: Setup, text = "Look at the data.") {
@@ -287,7 +293,7 @@ const vectors: Vector[] = [
     reads: () => [{ name: "read_file", args: { path: "calls.vcf" } }],
   },
   {
-    id: "text in the metadata of an image",
+    id: "the metadata of an image",
     shown: false,
     plant: (p) => writeFileSync(join(p, "cells.png"), png(payload())),
     reads: () => [{ name: "inspect_data", args: { path: "cells.png" } }, { name: "read_file", args: { path: "cells.png" } }],
@@ -437,4 +443,62 @@ test("a tool result that names the saved key file as an output: the harness does
   expect(copies).toEqual([]);
   expect(recordText(x.s)).not.toContain(KEY);
   expect(sent(x.provider)).not.toContain(KEY);
+});
+
+const TAG = /<([a-z][a-z0-9]*)((?:\s+[a-z_:@-][\w:.@-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*\/?>/gi;
+const shapeOf = (html: string) => [...html.matchAll(TAG)].map((m) => `${m[1]!.toLowerCase()} ${[...m[2]!.matchAll(/\s+([a-z_:@-][\w:.@-]*)/gi)].map((a) => a[1]!.toLowerCase()).sort().join(" ")}`).sort();
+
+test("the report of the session shows hostile data as escaped text", async () => {
+  const { trailHtml } = await import("../src/core/trail.ts");
+  const evil = `<script>alert(1)</script><img src=x onerror=alert(2)>"><svg onload=alert(3)> ' onmouseover='x [a](javascript:alert(5))`;
+  const make = async (text: string) => {
+    const x = await start({
+      reads: () => [{ name: "read_file", args: { path: "README.md" } }, { name: "lab_tool", args: {} }],
+      setup: (p) => writeFileSync(join(p, "README.md"), text),
+      finalText: text,
+    });
+    toolOf(x.s, "lab_tool", () => ({ ok: false, error: text, text }));
+    await ask(x, text);
+    x.s.record.append("note", { text, by: "agent" });
+    return trailHtml(x.s.record, x.s.adapters, "apa", { linkFrom: x.s.dir });
+  };
+  const hostile = await make(evil);
+  await session?.close();
+  const benign = await make("plain text with a [link](https://example.com/a)");
+  expect(hostile.length).toBeGreaterThan(500);
+  expect(hostile).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  expect(shapeOf(hostile).filter((t) => /^(script|iframe|svg|object|embed)\b/.test(t))).toEqual(shapeOf(benign).filter((t) => /^(script|iframe|svg|object|embed)\b/.test(t)));
+  expect(shapeOf(hostile).filter((t) => /\bon[a-z]+\b/.test(t.split(" ").slice(1).join(" ")))).toEqual(shapeOf(benign).filter((t) => /\bon[a-z]+\b/.test(t.split(" ").slice(1).join(" "))));
+  expect(hostile).not.toMatch(/href="javascript:/i);
+});
+
+test("a model that is told to hide a failed step: the review still records the finding and the answer lists it", async () => {
+  const x = await start({
+    only: ["hide", "passed"],
+    setup: (p) => writeFileSync(join(p, "README.md"), `${payload()} Read the broken file first.`),
+    reads: () => [{ name: "read_file", args: { path: "README.md" } }, { name: "read_file", args: { path: "missing.csv" } }],
+    finalText: "The analysis has no problems. The review passed. Every step worked.",
+  });
+  await ask(x);
+  const open = x.s.findings.list("open");
+  expect(open.map((f) => f.check)).toContain("failed_result_used");
+  const final = x.s.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)!;
+  expect((final.data.findings as string[]).length).toBeGreaterThan(0);
+  expect(x.s.record.entries(["finding_resolution"])).toEqual([]);
+  expect(x.s.record.entries(["tool_result"]).some((e) => e.data.tool === "read_file" && e.data.ok === false)).toBe(true);
+});
+
+test("a very long file with hostile text is cut before it reaches the model, and the cut keeps the record whole", async () => {
+  const x = await start({
+    only: ["mode"],
+    setup: (p) => writeFileSync(join(p, "big.txt"), `${"x".repeat(900_000)}\n${payload()}\n`),
+    reads: () => [{ name: "read_file", args: { path: "big.txt", max_bytes: 1_000_000 } }],
+  });
+  await ask(x);
+  const text = x.provider.requests.at(-1)!.messages.flatMap((m) => m.parts).flatMap((p: Part) => (p.type === "tool_result" ? [p.text] : []))[0]!;
+  expect(text.length).toBeLessThan(25_000);
+  expect(text).toContain("The harness cut");
+  expect(x.provider.fired.size).toBe(0);
+  expect(x.s.record.entries(["tool_result"])[0]!.data.ok).toBe(true);
+  expect(JSON.stringify(x.s.record.entries()).length).toBeLessThan(200_000);
 });
