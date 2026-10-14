@@ -29,6 +29,7 @@ run_tool(function() {
       cells_per_file = as.list(setNames(as.list(counts), sample_id_of(paths))),
       channels = lapply(seq_len(nrow(chan)), function(i) as.list(chan[i, ])),
       label_channels = chan$channel[chan$looks_like_label],
+      channel_stats_file = basename(paths[1]),
       flowcore_version = as.character(packageVersion("flowCore"))
     ),
     table = table_of(files, out, 40),
