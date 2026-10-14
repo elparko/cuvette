@@ -57,7 +57,7 @@ export class AnalysisRecord {
   private nodeById = new Map<string, Node>();
   private staleIds = new Set<string>();
   private envs = new Map<string, EnvLock & { name: string }>();
-  private replaced = new Map<string, string>();
+  private replaced = new Map<string, { node: string; entry: number }[]>();
   private nodeEntry = new Map<string, number>();
   private asideRanges: [number, number][] = [];
   private nextNode = 1;
@@ -155,7 +155,8 @@ export class AnalysisRecord {
       const l = e.data as unknown as EnvLock & { name: string };
       if (!this.envs.has(l.hash)) this.envs.set(l.hash, l);
     } else if (e.kind === "rerun") {
-      this.replaced.set(String(e.data.old), String(e.data.node));
+      const old = String(e.data.old);
+      this.replaced.set(old, [...(this.replaced.get(old) ?? []), { node: String(e.data.node), entry: e.id }]);
     } else if (e.kind === "rewind") {
       this.asideRanges.push([Number(e.data.upTo), e.id]);
     }
@@ -318,13 +319,15 @@ export class AnalysisRecord {
       hit.add(n.id);
       for (const d of this.descendants(n.id)) hit.add(d);
     }
-    const fresh = [...hit].filter((id) => !this.staleIds.has(id));
+    const known = this.stale();
+    const fresh = [...hit].filter((id) => !known.has(id));
     this.append("stale", { key: decisionKey, reason, nodes: fresh });
     return fresh;
   }
 
   stale(): Set<string> {
-    return new Set(this.staleIds);
+    if (!this.asideRanges.length) return new Set(this.staleIds);
+    return new Set(this.live(["stale"]).flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
   }
 
   addEnvironment(lock: EnvLock, name: string): string {
@@ -341,12 +344,16 @@ export class AnalysisRecord {
   }
 
   replacedBy(id: string): string | undefined {
-    return this.replaced.get(id);
+    return this.replaced.get(id)?.findLast((r) => !this.setAside(r.entry))?.node;
   }
 
   latest(id: string): string {
     let at = id;
-    for (let i = 0; i < 1000 && this.replaced.has(at); i++) at = this.replaced.get(at)!;
+    for (let i = 0; i < 1000; i++) {
+      const next = this.replacedBy(at);
+      if (next === undefined) break;
+      at = next;
+    }
     return at;
   }
 
