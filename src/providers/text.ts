@@ -1,19 +1,19 @@
-const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>|\[(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\]/gi;
+const NAME = "(?:\\u200b*[^|<>\\n\\u200b]){1,48}\\u200b*";
+const NAME_WIDE = "(?:\\u200b*[^｜<>\\n\\u200b]){1,48}\\u200b*";
+const tokens = (open: (c: string) => string) => [`${open("<")}\\|${NAME}\\|>`, `${open("<")}｜${NAME_WIDE}｜>`, `${open("\\[")}\\/?INST\\]`, `${open("<")}<\\/?SYS>>`, `${open("<")}\\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>`, `${open("\\[")}(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\\]`].join("|");
+const FANGED = (c: string) => `${c}\\u200b+`;
+const MARKER_OR_FANGED = new RegExp(`${tokens((c) => c)}|${tokens(FANGED)}`, "gi");
+const FANGED_ONLY = new RegExp(tokens(FANGED), "gi");
 
 // A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
+// A marker that has zero-width spaces already gets one more, and a marker inside a marker gets its own, so that refang gives back the same text.
 export function defang(text: string): string {
-  return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
+  return text.replace(MARKER_OR_FANGED, (m) => `${m[0]}\u200b${defang(m.slice(1))}`);
 }
-
-const MARKER_AT = new RegExp(SPECIAL_TOKENS.source, "iy");
 
 // The model copies a marker with its zero-width space into a tool call. The tool must get the marker as it is in the file.
 export function refang(text: string): string {
-  return text.replace(/([<[])\u200b/g, (m, c: string, at: number, whole: string) => {
-    MARKER_AT.lastIndex = 0;
-    const rest = c + whole.slice(at + 2, at + 80);
-    return MARKER_AT.test(rest) ? c : m;
-  });
+  return text.replace(FANGED_ONLY, (m) => m[0] + refang(m.slice(2)));
 }
 
 export function refangDeep<T>(v: T): T {
@@ -36,10 +36,17 @@ export function wrapperText(text: string): string {
 
 export function splitThink(raw: string): { text: string; thinking: string } {
   const thoughts: string[] = [];
-  let text = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
-    thoughts.push(t.trim());
-    return "";
-  });
+  let text = "";
+  let at = 0;
+  for (;;) {
+    const from = raw.indexOf("<think>", at);
+    const to = from < 0 ? -1 : raw.indexOf("</think>", from + 7);
+    if (to < 0) break;
+    text += raw.slice(at, from);
+    thoughts.push(raw.slice(from + 7, to).trim());
+    at = to + 8;
+  }
+  text += raw.slice(at);
   const open = text.indexOf("<think>");
   if (open >= 0) {
     thoughts.push(text.slice(open + 7).trim());
@@ -95,11 +102,12 @@ export class ThinkSplitter {
 
 function balancedObjects(s: string): { start: number; end: number }[] {
   const found: { start: number; end: number }[] = [];
+  let budget = 8 * s.length + 10_000;
   for (let i = 0; i < s.length; i++) {
     if (s[i] !== "{") continue;
     let depth = 0;
     let inStr = false;
-    for (let j = i; j < s.length; j++) {
+    for (let j = i; j < s.length && budget-- > 0; j++) {
       const c = s[j];
       if (inStr) {
         if (c === "\\") j++;
