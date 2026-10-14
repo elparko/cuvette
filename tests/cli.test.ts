@@ -296,3 +296,12 @@ test("headless text output shows model text without control codes", () => {
   expect(r.out).not.toMatch(/\x1b|\x07|‮|U1RDT1BZ/);
   expect(r.err).not.toMatch(/\x1b|‮/);
 });
+
+test("headless text output keeps the rest of an answer after a stray control introducer", () => {
+  const h = home();
+  const text = "Start\u009d52 middle text \u0090 still here End";
+  const model = fake("stray", [{ calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { text }, { text }, { text }]);
+  const r = cli(h, ["-p", "Give the mean of x", "--adapter", "drivefix", "--model", model, "--trust-folder"]);
+  expect(r.out).toContain("middle text");
+  expect(r.out).toContain("End");
+});

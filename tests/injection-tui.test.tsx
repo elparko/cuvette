@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "vitest";
+import { plainText } from "../src/core/plain.ts";
 import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
@@ -57,4 +58,14 @@ test("the terminal removes 8-bit control codes", async () => {
   expect(raw).not.toMatch(/[\x80-\x9f]/);
   expect(raw).not.toContain("QzFDT1BZ");
   expect(raw).not.toContain("pwned");
+});
+
+test("an unterminated control sequence removes only its introducer, not the rest of the text", () => {
+  const cases = ["one \x9d52;c;QQ== two three", "one \x90q#0 two three", "one \x1b]52;c;QQ== two three", "one \x1bP two three", "one \x98 two three", "one \x1b^ two three"];
+  for (const c of cases) {
+    const out = plainText(c);
+    expect(out, JSON.stringify(c)).toContain("two three");
+    expect(out).not.toMatch(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/);
+  }
+  expect(plainText("a \x9d52;c;QQ==\x9c b \x1b]0;t\x07 c \x1bPq\x1b\\ d")).toBe("a  b  c  d");
 });
