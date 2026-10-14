@@ -63,9 +63,30 @@ test("a deny rule for a program with capitals matches the program by any path an
 test("a deny rule looks past the value of an option of a wrapper, and past an unknown option", () => {
   const p = new Permissions({ "run_command:rm *": "deny" });
   const rc = tool({ name: "run_command", source: "generic" });
-  for (const argv of [["sudo", "-u", "root", "rm", "x"], ["sudo", "-g", "wheel", "-u", "root", "rm", "x"], ["xargs", "-n", "1", "rm", "x"], ["xargs", "-I", "{}", "rm", "{}"], ["env", "-u", "HOME", "rm", "x"], ["env", "-S", "FOO", "rm", "x"], ["sudo", "--user", "root", "rm", "x"], ["sudo", "-uroot", "rm", "x"], ["env", "--chdir=/tmp", "rm", "x"], ["nohup", "--", "rm", "x"], ["sudo", "env", "-u", "A", "nohup", "rm", "x"]]) expect(p.check(rc, { argv }), argv.join(" ")).toBe("deny");
+  for (const argv of [["sudo", "-u", "root", "rm", "x"], ["sudo", "-g", "wheel", "-u", "root", "rm", "x"], ["xargs", "-n", "1", "rm", "x"], ["xargs", "-I", "{}", "rm", "{}"], ["env", "-u", "HOME", "rm", "x"], ["env", "-S", "rm -rf x"], ["sudo", "--user", "root", "rm", "x"], ["sudo", "-uroot", "rm", "x"], ["env", "--chdir=/tmp", "rm", "x"], ["nohup", "--", "rm", "x"], ["sudo", "env", "-u", "A", "nohup", "rm", "x"]]) expect(p.check(rc, { argv }), argv.join(" ")).toBe("deny");
   expect(p.check(rc, { argv: ["sudo", "-u", "root", "ls"] })).toBe("ask");
   expect(p.check(rc, { argv: ["xargs", "-n", "1", "echo"] })).toBe("ask");
+});
+
+test("a deny rule tests the command after an unknown wrapper option, but not a word of a message, and it is fast on a long command", () => {
+  const p = new Permissions({ "run_command:rm *": "deny", "run_command:curl *": "ask" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  expect(p.check(rc, { argv: ["env", "-i", "rm", "x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "-i", "FOO=1", "rm", "x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["sudo", "-i", "env", "rm", "x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "-i", "git", "commit", "-m", "rm old"] })).toBe("ask");
+  const many = ["env", "-i", "echo", ...Array.from({ length: 2000 }, (_, i) => `word${i}`)];
+  const t0 = performance.now();
+  for (let i = 0; i < 50; i++) expect(p.check(rc, { argv: many })).toBe("ask");
+  expect(performance.now() - t0).toBeLessThan(2000);
+});
+
+test("env -S takes a command string, and a deny rule tests that string", () => {
+  const p = new Permissions({ "run_command:rm *": "deny" });
+  const rc = tool({ name: "run_command", source: "generic" });
+  expect(p.check(rc, { argv: ["env", "-S", "rm -rf x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "-S", "FOO=1 rm x"] })).toBe("deny");
+  expect(p.check(rc, { argv: ["env", "-S", "echo hello"] })).toBe("ask");
 });
 
 test("a deny rule does not catch a shell command, a renamed copy or a script, and an allow rule does not look through a wrapper", () => {
