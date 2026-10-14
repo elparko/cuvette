@@ -131,14 +131,14 @@ function listing(dir: string, key: string, st: WalkState): void {
       }
       if (++n > MAX_LISTED) {
         st.incomplete.push(`too many files in ${relative(key, dir)}`);
-        st.files[`${relative(key, dir)} (listing)`] = "too many files";
+        st.files[`(listing) ${relative(key, dir)}`] = "too many files";
         return;
       }
       h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? "link" : ""}\n`);
       if (l.isDirectory()) stack.push(p);
     }
   }
-  st.files[`${relative(key, dir)} (listing)`] = h.digest("hex");
+  st.files[`(listing) ${relative(key, dir)}`] = h.digest("hex");
 }
 
 function walk(dir: string, key: string, st: WalkState, found: string[]): void {
@@ -146,7 +146,7 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
   try {
     names = readdirSync(dir).sort();
   } catch {
-    st.files[`${relative(key, dir)} (unreadable folder)`] = "unreadable";
+    st.files[`(unreadable folder) ${relative(key, dir)}`] = "unreadable";
     return;
   }
   for (const name of names) {
@@ -159,7 +159,7 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
       continue;
     }
     if (l.isSymbolicLink()) {
-      st.files[`${r} (link)`] = linkHash(p);
+      st.files[`(link) ${r}`] = linkHash(p);
       let folder = false;
       try {
         folder = statSync(p).isDirectory();
@@ -297,7 +297,7 @@ export function scanFolder(folder: string): FolderScan {
   if (labBytes) files[LAB_FILE] = sha(labBytes);
   else if (labBig) files[LAB_FILE] = sha(`too large ${labBig}`);
   for (const p of paths) files[relative(key, p)] = readHash(p);
-  for (const l of linked) files[`${l} (linked folder)`] = linkHash(join(key, l));
+  for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);

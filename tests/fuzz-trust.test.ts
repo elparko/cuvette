@@ -349,7 +349,7 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
       const target = join(root, `target-${counter++}.txt`);
       symlinkSync(target, join(base, "dangling"));
       const dangling = scanFolder(b.folder);
-      expect(Object.keys(dangling.files).some((k) => k.endsWith("dangling (link)"))).toBe(true);
+      expect(Object.keys(dangling.files).some((k) => k.endsWith("dangling") && k.startsWith("(link) "))).toBe(true);
       writeFileSync(target, "one");
       const one = scanFolder(b.folder).hash;
       expect(one).not.toBe(dangling.hash);
@@ -363,6 +363,25 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
       symlinkSync(other, join(base, "dangling"));
       expect(scanFolder(b.folder).hash).not.toBe(two);
     }
+  });
+
+  test("a regular file that is named like the entry of a link does not hide the link", () => {
+    const folder = join(root, "decoy");
+    const base = join(folder, ".cuvette", "adapters", "tool");
+    mkdirSync(base, { recursive: true });
+    const target = join(root, "decoy-target.sh");
+    writeFileSync(target, "echo one\n");
+    symlinkSync(target, join(base, "run"));
+    writeFileSync(join(base, "run (link)"), "decoy");
+    mkdirSync(join(base, "node_modules"), { recursive: true });
+    writeFileSync(join(base, "node_modules", "dep.js"), "one");
+    writeFileSync(join(base, "node_modules (listing)"), "decoy");
+    const before = scanFolder(folder).hash;
+    writeFileSync(target, "echo two\n");
+    const second = scanFolder(folder).hash;
+    expect(second).not.toBe(before);
+    writeFileSync(join(base, "node_modules", "dep.js"), "twotwo");
+    expect(scanFolder(folder).hash).not.toBe(second);
   });
 
   test("a link loop and a link that points at its own folder do not stop the scan", () => {
