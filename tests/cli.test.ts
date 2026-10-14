@@ -286,3 +286,13 @@ test("NO_COLOR does not give FORCE_COLOR to child processes", () => {
   expect(r.status).toBe(0);
   expect(r.stderr).toContain("FORCE_COLOR=undefined");
 }, 40_000);
+
+test("headless text output shows model text without control codes", () => {
+  const h = home();
+  const model = fake("evil", [{ calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { text: "Result\x1b]52;c;U1RDT1BZ\x07 \x1b[8mHIDDEN\x1b[0m done‮" }, { text: "Result\x1b]52;c;U1RDT1BZ\x07 \x1b[8mHIDDEN\x1b[0m done‮" }, { text: "Result\x1b]52;c;U1RDT1BZ\x07 \x1b[8mHIDDEN\x1b[0m done‮" }]);
+  const r = cli(h, ["-p", "Give the mean of x", "--adapter", "drivefix", "--model", model, "--trust-folder"]);
+  expect(r.out).toContain("Result");
+  expect(r.out).toContain("HIDDEN");
+  expect(r.out).not.toMatch(/\x1b|\x07|‮|U1RDT1BZ/);
+  expect(r.err).not.toMatch(/\x1b|‮/);
+});
