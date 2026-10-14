@@ -74,3 +74,19 @@ test("a number in brackets before a full stop is read", () => {
   expect(namesValue("Use the standard level (alpha 0.05).", alpha, 0.05)).toBe(true);
   expect(namesValue("(alpha 0.05).", alpha, 0.05)).toBe(true);
 });
+
+test("a negation reaches only five tokens back and not over a clause boundary", () => {
+  const window = { key: "window", label: "Window" };
+  expect(namesValue("I don't have replicates so use window 5", window, 5)).toBe(true);
+  expect(namesValue("I don't have replicates, use window 5", window, 5)).toBe(true);
+  expect(namesValue("I don't have replicates because window 5 is the default", window, 5)).toBe(true);
+  expect(namesValue("Do not worry about the old runs window 5", window, 5)).toBe(true);
+});
+
+test("a value for another target in a later clause is not the value of the setting", () => {
+  const window = { key: "window", label: "Window" };
+  expect(namesValue("don't set window to 5, I want 7 for the threshold", window, 7)).toBe(false);
+  expect(namesValue("don't set window to 5, I want 7 for the threshold", window, 5)).toBe(false);
+  expect(namesValue("Set window, then use 7 for the threshold", window, 7)).toBe(false);
+  expect(namesValue("Do not use window 5, use 7", window, 7)).toBe(true);
+});
