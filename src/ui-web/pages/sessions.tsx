@@ -16,6 +16,7 @@ export interface SessionCard {
   age: string;
   status: string;
   moved: boolean;
+  hasRequest?: boolean;
   thumb: string;
 }
 
@@ -81,7 +82,7 @@ const STATUS_TONE: Record<string, "mag" | "info" | "ok" | "default"> = { "waitin
 export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; onRemove?: (id: string) => void; compact?: boolean; label?: string }) {
   const rove = useRoving(list.filter((s) => !s.moved).map((s) => s.id));
   return (
-    <ul aria-label={label} ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className={cn("grid gap-3", compact ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3")}>
+    <ul aria-label={label} ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {list.map((s) => (
         <li key={s.id} className="flex flex-col gap-1">
           <button
@@ -98,8 +99,8 @@ export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions
               </div>
             )}
             <div className="flex min-w-0 flex-1 flex-col gap-1 p-3.5">
-              <span className="line-clamp-2 font-medium break-words">{s.title}</span>
-              {s.text && <span className="line-clamp-2 text-[13px] break-words text-muted-foreground">{s.text}</span>}
+              <span className="line-clamp-2 font-medium [overflow-wrap:anywhere]">{s.title}</span>
+              {s.text && <span className="line-clamp-2 text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{s.text}</span>}
               <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-1.5 text-xs text-muted-foreground">
                 <span className="inline-flex min-w-0 items-center gap-1 truncate" title={s.folder}>
                   <FolderOpenIcon className="size-3.5 shrink-0" />

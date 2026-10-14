@@ -38,7 +38,7 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`, false, CONTEXT_OVERFLOW.test(e.message));
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
-    return new ProviderError(`The Claude API had a server error (${e.status}). Retry in a moment.`, true);
+    return new ProviderError(`The Claude API had a server error (${e.status}).`, true);
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);

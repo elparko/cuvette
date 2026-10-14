@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { loadAdapter, type LoadedAdapter } from "../src/adapters/manifest.ts";
-import { exportFlow, exportNotebook, exportProtocol, exportScript } from "../src/core/exports.ts";
+import { exportFlow, exportNotebook, exportProtocol, exportScript, methodsSentence } from "../src/core/exports.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { replayFlow, type Runner } from "../src/core/replay.ts";
 import type { Args, NodeIn, ToolOutput } from "../src/core/types.ts";
@@ -266,4 +266,10 @@ test("the script comments out a harness step, and the notebook has no run-step c
   const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "h4.ipynb")), "utf8"));
   const code = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code").map((c: { source: string[] }) => c.source.join(""));
   expect(code).toEqual([`!cuvette run-step fake open '{{"path":"${a}"}}'`]);
+});
+
+test("the methods sentence fills a name from the result as well as a name from the arguments", () => {
+  const summarized = { name: "fake", mapEntry: () => ({ tool: "count", route: "", steps: [], params: [], summary: "{path} has {metrics.lines} lines." }) } as never as LoadedAdapter;
+  const node = { ...nodeIn({ tool: "count", args: { path: "a.txt" }, result: { ok: true, metrics: { lines: 12 } } }), id: "n1" } as never;
+  expect(methodsSentence([summarized], node)).toBe("a.txt has 12 lines.");
 });

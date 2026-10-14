@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, opendirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { rename, writeFile } from "node:fs/promises";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { opendir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { hideKeys, isCredentialsFile } from "./credentials.ts";
@@ -44,7 +44,7 @@ import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
-import { FOLDER_LIST_MAX, folderListNote, foldersNote, systemPrompt } from "./prompt.ts";
+import { FOLDER_LIST_MAX, FOLDER_LIST_READ_MAX, folderListNote, foldersNote, systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
 import { RETRY_BUDGET_MS, realSleep, type Sleep } from "../providers/retry.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
@@ -401,7 +401,12 @@ export class Session {
     const lastMode = record.entries(["mode"]).at(-1)?.data;
     const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
     const switched = record.live(["setting"]).filter((e) => e.data.name === "model" && typeof e.data.new === "string" && e.data.new).at(-1)?.data.new as string | undefined;
-    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    const kept: Record<string, unknown> = {};
+    for (const name of ["effort", "promptCache", "show_thinking", "numCtx", "think"]) {
+      const last = record.live(["setting"]).filter((e) => e.data.name === name).at(-1)?.data;
+      if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
+    }
+    return Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
   }
 
   private async init(opts: SessionOptions) {
@@ -616,27 +621,36 @@ export class Session {
   }
 
   // The first message gives the list of the project folder, so the model does not need a list_dir call before its first real step.
-  private folderList(): string | undefined {
-    try {
-      const dir = opendirSync(this.cwd);
-      const entries: { name: string; folder: boolean; size?: number }[] = [];
-      let more = false;
+  private async folderList(): Promise<string | undefined> {
+    const read = async () => {
+      const dir = await opendir(this.cwd);
+      const names: { name: string; folder: boolean }[] = [];
       try {
-        for (let e = dir.readSync(); e; e = dir.readSync()) {
-          if (entries.length === FOLDER_LIST_MAX) {
-            more = true;
-            break;
-          }
-          entries.push({ name: e.name, folder: e.isDirectory(), size: e.isFile() ? statSync(join(this.cwd, e.name), { throwIfNoEntry: false })?.size : undefined });
+        for await (const e of dir) {
+          names.push({ name: e.name, folder: e.isDirectory() });
+          if (names.length === FOLDER_LIST_READ_MAX) break;
         }
       } finally {
-        dir.closeSync();
+        await dir.close().catch(() => {});
       }
-      return folderListNote(entries, more);
+      names.sort((x, y) => x.name.localeCompare(y.name));
+      const shown = await Promise.all(
+        names.slice(0, FOLDER_LIST_MAX).map(async (e) => {
+          const st = await stat(join(this.cwd, e.name)).catch(() => undefined);
+          return { name: e.name, folder: st ? st.isDirectory() : e.folder, size: st?.isFile() ? st.size : undefined };
+        }),
+      );
+      return folderListNote(shown, names.length > FOLDER_LIST_MAX);
+    };
+    const limit = new Promise<undefined>((done) => AbortSignal.timeout(this.folderListMs).addEventListener("abort", () => done(undefined)));
+    try {
+      return await Promise.race([read(), limit]);
     } catch {
       return undefined;
     }
   }
+
+  folderListMs = 2000;
 
   private buildSystem(): string {
     return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) }, textStyle: this.settings.text_style });
@@ -1097,7 +1111,7 @@ export class Session {
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
       if (this.history.length === 0 || !this.foldersSent) {
-        const list = this.history.length === 0 ? this.folderList() : undefined;
+        const list = this.history.length === 0 ? await this.folderList() : undefined;
         this.notes.unshift(...[this.foldersText(), list].filter((n): n is string => !!n));
         this.foldersSent = true;
       }
@@ -1342,8 +1356,9 @@ export class Session {
             tries = r.attempt + 1;
             dropStreamed();
             const text = `Waiting to retry (${r.attempt} of ${r.of})`;
-            this.bus.emit({ type: "status", state: "thinking", purpose: text });
-            this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${Math.round(r.waitMs / 1000)} s.` });
+            const wait = Math.round(r.waitMs / 1000);
+            this.bus.emit({ type: "status", state: "thinking", purpose: `${text}: ${r.reason}. The next try is in ${wait} s.` });
+            this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${wait} s.` });
           },
         });
         if (retried) this.bus.emit({ type: "status", state: "thinking" });
@@ -1383,7 +1398,8 @@ export class Session {
           await this.recoverySleep(this.recoveryWaitMs, signal);
           continue;
         }
-        const choice = await this.askRecovery(e.message, signal);
+        const choice = await this.askRecovery(e.message, after, signal);
+        if (choice !== "stop") this.bus.emit({ type: "status", state: "thinking" });
         budget = { leftMs: this.retryBudgetMs };
         started = Date.now();
         allTries = 0;
@@ -1396,7 +1412,7 @@ export class Session {
     }
   }
 
-  private async askRecovery(problem: string, signal: AbortSignal): Promise<"resume" | "local" | "stop"> {
+  private async askRecovery(problem: string, after: string, signal: AbortSignal): Promise<"resume" | "local" | "stop"> {
     const local = this.localSpec();
     const options = [
       { value: "resume", label: "Resume" },
@@ -1406,9 +1422,9 @@ export class Session {
     const q = await this.questions.ask({
       decisionKey: "",
       title: "The model did not answer",
-      text: `${problem} The finished steps are saved. Resume goes on from the last finished step. No finished step runs again.`,
+      text: `${problem} The model gave no answer ${after}. The finished steps are saved. Resume goes on from the last finished step. No finished step runs again.`,
       options,
-      recommendation: { value: "resume", reason: "A short network failure usually ends." },
+      recommendation: { value: "resume", reason: /rate limit/i.test(problem) ? (/wait of \d/i.test(problem) ? "Wait for the time that the text gives, then press Resume." : "Wait one minute, then press Resume.") : "The server is busy or the network failed. Press Resume to try again." },
       evidence: "",
     });
     this.bus.emit({ type: "question", question: q });

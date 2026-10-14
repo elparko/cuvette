@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { readIndex } from "./places.ts";
+import { cutText, readIndex } from "./places.ts";
 
 export type SessionStatus = "answered" | "waiting for you" | "running" | "not started";
 
@@ -230,11 +230,11 @@ export function ageText(ms: number): string {
 
 export function clip(s: string, n: number): string {
   const one = s.replace(/\s+/g, " ").trim();
-  return one.length > n ? one.slice(0, n - 1).trimEnd() + "…" : one;
+  return one.length > n ? cutText(one, n - 1).trimEnd() + "…" : one;
 }
 
 export function clipStart(s: string, n: number): string {
-  return s.length > n ? "…" + s.slice(s.length - n + 1) : s;
+  return s.length > n ? "…" + s.slice(s.length - n + 1).replace(/^[\udc00-\udfff]/, "") : s;
 }
 
 export function folderText(cwd: string, home = process.env.HOME ?? ""): string {

@@ -107,12 +107,11 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     const parts: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY) {
-        fail(new Error("body too large"));
-        req.destroy();
-      } else parts.push(c);
+      if (size <= MAX_BODY) parts.push(c);
+      else if (size > MAX_BODY * 256) req.destroy();
     });
     req.on("end", () => {
+      if (size > MAX_BODY) return fail(Object.assign(new Error(`The message is too long. The limit is ${MAX_BODY / 1024} KB. Save the text in a file in the data folder instead.`), { status: 413 }));
       try {
         const text = Buffer.concat(parts).toString("utf8");
         done(text ? JSON.parse(text) : {});
@@ -274,7 +273,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const sheets = () => {
     const s = current?.session as unknown as { record: never; adapters?: never[]; decisions: { fields(): never[] }; adapterInfo: { name: string; title: string; version: string; programVersion: string }[]; citationStyle?(): "apa" | "vancouver" };
     const dir = outDir();
-    if (!existsSync(join(dir, "results.xlsx"))) return undefined;
+    if (!existsSync(join(dir, "results.xlsx")) && !(s.record as unknown as { nodes(): unknown[] }).nodes().length) return undefined;
     try {
       return buildWorkbook({ record: s.record, adapters: s.adapters ?? [], fields: s.decisions.fields(), programs: s.adapterInfo.map((a) => ({ name: a.title || a.name, version: a.version, programVersion: a.programVersion })), dir, figures: copyFigures(s.record, dir), citationStyle: s.citationStyle?.() });
     } catch {
@@ -586,7 +585,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     try {
       await route(req, res, url);
     } catch (e) {
-      if (!res.headersSent) send(res, 400, { error: (e as Error).message });
+      if (!res.headersSent) send(res, (e as { status?: number }).status ?? 400, { error: (e as Error).message });
     }
   });
 

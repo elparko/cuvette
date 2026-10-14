@@ -444,7 +444,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Programs</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() => {

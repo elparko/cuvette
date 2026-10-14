@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import { loadAdapter } from "../src/adapters/manifest.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook, copyFigures, decodeText, typed, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
 import type { NodeIn } from "../src/core/types.ts";
@@ -99,6 +100,20 @@ test("figures are copied to figures/ with the step number and a readable name, w
   expect(names).toEqual(["figures/box.png", "figures/step02-histogram-red-intensity.png", "figures/step02-histogram-red-intensity.svg"]);
   expect(readFileSync(join(out, "figures", "step02-histogram-red-intensity.png"))).toEqual(PNG);
   expect(copyFigures(record, out).map((f) => f.path).sort()).toEqual(figs.map((f) => f.path).sort());
+});
+
+test("the Steps sheet shows no curly-brace text when a summary names a value that the result lacks", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s2");
+  const out = record.workDir;
+  const r1 = record.append("tool_result", { tool: "describe" });
+  record.addNode(node({ entry: r1.id, adapter: "biostats", tool: "describe", args: { path: "a.csv" }, result: { metrics: { n: 20 } }, summary: "Means by group." }));
+  const home = mkdtempSync(join(tmpdir(), "cuvette-res-ad-"));
+  writeFileSync(join(home, "adapter.yaml"), `adapter: { name: biostats, title: Biostats }\nprogram: { name: Biostats, version: "1.0" }\nconnection: { kind: cli }\nmap:\n  - { tool: describe, route: "", summary: "{path} has {metrics.missing} rows" }\n`);
+  const stub = loadAdapter(home);
+  const sheets = buildWorkbook({ record, adapters: [stub], fields: [] as never, programs: [], dir: out, figures: copyFigures(record, out) });
+  const steps = sheets.find((x) => x.name === "Steps")!;
+  const text = steps.rows.map((r) => String(r[steps.columns.indexOf("Description")])).join("\n");
+  expect(text).toBe("Means by group.");
 });
 
 test("the workbook has Summary, one sheet for each step table, Steps, Metrics and Files", () => {

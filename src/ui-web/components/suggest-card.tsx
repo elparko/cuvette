@@ -60,7 +60,7 @@ export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending;
   if (!best)
     return (
       <div className="flex w-full flex-col gap-3 rounded-xl border bg-card p-4" role="group" aria-label="Empty folder">
-        <p className="text-sm">Cuvette found no files in {name}. Choose the folder that holds your data, or open this folder to add files later.</p>
+        <p className="text-sm [overflow-wrap:anywhere]">Cuvette found no files in {name}. Choose the folder that holds your data, or open this folder to add files later.</p>
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy} onClick={cancel}>
             Back
@@ -76,7 +76,7 @@ export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending;
       <div className="flex items-center gap-2 text-sm font-medium">
         <SparklesIcon className="size-4 text-accent-brand" /> {best.headline}
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
         Found in {name}: {best.reason}.
       </p>
       <div className="flex flex-wrap gap-2">
