@@ -39,6 +39,17 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
 
 const useCompact = () => useContext(CardRows) < 14;
 
+function useOnce() {
+  const busy = useRef(false);
+  return <A extends unknown[]>(fn: (...a: A) => void) =>
+    (...a: A) => {
+      if (busy.current) return;
+      busy.current = true;
+      queueMicrotask(() => void (busy.current = false));
+      fn(...a);
+    };
+}
+
 function Hang({ head, lead, children }: { head: React.ReactNode; lead: number; children: React.ReactNode }) {
   return (
     <Box>
@@ -73,17 +84,22 @@ export function PermissionCard(props: {
   onInterrupt: () => void;
 }) {
   const { card } = props;
+  const once = useOnce();
   const [asking, setAsking] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const v = permissionView(card);
   const { always, purpose, does, code } = v;
+  const onAllow = once(props.onAllow);
+  const onAlways = once(props.onAlways);
+  const onDeny = once(props.onDeny);
+  const onInterrupt = once(props.onInterrupt);
   useInput(
     (input, key) => {
-      if (input === "y") props.onAllow();
-      else if (input === "a" && always) props.onAlways();
+      if (input === "y") onAllow();
+      else if (input === "a" && always) onAlways();
       else if (input === "n") setAsking(true);
       else if (input === "c" && code) setShowCode((x) => !x);
-      else if (key.escape) props.onInterrupt();
+      else if (key.escape) onInterrupt();
     },
     { isActive: !asking },
   );
@@ -113,7 +129,7 @@ export function PermissionCard(props: {
       {asking ? (
         <Prompt
           label="Reason for the agent (Enter to skip):"
-          onSubmit={(v) => props.onDeny(v.trim() || undefined)}
+          onSubmit={(v) => onDeny(v.trim() || undefined)}
           onCancel={() => setAsking(false)}
         />
       ) : (
@@ -129,10 +145,11 @@ export function PermissionCard(props: {
 
 export function PhiCard(props: { card: Extract<Card, { t: "phi" }>; onAction: (a: "send" | "mask" | "local" | "stop") => void }) {
   const v = phiView(props.card);
+  const onAction = useOnce()(props.onAction);
   useInput((input, key) => {
-    if (key.escape) return props.onAction("stop");
+    if (key.escape) return onAction("stop");
     const a = v.actions.find((x) => x.key === input);
-    if (a) props.onAction(a.act);
+    if (a) onAction(a.act);
   });
   return (
     <Frame title={v.title} color="red">
@@ -169,6 +186,10 @@ export function QuestionCard(props: {
   escText?: string;
 }) {
   const q = props.card.q;
+  const once = useOnce();
+  const onAnswer = once(props.onAnswer);
+  const onDismiss = once(props.onDismiss);
+  const onBack = props.onBack ? once(props.onBack) : undefined;
   const free = !q.options.length;
   const [other, setOther] = useState(free);
   const [cursor, setCursor] = useState(() => questionCursor(q, props.current));
@@ -181,16 +202,16 @@ export function QuestionCard(props: {
   useInput(
     (input, key) => {
       const n = Number(input);
-      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) props.onAnswer(q.options[n - 1]!.value);
+      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) onAnswer(q.options[n - 1]!.value);
       else if (key.upArrow) setCursor((c) => (c + q.options.length - 1) % q.options.length);
       else if (key.downArrow) setCursor((c) => (c + 1) % q.options.length);
       else if (input === "o") setOther(true);
       else if (key.return) {
         const r = questionEnter(q, cursor);
-        if ("value" in r) props.onAnswer(r.value);
+        if ("value" in r) onAnswer(r.value);
         else (setNeed(r.type), setOther(true));
-      } else if (props.onBack && ((key.tab && key.shift) || key.leftArrow)) props.onBack();
-      else if (key.escape) props.onDismiss();
+      } else if (onBack && ((key.tab && key.shift) || key.leftArrow)) onBack();
+      else if (key.escape) onDismiss();
     },
     { isActive: !other },
   );
@@ -233,13 +254,13 @@ export function QuestionCard(props: {
             initial={free ? questionStartText(q, props.current) : ""}
             onSubmit={(v) => {
               const t = v.trim();
-              if (t) return props.onAnswer(t);
+              if (t) return onAnswer(t);
               const r = questionEnter(q, cursor);
-              if ("value" in r && free) props.onAnswer(r.value);
+              if ("value" in r && free) onAnswer(r.value);
               else setNeed(questionNeed(q) ?? "Type your answer.");
             }}
-            onCancel={() => (free ? props.onDismiss() : setOther(false))}
-            onBack={props.onBack}
+            onCancel={() => (free ? onDismiss() : setOther(false))}
+            onBack={onBack}
           />
         ) : (
           <Text dimColor>
@@ -260,10 +281,14 @@ export function InstructionCard(props: {
   onAgent: () => void;
   onInterrupt: () => void;
 }) {
+  const once = useOnce();
+  const onDone = once(props.onDone);
+  const onAgent = once(props.onAgent);
+  const onInterrupt = once(props.onInterrupt);
   useInput((input, key) => {
-    if (key.return) props.onDone();
-    else if (input === "s") props.onAgent();
-    else if (key.escape) props.onInterrupt();
+    if (key.return) onDone();
+    else if (input === "s") onAgent();
+    else if (key.escape) onInterrupt();
   });
   const { card } = props;
   return (
@@ -281,11 +306,14 @@ export function InstructionCard(props: {
 export function RewindCard(props: { card: Extract<Card, { t: "rewind" }>; onChoose: (n: number) => void; onClose: () => void }) {
   const list = props.card.points;
   const [sel, setSel] = useState(Math.max(0, list.length - 1));
+  const once = useOnce();
+  const onClose = once(props.onClose);
+  const onChoose = once(props.onChoose);
   useInput((_, key) => {
-    if (key.escape) props.onClose();
+    if (key.escape) onClose();
     else if (key.upArrow) setSel((x) => Math.max(0, x - 1));
     else if (key.downArrow) setSel((x) => Math.min(list.length - 1, x + 1));
-    else if (key.return && list[sel]) props.onChoose(list[sel]!.n);
+    else if (key.return && list[sel]) onChoose(list[sel]!.n);
   });
   return (
     <Frame title={REWIND_TITLE} color="cyan" arrows>
@@ -307,16 +335,18 @@ export function FindingsCard(props: { card: Extract<Card, { t: "findings" }>; se
   const list = props.card.list;
   const f = list[i];
   const [reason, setReason] = useState<"reject" | "fix" | undefined>();
-  const resolve = (action: "accept" | "reject" | "fix", why?: string) => {
+  const once = useOnce();
+  const onClose = once(props.onClose);
+  const resolve = once((action: "accept" | "reject" | "fix", why?: string) => {
     if (!f) return;
     props.session.findings.resolve(f.fid, action, why);
     setDone((d) => ({ ...d, [f.fid]: action }));
     setReason(undefined);
     if (i + 1 < list.length) setI(i + 1);
-  };
+  });
   useInput(
     (input, key) => {
-      if (!f || key.escape || input === "q") props.onClose();
+      if (!f || key.escape || input === "q") onClose();
       else if (input === "a") resolve("accept");
       else if (input === "r") setReason("reject");
       else if (input === "f") setReason("fix");
@@ -362,6 +392,9 @@ export function SetupCard(props: {
   onCancel: () => void;
 }) {
   const { fields } = props;
+  const once = useOnce();
+  const onSubmit = once(props.onSubmit);
+  const onCancel = once(props.onCancel);
   const [values, setValues] = useState<Record<string, unknown>>(() => setupValues(fields, props.card));
   const [more, setMore] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -398,7 +431,7 @@ export function SetupCard(props: {
 
   useInput(
     (input, key) => {
-      if (key.escape) return props.onCancel();
+      if (key.escape) return onCancel();
       if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
       else if (key.downArrow) setCursor((c) => Math.min(rows.length - 1, c + 1));
       else if (row.type === "profile" && (key.leftArrow || key.rightArrow || key.return)) {
@@ -406,7 +439,7 @@ export function SetupCard(props: {
         setProfile((p) => ((p + 1 + (key.leftArrow ? n - 1 : 1)) % n) - 1);
       } else if (key.return) {
         if (row.type === "more") setMore((m) => !m);
-        else if (row.type === "done") props.onSubmit(values, profile >= 0 ? props.card.profiles[profile]!.name : undefined);
+        else if (row.type === "done") onSubmit(values, profile >= 0 ? props.card.profiles[profile]!.name : undefined);
         else if (row.type === "field") {
           const f = row.f;
           const fixed = fixedProblem(f);
@@ -554,7 +587,7 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
   const [refused, setRefused] = useState("");
   const open = clarifyOpen(card, props.session.questions.open());
   const v = seqView(seq, open);
-  const answer = (value: unknown, note?: string) => {
+  const answer = useOnce()((value: unknown, note?: string) => {
     if (!v) return;
     setSeq(seqAnswered(seq, v.q, value));
     const done = v.changing ? props.session.changeAnswer?.(v.q.qid, value, note) : props.session.answer(v.q.qid, value, note);
@@ -566,7 +599,7 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
         setSeq((s) => ({ ...s, done: s.done.filter((x) => x.q.qid !== v.q.qid) }));
       },
     );
-  };
+  });
   return (
     <Frame title={CLARIFY_TITLE} color="magenta">
       {card.found ? <Text>{card.found}</Text> : null}
@@ -611,6 +644,7 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
 
 export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: SessionLike; onRespond: (r: PlanResponse) => void }) {
   const { card } = props;
+  const onRespond = useOnce()(props.onRespond);
   const [raw, setSt] = useState<PlanState>(() => planInit(card));
   const [, setTick] = useState(0);
   const [refused, setRefused] = useState("");
@@ -621,7 +655,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const q = step === "decisions" ? open[0] : undefined;
   const act = (a: PlanAction) => {
     const r = planReduce(card, st, a);
-    if (r.respond) props.onRespond(r.respond);
+    if (r.respond) onRespond(r.respond);
     else setSt(r.state);
   };
   const switches = programSwitches(card);

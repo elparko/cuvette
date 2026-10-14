@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { decodeKey, emptyEd, footerKeys, splitKeys,inputKeys, keyRows, layout, press, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
+import { decodeKey, emptyEd, footerKeys, splitKeys,inputKeys, keyRows, layout, press, step, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
 
 function feed(style: InputKeys, keys: string[], start: string | Ed = "", width = 80) {
   let st = typeof start === "string" ? emptyEd(start) : start;
@@ -134,6 +134,24 @@ describe("mac style in each terminal", () => {
     expect(layout("abcdefghij", 5).map((r) => [r.start, r.end])).toEqual([[0, 5], [5, 10], [10, 10]]);
     expect(feed("mac", ["\x1b[A"], "abcdefghij", 5).cur).toBe(5);
     expect(feed("mac", ["\x1b[A", "\x1b[A"], at("abcdefghij", 7), 5).cur).toBe(2);
+  });
+
+  test("Left, Right and Backspace move over a whole character: an emoji, a flag or a letter with a mark", () => {
+    expect(feed("mac", ["\x7f"], "a😀").text).toBe("a");
+    expect(feed("mac", ["\x1b[D"], "a🇩🇪").cur).toBe(1);
+    expect(feed("mac", ["\x1b[C"], at("e\u0301x", 0)).cur).toBe(2);
+    expect(feed("mac", ["\x1b[3~"], at("👩‍🔬x", 0)).text).toBe("x");
+    expect(feed("mac", ["\x1b[1;3D"], "ab 𝒜𝒜").cur).toBe(3);
+  });
+
+  test("a lone surrogate in typed or pasted text is dropped", () => {
+    expect(feed("mac", ["a\ud83dd"]).text).toBe("ad");
+    expect(feed("mac", ["\ude00"]).text).toBe("");
+  });
+
+  test("the layout counts a wide character as two columns", () => {
+    expect(layout("日本語日本語", 4).map((r) => [r.start, r.end])).toEqual([[0, 2], [2, 4], [4, 6], [6, 6]]);
+    expect(layout("ab日", 4).map((r) => [r.start, r.end, r.last])).toEqual([[0, 3, false], [3, 3, true]]);
   });
 
   test("Ctrl+Z and Cmd+Z undo one word at a time", () => {
@@ -284,5 +302,14 @@ describe("splitKeys and one-line fields", () => {
     expect(press(emptyEd("a"), decodeKey("\x1b[13;2u"), "mac", 80, true).st.text).toBe("a");
     expect(press(emptyEd("a"), { key: "text", text: "b\nc" }, "mac", 80, true).st.text).toBe("ab c");
     expect(press({ ...emptyEd("x"), vim: "normal", cur: 0 }, decodeKey("o"), "vim", 80, true).st.text).toBe("x");
+  });
+});
+
+describe("paste in vim normal mode", () => {
+  test("the cursor stays on the last pasted character", () => {
+    const st = feed("vim", ["\x1b"], "ab").st;
+    const r = step(st, { insert: "xyz" }, 80);
+    expect(r.st.text).toBe("axyzb");
+    expect(r.st.cur).toBeLessThan(r.st.text.length);
   });
 });

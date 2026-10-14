@@ -57,22 +57,45 @@ export function InputBox(props: InputBoxProps) {
     return () => void stdin.internal_eventEmitter.removeListener("input", grab);
   }, []);
 
-  const onKey = (seq: string) => {
+  const onKey = (seq: string): boolean => {
     const p = latest.current;
     const k = decodeKey(seq);
-    if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key);
+    if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key), true;
     const r = press(ed.current, k, p.style, p.width, p.single);
     if (r.st !== ed.current) commit(r.st);
     if (r.out === "submit") p.onSubmit(r.st.text);
     else if (r.out === "escape") p.onEscape?.();
     else if (r.out) p.onEdge?.(r.out);
+    return !!r.out;
   };
 
-  useInput(() => {
-    for (const data of queue.current.splice(0)) for (const seq of splitKeys(data)) onKey(seq);
+  const keys = useRef<(string | { paste: string })[]>([]);
+  const drain = () => {
+    if (latest.current.active === false) keys.current = [];
+    while (keys.current.length) {
+      const next = keys.current.shift()!;
+      if (typeof next === "string") {
+        if (onKey(next)) break;
+      } else commit(step(ed.current, { insert: latest.current.single ? next.paste.replace(/\r\n?|\n/g, " ") : next.paste }, latest.current.width).st);
+    }
+    if (keys.current.length) render((n) => n + 1);
+  };
+  useEffect(() => {
+    if (keys.current.length) drain();
   });
 
-  usePaste((text) => commit(step(ed.current, { insert: latest.current.single ? text.replace(/\r\n?|\n/g, " ") : text }, latest.current.width).st), { isActive: props.active !== false });
+  useInput(() => {
+    for (const data of queue.current.splice(0)) keys.current.push(...splitKeys(data));
+    drain();
+  });
+
+  usePaste(
+    (text) => {
+      keys.current.push({ paste: text });
+      drain();
+    },
+    { isActive: props.active !== false },
+  );
 
   const { text, cur } = ed.current;
   const shown = props.mask ? props.mask.repeat(text.length) : text;

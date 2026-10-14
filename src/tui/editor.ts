@@ -219,7 +219,39 @@ export type EdOut = "submit" | "escape" | "up" | "down";
 
 export const emptyEd = (text = ""): Ed => ({ text, cur: text.length, vim: "insert", kill: "", undo: [] });
 
-const isWord = (c: string | undefined) => !!c && /[\p{L}\p{N}_]/u.test(c);
+const isWord = (c: string | undefined) => !!c && /[\p{L}\p{N}\p{M}_]/u.test(c);
+const isHigh = (c: number) => c >= 0xd800 && c <= 0xdbff;
+const isLow = (c: number) => c >= 0xdc00 && c <= 0xdfff;
+const cpBefore = (t: string, p: number) => (p > 1 && isLow(t.charCodeAt(p - 1)) && isHigh(t.charCodeAt(p - 2)) ? t.slice(p - 2, p) : t[p - 1]);
+const cpAt = (t: string, p: number) => (isHigh(t.charCodeAt(p)) && isLow(t.charCodeAt(p + 1)) ? t.slice(p, p + 2) : t[p]);
+
+const SEGMENTS = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const WINDOW = 48;
+
+export function snap(t: string, p: number): number {
+  if (p <= 0) return 0;
+  if (p >= t.length) return t.length;
+  if (t.charCodeAt(p) < 0x300 && t.charCodeAt(p - 1) < 0x300) return p;
+  const from = Math.max(0, p - WINDOW);
+  let at = from;
+  for (const g of SEGMENTS.segment(t.slice(from, p + WINDOW))) {
+    if (from + g.index > p) break;
+    at = from + g.index;
+  }
+  return at;
+}
+
+export function prevChar(t: string, p: number): number {
+  if (p <= 1) return 0;
+  return t.charCodeAt(p - 1) < 0x300 && t.charCodeAt(p - 2) < 0x300 ? p - 1 : snap(t, p - 1);
+}
+
+export function nextChar(t: string, p: number): number {
+  if (p >= t.length) return t.length;
+  if (t.charCodeAt(p) < 0x300 && (p + 1 >= t.length || t.charCodeAt(p + 1) < 0x300)) return p + 1;
+  for (const g of SEGMENTS.segment(t.slice(p, p + WINDOW))) return p + g.segment.length;
+  return p + 1;
+}
 const isSpace = (c: string | undefined) => !!c && /\s/.test(c);
 const vimClass = (c: string | undefined) => (c === undefined || isSpace(c) ? 0 : isWord(c) ? 1 : 2);
 
@@ -230,14 +262,14 @@ export function lineEndOf(t: string, p: number): number {
 }
 
 export function wordLeft(t: string, p: number): number {
-  while (p > 0 && !isWord(t[p - 1])) p--;
-  while (p > 0 && isWord(t[p - 1])) p--;
+  while (p > 0 && !isWord(cpBefore(t, p))) p -= cpBefore(t, p)!.length;
+  while (p > 0 && isWord(cpBefore(t, p))) p -= cpBefore(t, p)!.length;
   return p;
 }
 
 export function wordRight(t: string, p: number): number {
-  while (p < t.length && !isWord(t[p])) p++;
-  while (p < t.length && isWord(t[p])) p++;
+  while (p < t.length && !isWord(cpAt(t, p))) p += cpAt(t, p)!.length;
+  while (p < t.length && isWord(cpAt(t, p))) p += cpAt(t, p)!.length;
   return p;
 }
 
@@ -248,8 +280,8 @@ function spaceWordLeft(t: string, p: number): number {
 }
 
 function vimWordRight(t: string, p: number): number {
-  const c = vimClass(t[p]);
-  if (c) while (p < t.length && vimClass(t[p]) === c) p++;
+  const c = vimClass(cpAt(t, p));
+  if (c) while (p < t.length && vimClass(cpAt(t, p)) === c) p += cpAt(t, p)!.length;
   while (p < t.length && isSpace(t[p])) p++;
   return p;
 }
@@ -257,8 +289,8 @@ function vimWordRight(t: string, p: number): number {
 function vimWordLeft(t: string, p: number): number {
   while (p > 0 && isSpace(t[p - 1])) p--;
   if (p === 0) return 0;
-  const c = vimClass(t[p - 1]);
-  while (p > 0 && vimClass(t[p - 1]) === c) p--;
+  const c = vimClass(cpBefore(t, p));
+  while (p > 0 && vimClass(cpBefore(t, p)) === c) p -= cpBefore(t, p)!.length;
   return p;
 }
 
@@ -268,13 +300,51 @@ export interface Row {
   last: boolean;
 }
 
+const WIDE = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u{1f300}-\u{1faff}\u{20000}-\u{3fffd}]/u;
+const NARROW = /^[\p{M}\p{Cf}\u{1f3fb}-\u{1f3ff}]$/u;
+const LATIN = /^[\x00-\xff]*$/;
+const ZWJ = 0x200d;
+
+function cells(ch: string): number {
+  if (ch.charCodeAt(0) < 0x300) return 1;
+  return NARROW.test(ch) ? 0 : WIDE.test(ch) ? 2 : 1;
+}
+
+function lineRows(line: string, base: number, w: number, rows: Row[]): void {
+  if (LATIN.test(line)) {
+    for (let i = 0; i <= line.length; i += w) rows.push({ start: base + i, end: base + Math.min(i + w, line.length), last: i + w > line.length });
+    return;
+  }
+  let start = 0;
+  let used = 0;
+  let joined = false;
+  for (let i = 0; i < line.length; ) {
+    const ch = String.fromCodePoint(line.codePointAt(i)!);
+    const c = joined ? 0 : cells(ch);
+    joined = ch.charCodeAt(0) === ZWJ;
+    if (c > 0 && used > 0 && used + c > w) {
+      rows.push({ start: base + start, end: base + i, last: false });
+      start = i;
+      used = 0;
+    }
+    used += c;
+    i += ch.length;
+  }
+  if (used >= w) rows.push({ start: base + start, end: base + line.length, last: false }), (start = line.length);
+  rows.push({ start: base + start, end: base + line.length, last: true });
+}
+
+let layoutMemo: { t: string; w: number; rows: Row[] } | undefined;
+
 export function layout(t: string, w: number): Row[] {
+  if (layoutMemo && layoutMemo.w === w && layoutMemo.t === t) return layoutMemo.rows;
   const rows: Row[] = [];
   let s = 0;
   for (const line of t.split("\n")) {
-    for (let i = 0; i <= line.length; i += w) rows.push({ start: s + i, end: s + Math.min(i + w, line.length), last: i + w > line.length });
+    lineRows(line, s, w, rows);
     s += line.length + 1;
   }
+  layoutMemo = { t, w, rows };
   return rows;
 }
 
@@ -286,7 +356,7 @@ export function rowOf(rows: Row[], p: number): number {
 function clampNormal(st: Ed): Ed {
   if (st.vim !== "normal") return st;
   const ls = lineStartOf(st.text, st.cur);
-  if (st.cur > ls && st.cur === lineEndOf(st.text, st.cur)) return { ...st, cur: st.cur - 1 };
+  if (st.cur > ls && st.cur === lineEndOf(st.text, st.cur)) return { ...st, cur: prevChar(st.text, st.cur) };
   return st;
 }
 
@@ -301,7 +371,7 @@ function snapshot(st: Ed, kind: string, text?: string): Ed {
 
 function cut(st: Ed, from: number, to: number, a: Act): Ed {
   if (from === to) return st;
-  const [a0, b0] = from < to ? [from, to] : [to, from];
+  const [a0, b0] = from < to ? [snap(st.text, from), snap(st.text, to)] : [snap(st.text, to), snap(st.text, from)];
   return { ...st, text: st.text.slice(0, a0) + st.text.slice(b0), cur: a0, kill: KILLS.has(a) ? st.text.slice(a0, b0) : st.kill };
 }
 
@@ -310,7 +380,10 @@ function insertAt(st: Ed, s: string): Ed {
 }
 
 export function cleanPaste(s: string): string {
-  return s.replace(/\r\n?/g, "\n").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
+  return s
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "");
 }
 
 function vertical(st: Ed, dir: -1 | 1, width: number): Ed | undefined {
@@ -320,14 +393,15 @@ function vertical(st: Ed, dir: -1 | 1, width: number): Ed | undefined {
   if (!target) return undefined;
   const col = st.goal ?? st.cur - rows[r]!.start;
   const max = target.end - target.start - (target.last ? 0 : 1);
-  return { ...st, cur: target.start + Math.min(col, max), goal: col };
+  return { ...st, cur: snap(st.text, target.start + Math.min(col, max)), goal: col };
 }
 
 export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } {
   if (typeof a === "object") {
     const text = cleanPaste(a.insert);
     if (!text) return { st };
-    return { st: { ...insertAt(snapshot(st, "insert", text), text), last: "insert", goal: undefined } };
+    const done = insertAt(snapshot(st, "insert", text), text);
+    return { st: clampNormal({ ...done, cur: snap(done.text, done.cur), last: "insert", goal: undefined }) };
   }
   if (st.pending === "d") {
     if (a === "pendDelete") a = "deleteLine";
@@ -356,13 +430,13 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
   let next: Ed;
   switch (a) {
     case "left":
-      next = { ...base, cur: st.vim === "normal" ? Math.max(ls, p - 1) : Math.max(0, p - 1) };
+      next = { ...base, cur: st.vim === "normal" ? Math.max(ls, prevChar(t, p)) : prevChar(t, p) };
       break;
     case "charLeft":
-      next = { ...base, cur: Math.max(0, p - 1) };
+      next = { ...base, cur: prevChar(t, p) };
       break;
     case "right":
-      next = { ...base, cur: st.vim === "normal" ? Math.min(Math.max(ls, le - 1), p + 1) : Math.min(t.length, p + 1) };
+      next = { ...base, cur: st.vim === "normal" ? Math.min(Math.max(ls, prevChar(t, le)), nextChar(t, p)) : nextChar(t, p) };
       break;
     case "wordLeft":
       next = { ...base, cur: wordLeft(t, p) };
@@ -389,10 +463,10 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
       next = { ...base, cur: t.length };
       break;
     case "back":
-      next = cut(base, p, Math.max(0, p - 1), a);
+      next = cut(base, p, prevChar(t, p), a);
       break;
     case "fwd":
-      next = st.vim === "normal" && p === le ? base : cut(base, p, Math.min(t.length, p + 1), a);
+      next = st.vim === "normal" && p === le ? base : cut(base, p, nextChar(t, p), a);
       break;
     case "wordBack":
       next = cut(base, p, wordLeft(t, p), a);
@@ -404,10 +478,10 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
       next = cut(base, p, spaceWordLeft(t, p), a);
       break;
     case "lineBack":
-      next = cut(base, p, p === ls ? Math.max(0, p - 1) : ls, a);
+      next = cut(base, p, p === ls ? prevChar(t, p) : ls, a);
       break;
     case "lineFwd":
-      next = cut(base, p, p === le ? Math.min(t.length, p + 1) : le, a);
+      next = cut(base, p, p === le ? nextChar(t, p) : le, a);
       break;
     case "deleteLine": {
       const from = le < t.length ? ls : Math.max(0, ls - 1);
@@ -427,13 +501,13 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
       next = insertAt(base, "\n");
       break;
     case "normal":
-      next = { ...base, vim: "normal", cur: p > ls ? p - 1 : p };
+      next = { ...base, vim: "normal", cur: p > ls ? prevChar(t, p) : p };
       break;
     case "insert":
       next = { ...base, vim: "insert" };
       break;
     case "append":
-      next = { ...base, vim: "insert", cur: Math.min(le, p + 1) };
+      next = { ...base, vim: "insert", cur: Math.min(le, nextChar(t, p)) };
       break;
     case "appendEnd":
       next = { ...base, vim: "insert", cur: le };
@@ -453,7 +527,7 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
     default:
       next = base;
   }
-  return { st: clampNormal(next) };
+  return { st: clampNormal({ ...next, cur: snap(next.text, next.cur) }) };
 }
 
 const MULTILINE = new Set<Action>(["newline", "openBelow", "openAbove"]);
