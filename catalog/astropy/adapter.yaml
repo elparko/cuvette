@@ -190,8 +190,8 @@ decisions:
     default: false
     group: Background
     help: >
-      True runs a first detection (3 sigma, 5 connected pixels, grown by 11 pixels) and leaves those
-      pixels out of the background. Sources raise the sky level, so masking lowers it. In a crowded
+      True runs a first detection (3 sigma, 5 connected pixels). It grows each source with an 11 by 11 pixel square, so by 5 pixels on each side.
+      It leaves those pixels out of the background. Sources raise the sky level, so masking lowers it. In a crowded
       field, masking removes many pixels.
     essential: true
     owner: human
@@ -303,7 +303,7 @@ decisions:
     default: annulus
     group: Photometry
     help: >
-      annulus subtracts the clipped median of a ring around the source, times the aperture area.
+      annulus subtracts the clipped median of a ring around the source. It multiplies the median by the part of the aperture inside the image.
       none keeps the raw sum. Use none only if the image is already background-subtracted.
     essential: true
     owner: human
@@ -522,7 +522,7 @@ map:
     difference: >
       A direct Background2D call with the same settings gives the same median background and
       noise without a mask. With mask_sources the mask comes from the tool's own first
-      detection (3 sigma, 5 pixels, grown by 11 pixels). A mask that you build gives other numbers.
+      detection (3 sigma, 5 pixels, grown with an 11 by 11 pixel square). A mask that you build gives other numbers.
     evidence: { source: docs, test: background2d-masked }
 
   - tool: detect_sources

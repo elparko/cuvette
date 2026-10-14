@@ -13,26 +13,38 @@ interface Field {
 }
 
 const NUMBER = /^[-+]?(?:\d+(?:[.,]\d+)?|\.\d+)$/;
-const THOUSANDS = /^[-+]?\d+,\d{3}$/;
 const FILLER = new Set(["to", "is", "as", "the", "set", "=", "at"]);
+const LEAD = new Set(["use", "set", "with", "using", "take", "run", "apply", "make", "give", "want", "need", "please", "try", "and", "or", "of", "about", "around", "to", "is", "as", "the", "a", "an", "at", "=", "for", "by", "from", "than"]);
+const SKIP = new Set([...FILLER, "of", "about", "around", "roughly", "equal", "equals", "be", "value", "a", "an", "than"]);
+const THOUSANDS = /(?<![\d.,])([1-9]\d{0,2})((?:[, \u00a0\u202f]\d{3})+)(?!\d)/g;
 const ON = new Set(["on", "true", "yes", "enable", "enabled"]);
 const OFF = new Set(["off", "false", "no", "disable", "disabled"]);
 const NEGATION = new Set(["not", "never", "without", "avoid", "except", "unless", "neither", "nor", "cannot", "dont", "doesnt", "didnt", "cant", "wont", "isnt", "arent", "shouldnt", "wouldnt", "mustnt"]);
 const CLAUSE_END = new Set(["but", "however", "though", "although", "while"]);
+const CLAUSE_START = new Set(["so", "but", "however", "though", "although", "while", "because", "then"]);
 const CONNECT = new Set(["for", "as", "of", "on", "in"]);
+const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?"]);
 const OWN = 1;
 const OTHER = 2;
 const AFTER = 4;
-const BEFORE = 2;
 const AFTER_TEXT = 6;
 const BEFORE_TEXT = 3;
+const REACH = 5;
+const WALK = 40;
+
+function trimEnd(s: string): string {
+  let n = s.length;
+  while (n > 0 && TAIL.has(s[n - 1]!)) n--;
+  return s.slice(0, n);
+}
 
 function items(text: string): Item[] {
   const out: Item[] = [];
-  for (const raw of text.toLowerCase().replace(/n['’]t\b/g, " not").split(/\s+|(=)/).filter(Boolean)) {
+  const merged = text.replace(THOUSANDS, (_, a: string, b: string) => a + b.replace(/\D/g, ""));
+  for (const raw of merged.toLowerCase().replace(/n['\u2019]t\b/g, " not").split(/\s+|(=)/).filter(Boolean)) {
     const size = out.length;
-    const token = raw.replace(/^[("'[]+/, "").replace(/[)"'\],;:!?]+$/, "").replace(/\.$/, "");
-    if (NUMBER.test(token) && !THOUSANDS.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), head: true, tail: true });
+    const token = trimEnd(raw.replace(/^[("'[]+/, "")).replace(/\.$/, "");
+    if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), head: true, tail: true });
     else {
       const parts = raw.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
       parts.forEach((w, k) => out.push({ w, head: k === 0, tail: k === parts.length - 1 }));
@@ -55,7 +67,8 @@ function find(words: Item[], name: string): [number, number][] {
 interface Layout {
   own: [number, number][];
   inName: number[];
-  negated: boolean[];
+  named: boolean[];
+  starts: number[];
   prevEnd: number[];
   prevMask: number[];
   nextBegin: number[];
@@ -99,13 +112,6 @@ function layout(words: Item[], field: Field, others: Field[]): Layout {
     named.push(depth > 0);
     inName[i + 1] = inName[i]! + (depth > 0 ? 1 : 0);
   }
-  const negated: boolean[] = [];
-  let neg = false;
-  for (let i = 0; i < n; i++) {
-    negated.push(neg);
-    if (NEGATION.has(words[i]!.w) && !named[i]) neg = true;
-    if (words[i]!.stop) neg = false;
-  }
   const prevEnd: number[] = [];
   const prevMask: number[] = [];
   let lastEnd = -1;
@@ -130,7 +136,7 @@ function layout(words: Item[], field: Field, others: Field[]): Layout {
       nextBits = begins[i]!;
     }
   }
-  return { own: kept.filter((s) => s.mask === OWN).map((s) => [s.b, s.e]), inName, negated, prevEnd, prevMask, nextBegin, nextMask };
+  return { own: kept.filter((s) => s.mask === OWN).map((s) => [s.b, s.e]), inName, named, starts: begins, prevEnd, prevMask, nextBegin, nextMask };
 }
 
 function joined(words: Item[], from: number, to: number, connect = true): boolean {
@@ -138,8 +144,49 @@ function joined(words: Item[], from: number, to: number, connect = true): boolea
   return true;
 }
 
+function negWord(words: Item[], k: number, no: boolean): boolean {
+  const w = words[k]!.w;
+  const before = words[k - 1]?.w;
+  return w === "not" || NEGATION.has(w) || (no && w === "no") || (w === "of" && before === "instead") || (w === "than" && (before === "rather" || before === "other"));
+}
+
+function negatedAt(l: Layout, words: Item[], i: number, no: boolean): boolean {
+  let cost = 0;
+  for (let k = i - 1, steps = 0; k >= 0 && steps < WALK; k--, steps++) {
+    const it = words[k]!;
+    if (it.stop || CLAUSE_START.has(it.w)) return false;
+    if (negWord(words, k, no) && !l.named[k]) return true;
+    if (l.named[k]) continue;
+    if (it.w === "and" || it.w === "or") {
+      if (l.starts[k + 1]) continue;
+      return false;
+    }
+    if (++cost > REACH) return false;
+  }
+  return false;
+}
+
+function numberNamed(words: Item[], l: Layout, [b, e]: [number, number], value: number): boolean {
+  const same = (i: number) => words[i]!.num === value && !negatedAt(l, words, i, true);
+  for (let i = e + 1; i <= Math.min(words.length - 1, e + AFTER); i++) {
+    const it = words[i]!;
+    if (l.starts[i]! & OTHER) return false;
+    if (it.num !== undefined) return same(i);
+    if (!SKIP.has(it.w) && !l.named[i] && words[i + 1]?.num !== undefined) return false;
+  }
+  for (let i = Math.max(0, b - 2); i < b; i++) {
+    if (words[i]!.num === undefined) continue;
+    const lead = words[i - 1];
+    if (lead !== undefined && !LEAD.has(lead.w)) continue;
+    const prev = l.prevEnd[i]!;
+    if (prev >= 0 && i - prev <= AFTER && !joined(words, i + 1, b - 1)) return false;
+    return same(i);
+  }
+  return false;
+}
+
 function tied(l: Layout, words: Item[], from: number, to: number, after: number, before: number): boolean {
-  if (l.negated[from]) return false;
+  if (negatedAt(l, words, from, true)) return false;
   const prev = l.prevEnd[from]!;
   if (prev >= 0 && joined(words, prev + 1, from - 1, false)) return l.prevMask[from] === OWN;
   const next = l.nextBegin[to]!;
@@ -153,19 +200,19 @@ function boolNamed(words: Item[], l: Layout, [b, e]: [number, number], on: boole
   const yes = on ? ON : OFF;
   let i = e + 1;
   if (i < words.length && FILLER.has(words[i]!.w)) i++;
-  if (i < words.length && yes.has(words[i]!.w)) return !l.negated[i];
+  if (i < words.length && yes.has(words[i]!.w)) return !negatedAt(l, words, i, false);
   let j = b - 1;
   if (j >= 0 && FILLER.has(words[j]!.w)) j--;
   const word = j >= 0 ? words[j]!.w : "";
-  if (word === "enable" || word === "disable") return (on ? word === "enable" : word === "disable") && !l.negated[j];
-  return yes.has(word) && j >= 1 && words[j - 1]!.w === "turn" && !l.negated[j - 1];
+  if (word === "enable" || word === "disable") return (on ? word === "enable" : word === "disable") && !negatedAt(l, words, j, false);
+  return yes.has(word) && j >= 1 && words[j - 1]!.w === "turn" && !negatedAt(l, words, j - 1, false);
 }
 
 export function namesValue(request: string, field: Field, value: unknown, others: Field[] = []): boolean {
   const words = items(request);
   const l = layout(words, field, others.filter((o) => o.key !== field.key));
   if (!l.own.length) return false;
-  if (typeof value === "number") return words.some((it, i) => it.num === value && tied(l, words, i, i, AFTER, BEFORE));
+  if (typeof value === "number") return l.own.some((sp) => numberNamed(words, l, sp, value));
   if (typeof value === "boolean") return l.own.some((s) => boolNamed(words, l, s, value));
   const choice = (field.choices ?? []).find((c) => String(c !== null && typeof c === "object" && "value" in c ? (c as { value: unknown }).value : c) === String(value));
   const names = [String(value), ...(choice !== null && typeof choice === "object" && "label" in choice ? [String((choice as { label: unknown }).label)] : [])];

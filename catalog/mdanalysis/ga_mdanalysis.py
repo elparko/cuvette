@@ -136,10 +136,17 @@ def rmsd_trajectory(topology, trajectory, select, fit_select=None, fit=True, ref
         groups = None if fit_select == select else [select]
         run = rms.RMSD(u, u, select=fit_select, groupselections=groups, ref_frame=reference_frame).run(start=start, stop=stop, step=stride)
         col = 2 if groups is None else 3
+        res = run.results.rmsd
     else:
-        run = rms.RMSD(u, u, select=select, superposition=False, ref_frame=reference_frame).run(start=start, stop=stop, step=stride)
+        ag = u.select_atoms(select)
+        u.trajectory[reference_frame]
+        ref = ag.positions.astype(np.float64)
+        rows = []
+        for f in _frames(u, start, stop, stride):
+            ts = u.trajectory[f]
+            rows.append((f, ts.time, rms.rmsd(ag.positions.astype(np.float64), ref, center=False, superposition=False)))
+        res = np.array(rows)
         col = 2
-    res = run.results.rmsd
     frame = pd.DataFrame({"frame": res[:, 0].astype(int), "time_ps": res[:, 1], "rmsd_angstrom": res[:, col]})
     table = _csv(frame, "rmsd")
     plot = _line_plot(frame.time_ps, frame.rmsd_angstrom, "time (ps)", "RMSD (A)", "RMSD of '%s' to frame %d%s" % (select, reference_frame, "" if fit else ", no fit"), "rmsd")

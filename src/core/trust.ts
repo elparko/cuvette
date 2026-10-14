@@ -16,6 +16,8 @@ export const TRUST_OPTIONS = [
   { value: "no", label: "Do not trust (the session runs with user settings only)" },
 ];
 const LISTED = new Set(["node_modules", ".venv", ".git"]);
+const CACHE_NAMES = new Set([".pytest_cache"]);
+const skipped = (dir: string, name: string) => CACHE_NAMES.has(name) || (name === ".cache" && basename(dir) === "node_modules");
 const MAX_FILES = 2000;
 const MAX_LISTED = 200_000;
 
@@ -133,6 +135,7 @@ function listing(dir: string, key: string, st: WalkState): void {
       names = readdirSync(d).sort();
     } catch {}
     for (const name of names) {
+      if (skipped(d, name)) continue;
       const p = join(d, name);
       let l;
       try {
@@ -162,6 +165,7 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
     return;
   }
   for (const name of names) {
+    if (skipped(dir, name)) continue;
     const p = join(dir, name);
     const r = relative(key, p);
     let l;
@@ -444,7 +448,9 @@ const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replac
 
 const show = (v: unknown) => {
   const t = labDisplayText(typeof v === "string" ? v : JSON.stringify(v));
-  return t.length > 200 ? t.slice(0, 199) + "…" : t;
+  if (t.length <= 200) return t;
+  const cut = /[\ud800-\udbff]/.test(t[198]!) ? 198 : 199;
+  return t.slice(0, cut) + "…";
 };
 
 export function folderLines(s: FolderScan, trusted = false): string[] {

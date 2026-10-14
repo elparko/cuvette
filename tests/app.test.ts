@@ -210,6 +210,21 @@ describe("the app server", () => {
     }
   });
 
+  test.skipIf(process.platform === "win32")("the folder list shows folder names without text-direction characters, and keeps the real names for navigation", async () => {
+    app = await startApp({ env, start: home, makeSession: async () => new FakeSession() });
+    const c = client(app);
+    const parent = join(home, "bidi-list");
+    const real = "plates\u202egpj.exe\u200f";
+    mkdirSync(join(parent, real), { recursive: true });
+    const d = await (await c.get(`api/dirs?p=${encodeURIComponent(parent)}`)).json();
+    expect(d.dirs).toEqual([real]);
+    expect(d.shown).toEqual(["platesgpj.exe"]);
+    const inner = await (await c.get(`api/dirs?p=${encodeURIComponent(join(parent, d.dirs[0]))}`)).json();
+    expect(inner.path).toBe(join(parent, real));
+    expect(inner.parentShown).toBe(parent);
+    expect(inner.shown).toEqual([]);
+  });
+
   test("an empty folder gives no program suggestion, and /help in the app lists the keys of the app", async () => {
     const s = new FakeSession();
     app = await startApp({ session: s, env });

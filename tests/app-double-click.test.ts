@@ -15,14 +15,17 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
   let page: Page;
   let home = "";
   let data = "";
+  let project = "";
 
   beforeAll(async () => {
     if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
     home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
     data = mkdtempSync(join(tmpdir(), "cuvette-data-"));
     writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");
+    project = join(home, "project");
+    mkdirSync(project);
     const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: join(home, "spend.jsonl"), CUVETTE_NO_OPEN: "1", HOME: home };
-    proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:"], { cwd: tmpdir(), env, stdio: ["ignore", "pipe", "pipe"] });
+    proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:"], { cwd: project, env, stdio: ["ignore", "pipe", "pipe"] });
     url = await new Promise<string>((done, fail) => {
       let out = "";
       proc.stdout!.on("data", (b) => {
@@ -46,7 +49,7 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
   const sessions = async () => (await api("api/sessions.json")).length as number;
 
   test("the start page fits a phone when the folder list has a long folder name", async () => {
-    mkdirSync(join(tmpdir(), "cuvette-long-folder-name-" + "x".repeat(70)), { recursive: true });
+    mkdirSync(join(project, "cuvette-long-folder-name-" + "x".repeat(70)), { recursive: true });
     await page.size(390, 844);
     await page.go(url + "&page=start");
     expect(await until(page, `document.querySelector('input[aria-label="Folder"]') && document.body.textContent.includes("Up one folder")`)).toBe(true);

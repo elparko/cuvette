@@ -12,5 +12,14 @@ export function folderChoices(list: { folder: string; folderShown: string }[]): 
   const folders = [...new Set(list.map((s) => s.folder).filter(Boolean))].sort();
   const shown = new Map(list.map((s) => [s.folder, s.folderShown] as const));
   const labels = folderLabels([...new Set(folders.map((f) => shown.get(f) ?? f))].sort());
-  return folders.map((f) => ({ value: f, label: labels.get(shown.get(f) ?? f) ?? f }));
+  const choices = folders.map((f) => ({ value: f, label: labels.get(shown.get(f) ?? f) ?? f }));
+  const total = new Map<string, number>();
+  for (const c of choices) total.set(c.label, (total.get(c.label) ?? 0) + 1);
+  const next = new Map<string, number>();
+  return choices.map((c) => {
+    if (total.get(c.label)! < 2) return c;
+    const n = (next.get(c.label) ?? 0) + 1;
+    next.set(c.label, n);
+    return { value: c.value, label: `${c.label} #${n}` };
+  });
 }

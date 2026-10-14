@@ -1,3 +1,4 @@
+import { BIDI_CHARS } from "../core/markdown.ts";
 import { SETTINGS_CSS, SETTINGS_JS } from "./app-settings.ts";
 
 export function appPageHtml(token: string): string {
@@ -875,14 +876,14 @@ async function chooser(box) {
     const short = (p) => p.length > 48 ? p.slice(0, 20) + "…" + p.slice(p.length - 27) : p;
     const add = (label, path, cls, sub) => {
       const b = document.createElement("button");
-      b.type = "button"; b.textContent = label; if (cls) b.className = cls; b.title = path;
+      b.type = "button"; b.textContent = label; if (cls) b.className = cls; b.title = path.replace(/[${BIDI_CHARS}]/g, ""); b.dataset.path = path;
       if (sub) { const s2 = document.createElement("span"); s2.className = "dim small"; s2.textContent = short(sub); b.append(s2); }
       b.addEventListener("click", () => list(path));
       const li = document.createElement("li"); li.append(b); ul.append(li);
     };
-    if (d.parent) add("↑ Up", d.parent, "", d.parent);
-    for (const n of d.dirs.slice(0, 200)) add("▸ " + n, d.path.replace(/\/$/, "") + "/" + n);
-    if (d.recent.length) { const h = document.createElement("li"); h.className = "dim small"; h.textContent = "Recent project folders"; ul.append(h); for (const r of d.recent) add(r.split("/").filter(Boolean).pop() || r, r, "", r); }
+    if (d.parent) add("↑ Up", d.parent, "", d.parentShown);
+    d.dirs.slice(0, 200).forEach((n, i) => add("▸ " + d.shown[i], d.path.replace(/\/$/, "") + "/" + n));
+    if (d.recent.length) { const h = document.createElement("li"); h.className = "dim small"; h.textContent = "Recent project folders"; ul.append(h); d.recent.forEach((r, i) => { const t = d.recentShown[i]; add(t.split("/").filter(Boolean).pop() || t, r, "", t); }); }
   }
   list(start);
 }
@@ -976,7 +977,7 @@ async function afterSetup() {
   $("checkpanel").classList.remove("hidden");
   $("samplepanel").classList.remove("hidden");
   doctor($("doctorbody"));
-  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder.replace(/[\u202a-\u202e\u2066-\u2069]/g, ""); }
+  if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder.replace(/[${BIDI_CHARS}]/g, ""); }
 }
 
 let progStart = "";

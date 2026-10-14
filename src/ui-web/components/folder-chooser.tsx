@@ -10,19 +10,22 @@ import { Input } from "./ui/input.tsx";
 interface Dirs {
   path: string;
   parent: string | null;
+  parentShown: string | null;
   dirs: string[];
+  shown: string[];
   recent: string[];
+  recentShown: string[];
   home: string;
 }
 
 export function FolderChooser({ start, onOpened, big }: { start: string; onOpened: () => void; big?: boolean }) {
-  const [recent, setRecent] = useState<string[]>([]);
+  const [recent, setRecent] = useState<{ path: string; shown: string }[]>([]);
   const { pending, busy, msg, open, choose, cancel } = useFolderPick(onOpened);
   const [pickMsg, setPickMsg] = useState("");
 
   useEffect(() => {
     call<Dirs>("api/dirs?p=" + encodeURIComponent(start || ""))
-      .then((d) => setRecent(d.recent))
+      .then((d) => setRecent(d.recent.map((path, i) => ({ path, shown: d.recentShown[i] ?? path }))))
       .catch(() => {});
   }, [start]);
 
@@ -49,11 +52,11 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
             <div className="pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
             <ul className="rounded-xl border bg-card p-1">
               {recent.slice(0, 6).map((r) => (
-                <li key={r}>
-                  <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                <li key={r.path}>
+                  <button type="button" disabled={busy} onClick={() => choose(r.path)} title={r.shown} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                     <ClockIcon className="size-4 text-muted-foreground" />
-                    <span className="max-w-[65%] shrink-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
-                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(r, 40)}</span>
+                    <span className="max-w-[65%] shrink-0 truncate">{r.shown.split("/").filter(Boolean).pop() || r.shown}</span>
+                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(r.shown, 40)}</span>
                   </button>
                 </li>
               ))}
@@ -88,9 +91,9 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
     void list(start);
   }, [list, start]);
 
-  const row = (key: string, icon: React.ReactNode, label: string, target: string, sub?: string) => (
+  const row = (key: string, icon: React.ReactNode, label: string, target: string, sub?: string, title = target) => (
     <li key={key}>
-      <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={target} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+      <button type="button" onClick={() => list(target)} onDoubleClick={() => list(target)} title={title} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
         <span className="text-muted-foreground">{icon}</span>
         <span className="max-w-[65%] shrink-0 truncate">{label}</span>
         {sub && <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground max-sm:hidden">{midText(sub, 40)}</span>}
@@ -123,16 +126,16 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
       {d && !pick.pending && (
         <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 35vh)" }}>
           <ul>
-            {d.parent && row("up", <ArrowUpIcon className="size-4" />, "Up one folder", d.parent, d.parent)}
+            {d.parent && row("up", <ArrowUpIcon className="size-4" />, "Up one folder", d.parent, d.parentShown ?? d.parent, d.parentShown ?? d.parent)}
             {d.path !== d.home && row("home", <HomeIcon className="size-4" />, "Home folder", d.home)}
-            {d.dirs.slice(0, 300).map((n) => row("d" + n, <FolderIcon className="size-4" />, n, d.path.replace(/\/$/, "") + "/" + n))}
+            {d.dirs.slice(0, 300).map((n, i) => row("d" + n, <FolderIcon className="size-4" />, d.shown[i] ?? n, d.path.replace(/\/$/, "") + "/" + n, undefined, d.shown[i] ?? n))}
             {!d.dirs.length && <li className="px-2.5 py-2 text-sm text-muted-foreground">No folders here.</li>}
             {d.dirs.length > 300 && <li className="px-2.5 py-2 text-sm text-muted-foreground">The list shows 300 of {d.dirs.length} folders. Type the path of a folder that is not in the list.</li>}
           </ul>
           {d.recent.length > 0 && (
             <>
               <div className="px-2.5 pt-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
-              <ul>{d.recent.map((r) => row("r" + r, <ClockIcon className="size-4" />, r.split("/").filter(Boolean).pop() || r, r, r))}</ul>
+              <ul>{d.recent.map((r, i) => { const t = d.recentShown[i] ?? r; return row("r" + r, <ClockIcon className="size-4" />, t.split("/").filter(Boolean).pop() || t, r, t, t); })}</ul>
             </>
           )}
         </div>

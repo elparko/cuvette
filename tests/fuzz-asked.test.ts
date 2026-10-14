@@ -53,11 +53,13 @@ describe("fuzz: the value gate for setting changes", () => {
     expect(namesValue("Set cluster resolution to 2,5", f, 25)).toBe(false);
   });
 
-  test("a thousands separator does not read as a decimal", () => {
+  test("a thousands separator gives one number", () => {
     const f = NUM[0]!;
+    expect(namesValue("Set minimum cells to 1,000", f, 1000)).toBe(true);
+    expect(namesValue("Set minimum cells to 1 000", f, 1000)).toBe(true);
     expect(namesValue("Set minimum cells to 1,000", f, 1)).toBe(false);
-    expect(namesValue("Set minimum cells to 1,000", f, 1000)).toBe(false);
     expect(namesValue("Set minimum cells to 1,000,000", f, 1)).toBe(false);
+    expect(namesValue("Set minimum cells to 1,000,000", f, 1000000)).toBe(true);
   });
 
   test("a value that is in another setting, a file name or an identifier does not open the gate", () => {
@@ -110,6 +112,27 @@ describe("fuzz: the value gate for setting changes", () => {
     expect(namesValue("Load welch_results for the test", t, "Welch")).toBe(false);
     expect(namesValue("Set the test to Welch", t, "Welch")).toBe(true);
     expect(namesValue("Set the test to Welch.", t, "Welch")).toBe(true);
+  });
+
+  test("the sentences of the review give a card for the wrong value and apply the right one", () => {
+    const alpha = { key: "alpha", label: "Alpha" };
+    const cells = NUM[0]!;
+    const genes = NUM[1]!;
+    const window5 = { key: "window", label: "Window" };
+    expect(namesValue("Use alpha 0.05 instead of 0.1", alpha, 0.1)).toBe(false);
+    expect(namesValue("Use alpha 0.05 instead of 0.1", alpha, 0.05)).toBe(true);
+    expect(namesValue("Set minimum cells to 5 for 10 samples", cells, 10)).toBe(false);
+    expect(namesValue("Set minimum cells to 5 for 10 samples", cells, 5)).toBe(true);
+    expect(namesValue("Don't set min cells and min genes to 5", cells, 5, ALL)).toBe(false);
+    expect(namesValue("Don't set min cells and min genes to 5", genes, 5, ALL)).toBe(false);
+    expect(namesValue("Don't set min cells and min genes to 5", cells, 5)).toBe(false);
+    expect(namesValue("I don't have replicates so use window 5", window5, 5)).toBe(true);
+    expect(namesValue("Set Minimum cells to 42 and Tree depth to 521", cells, 42, ALL)).toBe(true);
+    expect(namesValue("Set Minimum cells to 42 and Tree depth to 521", NUM[3]!, 521, ALL)).toBe(true);
+    expect(namesValue("Set Minimum cells to 42 and Tree depth to 521", cells, 521, ALL)).toBe(false);
+    expect(namesValue("Set Minimum cells to 42 and Tree depth to 521", NUM[3]!, 42, ALL)).toBe(false);
+    expect(namesValue("Do not touch the filters, and also not the plots, then set minimum cells to 5", cells, 5)).toBe(true);
+    expect(namesValue("Never mind that I said ten, so set minimum cells to 5", cells, 5)).toBe(true);
   });
 
   test("a negation before the value closes the gate", () => {
@@ -194,6 +217,6 @@ describe("fuzz: the value gate for setting changes", () => {
     }
     const t = performance.now();
     namesValue("set the minimum cells to 6 and ".repeat(33000), f, 5, ALL);
-    expect(performance.now() - t).toBeLessThan(30000);
+    expect(performance.now() - t).toBeLessThan(3000);
   });
 });

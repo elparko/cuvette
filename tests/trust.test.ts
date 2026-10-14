@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -360,6 +360,54 @@ test("a new file in __pycache__, .venv or node_modules under a project adapter m
     const s = trustStatus(p.root);
     expect(s.state, folder).toBe("changed");
     cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+  }
+});
+
+test("a cache folder that a tool writes in a project adapter keeps the folder trusted", () => {
+  const p = trustedProject();
+  mkdirSync(join(p.adapter, "node_modules", "pkg"), { recursive: true });
+  writeFileSync(join(p.adapter, "node_modules", "pkg", "index.js"), "one");
+  mkdirSync(join(p.adapter, ".venv", "lib"), { recursive: true });
+  writeFileSync(join(p.adapter, ".venv", "pyvenv.cfg"), "home = /a");
+  trustFolder(p.root);
+  expect(trustStatus(p.root).state).toBe("trusted");
+  mkdirSync(join(p.adapter, "node_modules", ".cache", "babel"), { recursive: true });
+  writeFileSync(join(p.adapter, "node_modules", ".cache", "babel", "a.json"), "one");
+  mkdirSync(join(p.adapter, ".pytest_cache", "v", "cache"), { recursive: true });
+  writeFileSync(join(p.adapter, ".pytest_cache", "v", "cache", "lastfailed"), "{}");
+  mkdirSync(join(p.adapter, ".venv", ".pytest_cache"), { recursive: true });
+  writeFileSync(join(p.adapter, ".venv", ".pytest_cache", "x"), "x");
+  expect(trustStatus(p.root).state).toBe("trusted");
+  writeFileSync(join(p.adapter, "node_modules", ".cache", "babel", "a.json"), "three");
+  expect(trustStatus(p.root).state).toBe("trusted");
+});
+
+test("a .cache folder that is not directly in node_modules, and the code folders, still change the trust state", () => {
+  for (const [folder, name] of [[join("sub", ".cache"), "m.py"], [join("node_modules", "pkg", ".cache"), "evil.js"], [join(".venv", "pyvenv.cfg"), "x"], ["__pycache__", "m.pyc"]] as const) {
+    const p = trustedProject();
+    expect(trustStatus(p.root).state).toBe("trusted");
+    if (name === "x") {
+      mkdirSync(join(p.adapter, ".venv"), { recursive: true });
+      writeFileSync(join(p.adapter, ".venv", "pyvenv.cfg"), "home = /a");
+    } else {
+      mkdirSync(join(p.adapter, folder), { recursive: true });
+      writeFileSync(join(p.adapter, folder, name), "x");
+    }
+    expect(trustStatus(p.root).state, folder).toBe("changed");
+    cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
+  }
+});
+
+test("a long setting value is cut between characters, not inside a surrogate pair", () => {
+  const dir = join(realpathSync(cwd), ".cuvette");
+  mkdirSync(dir, { recursive: true });
+  for (const pad of [198, 199]) {
+    writeFileSync(join(dir, "settings.json"), JSON.stringify({ model: `${"a".repeat(pad)}😀${"b".repeat(20)}` }));
+    const scan = scanFolder(realpathSync(cwd));
+    const line = folderLines(scan).find((l) => l.includes("model"))!;
+    expect(line, JSON.stringify(scan.keys)).toBeDefined();
+    expect(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(line), String(pad)).toBe(false);
+    expect(line.endsWith("…")).toBe(true);
   }
 });
 
