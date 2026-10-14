@@ -115,12 +115,27 @@ export class AnalysisRecord {
       } catch {
         continue;
       }
-      if (!intact(e)) continue;
+      if (!intact(e)) {
+        this.skip(e);
+        continue;
+      }
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.lastId = Math.max(this.lastId, e.id);
       this.index(e);
     }
+    if (this.skipped) for (const n of this.nodeList) n.parents = n.parents.filter((p) => this.nodeById.has(p));
+  }
+
+  private skipped = 0;
+
+  private skip(e: unknown): void {
+    if (!isObject(e)) return;
+    if (Number.isFinite(e.id)) this.lastId = Math.max(this.lastId, e.id as number);
+    if (e.kind !== "node" || !isObject(e.data)) return;
+    this.skipped++;
+    const num = Number(/^n(\d+)$/.exec(String(e.data.id))?.[1] ?? 0);
+    if (num >= this.nextNode) this.nextNode = num + 1;
   }
 
   // A loaded message holds the full model history of its turn. Only a resume or a rewind reads it, so it stays on disk until then.

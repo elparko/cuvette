@@ -1,4 +1,4 @@
-import { appendFileSync, chmodSync, mkdtempSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -469,6 +469,49 @@ describe("the text names the problem and the next step", () => {
     } finally {
       chmodSync(dir, 0o755);
     }
+  }, 60000);
+
+  test("a node with no tool in the middle of the record: new ids stay above every id in the file, and the commands still work", async () => {
+    const t = await twoTurns();
+    const dir = t.place.outDir;
+    await t.close();
+    const file = join(dir, ".record", "log.jsonl");
+    const lines = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const nodes = lines.filter((e) => e.kind === "node");
+    expect(nodes.length).toBe(2);
+    delete nodes[0].data.tool;
+    nodes[1].data.parents = [nodes[0].data.id];
+    writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    const topId = Math.max(...lines.map((e) => e.id));
+    const s = await Session.resume(dir, { provider: new FakeProvider([count("Li"), { text: "Third." }]) });
+    open.push(s);
+    expect(s.record.nodes().map((n) => n.id)).toEqual([nodes[1].data.id]);
+    expect(s.record.nodes()[0]!.parents).toEqual([]);
+    expect(s.record.edges()).toEqual([]);
+    const me = s as unknown as SessionLike;
+    for (const line of ["/status", "/graph", "/trail 3", "/export md", "/export html", "/export script", "/databook html", "/branch kept", "/rewind"]) {
+      const r = await run(me, line);
+      expect(r.threw, line).toBeUndefined();
+      expect(all(r), line).not.toMatch(RAW);
+    }
+    const later = s.record.append("note", { text: "after the load" });
+    expect(later.id).toBeGreaterThan(topId);
+    await s.send("Count again with Li");
+    const ids = s.record.entries().map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const added = s.record.nodes().map((n) => n.id);
+    expect(added.at(-1)).toBe("n3");
+    expect(new Set(added).size).toBe(added.length);
+    expect(texts(await run(me, "/rewind 1"), ["notice"])[0]).toContain("Returned to:");
+  }, 60000);
+
+  test("a damaged record gets consistent ids after a resume", async () => {
+    const { s } = await STATES["with a damaged record entry"]!();
+    const onDisk = readFileSync(join(s.place.outDir, ".record", "log.jsonl"), "utf8").trim().split("\n").flatMap((l) => { try { return [JSON.parse(l).id as number]; } catch { return []; } });
+    const e = s.record.append("note", { text: "after the load" });
+    expect(e.id).toBeGreaterThan(Math.max(...onDisk));
+    const node = s.record.addNode({ entry: e.id, adapter: "lab", adapterVersion: "1", programVersion: "1", tool: "count", args: {}, decisions: {}, codeHash: "", inputHashes: [], outputs: [] } as never);
+    expect(node.id).toBe("n10");
   }, 60000);
 
   test("/review keeps working when a record entry misses fields", async () => {
