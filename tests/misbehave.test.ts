@@ -765,7 +765,9 @@ test("an answer with numbers that no step made gets one revision and then ends",
   expect(provider.requests.length).toBeLessThanOrEqual(3);
   expect(session.endedBy).toBe("answer");
   expect(answer).toMatch(/cells\./);
-  expect(session.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
+  const finals = session.record.entries(["assistant"]).filter((e) => e.data.final);
+  expect(finals).toHaveLength(2);
+  expect(finals[1]!.data.corrects).toBe(finals[0]!.id);
 });
 
 test("a model that gives an empty reply to the revision request keeps the first answer", async () => {

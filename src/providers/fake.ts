@@ -9,7 +9,7 @@ export interface FakeStep {
 }
 
 export type FakeStepFn = (messages: Message[], tools: ToolSchema[]) => FakeStep;
-export type FakeScript = FakeStep[] | FakeStepFn | { steps: FakeStep[] | FakeStepFn; complete?: string };
+export type FakeScript = FakeStep[] | FakeStepFn | { steps: FakeStep[] | FakeStepFn; complete?: string; completeDelayMs?: number };
 
 export interface RecordedRequest {
   system: string;
@@ -22,6 +22,7 @@ export class FakeProvider implements Provider {
   requests: RecordedRequest[] = [];
   private steps: FakeStep[] | FakeStepFn;
   private completeText: string;
+  private completeDelayMs: number;
   private index = 0;
   private callNo = 0;
 
@@ -29,6 +30,7 @@ export class FakeProvider implements Provider {
     const obj = Array.isArray(script) || typeof script === "function" ? { steps: script, complete: undefined } : script;
     this.steps = obj.steps;
     this.completeText = obj.complete ?? "No findings.";
+    this.completeDelayMs = "completeDelayMs" in obj ? (obj.completeDelayMs ?? 0) : 0;
   }
 
   static fromFile(path: string): FakeProvider {
@@ -57,7 +59,14 @@ export class FakeProvider implements Provider {
     };
   }
 
-  async complete(): Promise<string> {
+  async complete(_system?: string, _text?: string, signal?: AbortSignal): Promise<string> {
+    if (this.completeDelayMs) {
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(new Error("aborted"));
+        const timer = setTimeout(resolve, this.completeDelayMs);
+        signal?.addEventListener("abort", () => (clearTimeout(timer), reject(new Error("aborted"))), { once: true });
+      });
+    }
     return this.completeText;
   }
 }
