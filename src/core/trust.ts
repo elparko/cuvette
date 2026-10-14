@@ -15,7 +15,7 @@ export const TRUST_OPTIONS = [
   { value: "once", label: "Trust once (this session)" },
   { value: "no", label: "Do not trust (the session runs with user settings only)" },
 ];
-const LISTED = new Set(["node_modules", ".venv"]);
+const LISTED = new Set(["node_modules", ".venv", ".git"]);
 const MAX_FILES = 2000;
 const MAX_LISTED = 200_000;
 
@@ -150,7 +150,6 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
     return;
   }
   for (const name of names) {
-    if (name === ".git") continue;
     const p = join(dir, name);
     const r = relative(key, p);
     let l;
@@ -225,11 +224,15 @@ function safeNames(dir: string): string[] {
   }
 }
 
-const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
+const LAB_HIDDEN = "[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\u2028\\u2029\\p{Default_Ignorable_Code_Point}]";
+const LAB_ESCAPE_LOOKALIKE = "x[0-9a-f]{2}|u[0-9a-f]{4}|u\\{[0-9A-F]{5,6}\\}";
+const LAB_CONTROL = new RegExp(`(?<!\\\\)(\\\\+)(?=${LAB_ESCAPE_LOOKALIKE}|${LAB_HIDDEN})|${LAB_HIDDEN}`, "gu");
 
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
+// A backslash in front of text that looks like one of these escapes is doubled, so two different texts never show the same.
 export function labDisplayText(text: string): string {
-  return text.replace(LAB_CONTROL, (c) => {
+  return text.replace(LAB_CONTROL, (c, run?: string) => {
+    if (run !== undefined) return run + run;
     const n = c.codePointAt(0)!;
     return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
   });
