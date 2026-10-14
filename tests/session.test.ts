@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -251,6 +251,42 @@ test("the card for a change that the request did not name says so, gives the rea
   expect(cards[1]!.text).toBe('The agent asks to change "Threshold method" from not set to Otsu. Your message did not name this value. Reason: the agent gave none. To keep the setting as it is, answer later.');
   expect(cards[1]!.default).toBeUndefined();
   expect(cards[2]!.text).toContain(`Reason: ${"x".repeat(2000)}.`);
+});
+
+test("the card for a change shows the whole value, so two long values that differ late look different", async () => {
+  const dir = mkdtempSync(join(__dirname, "fixtures", "lab-note-"));
+  cpSync(join(__dirname, "fixtures/lab"), dir, { recursive: true });
+  const yaml = readFileSync(join(dir, "adapter.yaml"), "utf8").replace("decisions:\n", "decisions:\n  - key: note\n    label: Note\n    kind: text\n    owner: human\n    default: x\n");
+  writeFileSync(join(dir, "adapter.yaml"), yaml);
+  const a = `${"a".repeat(300)}FIRST${"b".repeat(195)}`;
+  const b = `${"a".repeat(300)}SECOND${"b".repeat(194)}`;
+  const huge = `${"h".repeat(1500)}MIDDLE${"i".repeat(1500)}END`;
+  const provider = new FakeProvider([
+    { calls: [{ name: "propose_change", args: { key: "note", value: b, reason: "r" } }] },
+    { calls: [{ name: "propose_change", args: { key: "note", value: huge, reason: "r" } }] },
+    { text: "done" },
+  ]);
+  session = await Session.create({ adapters: [dir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "q", note: a });
+  const cards: { text: string; options: string[]; evidence: string; values: unknown[] }[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    cards.push({ text: e.question.text, options: e.question.options.map((o) => o.label), evidence: e.question.evidence, values: e.question.options.map((o) => o.value) });
+    setTimeout(() => session!.answer(e.question.qid, e.question.options.at(-1)!.value), 0);
+  });
+  await session.send("go");
+  await session.close();
+  session = undefined;
+  rmSync(dir, { recursive: true, force: true });
+  expect(cards[0]!.text).toContain(a);
+  expect(cards[0]!.text).toContain(b);
+  expect(cards[0]!.options[0]).toBe(`Change to ${b}`);
+  expect(cards[0]!.options[1]).toBe(`Keep ${a}`);
+  expect(cards[1]!.options[0]).toContain("[1509 characters omitted of 3009]");
+  expect(cards[1]!.options[0]!.startsWith(`Change to ${"h".repeat(1000)}`)).toBe(true);
+  expect(cards[1]!.options[0]!.endsWith(`${"i".repeat(497)}END`)).toBe(true);
+  expect(cards[1]!.evidence).toContain(`Full new value (3009 characters):\n${huge}`);
+  expect(cards[1]!.values[0]).toBe(huge);
 });
 
 test("compare_options reruns the last step with other values as comparison runs and keeps the record", async () => {

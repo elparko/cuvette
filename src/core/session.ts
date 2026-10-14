@@ -2772,10 +2772,14 @@ export class Session {
       if (t) Object.assign(t, { value: this.decisions.value(f.key), by: "you" });
       return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. The scientist asked for this change, so no card asks again.` };
     }
+    const full = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
     const show = (v: unknown) => {
-      const t = typeof v === "string" ? v : JSON.stringify(v);
-      return t.length > 200 ? `${cutText(t, 200)}...` : t;
+      const t = full(v);
+      return t.length > 2000 ? `${cutText(t, 1000)} [${t.length - 1500} characters omitted of ${t.length}] ${t.slice(-500)}` : t;
     };
+    const evidence = [value, current].some((v) => v !== undefined && full(v).length > 2000)
+      ? [`Full new value (${full(value).length} characters):`, full(value), ...(current === undefined ? [] : [`Full current value (${full(current).length} characters):`, full(current)])].join("\n")
+      : "";
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
     if (!q) {
       q = await this.questions.ask({
@@ -2783,7 +2787,7 @@ export class Session {
         title: `Change ${f.label}?`,
         text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Your message did not name this value. Reason: ${spec.reason.trim().replace(/[.\s]+$/, "") || "the agent gave none"}.${current === undefined ? " To keep the setting as it is, answer later." : ""}`,
         options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
-        evidence: "",
+        evidence,
         ...(current === undefined ? {} : { default: current }),
       });
       this.bus.emit({ type: "question", question: q });
