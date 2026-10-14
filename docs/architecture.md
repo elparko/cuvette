@@ -542,10 +542,10 @@ The harness does not depend on the model to refuse. These rules hold if the mode
 - The harness does not copy the saved key file into the record, also if a tool result names it as an output.
 - `Session.answer` trusts a folder only for the question that the harness asked. The model can write a question with the same title.
 - A model proposal for a decision gets a card with the current value as the default. A headless run does not agree to it.
-- The model changes a decision with no card in one case. The scientist asked for a change, and the request names the setting. This works one time for each setting.
-- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder. The trust check reads the file one time, and the prompt uses that text. Cuvette does not read a `LAB.md` that is a link.
+- The model changes a decision with no card in one case. The message of the scientist names the setting and holds the value. This works one time for each setting.
+- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder. The trust check reads the file one time, and the prompt uses that text. Cuvette does not read a `LAB.md` that is a link or larger than 64 KB. The card shows all of the file. For a long file it shows the way to read it and offers no one-click trust. `write_file` refuses `LAB.md` in the project folder.
 - Text from data goes on one line in the log for the referee, the text for the summary, the data check and the design check. A line break cannot start a fake message.
-- The local providers put a zero-width space after the first character of a chat template marker, such as `<|im_start|>` or `[INST]`. In `tool_result`, `tool_call` and `tool_response` tags, they put an underscore after the `<` or `</`. A tool result cannot close its wrapper.
+- The local providers put a zero-width space after the first character of a chat template marker, such as `<|im_start|>` or `[INST]`. The Ollama provider also puts an underscore after the `<` or `</` of `tool_result`, `tool_call` and `tool_response` tags in a tool result. A tool result cannot close its wrapper. When the model copies a marker with its zero-width space into a tool call, `refang` removes the space before the tool runs.
 - The terminal app and the text output of a headless run use `plainText` (`src/core/plain.ts`), which removes control codes. The web app escapes all text, and `esc` removes text direction controls.
 
 Run `npx vitest run tests/injection*.test.ts`. Run the terminal file with `--fileParallelism=false`.
