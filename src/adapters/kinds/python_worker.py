@@ -3,6 +3,7 @@ import json
 import math
 import os
 import sys
+import threading
 import traceback
 
 proto = os.fdopen(os.dup(1), "w", buffering=1, encoding="utf-8")
@@ -111,12 +112,16 @@ def find(spec):
     return obj
 
 
-def preload(names):
+def _import_all(names):
     for name in names:
         try:
             importlib.import_module(name)
         except Exception as e:
             print("cuvette: preload of %s failed: %s" % (name, e), file=sys.stderr)
+
+
+def preload(names):
+    threading.Thread(target=_import_all, args=(names,), daemon=True).start()
     return {"result": None, "files": [], "metrics": {}}
 
 
