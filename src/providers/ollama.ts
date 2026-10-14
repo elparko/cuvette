@@ -2,7 +2,7 @@ import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
+import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
 import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
@@ -123,11 +123,11 @@ export class OllamaProvider implements Provider {
     const out: any[] = [{ role: "system", content: system }];
     for (const m of messages) {
       if (m.role === "assistant") {
-        const text = m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n");
+        const text = defang(m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n"));
         const calls = m.parts.filter((p) => p.type === "tool_call") as Extract<Part, { type: "tool_call" }>[];
-        const args = (c: Extract<Part, { type: "tool_call" }>) => (c.args && typeof c.args === "object" ? c.args : {});
+        const args = (c: Extract<Part, { type: "tool_call" }>) => defangDeep(c.args && typeof c.args === "object" ? c.args : {});
         if (this.promptedTools) {
-          const blocks = calls.map((c) => `<tool_call>${JSON.stringify({ name: c.name, arguments: args(c) })}</tool_call>`);
+          const blocks = calls.map((c) => defang(`<tool_call>${JSON.stringify({ name: c.name, arguments: args(c) })}</tool_call>`));
           out.push({ role: "assistant", content: [text, ...blocks].filter(Boolean).join("\n") });
           continue;
         }

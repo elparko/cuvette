@@ -5,6 +5,13 @@ export function defang(text: string): string {
   return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
 }
 
+export function defangDeep<T>(v: T): T {
+  if (typeof v === "string") return defang(v) as T;
+  if (Array.isArray(v)) return v.map(defangDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, defangDeep(x)])) as T;
+  return v;
+}
+
 export function wrapperText(text: string): string {
   return defang(text).replace(/<(\s*\/?\s*)(tool_result|tool_call)/gi, "<$1_$2");
 }

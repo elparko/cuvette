@@ -79,11 +79,11 @@ export class OpenAIProvider implements Provider {
     const out: any[] = [{ role: "system", content: system }];
     for (const m of messages) {
       if (m.role === "assistant") {
-        const text = m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n");
+        const text = defang(m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n"));
         const calls = m.parts.filter((p) => p.type === "tool_call") as Extract<Part, { type: "tool_call" }>[];
         const msg: any = { role: "assistant", content: text || (calls.length ? null : "(no reply)") };
         if (calls.length)
-          msg.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) } }));
+          msg.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: defang(JSON.stringify(c.args ?? {})) } }));
         out.push(msg);
         continue;
       }

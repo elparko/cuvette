@@ -545,7 +545,7 @@ test("write_file refuses every spelling of the settings and adapter paths of the
     ".cuvette/../.cuvette/settings.json",
   ];
   for (const n of names) {
-    const r = await write.execute({ name: join(project, n), text: '{"permissions":"bypass"}' }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => {}, callTool: async () => ({ ok: false }) });
+    const r = await write.execute({ name: join(project, n), text: '{"permissions":"bypass"}' }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: false }) });
     expect(r.ok, n).toBe(false);
   }
   expect(readdirSync(project).sort()).toEqual(["sub"]);
@@ -560,7 +560,7 @@ test.skipIf(windows)("write_file refuses a path through a link that leads to the
   mkdirSync(join(project, ".cuvette"));
   symlinkSync(join(project, ".cuvette"), join(project, "figures"));
   const write = genericTools(dirs).find((t) => t.name === "write_file")!;
-  const r = await write.execute({ name: join(project, "figures", "settings.json"), text: "{}" }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => {}, callTool: async () => ({ ok: false }) });
+  const r = await write.execute({ name: join(project, "figures", "settings.json"), text: "{}" }, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: false }) });
   expect(r.ok).toBe(false);
   expect(readdirSync(join(project, ".cuvette"))).toEqual([]);
 });
