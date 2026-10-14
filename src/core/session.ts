@@ -2357,6 +2357,7 @@ export class Session {
           vis === "summaries"
             ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path }
             : { path: o.table.path, ...o.table, rows: data?.fullTable ? o.table.rows : o.table.rows.slice(0, small ? 5 : 12) };
+      if (o.table && vis === "summaries") obj.note = "The harness does not send the rows of this table to a cloud model. Read the source file with read_file to see its column names and values.";
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = small ? JSON.stringify(obj) : `{\n${Object.entries(obj).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n")}\n}`;

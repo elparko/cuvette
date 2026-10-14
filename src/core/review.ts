@@ -446,6 +446,8 @@ mean that the claim check found no logged result for the number.
 Write your report as JSON lines. One finding for each line, with no other text:
 {"severity": "info" | "warning" | "error", "message": "<one or two plain sentences>", "entries": [<log entry numbers>]}
 Cite the log entry numbers (the number after #) that support each finding.
+Report only problems. Do not write a finding for a check that passed.
+Write at most five findings. Write the most severe first.
 If you find nothing, write [].`;
 
 export function refereePrompt(ctx: ReviewContext): { system: string; text: string } {
