@@ -75,6 +75,14 @@ function shellWords(text: string): string[] {
   return out;
 }
 
+function splitAt(w: string): number {
+  for (let i = 1; i < w.length; i++) {
+    if (w[i] === "S") return i;
+    if ("uCP".includes(w[i]!)) return -1;
+  }
+  return -1;
+}
+
 function optionStep(w: string, wrap: Wrapper): number[] {
   if (wrap.values.has(w)) return [2];
   if (wrap.flags.has(w) || (w.startsWith("--") && w.includes("="))) return [1];
@@ -131,9 +139,15 @@ function joinedArgv(args: Args, programs: RegExp[]): string[] {
       else if (env && (w === "-S" || w === "--split-string")) {
         if (words[p + 1] !== undefined) command(words[p + 1]!);
         todo.push(p + 2);
-      } else if (env && w.startsWith("-S") && w.length > 2) {
-        command(w.slice(2));
-        todo.push(p + 1);
+      } else if (env && /^-[A-Za-z0-9]/.test(w) && splitAt(w) >= 0) {
+        const at = splitAt(w);
+        if (at < w.length - 1) {
+          command(w.slice(at + 1));
+          todo.push(p + 1);
+        } else {
+          if (words[p + 1] !== undefined) command(words[p + 1]!);
+          todo.push(p + 2);
+        }
       } else if (env && w.startsWith("--split-string=")) {
         command(w.slice("--split-string=".length));
         todo.push(p + 1);

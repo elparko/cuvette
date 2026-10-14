@@ -85,6 +85,11 @@ describe("fuzz: the permission rules for a command", () => {
     }
   });
 
+  test("a deny rule sees the split string in a group of short options of env", () => {
+    for (const argv of [["env", "-iS", "rm -rf x"], ["env", "-vSrm -rf x"], ["env", "-iSrm", "x"], ["env", "-i0S", "rm x"], ["env", "-vi", "-S", "rm x"], ["sudo", "env", "-iS", "'rm' x"], ["env", "-iS", "FOO=1 sudo -n rm x"]]) expect(denyRm.check(rc, { argv }), argv.join(" ")).toBe("deny");
+    for (const argv of [["env", "-uS", "git", "status"], ["env", "-iS", "git commit -m rm"], ["env", "-iSgit", "commit", "-m", "rm"]]) expect(denyRm.check(rc, { argv }), argv.join(" ")).not.toBe("deny");
+  });
+
   test("a deep chain of wrappers does not hide the program", () => {
     expect(denyRm.check(rc, { argv: [...Array(40).fill("env"), "rm", "x"] })).toBe("deny");
     expect(denyRm.check(rc, { argv: [...Array(5000).fill("sudo"), "rm", "x"] })).toBe("deny");
