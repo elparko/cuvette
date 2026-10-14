@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { EventEmitter } from "node:events";
-import { Box, Text, useInput, usePaste, useStdin, useWindowSize } from "ink";
+import { Box, useInput, usePaste, useStdin, useWindowSize } from "ink";
+import { Text } from "./text.tsx";
 import { decodeKey, emptyEd, splitKeys, layout, press, rowOf, step, type Ed, type InputKeys, type VimMode } from "./editor.ts";
 
 export const INPUT_MAX_ROWS = 12;

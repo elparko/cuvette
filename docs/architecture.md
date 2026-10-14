@@ -282,6 +282,8 @@ class HookRunner {
 }
 ```
 
+A `deny` rule or an `ask` rule for `run_command:<name> *` also matches the program with a path or in other capitals. It also matches the program behind `env`, `command`, `exec`, `nohup`, `sudo` or `xargs`. It does not match `sh -c`, a renamed copy or a script. An `allow` rule matches only the name as written.
+
 Command hooks follow Claude Code. The command gets the input JSON on stdin. Exit 0 with JSON on
 stdout gives the result. Exit 2 gives a deny (PreToolUse) or a block (Stop), with stderr as the
 reason. The harness logs and ignores other exit codes.
@@ -315,9 +317,10 @@ Rules:
 - `loadSettings` (`config.ts`), `layers` (`settings.ts`) and `adapterDirs` (`manifest.ts`) use the project files only if `folderTrusted` is true. Without trust, only `SAFE_KEYS` apply. These are settings for how the UI looks, with no effect on code.
 - `findAdapter` does not load a path in a project adapter folder without trust. It loads the adapter with the same name from the user or catalog folder.
 - The harness trusts a folder if its entry in `trusted_folders` has the same hash as the files now. A new or changed file, key, hook or adapter sets the state to `changed`.
-- A folder with only `SAFE_KEYS` has the state `none`. It needs no card.
+- The `LAB.md` file of the project folder goes into the system prompt, so the trust check covers it. `labText` reads it only if `folderTrusted` is true. A folder with a `LAB.md` file has a state other than `none`.
+- A folder with only `SAFE_KEYS` and no `LAB.md` has the state `none`. It needs no card.
 - `Session.init` checks the trust before the `SessionStart` hooks. An interactive session asks a question with the title `Trust this folder?` and no decision key. Other sessions write one `notice` entry, and `session.trustNotice` holds the text.
-- `Session.answer` sends an answer to that question to `setTrust`. `setTrust` writes a `trust` entry.
+- `Session.answer` sends an answer to that question to `setTrust`. It compares the id of the question, not the title, because the model can write a question with the same title. `setTrust` writes a `trust` entry.
   On trust, `applyProjectFiles` loads the settings again.
   It sets the permission rules and command hooks.
   It turns on bypass if a file sets it.
@@ -526,3 +529,23 @@ can start and stop it without the command line.
 - **Question cards.** An item with an `ask` text and no value becomes a question card. The title is `Checklist ARRIVE 4a: Randomisation`. The answer is an `answer` entry in the record. The next `/checklist` reads it and shows the item as "Covered". The answer "not applicable" gives "Not applicable". An answer to a checklist card does not restart the agent.
 - **Offer.** A turn can run a step and leave no open plan step. After such a turn, the session writes one `notice` entry with `checklist: "offer"`. It does this only when the scientist sets a guideline.
 - **Exports.** The checklist is in `trail.md`, `trail.html`, the `Checklist` sheet of `results.xlsx`, and `checklist.md` and `checklist.csv` in the `.eln` file. Without a guideline, no file has a checklist.
+
+## Hostile data (`tests/injection*.test.ts`)
+
+WARNING: Do not trust the model or the data that it reads. A file, a file name, a tool result or a model reply can hold text that looks like an instruction.
+
+The harness does not depend on the model to refuse. These rules hold if the model does what the data says:
+
+- No tool changes the mode, the permission mode or the trust. Only the scientist does, with a command or a card.
+- The model never answers a permission card. A permission card for `run_script`, `run_command` or a write asks the scientist. A search that sends text to the outside asks the scientist also in bypass mode.
+- `write_file` refuses the record, `.cuvette/` and `.ga/` also after the scientist approves the card. `isCredentialsFile` finds the saved key file by its identity, so a hard link or another capital letter does not pass.
+- The harness does not copy the saved key file into the record, also if a tool result names it as an output.
+- `Session.answer` trusts a folder only for the question that the harness asked. The model can write a question with the same title.
+- A model proposal for a decision gets a card with the current value as the default. A headless run does not agree to it.
+- The model changes a decision with no card in one case. The message of the scientist names the setting and holds the value next to the name. A number must be a word of its own within 4 words after, or 2 words before, the name. A boolean needs a form such as `turn <name> off` or `<name> = true`. This works one time for each setting.
+- `LAB.md` of a project folder goes into the system prompt. The trust card shows it. Cuvette ignores it until the scientist trusts the folder. The trust check reads the file one time, and the prompt uses that text. Cuvette does not read a `LAB.md` that is a link or larger than 64 KB. The card does not cut the file: it shows every line, and the prompt gets the same text. Both write each control character as a visible escape, such as `\x1b`. A long file shows its line count and path, and the card offers no one-click trust. `write_file` refuses `LAB.md` in the project folder.
+- Text from data goes on one line in the log for the referee, the text for the summary, the data check and the design check. A line break cannot start a fake message.
+- The local providers put a zero-width space after the first character of a chat template marker, such as `<|im_start|>` or `[INST]`. The Ollama provider also puts an underscore after the `<` or `</` of `tool_result`, `tool_call` and `tool_response` tags in a tool result. A tool result cannot close its wrapper. When the model copies a marker with its zero-width space into a tool call, `refang` removes the space before the tool runs.
+- The terminal app and the text output of a headless run use `plainText` (`src/core/plain.ts`), which removes control codes. The web app escapes all text, and `esc` removes text direction controls.
+
+Run `npx vitest run tests/injection*.test.ts`. Run the terminal file with `--fileParallelism=false`.

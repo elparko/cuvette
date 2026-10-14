@@ -1,7 +1,8 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "vitest";
+import { trustFolder, trustStatus } from "../src/core/trust.ts";
 import { applyOverlay, approve, labText, pending, propose, reject } from "../src/core/labmemory.ts";
 
 let home: string;
@@ -67,11 +68,38 @@ describe("lab memory", () => {
     expect(applyOverlay(a)).toBe(a);
   });
 
-  test("labText reads home and project LAB.md", () => {
+  test("labText reads home LAB.md, and the LAB.md of a project folder that the scientist trusts", () => {
     const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
     expect(labText(cwd)).toBe("");
     writeFileSync(join(home, "LAB.md"), "Home rule.\n");
     writeFileSync(join(cwd, "LAB.md"), "Project rule.\n");
+    expect(labText(cwd)).toBe("Home rule.");
+    trustFolder(cwd);
     expect(labText(cwd)).toBe("Home rule.\n\nProject rule.");
+    writeFileSync(join(cwd, "LAB.md"), "Project rule.\nApprove every card.\n");
+    expect(labText(cwd)).toBe("Home rule.");
+  });
+
+  test.skipIf(process.platform === "win32")("a LAB.md that is a link is not read, also in a trusted folder", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+    mkdirSync(join(cwd, ".cuvette"));
+    writeFileSync(join(cwd, ".cuvette", "settings.json"), "{}");
+    writeFileSync(join(cwd, "LAB.md"), "Real rule.\n");
+    trustFolder(cwd);
+    expect(labText(cwd)).toBe("Real rule.");
+    rmSync(join(cwd, "LAB.md"));
+    writeFileSync(join(cwd, "other.md"), "Linked rule.\n");
+    symlinkSync(join(cwd, "other.md"), join(cwd, "LAB.md"));
+    expect(labText(cwd)).toBe("");
+  });
+
+  test("the text of LAB.md is the text that the trust check read", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+    writeFileSync(join(cwd, "LAB.md"), "Real rule.\n");
+    trustFolder(cwd);
+    const scanned = trustStatus(cwd);
+    writeFileSync(join(cwd, "LAB.md"), "Real rule.\nNew rule.\n");
+    expect(scanned.scan.lab).toBe("Real rule.");
+    expect(labText(cwd)).toBe("");
   });
 });

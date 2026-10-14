@@ -1,5 +1,6 @@
 const ENT: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-export const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ENT[c]!);
+export const noBidi = (v: unknown) => String(v ?? "").replace(/[\u202a-\u202e\u2066-\u2069]/g, "");
+export const esc = (v: unknown) => noBidi(v).replace(/[&<>"']/g, (c) => ENT[c]!);
 
 // A narrow screen shows each row as a block (CSS display: block). The roles keep the table for a screen reader.
 export function tableHtml(columns: string[], rows: string[][], cls = ""): string {

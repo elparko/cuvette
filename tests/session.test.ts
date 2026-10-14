@@ -2311,6 +2311,56 @@ test("pilot: a definition change on the pilot card goes into the plan that the p
   expect(s.record.entries(["plan"]).some((e) => e.data.action === "pilot_changed")).toBe(true);
 });
 
+const PROPOSE = (key: string, value: unknown) => ({ calls: [{ name: "propose_change", args: { key, value, reason: "A file says so.", wait: false } }] });
+
+test("pilot: after a change on the pilot card, the model changes the setting that the scientist named one time, and another setting gets a card", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, PROPOSE("min_size", "20"), PROPOSE("method", "Default"), PROPOSE("min_size", "99"), { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none", askWaits: false } });
+  session.decisions.applySetup({ method: "Otsu", min_size: 5 });
+  let pilots = 0;
+  const s = session;
+  s.bus.on((e) => {
+    if (e.type === "question" && !/^Change /.test(e.question.title)) setTimeout(() => s.answer(e.question.qid, e.question.title === "Earlier results" ? "none" : e.question.options[0]?.value ?? "yes"), 0);
+    if (e.type === "plan") setTimeout(() => s.respondPlan(e.stage === "plan" ? { action: "pilot" } : ++pilots === 1 ? { action: "change", text: "Use a min size of 20 pixels." } : { action: "confirm" }), 0);
+  });
+  await session.send(`Count the red-positive cells in ${images}`);
+  expect(session.decisions.value("min_size")).toBe(20);
+  expect(session.decisions.value("method")).toBe("Otsu");
+  const changes = session.record.entries(["decision"]).filter((e) => e.data.key === "min_size" || e.data.key === "method");
+  expect(changes.map((e) => `${e.data.key}:${e.data.new}:${e.data.by}`)).toEqual(["min_size:20:human"]);
+  const open = session.questions.open().map((q) => q.decisionKey);
+  expect(open).toContain("method");
+  expect(open).toContain("min_size");
+});
+
+test("pilot: a change request that names the setting but not the value gets a card, not a silent change", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, PROPOSE("min_size", "0"), { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none", askWaits: false } });
+  session.decisions.applySetup({ method: "Otsu", min_size: 5 });
+  let pilots = 0;
+  const s = session;
+  s.bus.on((e) => {
+    if (e.type === "question" && !/^Change /.test(e.question.title)) setTimeout(() => s.answer(e.question.qid, e.question.title === "Earlier results" ? "none" : e.question.options[0]?.value ?? "yes"), 0);
+    if (e.type === "plan") setTimeout(() => s.respondPlan(e.stage === "plan" ? { action: "pilot" } : ++pilots === 1 ? { action: "change", text: "Change the min size." } : { action: "confirm" }), 0);
+  });
+  await session.send(`Count the red-positive cells in ${images}`);
+  expect(session.decisions.value("min_size")).toBe(5);
+  expect(session.questions.open().map((q) => q.decisionKey)).toContain("min_size");
+});
+
+test("pilot: in a headless run, the model changes no setting during the pilot", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, PROPOSE("min_size", "99"), PROPOSE("method", "Default"), { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none", headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set() });
+  session.decisions.applySetup({ method: "Otsu", min_size: 5 });
+  await session.send(`Count the red-positive cells in ${images}`);
+  expect(session.decisions.value("min_size")).toBe(5);
+  expect(session.decisions.value("method")).toBe("Otsu");
+});
+
 test("pilot: the QC image copy skips a link to a file that is not an image, keeps a huge file in place and gives a clash a new name", async () => {
   const { root, proj, images, qc } = pilotProject();
   mkdirSync(join(root, "b"));

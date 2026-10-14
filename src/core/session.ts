@@ -5,7 +5,9 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpat
 import { opendir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { hideKeys, isCredentialsFile } from "./credentials.ts";
+import { namesValue } from "./asked.ts";
+import { refangDeep } from "../providers/text.ts";
+import { hideKeys, isCredentialsFile, isSecretFile } from "./credentials.ts";
 import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
@@ -53,7 +55,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, folderTrusted, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { endTrustOnce, folderTrusted, labLong, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -297,6 +299,7 @@ export class Session {
   private toolsHinted = false;
   private planStart = 0;
   private scientistAsked?: string;
+  private askedUsed = new Set<string>();
   inspection?: Inspection;
   reference?: Reference;
   private hidden: string[] = [];
@@ -1177,6 +1180,10 @@ export class Session {
       }
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
       else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.realRequest()?.data.text ?? text), true);
+      if (!opts.internal) {
+        this.scientistAsked = text;
+        this.askedUsed.clear();
+      }
       this.turnNo++;
       this.chooseActiveTools(text, true);
       this.warmAdapters(text);
@@ -2215,6 +2222,7 @@ export class Session {
   }
 
   private callArgs(tool: Tool, raw: unknown): Args {
+    raw = refangDeep(raw);
     const args = coerceArgs(dropNulls((raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Args, tool.inputSchema), tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     return absolutePaths(args, this.cwd) as Args;
@@ -2386,6 +2394,10 @@ export class Session {
     const mod = adapter ? await adapter.module() : {};
     const manualRoute = output.manualRoute ?? mod.manualRoute?.(remote, args) ?? entry?.route ?? "";
     const fidelity = output.fidelity ?? entry?.fidelity ?? (tool.source === "adapter" ? (manualRoute ? "close" : "none") : tool.source === "harness" ? undefined : "none");
+    if ([...(output.outputs ?? []).map((o) => o.path), ...(output.images ?? [])].some(isSecretFile)) {
+      output = { ...output, outputs: output.outputs?.filter((o) => !isSecretFile(o.path)), images: output.images?.filter((i) => !isSecretFile(i)) };
+      this.record.append("notice", { text: `Cuvette did not keep a key or password file that the result of ${tool.name} named as an output.`, warn: true });
+    }
     const fileList = [...(output.outputs ?? [])];
     for (const img of output.images ?? []) if (!fileList.some((o) => o.path === img)) fileList.push({ path: img, kind: "image" });
     const outputs = fileList
@@ -2719,6 +2731,11 @@ export class Session {
     }
   }
 
+  private askedFor(f: { key: string; label: string; choices?: unknown[] }, value: unknown): boolean {
+    if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
+    return namesValue(this.scientistAsked, f, value);
+  }
+
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
     const fields = this.decisions.fields();
     const f = fields.find((x) => x.key === spec.key);
@@ -2732,12 +2749,20 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
-    if (this.scientistAsked !== undefined || (this.pilotStage && this.pilotPlan)) {
+    const typed = (() => {
+      try {
+        return this.decisions.validate(f.key, value);
+      } catch {
+        return value;
+      }
+    })();
+    if (this.askedFor(f, typed)) {
       const asked = this.scientistAsked;
-      this.decisions.change(f.key, value, { by: asked !== undefined ? "human" : "agent", reason: asked !== undefined ? `the scientist asked: "${asked}"` : `changed during the demonstration: ${spec.reason}` });
+      this.askedUsed.add(f.key);
+      this.decisions.change(f.key, value, { by: "human", reason: `the scientist asked: "${asked}"` });
       const t = this.pilotPlan ? settingsOf(this.pilotPlan.plan).find((x) => x.setting.key === f.key)?.setting : undefined;
-      if (t) Object.assign(t, { value: this.decisions.value(f.key), by: asked !== undefined ? "you" : "agent" });
-      return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. ${asked !== undefined ? "The scientist asked for this change, so no card asks again." : "The scientist sees it on the demonstration card and confirms it there."}` };
+      if (t) Object.assign(t, { value: this.decisions.value(f.key), by: "you" });
+      return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. The scientist asked for this change, so no card asks again.` };
     }
     const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
@@ -2747,8 +2772,8 @@ export class Session {
         title: `Change ${f.label}?`,
         text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Reason: ${spec.reason}`,
         options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
-        recommendation: { value, reason: spec.reason },
         evidence: "",
+        ...(current === undefined ? {} : { default: current }),
       });
       this.bus.emit({ type: "question", question: q });
     }
@@ -2940,6 +2965,7 @@ export class Session {
 
   private async checkTrust(interactive: boolean): Promise<void> {
     const t = trustStatus(this.cwd);
+    if (t.scan.labProblem) this.record.append("notice", { text: `Cuvette could not read LAB.md in ${t.scan.folder}: ${t.scan.labProblem}. It ignores the file.`, warn: true });
     for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");
     if (t.state !== "new" && t.state !== "changed") return;
     this.untrusted = t;
@@ -2956,7 +2982,7 @@ export class Session {
     if (open?.status === "open") return open;
     const t = trustStatus(this.cwd);
     if (t.state === "none") return undefined;
-    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: TRUST_OPTIONS, evidence: trustEvidence(t) });
+    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
     this.trustQid = q.qid;
     this.bus.emit({ type: "question", question: q });
     return q;
@@ -2999,6 +3025,7 @@ export class Session {
       this.permissionMode = "bypass";
     }
     this.index = undefined;
+    this.system = this.buildSystem();
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
     const start = folderTrusted(this.cwd) ? (project.hooks as Settings["hooks"] | undefined)?.SessionStart : undefined;
     if (start?.length) {
@@ -3019,7 +3046,7 @@ export class Session {
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
     value = this.valueWithoutKeys(value);
     note = this.withoutKeys(note);
-    if (qid === this.trustQid || this.questions.get(qid)?.title === TRUST_TITLE) {
+    if (qid === this.trustQid) {
       const q = this.questions.get(qid);
       if (q?.status === "open") {
         const v = String(this.questions.match(q, value ?? "no"));
@@ -3143,6 +3170,8 @@ export class Session {
     this.planning = true;
     this.pilotStage = false;
     this.pilotPlan = undefined;
+    this.scientistAsked = undefined;
+    this.askedUsed.clear();
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     if (!answered) this.inspection = undefined;
@@ -3529,7 +3558,8 @@ export class Session {
       }
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
       this.scientistAsked = r.text;
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. ${r.definition ? `The harness already put the new definition of ${r.definition.measure} in the proposed analysis.` : "If a definition changes, call plan with the new definition and the reason."}` };
+      this.askedUsed.clear();
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change. If the request names the setting, the harness applies it at once, with no second card, because the scientist asked for it. For another setting, the scientist answers a card. ${r.definition ? `The harness already put the new definition of ${r.definition.measure} in the proposed analysis.` : "If a definition changes, call plan with the new definition and the reason."}` };
     }
     return { ok: false, error: "unknown answer" };
   }
@@ -3727,7 +3757,7 @@ export class Session {
       done.add(f.key);
       if (f.set && JSON.stringify(this.decisions.value(f.key)) === JSON.stringify(d.value)) continue;
       try {
-        this.decisions.change(f.key, d.value, { by: f.owner === "agent" ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+        this.decisions.change(f.key, d.value, { by: f.owner === "agent" || (this.settings.headless && !(f.key in this.setupPreset && JSON.stringify(this.setupPreset[f.key]) === JSON.stringify(d.value))) ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
       } catch (e) {
         this.notes.push(`The setting ${d.label} = ${JSON.stringify(d.value)} does not fit the decision ${f.key}: ${(e as Error).message}`);
       }
@@ -4430,6 +4460,8 @@ export class Session {
     if (!point) throw new Error(`No point ${n}. Type /rewind to see the list.`);
     const nodes = this.record.entries(["node"]).filter((e) => e.id > point.upTo && !this.record.setAside(e.id)).map((e) => String(e.node ?? e.data.id));
     const asked = new Set(this.record.entries(["question"]).filter((e) => e.id > point.upTo).map((e) => String(e.data.qid)));
+    this.scientistAsked = undefined;
+    this.askedUsed.clear();
     this.record.append("rewind", { upTo: point.upTo, entry: point.entry, kind: point.kind, point: point.label, nodes });
     for (const q of this.questions.open()) if (asked.has(q.qid)) this.questions.withdraw(q.qid, "The scientist rewound the conversation to a point before this question.");
     const decisions = this.decisions.restoreTo(point.upTo, `rewind to ${point.label}`);

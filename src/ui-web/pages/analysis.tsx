@@ -399,7 +399,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const rev = t.closest<HTMLElement>("[data-reveal]");
     if (rev) {
       try {
-        await bridge.reveal(rev.dataset.reveal!);
+        await bridge.reveal(decodeURIComponent(rev.dataset.reveal!));
       } catch (err) {
         toast.error((err as Error).message);
       }
@@ -523,7 +523,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const time = busy && status.since ? elapsed(Math.max(0, Math.floor((Date.now() - status.since) / 1000))) : "";
   const waits = busy && status.openQuestions ? " · " + waitText(status.openQuestions) : "";
   const showQ = !!status.openQuestions && !/data-type="(question|plan|clarify)"/.test(stream.cards);
-  const folderName = session.folder.split("/").filter(Boolean).pop() || session.folder;
+  const folderName = session.folderShown.split("/").filter(Boolean).pop() || session.folderShown;
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
@@ -531,11 +531,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 max-sm:basis-full">
           <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <h1 className="truncate font-semibold tracking-tight" title={session.folder}>
+            <h1 className="truncate font-semibold tracking-tight" title={session.folderShown}>
               {folderName}
             </h1>
             <div className="truncate text-xs text-muted-foreground max-sm:hidden" title={status.where ?? session.folderLine}>
-              {midText(session.folderLine || session.folder, 90)}
+              {midText(session.folderLine || session.folderShown, 90)}
             </div>
           </div>
         </div>

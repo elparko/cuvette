@@ -1,6 +1,7 @@
 import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
-import { Box, Text, useInput } from "ink";
+import { Box, useInput } from "ink";
+import { Text } from "./text.tsx";
 import { Field, InputBox } from "./input-box.tsx";
 import { canReset, type Scope, type SettingCtx, type SettingDef, type SettingRow } from "../core/settings.ts";
 import { choiceNote, matches, resetRow, rowHelp, rowTag, saveSetting, scopeText, secretState, settingEditor, settingRows, spendBar, spendState, RESET } from "../ui/config.ts";

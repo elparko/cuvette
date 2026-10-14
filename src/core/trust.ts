@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
+import { plainText } from "./plain.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
+export const LAB_FILE = "LAB.md";
 export const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 export const SAFE_KEYS = new Set(["animations", "input_keys", "openImages", "databook_paper", "databook_author"]);
 export const MODEL_KEYS = ["think", "numCtx", "effort"];
@@ -32,6 +34,9 @@ export interface FolderScan {
   linked: string[];
   incomplete: string[];
   bypass: boolean;
+  lab?: string;
+  labBig?: number;
+  labProblem?: string;
 }
 
 export interface TrustEntry {
@@ -220,9 +225,50 @@ function safeNames(dir: string): string[] {
   }
 }
 
+const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
+
+// The trust card and the system prompt use this one text, so the scientist reads what the model gets.
+export function labDisplayText(text: string): string {
+  return text.replace(LAB_CONTROL, (c) => {
+    const n = c.codePointAt(0)!;
+    return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
+  });
+}
+
+export const LAB_MAX_BYTES = 64 * 1024;
+export const LAB_CARD_LINES = 60;
+export const LAB_CARD_CHARS = 8000;
+
+function readLab(path: string): { bytes?: Buffer; big?: number; problem?: string } {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    const st = fstatSync(fd);
+    if (!st.isFile()) return {};
+    if (st.size > LAB_MAX_BYTES) return { big: st.size };
+    const buf = Buffer.alloc(st.size);
+    let n = 0;
+    while (n < buf.length) {
+      const got = readSync(fd, buf, n, buf.length - n, n);
+      if (!got) break;
+      n += got;
+    }
+    return { bytes: buf.subarray(0, n) };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return code === "ENOENT" || code === "ELOOP" || code === "ENOTDIR" ? {} : { problem: (e as Error).message };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+export const labLong = (s: FolderScan) => !!s.lab && (s.lab.split("\n").length > LAB_CARD_LINES || s.lab.length > LAB_CARD_CHARS);
+
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], linked: [], incomplete: [], bypass: false };
+  const { bytes: labBytes, big: labBig, problem: labProblem } = readLab(join(key, LAB_FILE));
+  const lab = labBytes ? labDisplayText(labBytes.toString("utf8").replace(/\r\n?/g, "\n").trim()) : "";
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d))) && !lab && !labBig && !labProblem) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], linked: [], incomplete: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
   const methods: string[] = [];
@@ -245,6 +291,8 @@ export function scanFolder(folder: string): FolderScan {
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }
   }
+  if (labBytes) files[LAB_FILE] = sha(labBytes);
+  else if (labBig) files[LAB_FILE] = sha(`too large ${labBig}`);
   for (const p of paths) files[relative(key, p)] = readHash(p);
   for (const l of linked) files[`${l} (linked folder)`] = linkHash(join(key, l));
   const layers = projectSettings(key);
@@ -257,10 +305,10 @@ export function scanFolder(folder: string): FolderScan {
       for (const n of safeNames(dir))
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, incomplete: [...new Set(incomplete)], bypass: values.permissionMode === "bypass" };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, incomplete: [...new Set(incomplete)], bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}), ...(labBig ? { labBig } : {}), ...(labProblem ? { labProblem } : {}) };
 }
 
-export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
+export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0 || !!s.lab || !!s.labBig;
 
 function userFile(): string {
   return join(cuvetteHome(), "settings.json");
@@ -377,25 +425,32 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   }
 }
 
+const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
+
 const show = (v: unknown) => {
-  const t = typeof v === "string" ? v : JSON.stringify(v);
+  const t = plainText(typeof v === "string" ? v : JSON.stringify(v));
   return t.length > 200 ? t.slice(0, 199) + "…" : t;
 };
 
-export function folderLines(s: FolderScan): string[] {
+export function folderLines(s: FolderScan, trusted = false): string[] {
   const out: string[] = [];
   if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${k}: ${show(s.values[k])}`));
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
   if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
   if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
   if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
-  return out;
+  const labPath = join(s.folder, LAB_FILE);
+  if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
+  if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}`}`);
+  else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
+  return out.map(plainText);
 }
 
 export function trustText(t: TrustStatus): string {
   return t.state === "changed"
     ? `The Cuvette files in ${t.scan.folder} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
-    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks or adapters. They can run programs on this computer. Cuvette ignores them until you trust the folder.`;
+    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
 }
 
 export function trustEvidence(t: TrustStatus): string {
@@ -405,7 +460,7 @@ export function trustEvidence(t: TrustStatus): string {
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${t.scan.folder}.`;
+  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${shellQuote(t.scan.folder)}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {

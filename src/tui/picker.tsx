@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, render, useApp, useInput, useStdout } from "ink";
+import { Box, render, useApp, useInput, useStdout } from "ink";
+import { Text } from "./text.tsx";
 import { terminalStdin } from "./key-stream.ts";
 import { ageText, clip, clipStart, folderText, type SessionInfo } from "../core/sessions.ts";
 

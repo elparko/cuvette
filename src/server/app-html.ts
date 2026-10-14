@@ -123,7 +123,7 @@ export function imageHtml(c: Ctx, path: string, name?: string, from?: string): s
 
 export function fileLink(c: Ctx, path: string, name?: string): string {
   const label = shownName(path, name);
-  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name || basename(path))}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
+  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name || basename(path))}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${encodeURIComponent(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
 }
 
 // ---------------------------------------------------------------- repeated steps
@@ -627,7 +627,7 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
   const open = (f: string) => (OPENS.test(f) ? ` <a href="${esc(fileUrl(c, f))}" target="_blank" rel="noopener" aria-label="Open ${esc(basename(f))} in a new tab">Open</a>` : "");
   if (files.length) parts.push(`<h4>Files</h4>${pictures.length ? `<div class="images">${pictures.map((f) => imageHtml(c, f)).join("")}</div>` : ""}<ul class="files">${files.map((f) => `<li>${fileLink(c, f)}${open(f)} <span class="dim small">${esc(extname(f).slice(1))}</span></li>`).join("")}</ul>`);
   parts.push(citeHtml(c));
-  parts.push(`<p class="dim small">Folder: ${midPath(outDir, 40)} <button type="button" class="link" data-reveal="${esc(outDir)}">Show in folder</button></p>`);
+  parts.push(`<p class="dim small">Folder: ${midPath(outDir, 40)} <button type="button" class="link" data-reveal="${encodeURIComponent(outDir)}">Show in folder</button></p>`);
   return parts.join("");
 }
 

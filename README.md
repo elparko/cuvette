@@ -246,6 +246,8 @@ A project folder can have Cuvette files in `.ga/` or `.cuvette/`:
 - `settings.json` and `settings.local.json`. These can set hooks, permission rules and bypass permissions.
 - `adapters/`. An adapter here replaces a catalog adapter with the same name.
 
+A project folder can also have a `LAB.md` file. Its text goes into the instructions of the agent. Cuvette ignores it until you trust the folder.
+
 Cuvette reads these files only in the project folder. It does not read them in a parent folder.
 Cuvette ignores these files until you trust the folder. Without trust, only these settings apply:
 `animations`, `input_keys`, `openImages`, `databook_paper` and `databook_author`.
@@ -257,6 +259,7 @@ When a session starts in a folder that you do not trust, a card shows:
 - Each hook command in full.
 - Each adapter, with "replaces the catalog adapter X" when it replaces one.
 - Whether the files turn on bypass permissions.
+- The first lines of `LAB.md`.
 
 The card has three choices:
 

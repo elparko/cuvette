@@ -248,7 +248,7 @@ export function App() {
                       type="button"
                       data-rove={s.id}
                       tabIndex={rove.tabIndex(s.id)}
-                      title={`${s.title}\n${s.folder}`}
+                      title={`${s.title}\n${s.folderShown}`}
                       onClick={() => sessions.open(s.id, opened)}
                       onContextMenu={(e) => e.stopPropagation()}
                       className={cn("flex w-full min-w-0 flex-col overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", state.session?.id === s.id && "bg-muted")}
