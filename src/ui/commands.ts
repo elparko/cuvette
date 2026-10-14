@@ -815,7 +815,7 @@ const base: Command[] = [
     help: "Open output number n with the system viewer.",
     run([n], ctx) {
       const outs = ctx.outputs();
-      const ref = /^\d+$/.test(n ?? "") ? outs[Number(n) - 1] : undefined;
+      const ref = /^\+?\d+(\.0+)?$/.test(n ?? "") ? outs[Number(n) - 1] : undefined;
       if (!ref) return ctx.error(outs.length ? `Use a number from 1 to ${outs.length}.` : "No outputs yet.");
       openWithOs(ref.path);
       ctx.notice(`Opening ${ref.path}`);

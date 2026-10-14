@@ -506,8 +506,10 @@ describe("the text names the problem and the next step", () => {
     const cmd = commands.find((c) => c.name === "open")!;
     for (const n of ["0x1", "1.5", "1e0", "0", "3"]) await cmd.run([n], ctx);
     expect(out.map((o) => o.text)).toEqual(Array(5).fill("Use a number from 1 to 2."));
-    await cmd.run(["2"], ctx);
-    expect(out.at(-1)).toEqual({ kind: "notice", text: "Opening /tmp/b.png" });
+    for (const n of ["2", "+2", "2.0", "02"]) {
+      await cmd.run([n], ctx);
+      expect(out.at(-1)).toEqual({ kind: "notice", text: "Opening /tmp/b.png" });
+    }
   });
 
   test("a stale mark with no result in it shows no line", () => {
