@@ -1,8 +1,8 @@
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { CATALOG_DIR, Manifest, bundledManifestFile, loadAdapter } from "../src/adapters/manifest.ts";
+import { CATALOG_DIR, Manifest, bundledManifestFile, findAdapter, loadAdapter } from "../src/adapters/manifest.ts";
 import { parseYaml } from "../src/core/yaml.ts";
 
 test("each catalog adapter.yaml gives the same manifest after a JSON round trip, as in dist/catalog/<name>/adapter.json", () => {
@@ -60,4 +60,18 @@ test("a manifest homepage that is not a web address is dropped", () => {
   const base = { adapter: { name: "x" }, connection: { kind: "cli" } };
   expect(Manifest.parse({ ...base, program: { name: "X", homepage: "javascript:alert(1)" } }).program.homepage).toBe("");
   expect(Manifest.parse({ ...base, program: { name: "X", homepage: "https://x.org" } }).program.homepage).toBe("https://x.org");
+});
+
+test("findAdapter with the name of an object property says that no adapter has that name", () => {
+  for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"]) expect(() => findAdapter(name, mkdtempSync(join(tmpdir(), "cuvette-proj-")))).toThrow(/no adapter named/);
+});
+
+test("a skill file with bad frontmatter or a name that is not text does not stop the skill list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-skills-"));
+  cpSync(join(__dirname, "fixtures/lab"), dir, { recursive: true });
+  mkdirSync(join(dir, "skills"));
+  writeFileSync(join(dir, "skills", "bad.md"), "---\nname: a: b\n---\nText.\n");
+  writeFileSync(join(dir, "skills", "num.md"), "---\nname: 123\ndescription: 7\n---\nText.\n");
+  const skills = loadAdapter(dir).skills().sort((a, b) => a.name.localeCompare(b.name));
+  expect(skills.map((k) => [k.name, k.description])).toEqual([["bad", ""], ["num", ""]]);
 });
