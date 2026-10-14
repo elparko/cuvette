@@ -377,7 +377,7 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
 const TABLE_ROWS = 20;
 
 function clip(x: unknown, n = 200): string {
-  const s = typeof x === "string" ? x : JSON.stringify(x);
+  const s = typeof x === "string" ? x : (JSON.stringify(x) ?? "");
   return s.length > n ? s.slice(0, n - 3) + "..." : s;
 }
 

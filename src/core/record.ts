@@ -37,7 +37,7 @@ const validId = (v: unknown): v is number => typeof v === "number" && Number.isS
 function intact(e: unknown): e is Entry {
   if (!isObject(e) || typeof e.kind !== "string" || !validId(e.id) || !isObject(e.data)) return false;
   const d = e.data;
-  if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
+  if (e.kind === "node") return typeof d.id === "string" && typeof d.tool === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
   if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
   if (e.kind === "stale") return Array.isArray(d.nodes ?? []);
   if (e.kind === "compaction") return Array.isArray(d.kept ?? []);
@@ -127,9 +127,7 @@ export class AnalysisRecord {
         continue;
       }
       if (!intact(e)) {
-        const bad: unknown = e;
-        if (isObject(bad) && validId(bad.id)) this.lastId = Math.max(this.lastId, bad.id);
-        this.skipped++;
+        this.skip(e);
         continue;
       }
       if (e.kind === "message") this.readLater(e, at, end - at);
@@ -137,6 +135,16 @@ export class AnalysisRecord {
       this.lastId = Math.max(this.lastId, e.id);
       this.index(e);
     }
+    if (this.skipped) for (const n of this.nodeList) n.parents = n.parents.filter((p) => this.nodeById.has(p));
+  }
+
+  private skip(e: unknown): void {
+    this.skipped++;
+    if (!isObject(e)) return;
+    if (validId(e.id)) this.lastId = Math.max(this.lastId, e.id);
+    if (e.kind !== "node" || !isObject(e.data)) return;
+    const num = Number(/^n(\d+)$/.exec(String(e.data.id))?.[1] ?? 0);
+    if (num >= this.nextNode) this.nextNode = num + 1;
   }
 
   // A loaded message holds the full model history of its turn. Only a resume or a rewind reads it, so it stays on disk until then.

@@ -6,7 +6,7 @@ import {
   applyRewind, applySetup, isPlainQuestion, setupRequest, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, respondPhi, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
-import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
+import { commands, openPanels, openSetup, failureText, parseCommand, unknownCommand, type CommandCtx } from "../ui/commands.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import type { SessionLike } from "../ui/types.ts";
@@ -338,14 +338,14 @@ export class WebView {
   }
 
   async runCommand(text: string): Promise<void> {
-    const [head, ...args] = text.slice(1).trim().split(/\s+/);
+    const { head, args } = parseCommand(text);
     this.push({ key: `u${++this.counter}`, t: "user", text });
     const cmd = commands.find((c) => c.name === head);
-    if (!cmd) return this.line("✗", `Unknown command /${head}. Type /help.`, "red");
+    if (!cmd) return this.line("✗", unknownCommand(head), "red");
     try {
       await cmd.run(args, this.ctx);
     } catch (e) {
-      this.line("✗", `/${cmd.name} failed: ${(e as Error).message}`, "red");
+      this.line("✗", failureText(cmd.name, e, this.session), "red");
     }
   }
 
