@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
@@ -30,6 +30,8 @@ export function methodsDir(): string {
 function check(name: string): string {
   const n = name.trim();
   if (!/^[\w][\w.-]*$/.test(n)) throw new Error("A method name can use letters, digits, dot, dash and underscore.");
+  if (n.length > 100) throw new Error("A method name can have 100 characters or fewer.");
+  if (/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(n)) throw new Error(`The name ${n} is reserved by the operating system. Use another name.`);
   return n;
 }
 
@@ -79,27 +81,70 @@ export function methodFrom(record: AnalysisRecord, name: string, decisions: Reco
   };
 }
 
-export function readMethod(text: string, source = "the file"): Method {
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const text = (v: unknown) => v === undefined || typeof v === "string";
+const listOf = (v: unknown, each: (x: unknown) => boolean) => v === undefined || (Array.isArray(v) && v.every(each));
+const objectsWith = (v: unknown, ...keys: string[]) => listOf(v, (x) => isObject(x) && keys.every((k) => typeof x[k] === "string"));
+
+function damage(m: Record<string, unknown>): string | undefined {
+  const a = m.analysis as Record<string, unknown>;
+  const pilot = a.pilot;
+  const checks: [string, boolean][] = [
+    ["saved", text(m.saved)],
+    ["request", text(m.request)],
+    ["questions", objectsWith(m.questions, "question", "answer")],
+    ["programs", listOf(m.programs, isObject)],
+    ["decisions", m.decisions === undefined || isObject(m.decisions)],
+    ["pilot", m.pilot === undefined || (isObject(m.pilot) && listOf(m.pilot.shows, (x) => typeof x === "string"))],
+    ["inputs", listOf(m.inputs, isObject)],
+    ["restatement", text(a.restatement)],
+    ["question", text(a.question)],
+    ["definitions", objectsWith(a.definitions, "measure", "definition")],
+    ["exclusions", objectsWith(a.exclusions, "what")],
+    ["checks", objectsWith(a.checks, "check")],
+    ["analysis programs", objectsWith(a.programs, "part", "adapter")],
+    ["outputs", listOf(a.outputs, (x) => typeof x === "string")],
+    ["out_of_scope", listOf(a.out_of_scope, (x) => typeof x === "string")],
+    ["analysis pilot", pilot === undefined || (isObject(pilot) && typeof pilot.sample === "string" && listOf(pilot.shows, (x) => typeof x === "string"))],
+    ["reference", a.reference === undefined || isObject(a.reference)],
+    ["data", a.data === undefined || (isObject(a.data) && listOf(a.data.files, (x) => typeof x === "string"))],
+    ["steps", objectsWith(a.steps, "step")],
+    ["settings", (a.steps as unknown[]).every((s) => isObject(s) && objectsWith(s.decisions, "label") && text(s.method) && text(s.tool) && text(s.reason))],
+  ];
+  return checks.find(([, ok]) => !ok)?.[0];
+}
+
+export function readMethod(raw: string, source = "the file"): Method {
   let m: Method;
   try {
-    m = JSON.parse(text) as Method;
+    m = JSON.parse(raw) as Method;
   } catch {
     throw new Error(`${source} is not a method file.`);
   }
-  if (m.cuvette_method !== METHOD_FORMAT || !m.name || !m.analysis || !Array.isArray(m.analysis.steps)) throw new Error(`${source} is not a Cuvette method file (format ${METHOD_FORMAT}).`);
+  if (isObject(m) && typeof m.cuvette_method === "number" && m.cuvette_method > METHOD_FORMAT) throw new Error(`${source} is a Cuvette method file of format ${m.cuvette_method}. This version of Cuvette reads format ${METHOD_FORMAT}. Update Cuvette to use it.`);
+  if (!isObject(m) || m.cuvette_method !== METHOD_FORMAT || typeof m.name !== "string" || !m.name || !isObject(m.analysis) || !Array.isArray(m.analysis.steps)) throw new Error(`${source} is not a Cuvette method file (format ${METHOD_FORMAT}).`);
+  const bad = damage(m as unknown as Record<string, unknown>);
+  if (bad) throw new Error(`${source} is damaged: the part "${bad}" has a wrong form.`);
+  m.saved ??= "";
   m.questions ??= [];
   m.programs ??= [];
   m.decisions ??= {};
   m.pilot ??= { required: true, shows: [] };
+  m.pilot.shows ??= [];
   return m;
 }
 
 export function saveMethod(m: Method, project?: string): string {
   const dir = project ? projectMethodsDir(project) : methodsDir();
-  mkdirSync(dir, { recursive: true });
   const p = pathOf(m.name, dir);
   const before = project ? trustStatus(project).state : undefined;
-  writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+  } catch (e) {
+    if (["EACCES", "EPERM", "EROFS"].includes((e as NodeJS.ErrnoException).code ?? "")) throw new Error(`Cannot write the method file ${p}. Check that the folder is not read-only.`);
+    throw e;
+  }
   if (project) afterProjectWrite(project, before!);
   return p;
 }
@@ -131,6 +176,20 @@ function rowsIn(dir: string, where: MethodRow["where"], trusted: boolean): Metho
 
 export function listMethods(project?: string): MethodRow[] {
   return [...(project ? rowsIn(projectMethodsDir(project), "project", folderTrusted(project)) : []), ...rowsIn(methodsDir(), "home", true)];
+}
+
+const realPath = (p: string): string => {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    return resolve(p);
+  }
+};
+
+const inside = (file: string, folder: string) => realPath(file).startsWith(realPath(folder) + sep);
+
+export function resumeMethodAllowed(file: string, project: string): boolean {
+  return inside(file, methodsDir()) || (inside(file, projectMethodsDir(project)) && trustStatus(project).state === "trusted");
 }
 
 export function loadMethod(ref: string, project?: string): Method & { path: string; hash: string } {
@@ -194,7 +253,7 @@ export function fillFromMethod(plan: AnalysisPlan, m: Method): AnalysisPlan {
     for (const d of s.decisions ?? []) {
       if (d.value !== undefined && d.value !== null && d.value !== "") continue;
       const hit = settings.find((x) => (d.key && x.key === d.key) || norm(x.label) === norm(d.label));
-      if (hit?.value === undefined) continue;
+      if (hit?.value === undefined || hit.value === null || hit.value === "") continue;
       d.value = hit.value;
       d.by = `method ${m.name}`;
     }

@@ -18,7 +18,7 @@ export function useRoving(ids: string[]) {
     };
     const out = (e: FocusEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && box.current?.contains(t) && !e.relatedTarget && t.isConnected) pending.current = "";
+      if (t && box.current?.contains(t) && !e.relatedTarget) queueMicrotask(() => t.isConnected && (pending.current = ""));
     };
     document.addEventListener("focusin", away);
     document.addEventListener("focusout", out);

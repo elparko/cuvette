@@ -4,7 +4,7 @@ import { extname, isAbsolute, join, relative } from "node:path";
 import { COPY_LIMIT_BYTES, local, portable } from "./places.ts";
 import { extractNumbers } from "./claims.ts";
 import type { EnvLock } from "./envlock.ts";
-import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
+import { ENTRY_KINDS, type Entry, type EntryKind, type Message, type Node, type NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
@@ -32,8 +32,10 @@ function sha256File(path: string): string {
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 // A damaged line can hold valid JSON that is not an entry. The record skips it, so that no reader gets a wrong shape.
+const validId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
 function intact(e: unknown): e is Entry {
-  if (!isObject(e) || typeof e.kind !== "string" || !Number.isFinite(e.id) || !isObject(e.data)) return false;
+  if (!isObject(e) || typeof e.kind !== "string" || !validId(e.id) || !isObject(e.data)) return false;
   const d = e.data;
   if (e.kind === "node") return typeof d.id === "string" && Array.isArray(d.parents) && Array.isArray(d.outputs);
   if (e.kind === "message") return isObject(d.message) && Array.isArray(d.message.parts);
@@ -41,6 +43,8 @@ function intact(e: unknown): e is Entry {
   if (e.kind === "compaction") return Array.isArray(d.kept ?? []);
   return true;
 }
+
+export const ownerOf = (entries: Pick<Entry, "kind" | "session">[]): string => entries.findLast((e) => e.kind === "fork")?.session ?? entries[0]?.session ?? "";
 
 export const liveEntries = (r: Pick<AnalysisRecord, "entries"> & { live?: AnalysisRecord["live"] }, kinds?: EntryKind[]): Entry[] => (r.live ? r.live(kinds) : r.entries(kinds));
 
@@ -57,12 +61,13 @@ export class AnalysisRecord {
   private nodeById = new Map<string, Node>();
   private staleIds = new Set<string>();
   private envs = new Map<string, EnvLock & { name: string }>();
-  private replaced = new Map<string, string>();
+  private replaced = new Map<string, { node: string; entry: number }[]>();
   private nodeEntry = new Map<string, number>();
   private asideRanges: [number, number][] = [];
   private nextNode = 1;
   private cutTail = false;
   private lastId = 0;
+  skipped = 0;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
@@ -84,20 +89,25 @@ export class AnalysisRecord {
   }
 
   // A crash can leave a cut last line. Call this only with the session lock held: the next entry must start on a new line.
-  repairTail(): void {
+  repairTail(): boolean {
     try {
-      const size = statSync(this.logPath).size;
-      if (!size) return;
-      const fd = openSync(this.logPath, "r");
-      const last = Buffer.alloc(1);
-      try {
-        readSync(fd, last, 0, 1, size - 1);
-      } finally {
-        closeSync(fd);
+      const buf = readFileSync(this.logPath);
+      if (!buf.length) return false;
+      if (buf[buf.length - 1] !== 0x0a) {
+        appendFileSync(this.logPath, "\n");
+        this.cutTail = false;
+        try {
+          JSON.parse(buf.toString("utf8", buf.lastIndexOf(10) + 1).replace(/^\uFEFF/, ""));
+          return false;
+        } catch {
+          return true;
+        }
       }
-      if (last[0] !== 0x0a) appendFileSync(this.logPath, "\n");
       this.cutTail = false;
-    } catch {}
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   private load(): void {
@@ -113,9 +123,15 @@ export class AnalysisRecord {
       try {
         e = local(JSON.parse(line), this.project) as Entry;
       } catch {
+        if (end < buf.length) this.skipped++;
         continue;
       }
-      if (!intact(e)) continue;
+      if (!intact(e)) {
+        const bad: unknown = e;
+        if (isObject(bad) && validId(bad.id)) this.lastId = Math.max(this.lastId, bad.id);
+        this.skipped++;
+        continue;
+      }
       if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.lastId = Math.max(this.lastId, e.id);
@@ -155,10 +171,16 @@ export class AnalysisRecord {
       const l = e.data as unknown as EnvLock & { name: string };
       if (!this.envs.has(l.hash)) this.envs.set(l.hash, l);
     } else if (e.kind === "rerun") {
-      this.replaced.set(String(e.data.old), String(e.data.node));
+      const old = String(e.data.old);
+      this.replaced.set(old, [...(this.replaced.get(old) ?? []), { node: String(e.data.node), entry: e.id }]);
     } else if (e.kind === "rewind") {
       this.asideRanges.push([Number(e.data.upTo), e.id]);
     }
+  }
+
+  unknownKinds(): string[] {
+    const known = new Set<string>(ENTRY_KINDS);
+    return [...new Set(this.log.map((e) => e.kind).filter((k) => !known.has(k)))].sort();
   }
 
   setAside(id: number): boolean {
@@ -318,13 +340,19 @@ export class AnalysisRecord {
       hit.add(n.id);
       for (const d of this.descendants(n.id)) hit.add(d);
     }
-    const fresh = [...hit].filter((id) => !this.staleIds.has(id));
+    const known = this.stale();
+    const fresh = [...hit].filter((id) => !known.has(id));
     this.append("stale", { key: decisionKey, reason, nodes: fresh });
     return fresh;
   }
 
+  staleMarks(): Entry[] {
+    return this.log.filter((e) => e.kind === "stale" && (e.data.kind || !this.setAside(e.id)));
+  }
+
   stale(): Set<string> {
-    return new Set(this.staleIds);
+    if (!this.asideRanges.length) return new Set(this.staleIds);
+    return new Set(this.staleMarks().flatMap((e) => (e.data.nodes as string[] | undefined) ?? []));
   }
 
   addEnvironment(lock: EnvLock, name: string): string {
@@ -341,12 +369,16 @@ export class AnalysisRecord {
   }
 
   replacedBy(id: string): string | undefined {
-    return this.replaced.get(id);
+    return this.replaced.get(id)?.findLast((r) => !this.setAside(r.entry))?.node;
   }
 
   latest(id: string): string {
     let at = id;
-    for (let i = 0; i < 1000 && this.replaced.has(at); i++) at = this.replaced.get(at)!;
+    for (let i = 0; i < 1000; i++) {
+      const next = this.replacedBy(at);
+      if (next === undefined) break;
+      at = next;
+    }
     return at;
   }
 

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { folderKey } from "./trust.ts";
+import { assertUserFileSound, folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
 
 export type PhiKind = "name" | "birth_date" | "mrn" | "ssn" | "phone" | "email" | "address" | "zip";
@@ -66,6 +66,13 @@ interface Rule {
 
 const looksLikeName = (v: string) => !v.split(/[\s,]+/).some((w) => NOT_NAMES.has(w.replace(/\.$/, "")));
 
+// The ZIP rule reads the full line for a date. Each hit on the same line uses the first answer, so a long line with many ZIP codes stays linear.
+let lastDate: { line: string; has: boolean } | undefined;
+function hasDate(line: string): boolean {
+  if (lastDate?.line !== line) lastDate = { line, has: DATE_RE.test(line) };
+  return lastDate.has;
+}
+
 const TEXT_RULES: Rule[] = [
   { kind: "ssn", re: /(?<![\d-])(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}(?![\d-])/g },
   { kind: "phone", re: /(?<![\d.\-/])(?:\+?1[\s.-])?(?:\([2-9]\d{2}\)\s?|[2-9]\d{2}[-.])\d{3}[-.]\d{4}(?![\d.\-/]?\d)/g },
@@ -78,7 +85,7 @@ const TEXT_RULES: Rule[] = [
   { kind: "name", re: new RegExp(`\\b(${FULL})\\s+(?:was\\s+|is\\s+)?(?:admitted|diagnosed|discharged|presented|presents|underwent|complained|complains)\\b`, "g"), check: looksLikeName },
   { kind: "address", re: new RegExp(`\\b\\d{1,6}\\s+(?:[NSEW]\\.?\\s+)?(?:[A-Z][a-z]+\\.?\\s+){1,3}(?:${STREET})\\b\\.?`, "g") },
   { kind: "address", re: new RegExp(`\\b[A-Z][a-z]+(?:\\s[A-Z][a-z]+)?,\\s*(?:${STATES})\\s+\\d{5}(?:-\\d{4})?\\b`, "g") },
-  { kind: "zip", re: /\b(?:ZIP|zip(?:\s*code)?|Zip(?:\s*code)?|postal code)\s*[:#=]?\s*(\d{5}(?:-\d{4})?)\b/g, check: (_v, line) => DATE_RE.test(line) },
+  { kind: "zip", re: /\b(?:ZIP|zip(?:\s*code)?|Zip(?:\s*code)?|postal code)\s*[:#=]?\s*(\d{5}(?:-\d{4})?)\b/g, check: (_v, line) => hasDate(line) },
 ];
 
 const STAFF = /\b(contact|author|authors|investigator|maintainer|corresponding|reporting|copyright|institution|affiliation|study person|submitter|creator|owner|support|help|mailing list|send email|questions|bugs?|feedback|licen[cs]e|developer|curator|publisher|editor)\b/i;
@@ -97,9 +104,11 @@ function staffLine(lines: string[], i: number): boolean {
 }
 
 // A long line is read in parts of 4000 characters. The parts overlap, and a match that starts in the overlap belongs to the next part.
+// Each part also reads a few characters before it, so that a "\b" or a look-behind at the start of the part sees the true text.
 const PART = 4000;
-const STEP = 3800;
-const SPAN_RULES = TEXT_RULES.map((r) => ({ ...r, re: new RegExp(r.re.source, `${r.re.flags}d`) }));
+const STEP = 3000;
+const LEAD = 16;
+const SPAN_RULES = TEXT_RULES.map((r) => ({ ...r, re: new RegExp(r.re.source, `${r.re.flags}d`), whole: new RegExp(r.re.source, `${r.re.flags.replace("g", "")}yd`) }));
 
 // Two hits that overlap, such as a street and a city with the same word, become one hit. Else the mask of one hit leaves a part of the other.
 export function scanText(text: string, where: string): PhiHit[] {
@@ -109,20 +118,33 @@ export function scanText(text: string, where: string): PhiHit[] {
     let staff: boolean | undefined;
     const spans: { kind: PhiKind; a: number; b: number }[] = [];
     for (let at = 0; at === 0 || at + PART - STEP < full.length; at += STEP) {
-      const line = full.length > PART ? full.slice(at, at + PART) : full;
+      const from = Math.max(0, at - LEAD);
+      const lead = at - from;
+      const line = full.length > PART ? full.slice(from, at + PART) : full;
       const last = at + PART >= full.length;
       if (!QUICK.test(line)) continue;
       for (const r of SPAN_RULES) {
         r.re.lastIndex = 0;
         for (const m of line.matchAll(r.re)) {
-          if (!last && (m.index >= STEP || m.index + m[0].length >= line.length)) continue;
-          let [a, b] = (m.indices![1] ?? m.indices![0])!;
-          while (a < b && /\s/.test(line[a]!)) a++;
-          while (b > a && /\s/.test(line[b - 1]!)) b--;
-          if (b > a && /[.,]/.test(line[b - 1]!)) b--;
-          if (r.check && !r.check(line.slice(a, b), line)) continue;
+          if (m.index < lead || (!last && m.index - lead >= STEP)) continue;
+          let hit: RegExpMatchArray | null = m;
+          let src = line;
+          let base = from;
+          // A match that reaches the end of a part can go on after it. The scan reads it again in the full line, from the same start.
+          if (!last && m.index + m[0].length >= line.length) {
+            r.whole.lastIndex = from + m.index;
+            hit = r.whole.exec(full);
+            if (!hit) continue;
+            src = full;
+            base = 0;
+          }
+          let [a, b] = (hit.indices![1] ?? hit.indices![0])!;
+          while (a < b && /\s/.test(src[a]!)) a++;
+          while (b > a && /\s/.test(src[b - 1]!)) b--;
+          if (b > a && /[.,]/.test(src[b - 1]!)) b--;
+          if (r.check && !r.check(src.slice(a, b), full)) continue;
           if (STAFF_KINDS.has(r.kind) && (staff ??= staffLine(lines, i))) continue;
-          spans.push({ kind: r.kind, a: at + a, b: at + b });
+          spans.push({ kind: r.kind, a: base + a, b: base + b });
         }
       }
     }
@@ -185,7 +207,7 @@ function valueFits(kind: PhiKind, column: string, v: string): boolean {
   }
 }
 
-export function scanTable(columns: string[], rows: unknown[][], where: string, firstLine?: number): PhiHit[] {
+export function scanTable(columns: string[], rows: unknown[][], where: string, lines?: number[]): PhiHit[] {
   const out: PhiHit[] = [];
   const cell = (r: unknown[], j: number) => (r[j] === null || r[j] === undefined ? "" : String(r[j]).trim());
   const hasDate = columns.some((_, j) => {
@@ -203,7 +225,7 @@ export function scanTable(columns: string[], rows: unknown[][], where: string, f
     for (const x of fit) {
       if (seen.has(x.v)) continue;
       seen.add(x.v);
-      out.push({ kind, value: x.v, where, column: String(col), ...(firstLine ? { line: firstLine + x.i } : { row: x.i + 1 }) });
+      out.push({ kind, value: x.v, where, column: String(col), ...(lines ? { line: lines[x.i] } : { row: x.i + 1 }) });
     }
   });
   return out;
@@ -232,7 +254,8 @@ function splitRow(line: string, d: string): string[] {
   return out.map((c) => c.replace(/^(\s*)"([^]*)"(\s*)$/, "$1$2$3"));
 }
 
-function delimited(text: string): { columns: string[]; rows: string[][]; first: number } | undefined {
+// A quoted cell can hold a line break. The row then goes on in the next line, until the quote closes.
+function delimited(text: string): { columns: string[]; rows: string[][]; lines: number[] } | undefined {
   const lines = text.split("\n").map((l) => l.replace(/\r$/, ""));
   const start = lines.findIndex((l) => l.trim() && !l.startsWith("#"));
   if (start < 0) return undefined;
@@ -241,13 +264,29 @@ function delimited(text: string): { columns: string[]; rows: string[][]; first: 
   if (!d) return undefined;
   const columns = splitRow(head, d).map((c) => c.trim().replace(/^"|"$/g, ""));
   const rows: string[][] = [];
-  for (const l of lines.slice(start + 1)) {
-    const r = splitRow(l, d);
+  const at: number[] = [];
+  const quotes = (l: string) => l.split('"').length - 1;
+  for (let i = start + 1; i < lines.length; i++) {
+    const first = i;
+    let l = lines[i]!;
+    let open = quotes(l) % 2 === 1;
+    while (open && i + 1 < lines.length) {
+      l += `\n${lines[++i]}`;
+      open = (quotes(lines[i]!) % 2 === 1) !== open;
+    }
+    let r = splitRow(l, d);
+    // A quote that does not start a cell, such as 5" for inches, does not join lines.
+    if (i > first && (open || Math.abs(r.length - columns.length) > 1)) {
+      i = first;
+      l = lines[i]!;
+      r = splitRow(l, d);
+    }
     if (!l.trim() || Math.abs(r.length - columns.length) > 1) break;
     rows.push(r);
+    at.push(first + 1);
   }
   if (!rows.length) return undefined;
-  return { columns, rows, first: start + 2 };
+  return { columns, rows, lines: at };
 }
 
 function tablesIn(v: unknown, out: { columns: string[]; rows: unknown[][] }[] = [], depth = 0): typeof out {
@@ -281,7 +320,7 @@ export function scanContent(text: string, where: string): PhiHit[] {
     } catch {}
   }
   const tb = delimited(text);
-  if (tb) hits.push(...scanTable(tb.columns, tb.rows, where, tb.first));
+  if (tb) hits.push(...scanTable(tb.columns, tb.rows, where, tb.lines));
   return dedupe(hits);
 }
 
@@ -350,14 +389,16 @@ export function groupHits(hits: PhiHit[]): PhiShown[] {
   const groups = new Map<string, PhiHit[]>();
   for (const h of hits) {
     const k = `${h.kind}\0${h.where}\0${h.column ?? ""}`;
-    groups.set(k, [...(groups.get(k) ?? []), h]);
+    const g = groups.get(k);
+    if (g) g.push(h);
+    else groups.set(k, [h]);
   }
   return [...groups.values()].map((g) => {
     const first = g[0]!;
     const masked = g.slice(0, 2).map((h) => maskShown(h.value)).join(", ") + (g.length > 2 ? ` and ${g.length - 2} more` : "");
     const at = (h: PhiHit) => h.line ?? h.row ?? 0;
-    const lo = Math.min(...g.map(at));
-    const hi = Math.max(...g.map(at));
+    const lo = g.reduce((m, h) => Math.min(m, at(h)), Infinity);
+    const hi = g.reduce((m, h) => Math.max(m, at(h)), -Infinity);
     const unit = first.line ? "line" : "row";
     const span = !lo ? "" : lo === hi ? `${unit} ${lo}` : `${unit}s ${lo} to ${hi}`;
     return { kind: first.kind, label: KIND_LABEL[first.kind], masked, where: [first.where, first.column ? `column ${first.column}` : "", span].filter(Boolean).join(", ") };
@@ -372,6 +413,8 @@ function bounded(k: string): string {
   return `${head ? `(?<![${head}])` : ""}${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${tail ? `(?![${tail}])` : ""}`;
 }
 
+const MASK_CHUNK = 1000;
+
 export class Masker {
   map = new Map<string, string>();
   private counts = new Map<PhiKind, number>();
@@ -385,17 +428,47 @@ export class Masker {
     }
   }
 
+  private built?: { size: number; all: Map<string, string>; res: RegExp[] };
+
   // A value can also be in JSON text, where a quote, a backslash or a line break has an escape.
-  text(s: string): string {
-    if (!this.map.size) return s;
+  // One regular expression holds at most 1000 values, because a very large one does not compile.
+  private matcher(): { all: Map<string, string>; res: RegExp[] } {
+    if (this.built?.size === this.map.size) return this.built;
     const all = new Map(this.map);
     for (const [k, v] of this.map) {
       const e = JSON.stringify(k).slice(1, -1);
       if (!all.has(e)) all.set(e, v);
     }
     const keys = [...all.keys()].sort((a, b) => b.length - a.length);
-    const re = new RegExp(keys.map(bounded).join("|"), "g");
-    return s.replace(re, (m) => all.get(m) ?? m);
+    const res: RegExp[] = [];
+    for (let i = 0; i < keys.length; i += MASK_CHUNK) res.push(new RegExp(keys.slice(i, i + MASK_CHUNK).map(bounded).join("|"), "g"));
+    this.built = { size: this.map.size, all, res };
+    return this.built;
+  }
+
+  // With more than one regular expression, the first match from the left wins, and the longer one if two start at the same place.
+  text(s: string): string {
+    if (!this.map.size) return s;
+    const { all, res } = this.matcher();
+    if (res.length === 1) return s.replace(res[0]!, (m) => all.get(m) ?? m);
+    const next: (RegExpExecArray | null | undefined)[] = res.map(() => undefined);
+    let out = "";
+    let at = 0;
+    for (;;) {
+      let best: RegExpExecArray | undefined;
+      res.forEach((re, k) => {
+        if (next[k] === undefined || (next[k] && next[k]!.index < at)) {
+          re.lastIndex = at;
+          next[k] = re.exec(s);
+        }
+        const m = next[k];
+        if (m && (!best || m.index < best.index || (m.index === best.index && m[0].length > best[0].length))) best = m;
+      });
+      if (!best) break;
+      out += s.slice(at, best.index) + (all.get(best[0]) ?? best[0]);
+      at = best.index + Math.max(1, best[0].length);
+    }
+    return out + s.slice(at);
   }
 
   private marked(path: string): boolean {
@@ -470,6 +543,7 @@ export function folderHasNoPatientData(folder: string): boolean {
 
 export function setFolderNoPatientData(folder: string, on: boolean): void {
   const k = folderKey(folder);
+  assertUserFileSound();
   const data = readUser();
   const list = noPatientDataFolders().filter((x) => x !== k);
   if (on) list.push(k);

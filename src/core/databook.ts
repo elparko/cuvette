@@ -13,7 +13,7 @@ import { stepNumbers } from "./housekeeping.ts";
 import { inProject, outputRoot, placeAt, readIndex } from "./places.ts";
 import { pilotRows, validationRows } from "./pilot.ts";
 import { checkSheets } from "./results.ts";
-import { AnalysisRecord } from "./record.ts";
+import { AnalysisRecord, ownerOf } from "./record.ts";
 import { find, resolve as resolveSetting, type Paper } from "./settings.ts";
 export { localePaper, type Paper } from "./settings.ts";
 import { dataUri, esc, fillTemplate, findChrome, findPandoc, renderMarkdown, show } from "./trail.ts";
@@ -196,7 +196,7 @@ function firstQuestion(r: AnalysisRecord): string {
 }
 
 export function sessionTitle(r: AnalysisRecord): string {
-  return clip(firstQuestion(r) || `Session ${r.entries()[0]?.session ?? ""}`, 90);
+  return clip(firstQuestion(r) || `Session ${ownerOf(r.entries())}`, 90);
 }
 
 function confirmedPlan(r: AnalysisRecord) {
@@ -736,7 +736,7 @@ export function buildDatabook(input: BookInput): Book {
   for (const p of parts) {
     if (!single) {
       w.add(`<section class="session">`);
-      w.head(1, `Session ${p.record.entries()[0]?.session ?? p.k}: ${sessionTitle(p.record)}`);
+      w.head(1, `Session ${ownerOf(p.record.entries()) || p.k}: ${sessionTitle(p.record)}`);
     }
     sectionQuestion(w, p, L);
     sectionData(w, p, L);
@@ -756,7 +756,7 @@ export function buildDatabook(input: BookInput): Book {
   w.startAppendix();
   w.head(1, "Steps and arguments");
   for (const p of parts) {
-    if (!single) w.head(2, `Session ${p.record.entries()[0]?.session}`);
+    if (!single) w.head(2, `Session ${ownerOf(p.record.entries())}`);
     appendixSteps(w, p, single ? 1 : 2);
   }
   w.head(1, "Software environment");
@@ -765,12 +765,12 @@ export function buildDatabook(input: BookInput): Book {
     ["Session", "Adapters and programs", "Model", "Referee model"],
     parts.map((p) => {
       const f = sessionFacts(p.record);
-      return [p.record.entries()[0]?.session ?? "", f.adapters, f.model, f.referee];
+      return [ownerOf(p.record.entries()), f.adapters, f.model, f.referee];
     }),
   );
   for (const p of parts) {
     for (const e of envsUsed(p.record).filter((x) => x.kind !== "program")) {
-      const where = `${single ? "" : `Session ${p.record.entries()[0]?.session ?? p.k}, `}environment ${e.name}`;
+      const where = `${single ? "" : `Session ${ownerOf(p.record.entries()) || p.k}, `}environment ${e.name}`;
       w.table(`Package versions: ${where} (${e.language}, ${e.path}). Lock hash ${e.hash}.`, ["Package", "Version"], e.packages.map((x) => [x.name, x.version]));
     }
   }
@@ -781,7 +781,7 @@ export function buildDatabook(input: BookInput): Book {
     ["Session", "Record file", "SHA-256", "Entries", "First and last entry"],
     parts.map((p) => {
       const e = p.record.entries();
-      return [esc(e[0]?.session ?? ""), esc(p.record.logPath), `<code class="hash">${esc(sha256File(p.record.logPath) ?? "")}</code>`, String(e.length), esc(`${time(e[0]?.ts)} to ${time(e.at(-1)?.ts)}`)];
+      return [esc(ownerOf(e)), esc(p.record.logPath), `<code class="hash">${esc(sha256File(p.record.logPath) ?? "")}</code>`, String(e.length), esc(`${time(e[0]?.ts)} to ${time(e.at(-1)?.ts)}`)];
     }),
     "",
     true,
@@ -791,7 +791,7 @@ export function buildDatabook(input: BookInput): Book {
     w.head(1, "Earlier versions of the analysis");
     for (const { p, e } of earlier) {
       const what = (e.kind as string) === "plan_approved" ? "confirmed" : "proposed";
-      w.add(`<h4>${single ? "" : `Session ${esc(p.record.entries()[0]?.session ?? "")}, `}version ${esc(str(e.data.version))}, ${what} on ${esc(time(e.ts))}</h4><div class="plan">${esc(str(e.data.full ?? e.data.text))}</div>`);
+      w.add(`<h4>${single ? "" : `Session ${esc(ownerOf(p.record.entries()))}, `}version ${esc(str(e.data.version))}, ${what} on ${esc(time(e.ts))}</h4><div class="plan">${esc(str(e.data.full ?? e.data.text))}</div>`);
     }
   }
   w.add(`</section>`);
@@ -825,6 +825,8 @@ ${w.out.join("\n")}
 // ---------------------------------------------------------------- finding the sessions
 
 function sessionIdOf(dir: string): string {
+  const place = placeAt(dir);
+  if (place) return place.id;
   try {
     const first = readFileSync(join(dir, "log.jsonl"), "utf8").split("\n", 1)[0]!;
     return String(JSON.parse(first).session ?? basename(dir));

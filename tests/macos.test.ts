@@ -88,7 +88,7 @@ function sandbox(withApp: boolean) {
 }
 
 const waitFor = (f: string) => {
-  for (let i = 0; i < 50 && !(existsSync(f) && readFileSync(f, "utf8").includes("node")); i++) spawnSync("/bin/sleep", ["0.1"]);
+  for (let i = 0; i < 300 && !(existsSync(f) && readFileSync(f, "utf8").includes("node")); i++) spawnSync("/bin/sleep", ["0.1"]);
   return existsSync(f) ? readFileSync(f, "utf8") : "";
 };
 

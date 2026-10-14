@@ -409,7 +409,7 @@ export function sheetHtml(q: Question): string {
   const rows = t.rows.slice(0, SHEET_ROWS).map((r, i) => `<tr><td>${i + 1}</td>${t.columns.map((c, j) => `<td><input type="text" name="cell:${i}:${j}" value="${esc(r[j] ?? "")}" aria-label="${esc(`${c}, row ${i + 1}`)}"></td>`).join("")}</tr>`).join("");
   return `<p>${esc(q.text)}</p><div class="sheetwrap"><table class="sheet"><thead>${head}</thead><tbody>${rows}</tbody></table></div>${more}
 <div class="row">${btn("Save the sheet and continue", `data-act="sheet" data-qid="${esc(q.qid)}"`, "primary")}${btn("Read samples.csv again", `data-act="answer" data-qid="${esc(q.qid)}" data-value="1"`)}</div>
-<p class="dim small">Change a cell in the table, then save. unit is the unit of replication (one n). batch is the slide, plate, day or run.</p>`;
+<p class="dim small">Change a cell in the table, then save. The unit column is the unit of replication (one n). The batch column is the slide, plate, day or run.</p>`;
 }
 
 const MODE_LABEL: Record<Mode, string> = { watch: "Watch: the agent runs the steps", follow: "Follow: you run the steps", teach: "Teach: you work, the agent checks", plan: "Plan: the agent plans only" };

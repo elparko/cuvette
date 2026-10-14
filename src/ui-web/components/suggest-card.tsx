@@ -96,7 +96,7 @@ export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending;
           <ul className="rounded-lg border p-1">
             {rest.slice(0, 5).map((m) => (
               <li key={m.adapter}>
-                <button type="button" disabled={busy} onClick={() => open(pending.folder, m.adapter)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+                <button type="button" disabled={busy} onClick={() => open(pending.folder, m.adapter)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                   <span className="min-w-0 truncate">{m.program}</span>
                   <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{m.reason}</span>
                 </button>

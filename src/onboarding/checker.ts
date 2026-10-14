@@ -228,41 +228,60 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
 }
 
 export function pythonSignature(source: string, fn: string): { names: string[]; required: string[]; kwargs: boolean } | undefined {
+  if (!/^[A-Za-z_]\w*$/.test(fn)) return undefined;
   const start = new RegExp(`^def\\s+${fn}\\s*\\(`, "m").exec(source);
   if (!start) return undefined;
-  const parts: string[] = [];
+  const parts: { text: string; optional: boolean }[] = [];
   let cur = "";
+  let optional = false;
   let depth = 0;
+  let lambdas = 0;
   let quote = "";
   for (let i = start.index + start[0].length; i < source.length; i++) {
     const ch = source[i];
     if (quote) {
       if (ch === "\\") cur += source[i++];
-      else if (ch === quote) quote = "";
+      else if (source.startsWith(quote, i)) {
+        cur += quote.slice(1);
+        i += quote.length - 1;
+        quote = "";
+      }
     } else if (ch === "#") {
       while (i + 1 < source.length && source[i + 1] !== "\n") i++;
       continue;
-    } else if (ch === '"' || ch === "'") quote = ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = source.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch;
+      cur += quote.slice(1);
+      i += quote.length - 1;
+    }
     else if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch)) {
       if (depth === 0) break;
       depth--;
-    } else if (ch === "," && depth === 0) {
-      parts.push(cur);
-      cur = "";
-      continue;
+    } else if (depth === 0) {
+      if (ch === "=") optional = true;
+      else if (optional && ch === ":" && lambdas) lambdas--;
+      else if (optional && /^lambda\b/.test(source.slice(i, i + 7)) && !/\w/.test(source[i - 1] ?? "")) lambdas++;
+      else if (ch === "," && !lambdas) {
+        parts.push({ text: cur, optional });
+        cur = "";
+        optional = false;
+        continue;
+      }
     }
     cur += ch;
   }
-  parts.push(cur);
+  parts.push({ text: cur, optional });
   const out = { names: [] as string[], required: [] as string[], kwargs: false };
-  for (const raw of parts.map((x) => x.trim()).filter(Boolean)) {
+  for (const part of parts) {
+    const raw = part.text.trim();
+    if (!raw) continue;
     if (raw.startsWith("**")) out.kwargs = true;
     if (raw.startsWith("*") || raw === "/") continue;
     const name = /^([A-Za-z_]\w*)/.exec(raw)?.[1];
     if (!name || name === "self") continue;
     out.names.push(name);
-    if (!/=/.test(raw.replace(/:[^=]*/, ""))) out.required.push(name);
+    if (!part.optional) out.required.push(name);
   }
   return out;
 }
@@ -276,6 +295,7 @@ const PARAM_READS: Record<string, RegExp[]> = {
 export function scriptReads(source: string, file: string): Set<string> {
   const lang = /\.[Rr]$/.test(file) ? "r" : /\.py$/.test(file) ? "py" : /\.m?js$/.test(file) ? "js" : "";
   const out = new Set<string>();
+  if (lang === "js" && /\b(?:const|let|var)\s+p\s*=\s*[\w$]+(?:\??\.[\w$]+)*\??\.(?!(?:params|args|arguments|input|p)\b)[\w$]+\s*(?:;|$)/m.test(source)) return out;
   for (const re of PARAM_READS[lang] ?? []) for (const m of source.matchAll(re)) out.add(m[1]);
   for (const m of source.matchAll(/\b(?:p\$|p\.|p\[\[?["'])([A-Za-z_]\w*)["']?\]?\]?\s*(?:<-|=(?!=))/g)) out.delete(m[1]);
   return out;

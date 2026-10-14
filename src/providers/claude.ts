@@ -6,7 +6,7 @@ import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { RETRIES, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
+import { RETRIES, noRetry, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
@@ -31,14 +31,15 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
   if (e instanceof Anthropic.RateLimitError) {
     const wait = retryAfterMs(e);
-    return new ProviderError(`The Claude API refused the request because of a rate limit (HTTP 429).${wait ? ` It asks for a wait of ${Math.ceil(wait / 1000)} s.` : ""}`, true);
+    return new ProviderError(`The Claude API refused the request because of a rate limit (HTTP 429).${wait ? ` It asks for a wait of ${Math.ceil(wait / 1000)} s.` : ""}`, !noRetry(e));
   }
   if (e instanceof Anthropic.APIError && e.status === 413) return new ProviderError(`The request is too large for the Claude API: ${e.message}`, false, true);
   if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`, false, CONTEXT_OVERFLOW.test(e.message));
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
-    return new ProviderError(`The Claude API had a server error (${e.status}).`, true);
+    return new ProviderError(`The Claude API had a server error (${e.status}).`, !noRetry(e));
+  if ((e as any)?.partial === true) return new ProviderError("The Claude API stopped the reply before the end.", true);
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
@@ -198,7 +199,12 @@ export class ClaudeProvider implements Provider {
       live = stream;
       stream.on("text", (d: string) => req.onDelta?.({ type: "text", text: d }));
       stream.on("thinking", (d: string) => req.onDelta?.({ type: "thinking", text: d }));
-      return stream.finalMessage();
+      try {
+        return await stream.finalMessage();
+      } catch (e) {
+        if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError) && /^(stream|request) ended without/.test(e.message)) throw Object.assign(new Error(e.message), { partial: true });
+        throw e;
+      }
     };
     let msg: any;
     try {

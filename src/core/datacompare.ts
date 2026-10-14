@@ -102,7 +102,7 @@ function byKey(cols: ColumnSummary[]): Map<string, { c: ColumnSummary; i: number
     const k = same(c.name);
     const n = (seen.get(k) ?? 0) + 1;
     seen.set(k, n);
-    out.set(n === 1 ? k : `${k} #${n}`, { c, i });
+    out.set(n === 1 ? k : `${k}\u0000${n}`, { c, i });
   });
   return out;
 }
@@ -114,7 +114,7 @@ export function compareChecks(before: DataSummary, after: DataSummary): DataDiff
   const lost = [...old].filter(([k]) => !now.has(k));
   const gained = [...now].filter(([k]) => !old.has(k));
 
-  const pairs: { a: ColumnSummary; b: ColumnSummary }[] = [...old].flatMap(([k, { c }]) => (now.has(k) ? [{ a: c, b: now.get(k)!.c }] : []));
+  const pairs: { a: ColumnSummary; b: ColumnSummary; k: string }[] = [...old].flatMap(([k, { c }]) => (now.has(k) ? [{ a: c, b: now.get(k)!.c, k }] : []));
   const lostLeft = new Set(lost.map(([k]) => k));
   const gainedLeft = new Set(gained.map(([k]) => k));
   for (const [k, { c, i }] of lost) {
@@ -130,9 +130,8 @@ export function compareChecks(before: DataSummary, after: DataSummary): DataDiff
   const order = (m: Map<string, unknown>, other: Map<string, unknown>) => [...m.keys()].filter((k) => other.has(k)).join("\u0001");
   if (pairs.length > 1 && order(old, now) !== order(now, old)) out.push({ id: "order", kind: "order", text: `The columns are in a different order. Before: ${list(before.columns.map((c) => c.name))}. Now: ${list(after.columns.map((c) => c.name))}. A step that uses the position of a column can read the wrong column.` });
 
-  for (const { a, b } of pairs) {
+  for (const { a, b, k: key } of pairs) {
     const col = b.name;
-    const key = same(col);
     if (a.type !== b.type) {
       out.push({ id: `type:${key}`, kind: "type", column: col, text: `Column ${quote(col)} has ${b.type === "number" ? "numbers" : "text"} now. Before, it had ${a.type === "number" ? "numbers" : "text"}.` });
       continue;

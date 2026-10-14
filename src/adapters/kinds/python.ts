@@ -54,6 +54,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let spawnedWith = "";
   let closed = false;
   let warming: { error?: unknown } | undefined;
+  let preloading: Promise<unknown> | undefined;
 
   const interpreter = (): string[] => {
     const given = conn.interpreter.map((a) => expand(a, c.ph));
@@ -65,6 +66,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     waiting.clear();
     child = undefined;
     ready = undefined;
+    preloading = undefined;
   };
 
   const spawnWorker = (): Promise<void> => {
@@ -87,11 +89,14 @@ export function startPython(c: KindContext): AdapterRuntime {
     p.stdin?.on("error", () => {});
     return new Promise((ok, fail) => {
       let started = false;
+      let startTimer: NodeJS.Timeout | undefined;
       p.on("error", (e) => {
+        clearTimeout(startTimer);
         if (child === p) stopped(e.message);
         if (!started) fail(new Error(`cannot start ${argv[0]}: ${e.message}`));
       });
       p.on("close", (code, sig) => {
+        clearTimeout(startTimer);
         if (child !== p) return;
         const reason = `${sig ? `signal ${sig}` : `exit code ${code}`}${stderrTail.trim() ? `: ${tail(stderrTail.trim(), 600)}` : ""}`;
         stopped(reason);
@@ -107,13 +112,14 @@ export function startPython(c: KindContext): AdapterRuntime {
         if (!msg || typeof msg !== "object") return;
         if (msg.ready) {
           started = true;
+          clearTimeout(startTimer);
           ok();
         } else if (msg.id !== undefined) {
           waiting.get(msg.id)?.(msg);
           waiting.delete(msg.id);
         }
       });
-      setTimeout(() => {
+      startTimer = setTimeout(() => {
         if (!started) {
           killTree(p.pid);
           fail(new Error(`the Python worker did not start within ${conn.startup_timeout_s} s`));
@@ -160,6 +166,11 @@ export function startPython(c: KindContext): AdapterRuntime {
     started.catch((e) => {
       if (!closed) w.error = e;
     });
+    const settled = started.then(() => undefined, () => undefined);
+    preloading = settled;
+    settled.then(() => {
+      if (preloading === settled) preloading = undefined;
+    });
   };
 
   const send = (msg: Record<string, unknown>): Promise<Reply> => {
@@ -171,18 +182,38 @@ export function startPython(c: KindContext): AdapterRuntime {
 
   const request = (fn: string, args: Args, outDir: string, signal: AbortSignal): Promise<Reply> => {
     const cut = { ok: false, error: "interrupted: the scientist stopped this call before it started" };
-    const stopped = new Promise<void>((r) => (signal.aborted ? r() : signal.addEventListener("abort", () => r(), { once: true })));
+    const late = { ok: false, error: `the call timed out after ${conn.call_timeout_s} s` };
+    const cancelled = new Promise<void>((r) => (signal.aborted ? r() : signal.addEventListener("abort", () => r(), { once: true })));
+    // A worker that timed out leaves at once. The next call then starts a new worker and does not write to the worker that stops.
+    const drop = (reason: string) => {
+      const p = child;
+      stopped(reason);
+      killTree(p?.pid);
+    };
     const run = async (): Promise<Reply> => {
       if (signal.aborted) return cut;
       const started = ensure();
       started.catch(() => {});
-      await Promise.race([started, stopped]);
+      await Promise.race([started, cancelled]);
       if (signal.aborted) return cut;
+      // The call waits for the import of the adapter modules. The import has the start time limit, and the call time limit starts after it.
+      if (preloading) {
+        let over = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const limit = new Promise<void>((r) => (timer = setTimeout(() => ((over = true), r()), conn.startup_timeout_s * 1000)));
+        await Promise.race([preloading, cancelled, limit]);
+        clearTimeout(timer);
+        if (signal.aborted) return cut;
+        if (over) {
+          drop("the import of the adapter modules did not end");
+          return { ok: false, error: `the import of the adapter modules did not end within ${conn.startup_timeout_s} s` };
+        }
+      }
       const id = nextId;
       const reply = send({ function: fn, args, out_dir: outDir });
       const timeout = setTimeout(() => {
-        waiting.get(id)?.({ id, ok: false, error: `the call timed out after ${conn.call_timeout_s} s` });
-        killTree(child?.pid);
+        waiting.get(id)?.({ id, ...late });
+        drop("the call timed out");
       }, conn.call_timeout_s * 1000);
       const abort = () => {
         if (process.platform === "win32") return killTree(child?.pid);
@@ -201,7 +232,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     };
     // A stopped call leaves the queue at once. The next call still waits for the call before it.
     const before = queue;
-    const next = Promise.race([before, stopped]).then(run);
+    const next = Promise.race([before, cancelled]).then(run);
     queue = Promise.all([before, next]).then(() => undefined, () => undefined);
     return next;
   };

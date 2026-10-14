@@ -12,16 +12,30 @@ export interface Page {
   go(url: string): Promise<void>;
   shot(): Promise<Buffer>;
   media(features: { name: string; value: string }[], type?: "print" | ""): Promise<void>;
+  press(key: string, shift?: boolean): Promise<void>;
+  cdp<T = any>(method: string, params?: object): Promise<T>;
   close(): Promise<void>;
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function openChrome(): Promise<Page> {
+const KEYS: Record<string, { code: string; vk: number }> = {
+  Tab: { code: "Tab", vk: 9 },
+  Escape: { code: "Escape", vk: 27 },
+  Enter: { code: "Enter", vk: 13 },
+  ArrowDown: { code: "ArrowDown", vk: 40 },
+  ArrowUp: { code: "ArrowUp", vk: 38 },
+  ArrowLeft: { code: "ArrowLeft", vk: 37 },
+  ArrowRight: { code: "ArrowRight", vk: 39 },
+  Home: { code: "Home", vk: 36 },
+  End: { code: "End", vk: 35 },
+};
+
+export async function openChrome(extraArgs: string[] = []): Promise<Page> {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-chrome-"));
-  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
+  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "--hide-scrollbars", ...extraArgs, "about:blank"], { stdio: "ignore" });
   let port = "";
-  for (let i = 0; i < 100 && !port; i++) {
+  for (let i = 0; i < 600 && !port; i++) {
     await wait(100);
     const f = join(dir, "DevToolsActivePort");
     if (existsSync(f)) port = readFileSync(f, "utf8").split("\n")[0]!;
@@ -69,6 +83,13 @@ export async function openChrome(): Promise<Page> {
     async media(features, type = "") {
       await send("Emulation.setEmulatedMedia", { media: type, features: [{ name: "prefers-color-scheme", value: "light" }, ...features] });
     },
+    async press(key, shift = false) {
+      const k = KEYS[key]!;
+      const base = { key, code: k.code, windowsVirtualKeyCode: k.vk, modifiers: shift ? 8 : 0 };
+      await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...base });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", ...base });
+    },
+    cdp: send,
     async shot() {
       const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
       return Buffer.from(r.data, "base64");

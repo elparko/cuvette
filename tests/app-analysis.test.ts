@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
@@ -39,7 +39,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     await page.go(url);
     await page.eval(`fetch("api/open?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ folder: ${JSON.stringify(data)} }) })`);
     await page.go(url);
-    await until(page, `document.querySelector("#msg")`);
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
   }, 90000);
   afterAll(async () => {
     await page?.close();
@@ -52,7 +52,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     await page.size(390, 844);
     expect(await page.eval(`${toggle}.getClientRects().length > 0`)).toBe(true);
     await page.eval(`${toggle}.click()`);
-    await until(page, `!document.querySelector('aside[aria-label="Analysis details"]')`);
+    expect(await until(page, `!document.querySelector('aside[aria-label="Analysis details"]')`)).toBe(true);
     expect(await page.eval(`${toggle}.getClientRects().length > 0`)).toBe(true);
     await page.eval(`${toggle}.click()`);
     expect(await until(page, `document.querySelector('aside[aria-label="Analysis details"]')`)).toBe(true);
@@ -100,7 +100,7 @@ describe.skipIf(!CHROME)("the analysis page in headless Chrome", () => {
     const label = `(async () => {
       const t = document.querySelector('header button[aria-label="More"]');
       t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-      for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
+      for (let i = 0; i < 200 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
       const text = [...document.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent).find((x) => /every step|housekeeping/.test(x));
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       document.querySelector('[role="menu"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

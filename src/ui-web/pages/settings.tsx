@@ -105,7 +105,7 @@ function PathDialog({ start, onDone }: { start: string; onDone: (p: string) => v
             </li>
           ))}
         </ul>
-        {msg && <p className="text-sm text-bad">{msg}</p>}
+        {msg && <p className="text-sm text-bad" role="alert">{msg}</p>}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onDone("")}>
             Cancel
@@ -209,7 +209,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
               tabIndex={tabStop(c.value)}
               disabled={dis}
               onClick={() => ask(c.value)}
-              className={cn("h-7 rounded-md px-3 text-[13px] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40", c.value === shown && "bg-card font-medium text-foreground shadow-sm")}
+              className={cn("h-7 rounded-md px-3 text-[13px] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring", c.value === shown && "bg-card font-medium text-foreground shadow-sm")}
             >
               {c.label}
             </button>
@@ -230,7 +230,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
                 tabIndex={tabStop(c.value)}
                 disabled={dis}
                 onClick={() => ask(c.value)}
-                className={cn("flex items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors outline-none last:border-b-0 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", c.value === shown && "bg-muted")}
+                className={cn("flex items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors outline-none last:border-b-0 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", c.value === shown && "bg-muted")}
               >
                 <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", c.value === shown && "border-accent-brand")}>{c.value === shown && <span className="size-2 rounded-full bg-accent-brand" />}</span>
                 <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
@@ -483,7 +483,7 @@ export function SettingsPanel({ ctx }: { ctx: AppCtx }) {
     if (v) setTimeout(() => setSavedMap((m) => (m[name] === v ? { ...m, [name]: undefined } : m)), 8000);
   }, []);
 
-  if (err) return <p className="text-sm text-bad">{err}</p>;
+  if (err) return <p className="text-sm text-bad" role="alert">{err}</p>;
   if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const current = data.sections.includes(sec) ? sec : data.sections[0]!;
@@ -510,7 +510,7 @@ export function SettingsPanel({ ctx }: { ctx: AppCtx }) {
                 setSec(s);
                 setQ("");
               }}
-              className={cn("flex h-8 items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-40", !words.length && s === current && "bg-card font-medium text-foreground shadow-card")}
+              className={cn("flex h-8 items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring disabled:opacity-40", !words.length && s === current && "bg-card font-medium text-foreground shadow-card")}
             >
               <span>{s}</span>
               {words.length > 0 && <span className="text-xs tabular-nums">{count(s)}</span>}
@@ -522,7 +522,7 @@ export function SettingsPanel({ ctx }: { ctx: AppCtx }) {
         {shownSecs.map((s) => (
           <Card key={s} className="mb-4">
             <CardContent className="py-2">
-              <h3 className="pt-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">{s}</h3>
+              <h2 className="pt-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">{s}</h2>
               {data.rows
                 .filter((r) => r.group === s && match(r))
                 .map((r) => (

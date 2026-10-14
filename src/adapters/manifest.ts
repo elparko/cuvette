@@ -295,8 +295,12 @@ export interface LoadedAdapter {
 function frontmatter(text: string): Record<string, string> {
   const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!m) return {};
-  const out = parseYaml(m[1]);
-  return typeof out === "object" && out ? out : {};
+  try {
+    const out = parseYaml(m[1]);
+    return typeof out === "object" && out ? out : {};
+  } catch {
+    return {};
+  }
 }
 
 const FROM_BUNDLE = !/\.tsx?$/.test(import.meta.url);
@@ -357,7 +361,7 @@ export function loadAdapter(path: string): LoadedAdapter {
         .map((f) => {
           const p = join(dir, f);
           const fm = frontmatter(readFileSync(p, "utf8"));
-          return { name: fm.name ?? f.replace(/\.md$/, ""), description: fm.description ?? "", path: p };
+          return { name: typeof fm.name === "string" ? fm.name : f.replace(/\.md$/, ""), description: typeof fm.description === "string" ? fm.description : "", path: p };
         });
     },
     mapEntry(tool, args = {}) {
@@ -403,7 +407,7 @@ export function cuvetteHome(): string {
 export const CATALOG_DIR = join(ROOT, "catalog");
 
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
-  const found: Record<string, string> = {};
+  const found: Record<string, string> = Object.create(null);
   for (const base of [...(folderTrusted(cwd) ? projectAdapterDirs(cwd) : []), join(cuvetteHome(), "adapters"), CATALOG_DIR]) {
     if (!existsSync(base)) continue;
     for (const d of readdirSync(base)) {

@@ -9,16 +9,18 @@ const PAGE = String.raw`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cuvette</title>
 <style>
-:root { --bg:#f7f7f5; --panel:#fff; --ink:#1c1c1e; --dim:#6b6b70; --line:#d8d8d4; --accent:#2f6fdb; --ok:#1f8a4c; --bad:#c0392b; }
+:root { --bg:#f7f7f5; --panel:#fff; --ink:#1c1c1e; --dim:#6b6b70; --line:#d8d8d4; --edge:#7d7d86; --accent:#2f6fdb; --ok:#1f8a4c; --bad:#c0392b; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#141416; --panel:#1d1d20; --ink:#ececee; --dim:#9a9aa2; --line:#36363b; --accent:#6ea2ff; --ok:#5fd28a; --bad:#ff7a6b; }
+  :root { --bg:#141416; --panel:#1d1d20; --ink:#ececee; --dim:#9a9aa2; --line:#36363b; --edge:#7a7a84; --accent:#6ea2ff; --ok:#5fd28a; --bad:#ff7a6b; }
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
 body { display: flex; flex-direction: column; }
 #status { padding: 6px 12px; border-bottom: 1px solid var(--line); color: var(--dim); font-size: 13px; display: flex; gap: 8px; align-items: center; }
-#status select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+#status select { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--edge); border-radius: 4px; }
+main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #log { flex: 1; overflow-y: auto; padding: 8px 12px; }
+::placeholder { color: var(--dim); opacity: 1; }
 .m { margin: 0 0 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .m.user { color: var(--accent); }
 .m.step { color: var(--dim); margin-bottom: 2px; }
@@ -33,17 +35,19 @@ body { display: flex; flex-direction: column; }
 .rec { color: var(--ok); font-size: 12px; }
 button { font: inherit; padding: 6px 12px; margin: 4px 6px 0 0; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; min-height: 36px; }
 button.primary { border-color: var(--accent); }
-input[type=text] { font: inherit; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); flex: 1; min-width: 0; }
+input[type=text] { font: inherit; padding: 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--bg); color: var(--ink); flex: 1; min-width: 0; }
 form { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); }
 form button { margin: 0; }
 .card input[type=text] { width: 100%; margin-top: 6px; }
 </style>
 </head>
 <body>
-<div id="status"><span id="state">Connecting</span><select id="mode"><option>watch</option><option>follow</option><option>teach</option><option>plan</option></select></div>
-<div id="log"></div>
-<div id="cards"></div>
-<form id="f"><input type="text" id="in" placeholder="Ask the agent" autocomplete="off"><button class="primary">Send</button><button type="button" id="stop">Stop</button></form>
+<div id="status"><span id="state" role="status">Connecting</span><select id="mode" aria-label="Mode"><option>watch</option><option>follow</option><option>teach</option><option>plan</option></select></div>
+<main>
+<div id="log" role="log" aria-label="Messages"></div>
+<div id="cards" role="region" aria-label="Questions for you" aria-live="polite"></div>
+</main>
+<form id="f"><input type="text" id="in" aria-label="Ask the agent" placeholder="Ask the agent" autocomplete="off"><button class="primary">Send</button><button type="button" id="stop">Stop</button></form>
 <script>
 const T = __TOKEN__;
 let since = 0, sig = "";
@@ -99,11 +103,11 @@ async function poll() {
     const log = $("log"), stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
     for (const e of f.entries) addEntry(e);
     since = f.next;
-    $("state").textContent = f.busy ? "Working" : "Ready";
+    { const st = f.busy ? "Working" : "Ready"; if ($("state").textContent !== st) $("state").textContent = st; }
     if (document.activeElement !== $("mode")) $("mode").value = f.mode;
     drawCards(f);
     if (stick) log.scrollTop = log.scrollHeight;
-  } catch { $("state").textContent = "Disconnected"; }
+  } catch { if ($("state").textContent !== "Disconnected") $("state").textContent = "Disconnected"; }
   setTimeout(poll, 1000);
 }
 $("f").onsubmit = async (ev) => {

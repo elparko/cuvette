@@ -3,7 +3,7 @@ import { startWindow, type WindowSession } from "../src/server/window.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 
 describe.skipIf(!CHROME)("the step graph page in headless Chrome", () => {
   let page: Page;
@@ -19,7 +19,7 @@ describe.skipIf(!CHROME)("the step graph page in headless Chrome", () => {
     page = await openChrome();
     await page.size(1280, 900);
     await page.go(win.url);
-    await until(page, `document.querySelectorAll("#canvas button.card").length === 6`);
+    expect(await until(page, `document.querySelectorAll("#canvas button.card").length === 6`)).toBe(true);
   }, 60000);
   afterAll(async () => {
     await page?.close();

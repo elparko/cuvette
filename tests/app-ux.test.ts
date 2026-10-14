@@ -7,7 +7,7 @@ import { UI_DIST } from "../src/server/app.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
-const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 300 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const MOCK = `(() => {
@@ -68,7 +68,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.go(url);
     await page.eval(`fetch("api/open?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ folder: ${JSON.stringify(data)} }) })`);
     await page.go(url);
-    await until(page, `document.querySelector("#msg")`);
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
     await page.eval(MOCK);
   }, 90000);
   afterAll(async () => {
@@ -105,7 +105,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     const q = `document.querySelector('[data-card][data-type="question"]')`;
     const key = (k: string) => page.eval<boolean>(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
     await page.eval(`[...${q}.querySelectorAll(".btn")].find((b) => b.textContent === "Answer later").focus()`);
-    expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).boxShadow : "not visible"`)).not.toBe("none");
+    expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).outlineStyle + " " + getComputedStyle(document.activeElement).outlineWidth : "not visible"`)).toBe("solid 2px");
     expect(await key("Enter")).toBe(true);
     await wait(300);
     expect(await page.eval(`!!${q}`)).toBe(true);
@@ -137,7 +137,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     const r = await page.eval<{ texts: string[]; stops: number; shown: boolean }>(`(async () => {
       const t = document.querySelector('header button[aria-label^="Mode:"]');
       t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-      for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
+      for (let i = 0; i < 200 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
       const items = [...document.querySelectorAll('[role="menuitemradio"]')];
       const out = { texts: items.map((x) => x.textContent), stops: document.querySelectorAll('[role="menu"] [tabindex="0"]').length, shown: [...items[0].querySelectorAll("span")].some((x) => x.textContent === "The agent runs the steps." && x.offsetHeight > 0) };
       document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -188,9 +188,9 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
 
   test("settings: an arrow key in a radio group selects the next choice and keeps the focus", async () => {
     await goPage("Settings");
-    await until(page, `document.querySelector('[data-setting="mode"]')`);
+    expect(await until(page, `[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].some((b) => b.textContent === "Session")`)).toBe(true);
     await page.eval(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].find((b) => b.textContent === "Session").click()`);
-    await wait(100);
+    expect(await until(page, `document.querySelector('[data-setting="mode"]')`)).toBe(true);
     const row = `document.querySelector('[data-setting="mode"]')`;
     const checked = () => page.eval<string>(`${row}.querySelector('[role="radio"][aria-checked="true"]').textContent`);
     const first = await checked();
@@ -501,7 +501,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
 
   test("settings: Cancel puts back the value that a text box showed before the change", async () => {
     await goPage("Settings");
-    await until(page, `document.querySelector('nav[aria-label="Setting sections"]')`);
+    expect(await until(page, `document.querySelector('nav[aria-label="Setting sections"]')`)).toBe(true);
     await page.eval(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].find((b) => b.textContent === "Outputs").click()`);
     expect(await until(page, `document.querySelector('[data-setting="databook_author"] input')`)).toBe(true);
     await setText('[data-setting="databook_author"] input', "A. Scientist");

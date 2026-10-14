@@ -10,7 +10,7 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
-import { cap, EXIT_GRACE_MS, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, EXIT_GRACE_MS, fileKind, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
 export function scriptPython(): string {
@@ -322,11 +322,11 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       });
       const timer = setTimeout(() => {
         timedOut = true;
-        killTree(child.pid);
+        void killAll(child.pid);
       }, timeoutS * 1000);
       const onAbort = () => {
         aborted = true;
-        killTree(child.pid);
+        void killAll(child.pid);
       };
       if (ctx.signal.aborted) onAbort();
       else ctx.signal.addEventListener("abort", onAbort, { once: true });

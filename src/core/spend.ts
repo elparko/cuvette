@@ -1,4 +1,4 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { homeFolder } from "./old-names.ts";
@@ -29,8 +29,20 @@ export function recordSpend(model: string, u: Usage, session?: string): number {
   const usd = costUsd(model, u);
   const path = spendFile();
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify({ t: new Date().toISOString(), model, session, usd, ...u }) + "\n");
+  appendFileSync(path, (endsCut(path) ? "\n" : "") + JSON.stringify({ t: new Date().toISOString(), model, session, usd, ...u }) + "\n");
   return usd;
+}
+
+function endsCut(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    const last = Buffer.alloc(1);
+    return size > 0 && readSync(fd, last, 0, 1, size - 1) === 1 && last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 const CHUNK = 1 << 20;

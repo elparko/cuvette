@@ -88,7 +88,7 @@ export function saveIndexRow(p: Place, named?: { title: string; description: str
   if (p.legacy) return;
   const all = readIndex();
   const old = all.find((r) => r.id === p.id);
-  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
+  const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
   writeIndex([...all.filter((r) => r.id !== p.id), row]);
 }
 
@@ -259,13 +259,22 @@ function findUp(start: string, outputFolder: string): Place | undefined {
   }
 }
 
+function inIndex(project: string): Place | undefined {
+  const rows = readIndex().filter((r) => r.project && resolve(r.project) === resolve(project)).sort((a, b) => b.date.localeCompare(a.date));
+  for (const r of rows) {
+    const p = placeAt(join(r.folder, ".record"));
+    if (p && p.project && resolve(p.project) === resolve(project)) return p;
+  }
+  return undefined;
+}
+
 export function findPlace(ref: string, opts: { cwd?: string; outputFolder?: string } = {}): Place | undefined {
   const cwd = opts.cwd ?? process.cwd();
   const path = resolve(cwd, ref.replace(/^~(?=\/|$)/, process.env.HOME ?? "~"));
   if (ref.includes("/") || ref === "." || ref === ".." || isAbsolute(ref) || (existsSync(path) && statSync(path).isDirectory())) {
     if (!existsSync(path)) return undefined;
-    if (existsSync(join(path, "log.jsonl")) && !existsSync(join(path, "meta.json"))) return legacyPlace(basename(path), cwd);
-    const p = findUp(path, opts.outputFolder ?? "cuvette");
+    if (existsSync(join(path, "log.jsonl")) && !existsSync(join(path, "meta.json"))) return { ...legacyPlace(basename(path), cwd), recordDir: path, outDir: join(path, "work") };
+    const p = findUp(path, opts.outputFolder ?? "cuvette") ?? inIndex(path);
     if (p) saveIndexRow(p);
     return p;
   }

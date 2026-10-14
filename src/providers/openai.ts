@@ -4,7 +4,7 @@ import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { hideKeys } from "../core/credentials.ts";
-import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
@@ -137,7 +137,7 @@ export class OpenAIProvider implements Provider {
     if (e instanceof ProviderError) return e;
     if (timedOut(signal)) return new ProviderError(`The model server sent no data for ${TIMEOUT_MS / 1000} s.`, true);
     if (signal.aborted) return e;
-    if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, true);
+    if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, !noRetry(e));
     if ((e as any).partial) return new ProviderError(`The model server stopped during the reply: ${(e as Error).message}.`, true);
     return new ProviderError(`Cannot reach the model server at ${this.base.replace(/\/\/[^@/]*@/, "//")}. Check that it is running.`, true);
   }
@@ -192,6 +192,7 @@ export class OpenAIProvider implements Provider {
     const slots = new Map<string, CallDraft>();
     let ended = false;
     const chunk = (j: any) => {
+      if (!j || typeof j !== "object") return;
       if (j.error) {
         const msg = hideKeys(typeof j.error === "string" ? j.error : String(j.error.message ?? JSON.stringify(j.error))).text;
         throw new ProviderError(`Model server error: ${String(msg).slice(0, 300)}`, false, CONTEXT_OVERFLOW.test(msg));
@@ -210,7 +211,8 @@ export class OpenAIProvider implements Provider {
         reply.content += d.content;
         if (sse) splitter.push(d.content);
       }
-      for (const tc of d.tool_calls ?? []) {
+      for (const tc of Array.isArray(d.tool_calls) ? d.tool_calls : []) {
+        if (!tc || typeof tc !== "object") continue;
         const key = !sse ? "" : typeof tc.index === "number" ? `i${tc.index}` : tc.id ? `id${tc.id}` : "last";
         let c = !key ? undefined : key === "last" ? reply.calls.at(-1) : slots.get(key);
         if (!c || (tc.id && c.id && tc.id !== c.id)) {
@@ -278,7 +280,7 @@ export class OpenAIProvider implements Provider {
       throw partial(`the reply is not valid JSON (${(e as Error).message})`);
     }
     chunk(j);
-    if (!j.choices?.length) throw new ProviderError("The model server returned no choices.");
+    if (!j?.choices?.length) throw new ProviderError("The model server returned no choices.");
     const split = splitThink(reply.content);
     reply.text = split.text;
     reply.thinking = [reply.thinking.trim(), split.thinking].filter(Boolean).join("\n\n");

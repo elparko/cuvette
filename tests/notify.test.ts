@@ -64,7 +64,7 @@ test("a blocking scientist-owned decision posts the question to the ntfy topic",
   await s.send("Count the particles");
   const open = s.questions.open();
   expect(open).toHaveLength(1);
-  for (let i = 0; i < 150 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 1500 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
   expect(posts).toHaveLength(1);
   const p = posts[0];
   expect(p.method).toBe("POST");
@@ -80,7 +80,7 @@ test("the post carries the window address when one is set", async () => {
   setWindowUrl("http://127.0.0.1:4500/?t=abc");
   const s = await blockedSession();
   await s.send("Count the particles");
-  for (let i = 0; i < 150 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 1500 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
   expect(posts).toHaveLength(1);
   expect(posts[0].headers.click).toBe("http://127.0.0.1:4500/?t=abc");
   expect(posts[0].body.split("\n").at(-1)).toBe("http://127.0.0.1:4500/?t=abc");

@@ -3,7 +3,7 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
-import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
 
@@ -188,7 +188,7 @@ export class OllamaProvider implements Provider {
     try {
       return await this.retry(() => this.attempt(body, idle), idle.signal, onRetry, budget);
     } catch (e) {
-      if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
+      if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, !noRetry(e));
       throw this.networkError(e, host, idle.signal);
     }
   }
@@ -208,7 +208,8 @@ export class OllamaProvider implements Provider {
       } catch {
         return false;
       }
-      if (j.error) throw ollamaError(String(j.error));
+      if (!j || typeof j !== "object" || Array.isArray(j)) return false;
+      if (j.error) throw ollamaError(typeof j.error === "string" ? j.error : String(j.error.message ?? JSON.stringify(j.error)));
       return take(j);
     };
     const reader = res.body!.getReader();
@@ -296,12 +297,12 @@ export class OllamaProvider implements Provider {
       req.onDelta?.({ type: kind, text: s });
     });
     await this.readLines(res, idle, (j) => {
-      const m = j.message;
-      if (m?.thinking) {
+      const m = j.message && typeof j.message === "object" ? j.message : undefined;
+      if (typeof m?.thinking === "string" && m.thinking) {
         thinkField += m.thinking;
         req.onDelta?.({ type: "thinking", text: m.thinking });
       }
-      if (m?.content) {
+      if (typeof m?.content === "string" && m.content) {
         content += m.content;
         splitter.push(m.content);
         if (content.length >= checkAt) {
@@ -309,7 +310,8 @@ export class OllamaProvider implements Provider {
           if (repeatStart(content) !== null) looped = true;
         }
       }
-      for (const c of m?.tool_calls ?? []) {
+      for (const c of Array.isArray(m?.tool_calls) ? m.tool_calls : []) {
+        if (!c || typeof c !== "object") continue;
         const a = c.function?.arguments;
         const { args, parseError } = parseArgs({ id: "", name: "", args: typeof a === "string" ? a : "", obj: typeof a === "string" ? undefined : (a ?? {}) }, false);
         nativeCalls.push({ name: c.function?.name ?? "", args, ...(parseError ? { parseError } : {}) });
@@ -385,7 +387,7 @@ export class OllamaProvider implements Provider {
       let looped = false;
       let finished = false;
       await this.readLines(res, idle, (j) => {
-        content += j.message?.content ?? "";
+        if (typeof j.message?.content === "string") content += j.message.content;
         if (j.done) finished = true;
         if (content.length >= checkAt) {
           checkAt = content.length + 1000;

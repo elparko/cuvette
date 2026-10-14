@@ -73,7 +73,8 @@ export async function fileSha(path: string): Promise<string> {
 export const adapterKey = (n: Pick<Node, "adapter" | "tool">) => n.adapter || n.tool;
 
 export function currentNodes(record: AnalysisRecord): Node[] {
-  return record.nodes().filter((n) => !n.sensitivityOf && !record.replacedBy(n.id));
+  const rewound = record.rewound();
+  return record.nodes().filter((n) => !n.sensitivityOf && !rewound.has(n.id) && !record.replacedBy(n.id));
 }
 
 export async function liveReasons(record: AnalysisRecord, cur: Current): Promise<Map<string, Reason[]>> {
@@ -112,7 +113,7 @@ export function recordReasons(record: AnalysisRecord, labels: Record<string, str
     if (!list.some((x) => x.text === r.text)) list.push(r);
     out.set(id, list);
   };
-  for (const e of record.entries(["stale"])) {
+  for (const e of record.staleMarks()) {
     const nodes = (e.data.nodes as string[] | undefined) ?? [];
     if (e.data.kind) {
       for (const id of (e.data.direct as string[] | undefined) ?? nodes) add(id, { kind: e.data.kind as ReasonKind, text: String(e.data.reason) });

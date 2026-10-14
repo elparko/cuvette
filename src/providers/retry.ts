@@ -71,6 +71,10 @@ export function retryAfterMs(e: unknown): number | undefined {
   return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
 
+export function noRetry(e: unknown): boolean {
+  return headerOf(e, "x-should-retry") === "false";
+}
+
 export function retryReason(e: unknown): string | undefined {
   if (e instanceof Anthropic.APIUserAbortError || e instanceof ProviderError) return undefined;
   if ((e as any)?.partial === true) return "the reply stopped early";

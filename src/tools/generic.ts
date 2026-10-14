@@ -1,6 +1,6 @@
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { cap, commandLine, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
@@ -35,6 +35,35 @@ export function insideWorkDir(workDir: string, name: string): string | undefined
   mkdirSync(dirname(target), { recursive: true });
   if (!inRoot(realpathSync(dirname(target))) || isLink(target)) return undefined;
   return target;
+}
+
+const GUARDED_NAMES = new Set([".cuvette", ".ga"]);
+
+function realish(p: string): string {
+  const at = existingAncestor(p);
+  return resolve(realpathSync.native(at), relative(at, p));
+}
+
+function inRecordFolder(p: string): boolean {
+  for (let at = dirname(p); dirname(at) !== at; at = dirname(at))
+    if (basename(at).toLowerCase() === ".record" && (existsSync(resolve(at, "log.jsonl")) || existsSync(resolve(at, "meta.json")))) return true;
+  return false;
+}
+
+function guarded(target: string, dirs: Dirs): boolean {
+  const inside = (root: string, p: string) => p === root || below(root, p);
+  const record = realish(dirs.sessionDir);
+  const work = realish(dirs.workDir);
+  const legacy = below(record, work);
+  for (const t of [realish(target), resolve(target)]) {
+    if (inside(record, t) && !(legacy && inside(work, t))) return true;
+    if (inRecordFolder(t)) return true;
+  }
+  for (const [t, w, project] of [[realish(target), work, dirs.projectDir && realish(dirs.projectDir)], [resolve(target), resolve(dirs.workDir), dirs.projectDir && resolve(dirs.projectDir)]] as const) {
+    if (below(w, t) || !project || !below(project, t)) continue;
+    if (GUARDED_NAMES.has(relative(project, t).split(/[\\/]/)[0]!.toLowerCase())) return true;
+  }
+  return false;
 }
 
 export function projectPath(projectDir: string, p: string): string {
@@ -148,9 +177,20 @@ export function genericTools(dirs: Dirs): Tool[] {
       },
       run(a) {
         const name = String(a.name);
+        const asked = resolve(dirs.workDir, name);
+        if (guarded(asked, dirs)) return { ok: false, error: `the path ${asked} belongs to the record or to the settings of Cuvette. The agent cannot write there. Write the file in the session folder ${dirs.workDir}.` };
         const target = insideWorkDir(dirs.workDir, name) ?? (dirs.projectDir && isAbsolute(name) ? insideWorkDir(dirs.projectDir, name) : undefined);
         if (!target) return { ok: false, error: `the path is outside the session folder ${dirs.workDir} and the project folder ${project}` };
-        writeFileSync(target, String(a.text));
+        const fd = openSync(target, constants.O_WRONLY | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o666);
+        try {
+          const st = fstatSync(fd);
+          if (!st.isFile()) return { ok: false, error: `${target} is not a file` };
+          if (st.nlink > 1) return { ok: false, error: `the file ${target} has more than one hard link. The agent cannot write to it. Write a new file in the session folder ${dirs.workDir}.` };
+          ftruncateSync(fd, 0);
+          writeSync(fd, String(a.text));
+        } finally {
+          closeSync(fd);
+        }
         return { ok: true, summary: `Wrote ${Buffer.byteLength(String(a.text))} bytes to ${target}.`, outputs: [outputFile(target)] };
       },
     }),
