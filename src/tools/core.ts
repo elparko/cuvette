@@ -157,8 +157,8 @@ export function coreTools(d: CoreDeps): Tool[] {
       "Ask the scientist a question when a choice can change the conclusion. Give options, your recommendation and the reason. With wait false, the question waits in the queue and you can continue other work.",
       {
         question: { type: "string" },
-        options: { type: "array", items: { type: "string" } },
-        recommendation: { type: "string" },
+        options: { type: "array", items: { type: ["string", "number"] } },
+        recommendation: { type: ["string", "number"] },
         reason: { type: "string" },
         wait: { type: "boolean", default: true },
       },

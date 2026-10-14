@@ -263,6 +263,14 @@ test("duplicate and empty options become one list of different options", async (
   expect(s.questions.open()[0]!.options.map((o) => o.value)).toEqual(["a", "b"]);
 });
 
+test("numbers as options and as the recommendation are still accepted", async () => {
+  const { session: s } = await start([call("ask_scientist", { question: "How many groups?", options: [2, 3, 4], recommendation: 3 }), { text: "ok" }]);
+  await s.send("go");
+  const q = s.questions.open()[0]!;
+  expect(q.options.map((o) => o.value)).toEqual(["2", "3", "4"]);
+  expect(q.recommendation?.value).toBe("3");
+});
+
 test("markdown and HTML in a question stay as plain text in the record", async () => {
   const question = "<script>alert(1)</script> **bold** [x](javascript:alert(1)) <img src=x onerror=1>";
   const { session: s } = await start([call("ask_scientist", { question, options: ["<b>x</b>", "`y`"] }), { text: "ok" }]);
