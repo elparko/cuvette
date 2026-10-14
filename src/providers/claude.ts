@@ -252,14 +252,14 @@ export class ClaudeProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string }): Promise<string> {
     const params = {
       model: this.model,
       max_tokens: 16000,
       system: [{ type: "text", text: system }],
       messages: [{ role: "user", content: text }],
       thinking: { type: "adaptive", display: "omitted" },
-      output_config: { effort: this.effort },
+      output_config: { effort: opts?.effort ?? this.effort },
     };
     try {
       const over = budgetProblem();

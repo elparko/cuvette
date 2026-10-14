@@ -506,7 +506,9 @@ export function parseReferee(raw: string): FindingIn[] {
   return [{ check: "referee", severity: "info", message: `The referee reply could not be read: ${clip(body, 800)}` }];
 }
 
+export const REFEREE_EFFORT = "low";
+
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  return parseReferee(await provider.complete(system, text, signal));
+  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT }));
 }

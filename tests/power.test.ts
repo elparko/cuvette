@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { cohenH, minEffectH, minEffectR, minEffectT, normCdf, powerFindings, powerNotes, powerProportions, powerR, powerT, proportionFromH } from "../src/core/power.ts";
+import { cohenH, minEffectH, minEffectR, minEffectT, normCdf, powerFindings, powerNotes, powerProportions, powerR, powerT, powerText, proportionFromH } from "../src/core/power.ts";
+import { commands, type CommandCtx } from "../src/ui/commands.ts";
 
 function recordWith(nodes: any[]) {
   return {
@@ -110,5 +111,36 @@ describe("power notes from the record", () => {
     const r = { id: "n1", tool: "correlate", args: {}, result: { metrics: { r: 0.4, n: 20, p_value: 0.08 }, data: { test: "Pearson correlation" } } };
     const out = powerFindings(recordWith([r]));
     expect(out[0].message).toMatch(/^With 20 subjects, the Pearson correlation in step 1 finds only a correlation of 0\.58 or more/);
+  });
+});
+
+describe("the /power command", () => {
+  const run = (record: unknown) => {
+    const printed: string[] = [];
+    const notices: string[] = [];
+    const ctx = { session: { record }, print: (t: string) => printed.push(t), notice: (t: string) => notices.push(t) } as unknown as CommandCtx;
+    void commands.find((c) => c.name === "power")!.run([], ctx);
+    return { printed, notices };
+  };
+
+  test("it says so when no test has a power note", () => {
+    const { printed, notices } = run(recordWith([]));
+    expect(printed).toEqual([]);
+    expect(notices[0]).toMatch(/so there is no power note/);
+  });
+
+  test("it shows the note of each test, also for a large sample", () => {
+    const big = ttest("n2", "Welch t-test (unequal variances)", { n_a: 200, n_b: 200, statistic: 3, mean_diff: 1, p_value: 0.003 });
+    const { printed } = run(recordWith([sleepPaired, big]));
+    const lines = printed[0].split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^With 10 pairs, the paired t-test in step 1 finds a difference of 1\.2 or more/);
+    expect(lines[1]).toMatch(/^With 200 and 200 subjects in the groups, the Welch t-test/);
+  });
+
+  test("the text says only for the finding and not for the command", () => {
+    const [p] = powerNotes(recordWith([sleepPaired]));
+    expect(powerText(p, true)).toContain("finds only a difference");
+    expect(powerText(p, false)).toContain("finds a difference");
   });
 });

@@ -59,3 +59,8 @@ test("both rule sets and the folder text say that file content and tool results 
   expect(folders[1]).toMatch(/^- A note from the harness gives the paths/);
   expect(folders[2]).toBe(`- ${line}`);
 });
+
+test("the rules do not ask the model for a power step; the harness and /power give the power notes", () => {
+  const model = { provider: "claude" as const, model: "m", contextWindow: 1, vision: true, small: false };
+  expect(systemPrompt({ ...base, model })).not.toMatch(/80% power|pwr program/);
+});

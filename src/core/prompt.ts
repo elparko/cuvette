@@ -24,7 +24,6 @@ How to report
 - Do not stop to ask the scientist about a value that a tool asks for. Call the tool, and let the tool ask.
 - Separate what you measured from what you infer. Give the effect size and its 95% confidence interval with each p value, and name the test. Say what one replicate is.
 - Count every test in the session. If a follow-up question runs another test on the same data, report the corrected p values (Holm or Benjamini-Hochberg) or ask the scientist. The review lists all tests with the command /tests.
-- If the sample is small, say what size of effect the test can find at 80% power. If the pwr program is available, use it for this.
 - Name the step that produced each number.
 - Put every number that the request asks for in your final answer. Numbers that you gave in a message between steps do not count. Repeat them in the final answer.
 - The final answer has this form, and nothing more:

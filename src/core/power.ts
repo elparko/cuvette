@@ -212,13 +212,12 @@ export function powerNotes(record: AnalysisRecord): PowerInfo[] {
   return out;
 }
 
+export function powerText(p: PowerInfo, only: boolean): string {
+  return `With ${p.sample}, the ${p.test} in step ${p.step} finds ${only ? "only " : ""}${p.minimumText} (80% power, alpha 0.05). The observed effect has a power of ${fmt(p.power)}.`;
+}
+
 export function powerFindings(record: AnalysisRecord): FindingIn[] {
   return powerNotes(record)
     .filter((p) => p.mediumPower < 0.8)
-    .map((p) => ({
-      check: "low_power",
-      severity: "info" as const,
-      message: `With ${p.sample}, the ${p.test} in step ${p.step} finds only ${p.minimumText} (80% power, alpha 0.05). The observed effect has a power of ${fmt(p.power)}.`,
-      nodes: [p.node],
-    }));
+    .map((p) => ({ check: "low_power", severity: "info" as const, message: powerText(p, true), nodes: [p.node] }));
 }

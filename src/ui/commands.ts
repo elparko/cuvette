@@ -12,6 +12,7 @@ import { groupSummary, sheetTable } from "../core/samples.ts";
 import { dollars, kTokens, percentText, priceLine, usageLong, type UsageSummary } from "../core/spend.ts";
 import { applyRewind, changeCard, changePicker, changeRows, choiceLabel, choiceValue, findChange, show, type Card } from "./cards.ts";
 import { testsText } from "../core/testcount.ts";
+import { powerNotes, powerText } from "../core/power.ts";
 import { rewindPoints } from "../core/rewind.ts";
 import { branchesText } from "../core/branch.ts";
 import { listMethods, methodText } from "../core/methods.ts";
@@ -565,6 +566,15 @@ export const commands: Command[] = [
     help: "Show each test with a p value in this session, with the Holm and Benjamini-Hochberg p values for its family.",
     run(_, ctx) {
       ctx.print(testsText(ctx.session.record), "Tests in this session");
+    },
+  },
+  {
+    name: "power",
+    help: "Show the size of effect that each t-test and correlation can find at 80% power.",
+    run(_, ctx) {
+      const notes = powerNotes(ctx.session.record);
+      if (!notes.length) return ctx.notice("No t-test or correlation with a sample size has run yet, so there is no power note.");
+      ctx.print(notes.map((p) => powerText(p, false)).join("\n"), "Power in this session");
     },
   },
   {

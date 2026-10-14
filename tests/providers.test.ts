@@ -299,6 +299,15 @@ describe("claude", () => {
     expect(await p.countTokens!({ system: "S", messages: [user("q")], tools })).toBe(42);
   });
 
+  test("complete uses the effort of the call when one is given, and the effort of the provider when not", async () => {
+    const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "a" }]), claudeMsg([{ type: "text", text: "b" }])]);
+    const p = new ClaudeProvider("claude-opus-5-5", { client, effort: "high" });
+    await p.complete("S", "Q", undefined, { effort: "low" });
+    await p.complete("S", "Q");
+    expect(calls[0].params.output_config).toEqual({ effort: "low" });
+    expect(calls[1].params.output_config).toEqual({ effort: "high" });
+  });
+
   test("makeProvider claude uses default model and info", async () => {
     const p = await makeProvider("claude", { client: {} });
     expect(p.info).toEqual({ provider: "claude", model: "claude-opus-5-5", contextWindow: 1_000_000, vision: true, small: false, local: false });
