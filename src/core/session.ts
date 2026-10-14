@@ -2733,7 +2733,7 @@ export class Session {
 
   private askedFor(f: { key: string; label: string; choices?: unknown[] }, value: unknown): boolean {
     if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
-    return namesValue(this.scientistAsked, f, value);
+    return namesValue(this.scientistAsked, f, value, this.decisions.fields());
   }
 
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
