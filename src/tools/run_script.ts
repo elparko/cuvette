@@ -248,21 +248,22 @@ export interface SettingsScope {
 
 export function settingsScope(dirs: Dirs): SettingsScope {
   const out: SettingsScope = { locked: [], open: [], files: [] };
-  if (!dirs.projectDir) return out;
-  const project = realish(dirs.projectDir);
-  const homes = [...new Set([cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")].map(realish))].filter((h) => within(h, project));
-  for (const home of homes) {
+  const project = dirs.projectDir ? realish(dirs.projectDir) : undefined;
+  const homes = [...new Set([cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")].map(realish))];
+  const inside = (h: string) => !!project && within(h, project);
+  for (const home of homes.filter((h) => inside(h) || h === realish(cuvetteHome()))) {
     let index: string[] = [];
     try {
       index = readdirSync(home).filter((f) => f.startsWith("sessions-index.json")).map((f) => join(home, f));
     } catch {}
     const files = [...SETTINGS_NAMES.map((f) => join(home, f)), join(home, "sessions-index.json"), ...index];
-    out.locked.push(...files, join(home, "sessions"));
+    out.locked.push(...files, ...(inside(home) ? [join(home, "sessions")] : []));
     out.files.push(...files);
   }
+  if (!dirs.projectDir) return out;
   for (const name of [".cuvette", ".ga"]) {
     const dir = join(dirs.projectDir, name);
-    if (homes.some((h) => within(h, realish(dir)))) {
+    if (homes.filter(inside).some((h) => within(h, realish(dir)))) {
       const files = SETTINGS_NAMES.map((f) => join(dir, f));
       out.locked.push(...files);
       out.files.push(...files);

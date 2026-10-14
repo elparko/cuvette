@@ -330,7 +330,7 @@ test("write steps open a work folder that is inside the record folder, and lock 
   mkdirSync(join(work, ".record"), { recursive: true });
   writeFileSync(join(work, ".record", "meta.json"), "{}");
   const steps = writeSteps({ workDir: work, sessionDir: record });
-  expect(steps.filter((x) => !x.fixed).map((x) => [x.allow, x.path])).toEqual([[false, record], [false, join(work, ".record")], [true, work], [false, join(work, ".record")]]);
+  expect(steps.filter((x) => !x.fixed && x.path.startsWith(record)).map((x) => [x.allow, x.path])).toEqual([[false, record], [false, join(work, ".record")], [true, work], [false, join(work, ".record")]]);
 });
 
 test("Linux wrap: bubblewrap mounts a locked folder read-only after the writable folders", () => {
@@ -744,4 +744,46 @@ test.skipIf(!sandboxWorks)("run_command cannot create a file under the adapters 
   expect(readdirSync(join(l.project, ".cuvette", "adapters"))).toEqual([]);
   expect(existsSync(join(l.project, ".cuvette", "skills"))).toBe(false);
   expect((await run(["/bin/sh", "-c", `echo ok > ${JSON.stringify(join(l.project, "data", "r.txt"))}`])).error).toBeUndefined();
+});
+
+test("the settings files of the Cuvette home folder are locked and hashed also if the home folder is outside the project", () => {
+  const l = layout();
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-")));
+  writeFileSync(join(home, "settings.json"), '{"hooks":{}}');
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    const scope = settingsScope(l.dirs);
+    expect(scope.locked).toEqual(expect.arrayContaining([join(home, "settings.json"), join(home, "settings.local.json")]));
+    expect(scope.locked).not.toContain(home);
+    const guard = fingerprint(l.dirs, true);
+    writeFileSync(join(home, "cache.txt"), "x");
+    expect(guard.changed()).toEqual([]);
+    writeFileSync(join(home, "settings.json"), '{"hooks":{"SessionStart":[]}}');
+    writeFileSync(join(home, "settings.local.json"), "{}");
+    expect(guard.changed().sort()).toEqual([join(home, "settings.json"), join(home, "settings.local.json")].sort());
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
+});
+
+test.skipIf(!sandboxWorks)("a model command cannot write the settings of the Cuvette home folder outside the project, and writes other files there", async () => {
+  const l = layout();
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-guard-")));
+  writeFileSync(join(home, "settings.json"), '{"hooks":{}}');
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    const tool = genericTools(l.dirs).find((t) => t.name === "run_command")!;
+    const run = (cmd: string) => tool.execute({ purpose: "Test", does: "Runs a test.", argv: ["/bin/sh", "-c", cmd] }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+    expect((await run(`echo x >> ${JSON.stringify(join(home, "settings.json"))}`)).ok).toBe(false);
+    expect((await run(`echo x > ${JSON.stringify(join(home, "settings.local.json"))}`)).ok).toBe(false);
+    expect(readFileSync(join(home, "settings.json"), "utf8")).toBe('{"hooks":{}}');
+    expect(existsSync(join(home, "settings.local.json"))).toBe(false);
+    expect((await run(`echo x > ${JSON.stringify(join(home, "cache.txt"))}`)).error).toBeUndefined();
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
 });
