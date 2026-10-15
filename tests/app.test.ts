@@ -896,3 +896,30 @@ describe("sample sheet card", () => {
     expect(saved[499]).toEqual(rows[499]);
   });
 });
+
+describe("the resume command names the way that fits the view", () => {
+  test("the browser app points to the Sessions page", async () => {
+    const view = new WebView(new FakeSession(), { token: "t", env, url: (p) => p, quit: async () => {} });
+    await view.runCommand("/resume");
+    const text = view.recordHtml();
+    expect(text).toContain("open the Sessions page");
+    expect(text).not.toContain("cuvette resume");
+    view.close();
+  });
+
+  test("the window command opens the window, not only a link", async () => {
+    const opened: string[] = [];
+    const view = new WebView(new FakeSession(), { token: "t", env, url: (p) => `http://127.0.0.1:1/${p}`, open: (u) => opened.push(u), quit: async () => {} });
+    await view.runCommand("/window");
+    expect(opened).toEqual(["http://127.0.0.1:1/graph/"]);
+    expect(view.recordHtml()).toContain("Window: http://127.0.0.1:1/graph/");
+    view.close();
+  });
+
+  test("the terminal names the command", async () => {
+    const { commands } = await import("../src/ui/commands.ts");
+    const out: string[] = [];
+    await commands.find((c) => c.name === "resume")!.run([], { print: (t: string) => out.push(t) } as never);
+    expect(out[0]).toContain("quit and run: cuvette resume");
+  });
+});

@@ -42,6 +42,8 @@ export interface AppCtx {
   opened: () => void;
   programStart: string;
   setProgramStart: (name: string) => void;
+  renameSession: (s: SessionCard) => void;
+  removeSession: (s: SessionCard) => void;
 }
 
 function Logo({ className }: { className?: string }) {
@@ -181,7 +183,6 @@ export function App() {
 
   if (!state) return <div className="flex h-full items-center justify-center text-muted-foreground">Loading…</div>;
 
-  const ctx: AppCtx = { state, go, boot, openFolder: () => setFolderOpen(true), opened, programStart, setProgramStart };
   const current = (p: Page) => p === page || (p === "session" && !OWN_PAGES.includes(page));
   const recent = sessions.list.filter((x) => !x.moved).slice(0, 6);
   const dateName = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -193,6 +194,7 @@ export function App() {
     if (renaming) void sessions.rename(renaming.id, draft);
     setRenaming(null);
   };
+  const ctx: AppCtx = { state, go, boot, openFolder: () => setFolderOpen(true), opened, programStart, setProgramStart, renameSession: startRename, removeSession: setRemoving };
 
   return (
     <TooltipProvider delayDuration={400}>
