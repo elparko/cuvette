@@ -361,12 +361,13 @@ export class WebView {
     this.line("▸", "The questions stay open. They come back with /questions.", undefined, true);
   }
 
-  stop(): void {
+  stop(): string[] {
     this.stopping = this.busy;
     const dropped = stopTurn(this.session, this.queue);
     this.queue = [];
-    if (dropped.length) this.line("!", droppedNote(dropped, false), "yellow");
+    if (dropped.length) this.line("!", droppedNote(dropped, true), "yellow");
     this.sendStatus();
+    return dropped;
   }
 
   private makeCtx(): CommandCtx {

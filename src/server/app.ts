@@ -568,8 +568,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return send(res, 200, { ok: true });
     }
     if (p === "/api/stop") {
-      c.view.stop();
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true, dropped: c.view.stop() });
     }
     if (p === "/api/mode") {
       if (!MODES.has(String(body.mode))) return send(res, 400, { error: "unknown mode" });

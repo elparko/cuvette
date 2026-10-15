@@ -172,6 +172,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   const itemCount = useRef(0);
   itemCount.current = stream.items.length;
+  const stop = async () => {
+    const r = await post<{ dropped?: string[] }>("api/stop", {});
+    const back = (r?.dropped ?? []).join("\n");
+    if (back) setText((t) => (t.trim() ? `${t}\n${back}` : back));
+  };
+
   const send = useCallback(async (value: string, now = false) => {
     if (!value.trim()) return true;
     askNotify();
@@ -657,7 +663,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </Button>
               )}
               {busy && (
-                <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="h-7 text-destructive">
+                <Button variant="outline" size="sm" onClick={() => void stop()} className="h-7 text-destructive">
                   <SquareIcon className="size-3 fill-current" /> Stop
                 </Button>
               )}
@@ -714,7 +720,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   }
                   if (e.key === "Escape") {
                     if (sugg.length) setSugg([]);
-                    else if (busy) void post("api/stop", {});
+                    else if (busy) void stop();
                     return;
                   }
                   if (e.key === "Enter" && !e.shiftKey) {

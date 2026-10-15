@@ -620,6 +620,12 @@ async function post(path, body) {
   try { return await call(path, body); } catch (e) { toast(e.message); }
 }
 
+async function stopAgent() {
+  const r = await post("api/stop", {});
+  const back = ((r && r.dropped) || []).join("\n");
+  if (back) $("msg").value = $("msg").value.trim() ? $("msg").value + "\n" + back : back;
+}
+
 async function send(text, now) {
   if (!text.trim()) return;
   askNotify();
@@ -636,7 +642,7 @@ $("composer").addEventListener("submit", (e) => {
   send(v, false);
 });
 $("sendnow").addEventListener("click", () => { const v = $("msg").value; $("msg").value = ""; send(v, true); });
-$("stop").addEventListener("click", () => post("api/stop", {}));
+$("stop").addEventListener("click", () => stopAgent());
 $("showq").addEventListener("click", () => send("/questions", false));
 $("openfolder").addEventListener("click", () => { chooser($("chooser2")); $("folderdlg").showModal(); });
 const MODES = [["watch", "Watch", "The agent runs the steps."], ["follow", "Follow", "You run the steps."], ["teach", "Teach", "You work. The agent checks."], ["plan", "Plan", "The agent plans only."]];
@@ -664,7 +670,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleMode
 $("msg").addEventListener("keydown", (e) => {
   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); suggSel = (suggSel + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length; drawSuggest(); return; }
   if (sugg.length && e.key === "Tab") { e.preventDefault(); pickSuggest(suggSel); return; }
-  if (e.key === "Escape") { if (sugg.length) hideSuggest(); else if (status.state !== "idle") post("api/stop", {}); return; }
+  if (e.key === "Escape") { if (sugg.length) hideSuggest(); else if (status.state !== "idle") stopAgent(); return; }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("msg").addEventListener("input", async () => {
