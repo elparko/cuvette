@@ -23,6 +23,12 @@ test("cost uses the model's prices", () => {
   expect(costUsd("unknown-model", { inputTokens: 1e6, outputTokens: 0 })).toBe(10);
 });
 
+test("cache writes of the one-hour cache cost twice the input price", () => {
+  expect(costUsd("claude-opus-5-5", { inputTokens: 0, outputTokens: 0, cacheWrite: 1e6, cacheWrite1h: 1e6 })).toBeCloseTo(8, 6);
+  expect(costUsd("claude-opus-5-5", { inputTokens: 0, outputTokens: 0, cacheWrite: 1e6, cacheWrite1h: 4e5 })).toBeCloseTo(0.6 * 5 + 0.4 * 8, 6);
+  expect(entryCost({ provider: "claude", model: "claude-opus-5-5", cacheWrite: 1e6, cacheWrite1h: 1e6 })).toBeCloseTo(8, 6);
+});
+
 test("the ledger adds up and the budget stops further requests", () => {
   expect(spendFile()).not.toContain(".cuvette/spend.jsonl");
   const before = totalSpend();

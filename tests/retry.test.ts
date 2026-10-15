@@ -1,11 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createServer } from "node:http";
+import { subscribe, unsubscribe } from "node:diagnostics_channel";
+import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { Message, StepRequest } from "../src/core/types.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
-import { RETRY_BUDGET_MS, retryReason, waitMs, withRetry } from "../src/providers/retry.ts";
+import { OllamaProvider } from "../src/providers/ollama.ts";
+import { OpenAIProvider } from "../src/providers/openai.ts";
+import { RETRY_BUDGET_MS, longFetch, retryReason, waitMs, withRetry } from "../src/providers/retry.ts";
 
 const user = (text: string): Message => ({ role: "user", parts: [{ type: "text", text }] });
 const req = (extra: Partial<StepRequest> = {}): StepRequest => ({ system: "SYS", messages: [user("x")], tools: [], ...extra });
@@ -175,4 +178,76 @@ test("withRetry returns the first success without a wait", async () => {
   let slept = 0;
   expect(await withRetry(async () => 7, { sleep: async () => void slept++ })).toBe(7);
   expect(slept).toBe(0);
+});
+
+async function serve(handler: Parameters<typeof createServer>[1]): Promise<{ server: Server; url: string }> {
+  const server = createServer(handler);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return { server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
+}
+
+test("longFetch sends the body, waits for slow headers and streams the reply", async () => {
+  let got = "";
+  const { server, url } = await serve((rq, rs) => {
+    rq.on("data", (d) => (got += d));
+    rq.on("end", () => {
+      setTimeout(() => {
+        rs.writeHead(200, { "content-type": "application/x-ndjson", "x-one": "1" });
+        rs.write("a\n");
+        setTimeout(() => rs.end("b\n"), 50);
+      }, 150);
+    });
+  });
+  try {
+    const res = await longFetch(`${url}/x`, { method: "POST", headers: { "content-type": "application/json" }, body: '{"q":"é"}', signal: new AbortController().signal });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-one")).toBe("1");
+    expect(await res.text()).toBe("a\nb\n");
+    expect(got).toBe('{"q":"é"}');
+  } finally {
+    server.close();
+  }
+});
+
+test("longFetch stops when the signal aborts, and a refused connection counts as a network error", async () => {
+  const { server, url } = await serve(() => {});
+  try {
+    const ctl = new AbortController();
+    const pending = longFetch(url, { method: "POST", headers: {}, body: "{}", signal: ctl.signal });
+    setTimeout(() => ctl.abort(new DOMException("stop", "TimeoutError")), 50);
+    await expect(pending).rejects.toBeTruthy();
+    expect(ctl.signal.aborted).toBe(true);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+  const err = await longFetch(url, { method: "POST", headers: {}, body: "{}", signal: new AbortController().signal }).catch((e) => e);
+  expect(retryReason(err)).toBe("network error");
+});
+
+test("the Ollama and OpenAI providers send no request through the global fetch, which has a 300 s limit", async () => {
+  const { server, url } = await serve((rq, rs) => {
+    rq.resume();
+    rq.on("end", () => {
+      if (rq.url?.endsWith("/api/chat")) rs.end(`${JSON.stringify({ message: { content: "ok" } })}\n${JSON.stringify({ done: true })}\n`);
+      else rs.end(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: "ok" }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
+    });
+  });
+  vi.stubEnv("OLLAMA_HOST", url);
+  let global = 0;
+  const count = () => void global++;
+  subscribe("undici:request:create", count);
+  try {
+    const r = await new OllamaProvider("m", { capabilities: [], paramSize: 8, contextLength: 8192 }).step(req());
+    expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+    const o = await new OpenAIProvider(`${url}/v1`, "m").step(req());
+    expect(o.message.parts).toEqual([{ type: "text", text: "ok" }]);
+    expect(global).toBe(0);
+    await (await fetch(url, { method: "POST", body: "{}" })).text();
+    expect(global).toBe(1);
+  } finally {
+    unsubscribe("undici:request:create", count);
+    vi.unstubAllEnvs();
+    server.close();
+  }
 });

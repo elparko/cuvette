@@ -2,8 +2,8 @@ import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
-import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, splitThink, wrapperText } from "./text.ts";
+import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
 
@@ -103,7 +103,7 @@ export class OllamaProvider implements Provider {
   readonly promptedTools: boolean;
 
   constructor(readonly model: string, show: OllamaShow, opts: OllamaOpts = {}) {
-    this.numCtx = opts.numCtx ?? Math.min(DEFAULT_NUM_CTX, show.contextLength ?? DEFAULT_NUM_CTX);
+    this.numCtx = Math.min(opts.numCtx ?? DEFAULT_NUM_CTX, show.contextLength ?? Infinity);
     this.think = opts.think ?? false;
     this.promptedTools = opts.promptedTools ?? false;
     this.sleep = opts.sleep;
@@ -119,7 +119,7 @@ export class OllamaProvider implements Provider {
   }
 
   toNative(system: string, messages: Message[]): unknown[] {
-    const budget = new ImageBudget();
+    const budget = new ImageBudget(messages);
     const out: any[] = [{ role: "system", content: system }];
     for (const m of messages) {
       if (m.role === "assistant") {
@@ -170,7 +170,7 @@ export class OllamaProvider implements Provider {
 
   private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
     idle.touch();
-    const res = await fetch(`${ollamaHost()}/api/chat`, {
+    const res = await longFetch(`${ollamaHost()}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -290,12 +290,7 @@ export class OllamaProvider implements Provider {
     let finished = false;
     let checkAt = 3000;
     let looped = false;
-    const textOut: string[] = [];
-    const thinkOut: string[] = [];
-    const splitter = new ThinkSplitter((kind, s) => {
-      (kind === "text" ? textOut : thinkOut).push(s);
-      req.onDelta?.({ type: kind, text: s });
-    });
+    const splitter = new ThinkSplitter((kind, s) => req.onDelta?.({ type: kind, text: s }));
     await this.readLines(res, idle, (j) => {
       const m = j.message && typeof j.message === "object" ? j.message : undefined;
       if (typeof m?.thinking === "string" && m.thinking) {
@@ -331,9 +326,9 @@ export class OllamaProvider implements Provider {
       outTok = Math.ceil((content.length + thinkField.length) / 3.5);
     }
 
-    let text = textOut.join("").trim();
+    let text = splitter.text.trim();
     if (looped) text = cutRepeat(text);
-    const thinking = [thinkField.trim(), thinkOut.join("").trim()].filter(Boolean).join("\n\n");
+    const thinking = [thinkField.trim(), splitter.thinking.trim()].filter(Boolean).join("\n\n");
     let n = lastCallNumber(req.messages);
     const parts: Part[] = [];
     let note: string | undefined;
@@ -397,7 +392,7 @@ export class OllamaProvider implements Provider {
       });
       if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
       if (looped) content = cutRepeat(content);
-      return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      return splitThink(content).text;
     } finally {
       idle.stop();
     }
