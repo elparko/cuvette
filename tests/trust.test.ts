@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { describe, afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CATALOG_DIR, adapterDirs, findAdapter } from "../src/adapters/manifest.ts";
 import { accessOf } from "../src/adapters/access.ts";
 import { runPapers } from "../src/bench/papers.ts";
@@ -153,6 +153,85 @@ test("a hook script in the project root does not pull the output folders into th
   expect(trustStatus(cwd).state).toBe("changed");
 });
 
+describe("the files of a hook command, found with no shell parsing", () => {
+  const hooked = () => Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).map((f) => f.slice(14)).sort();
+  const put = (f: string, text = "x") => {
+    mkdirSync(join(cwd, f, ".."), { recursive: true });
+    writeFileSync(join(cwd, f), text);
+  };
+
+  test("a file behind an option with a value and a file behind it are both in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "-r", "./reg", "./hooks/check"] }] } });
+    put("reg");
+    put("hooks/check");
+    expect(hooked()).toEqual(expect.arrayContaining(["hooks/check", "reg"]));
+  });
+
+  test("a sourced file in a quoted command string is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", ". ./hooks/lib; run"] }] } });
+    put("hooks/lib");
+    expect(hooked()).toContain("hooks/lib");
+  });
+
+  test("a file after cd in a quoted command string is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["bash", "-c", "cd x && ./s"] }] } });
+    put("x/s");
+    expect(hooked()).toContain("x/s");
+  });
+
+  test("a folder with more than 200 files or a node_modules folder gives the script files and a large folder line", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+    put("hooks/index.js");
+    put("hooks/lib.cjs");
+    for (let i = 0; i < 210; i++) put(`hooks/data/d${i}.dat`);
+    const scan = scanFolder(cwd);
+    expect(hooked()).toEqual(expect.arrayContaining(["hooks/index.js", "hooks/lib.cjs"]));
+    expect(hooked().some((f) => f.endsWith(".dat"))).toBe(false);
+    expect(scan.bigScripts).toEqual(["hooks"]);
+    expect(folderLines(scan).join("\n")).toContain("script folder is large");
+  });
+
+  test("a folder with node_modules gives its script files", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+    put("hooks/index.js");
+    put("hooks/node_modules/dep/index.js");
+    expect(hooked()).toEqual(["hooks/index.js"]);
+  });
+
+  test("a file named run after an interpreter is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "run"] }] } });
+    put("run");
+    expect(hooked()).toEqual(["run"]);
+  });
+
+  test("a cjs script and its cjs sibling are in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "tools/a.cjs"] }] } });
+    put("tools/a.cjs");
+    put("tools/b.cjs");
+    expect(hooked()).toEqual(["tools/a.cjs", "tools/b.cjs"]);
+  });
+
+  test("a state file that a script writes is not in the hash, and a rerun keeps the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["python3", "hooks/check.py", "hooks/state.json"] }] } });
+    put("hooks/check.py");
+    trustFolder(cwd);
+    put("hooks/state.json", "{}");
+    expect(hooked()).toEqual(["hooks/check.py"]);
+    put("hooks/state.json", '{"n":2}');
+    expect(trustStatus(cwd).state).toBe("trusted");
+  });
+
+  test("a new step script in the output folder does not change the hash, also when the setting names another folder", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py", "results/s2/step2.py"] }] }, output_folder: "results" });
+    put("hooks/check.js");
+    put("cuvette/s1/step1.py");
+    put("results/s2/step2.py");
+    expect(hooked()).toEqual(["cuvette/s1/step1.py", "hooks/check.js"]);
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py"] }] } });
+    expect(hooked()).toEqual(["hooks/check.js"]);
+  });
+});
+
 test("a script that imports a module in its own small folder has that module in the trust hash", () => {
   project(".ga", { hooks: { SessionStart: [{ command: ["node", "tools/hook.js"] }] } });
   mkdirSync(join(cwd, "tools"));
@@ -220,7 +299,7 @@ test("a hook script with no extension and no slash, and a python module, are in 
   mkdirSync(join(cwd, "pkgone"));
   for (const f of ["hook", "other", "plain", "checks/run.py", "checks/__init__.py", "pkgone/__main__.py"]) writeFileSync(join(cwd, f), "x");
   const keys = Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort();
-  expect(keys).toEqual(["hook", "other", "checks/__init__.py", "checks/run.py", "pkgone/__main__.py"].sort().map((f) => `(hook script) ${f}`));
+  expect(keys).toEqual(["hook", "other", "plain", "checks/__init__.py", "checks/run.py", "pkgone/__main__.py"].sort().map((f) => `(hook script) ${f}`));
 });
 
 test("a python module with a dotted name adds the __init__.py of each parent package", () => {

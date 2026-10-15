@@ -4,6 +4,7 @@ import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, open
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
+import { outputRoot } from "./places.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
 export const LAB_FILE = "LAB.md";
@@ -40,6 +41,7 @@ export interface FolderScan {
   lab?: string;
   labBig?: number;
   labProblem?: string;
+  bigScripts?: string[];
 }
 
 export interface TrustEntry {
@@ -102,6 +104,14 @@ function readHash(p: string): string {
   } catch (e) {
     return `unreadable:${(e as NodeJS.ErrnoException).code ?? "error"}`;
   }
+}
+
+function scriptHash(p: string): string {
+  try {
+    const st = statSync(p);
+    if (st.size > SCRIPT_SIZE_CAP) return sha(`large:${st.size}:${st.mtimeMs}`);
+  } catch {}
+  return readHash(p);
 }
 
 function linkHash(p: string): string {
@@ -240,8 +250,16 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
   return out;
 }
 
-const PATH_LIKE = /[\\/]|^\.|\.\w+$/;
-const INTERPRETER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell)(\.exe)?$/i;
+const LAUNCHER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell|env|uv|npx|pnpx|bunx|npm|pnpm|yarn|cmd|exec|time|nice|xargs|source)(\.exe)?$/i;
+const RUN_AFTER = /^(uv|npm|pnpm|yarn|bun)(\.exe)?$/i;
+const DENY_EXT = /\.(log|json|txt|csv|tsv|db|sqlite|out|md|png|jpg|pdf|xlsx|parquet)$/i;
+const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|bash|zsh|rb|pl|r|ps1|bat|cmd)$/i;
+const FOLDER_EXT = /\.(js|mjs|cjs|ts|py|sh)$/i;
+const VOLATILE_DIR = /^(logs?|state|caches?|\.cache|tmp|temp|__pycache__)$/i;
+const SKIPPED_DIR = /^(node_modules|\.venv|\.record)$/i;
+const FOLDER_FILE_LIMIT = 50;
+const SCRIPT_FOLDER_LIMIT = 200;
+const SCRIPT_SIZE_CAP = 2 * 1024 * 1024;
 
 function moduleFiles(name: string): string[] {
   const parts = name.split(".");
@@ -250,61 +268,70 @@ function moduleFiles(name: string): string[] {
   return [...parents, `${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
 }
 
-const LAUNCHER = /^(env|uv|npx|pnpx|bunx|cmd|exec|time|nice|xargs)(\.exe)?$/i;
-const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|rb|pl|php|ps1|r|bat|cmd)$/i;
-const DATA_EXT = /\.(log|json|txt|csv|db|tsv|out)$/i;
-const OUTPUT_DIR = /^(cuvette|\.record|output|outputs|data)$/i;
-const FOLDER_EXT = /\.(js|mjs|ts|py|sh)$/i;
-const VOLATILE_DIR = /^(logs?|state|caches?|\.cache|tmp|temp|__pycache__)$/i;
-const FOLDER_FILE_LIMIT = 50;
-
-interface HookWord {
+interface Token {
   word: string;
-  explicit: boolean;
+  allowed: boolean;
+  module?: boolean;
+  base: string[];
 }
 
-function segmentWords(words: string[]): HookWord[] {
-  const lead = words.find((w) => !/^\w+=/.test(w));
-  const out: HookWord[] = lead ? [{ word: lead, explicit: true }] : [];
-  let script = false;
-  for (let i = 0; i < words.length; i++) {
-    const bare = words[i]!.replace(/^["']|["']$/g, "");
-    for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push({ word: w, explicit: false });
-    if (INTERPRETER.test(basename(bare)) || LAUNCHER.test(basename(bare))) {
-      script = true;
-      continue;
+function segments(text: string): string[][] {
+  return text.split(/[;&|()`\n]+/).map((seg) => seg.split(/["'\s]+/).filter(Boolean)).filter((w) => w.length);
+}
+
+function tokens(argv: string[], key: string): Token[] {
+  const out: Token[] = [];
+  const bases = [key];
+  const walk = (words: string[]) => {
+    let allowed = true;
+    let afterLauncher = "";
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i]!;
+      if (allowed && /^\w+=/.test(w) && !afterLauncher) {
+        for (const part of w.slice(w.indexOf("=") + 1).split(/[=:]/)) if (part) out.push({ word: part, allowed: false, base: [...bases] });
+        continue;
+      }
+      if (w === "cd" || w === "pushd") {
+        const next = words[i + 1];
+        if (next) bases.push(resolve(bases.at(-1)!, next));
+        i++;
+        continue;
+      }
+      if (w === "-m" && afterLauncher && words[i + 1]) {
+        for (const f of moduleFiles(words[i + 1]!)) out.push({ word: f, allowed: true, base: [...bases] });
+        i++;
+        continue;
+      }
+      if (/^\/[ck]$/i.test(w) || (w === "run" && RUN_AFTER.test(afterLauncher))) continue;
+      const opt = w.startsWith("-");
+      for (const part of [...(opt ? [] : [w]), ...w.split(/[=:]/)]) if (part && !part.startsWith("-")) out.push({ word: part, allowed: allowed && !opt && part === w, base: [...bases] });
+      if (opt) continue;
+      if (LAUNCHER.test(basename(w))) {
+        afterLauncher = basename(w);
+        continue;
+      }
+      allowed = false;
+      afterLauncher = "";
     }
-    if (!script || bare.startsWith("-") && bare !== "-m" || /^\/[ck]$/i.test(bare) || /^\w+=/.test(bare) || bare === "run") continue;
-    if (bare === "-m" && words[i + 1]) {
-      out.push(...moduleFiles(words[i + 1]!.replace(/^["']|["']$/g, "")).map((word) => ({ word, explicit: true })));
-      script = false;
-      continue;
-    }
-    out.push({ word: bare, explicit: true });
-    script = false;
-  }
+  };
+  walk(argv);
+  argv.forEach((a, i) => {
+    if (i === 0 || !/[\s;&|()`"']/.test(a)) return;
+    for (const seg of segments(a)) walk(seg);
+  });
   return out;
 }
 
-function scriptWords(argv: string[]): HookWord[] {
-  const out = segmentWords(argv);
-  for (const arg of argv) {
-    if (!/\s/.test(arg)) continue;
-    for (const part of arg.split(/&&|\|\||[;|\n]/)) out.push(...segmentWords(part.split(/\s+/).filter(Boolean)));
-  }
-  return out;
-}
-
-function namedFiles(script: string, key: string): string[] {
+function namedFiles(script: string, key: string, skip: (rel: string) => boolean): string[] {
   let text = "";
   try {
     text = statSync(script).size < 256 * 1024 ? readFileSync(script, "utf8") : "";
   } catch {}
   const out: string[] = [];
-  for (const m of text.matchAll(/[\w./-]+\.(?:js|mjs|ts|py|sh)\b/g)) {
+  for (const m of text.matchAll(/[\w./-]+\.(?:js|mjs|cjs|ts|py|sh)\b/g)) {
     const path = resolve(dirname(script), m[0]);
     const rel = relative(key, path);
-    if (path === script || rel.startsWith("..") || isAbsolute(rel) || rel.split(sep).some((part) => part.startsWith(".") || VOLATILE_DIR.test(part) || OUTPUT_DIR.test(part))) continue;
+    if (path === script || rel.startsWith("..") || isAbsolute(rel) || skip(rel)) continue;
     try {
       if (statSync(path).isFile()) out.push(path);
     } catch {}
@@ -312,20 +339,21 @@ function namedFiles(script: string, key: string): string[] {
   return out;
 }
 
-function codeFolder(dir: string): string[] | undefined {
-  const found: string[] = [];
+function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, limit: number): { files: string[]; count: number; stopped: boolean } {
+  const files: string[] = [];
   let count = 0;
-  const visit = (d: string): boolean => {
+  let stopped = false;
+  const visit = (d: string) => {
     let names: string[];
     try {
       names = readdirSync(d).sort();
     } catch {
-      return true;
+      return;
     }
     for (const name of names) {
-      if (name === "node_modules") return false;
-      if (name.startsWith(".") || VOLATILE_DIR.test(name) || OUTPUT_DIR.test(name)) continue;
+      if (stopped) return;
       const p = join(d, name);
+      if (name.startsWith(".") || SKIPPED_DIR.test(name) || VOLATILE_DIR.test(name) || skip(relative(key, p))) continue;
       let l;
       try {
         l = lstatSync(p);
@@ -333,51 +361,93 @@ function codeFolder(dir: string): string[] | undefined {
         continue;
       }
       if (l.isSymbolicLink()) continue;
-      if (l.isDirectory()) {
-        if (!visit(p)) return false;
-        continue;
+      if (l.isDirectory()) visit(p);
+      else {
+        if (++count > limit) {
+          stopped = true;
+          return;
+        }
+        files.push(p);
       }
-      if (++count > FOLDER_FILE_LIMIT) return false;
-      if (FOLDER_EXT.test(name)) found.push(p);
     }
-    return true;
   };
-  return visit(dir) ? found : undefined;
+  visit(dir);
+  return { files, count, stopped };
 }
 
-export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
+function codeFolder(dir: string, skip: (rel: string) => boolean, key: string): string[] | undefined {
+  try {
+    if (readdirSync(dir).includes("node_modules")) return undefined;
+  } catch {
+    return undefined;
+  }
+  const r = walkFiles(dir, skip, key, FOLDER_FILE_LIMIT);
+  return r.stopped ? undefined : r.files.filter((f) => FOLDER_EXT.test(f));
+}
+
+export function hookScriptScan(folder: string, layers?: Record<string, unknown>[]): { files: string[]; large: string[] } {
   const key = folderKey(folder);
   const found = new Set<string>();
+  const large: string[] = [];
   try {
     layers ??= projectSettings(key);
   } catch {
-    return [];
+    return { files: [], large };
   }
+  let outFolder = "cuvette";
+  for (const l of layers) if (typeof l.output_folder === "string" && l.output_folder.trim()) outFolder = l.output_folder;
+  const outRoot = outputRoot(key, outFolder);
+  const skip = (rel: string) => {
+    const abs = resolve(key, rel);
+    const parts = rel.split(sep);
+    if (parts.some((part) => SKIPPED_DIR.test(part))) return true;
+    if (parts[0] === ".git" && parts[1] !== "hooks") return true;
+    return abs === outRoot || abs.startsWith(outRoot + sep);
+  };
+  const own = (d: string) => d !== key && !skip(relative(key, d));
   for (const l of layers) {
     const hooks = l.hooks;
     if (!hooks || typeof hooks !== "object") continue;
     for (const list of Object.values(hooks as Record<string, unknown>))
-      for (const h of Array.isArray(list) ? list : [])
-        for (const { word, explicit } of Array.isArray(h?.command) ? scriptWords(h.command.map(String)) : []) {
-          const path = resolve(key, word);
-          const rel = relative(key, path);
-          if (!word || rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
-          if (!explicit && (DATA_EXT.test(word) || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
-          const own = (d: string) => d !== key && !relative(key, d).split(sep).some((part) => OUTPUT_DIR.test(part));
-          try {
-            const st = statSync(path);
+      for (const h of Array.isArray(list) ? list : []) {
+        if (!Array.isArray(h?.command)) continue;
+        for (const t of tokens(h.command.map(String), key)) {
+          for (const base of t.base) {
+            const path = resolve(base, t.word);
+            const rel = relative(key, path);
+            if (!t.word || rel === "" || rel.startsWith("..") || isAbsolute(rel) || skip(rel)) continue;
+            let st;
+            try {
+              st = statSync(path);
+            } catch {
+              continue;
+            }
             if (st.isFile()) {
-              if (!explicit && !SCRIPT_EXT.test(word) && (process.platform === "win32" || !(st.mode & 0o111))) continue;
+              if (!t.allowed && (DENY_EXT.test(path) || st.size === 0 || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
               found.add(path);
               if (FOLDER_EXT.test(path)) {
                 const d = dirname(path);
-                for (const f of own(d) ? codeFolder(d) ?? [] : namedFiles(path, key)) found.add(f);
+                for (const f of own(d) ? codeFolder(d, skip, key) ?? [] : namedFiles(path, key, skip)) found.add(f);
               }
-            } else if (st.isDirectory() && explicit && own(path)) for (const f of codeFolder(path) ?? []) found.add(f);
-          } catch {}
+            } else if (st.isDirectory() && own(path)) {
+              const r = walkFiles(path, skip, key, SCRIPT_FOLDER_LIMIT);
+              if (!r.stopped) {
+                for (const f of r.files) if (!DENY_EXT.test(f)) found.add(f);
+              } else {
+                large.push(rel.split(sep).join("/"));
+                const all = walkFiles(path, skip, key, Infinity).files;
+                for (const f of all.filter((x) => SCRIPT_EXT.test(x)).slice(0, SCRIPT_FOLDER_LIMIT)) found.add(f);
+              }
+            }
+          }
         }
+      }
   }
-  return [...found];
+  return { files: [...found], large: [...new Set(large)] };
+}
+
+export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
+  return hookScriptScan(folder, layers).files;
 }
 
 function shadows(name: string): string | undefined {
@@ -474,7 +544,9 @@ export function scanFolder(folder: string): FolderScan {
   for (const p of paths) files[relative(key, p)] = readHash(p);
   for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
-  for (const p of hookScripts(key, layers)) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = readHash(p);
+  const scripts = hookScriptScan(key, layers);
+  for (const p of scripts.files) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = scriptHash(p);
+  for (const f of scripts.large) files[`(large script folder) ${f}`] = "large";
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
   const keys = Object.keys(values).filter((k) => !SAFE_KEYS.has(k));
@@ -484,7 +556,7 @@ export function scanFolder(folder: string): FolderScan {
       for (const n of safeNames(dir))
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, incomplete: [...new Set(incomplete)], bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}), ...(labBig ? { labBig } : {}), ...(labProblem ? { labProblem } : {}) };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, linked, incomplete: [...new Set(incomplete)], ...(scripts.large.length ? { bigScripts: scripts.large } : {}), bypass: values.permissionMode === "bypass", ...(lab ? { lab } : {}), ...(labBig ? { labBig } : {}), ...(labProblem ? { labProblem } : {}) };
 }
 
 export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0 || !!s.lab || !!s.labBig;
@@ -622,6 +694,7 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
   if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${oneLine(h)}`));
   if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${oneLine(a.name)}${a.replaces ? `: replaces ${oneLine(a.replaces)}` : ""}`));
+  if (s.bigScripts?.length) out.push("The script folder is large. Cuvette hashes only the script files in it:", ...s.bigScripts.map((f) => `  ${oneLine(f)}`));
   if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${oneLine(m)}`));
   const labPath = oneLine(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
