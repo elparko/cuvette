@@ -167,27 +167,23 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     for (const e of loads) lines.push(`- ${oneLine(show(e.data.name))} adapter ${oneLine(show(e.data.version))}, program ${oneLine(show(e.data.programVersion)) || "version unknown"}: ${oneLine(show(e.data.reason))}`);
   }
   lines.push("", "## Steps", "");
-  const setAside = mainNodes(record).length - nodes.length;
-  if (setAside > 0) {
-    const numbers = stepNumbers(record.nodes());
-    const live = new Set(nodes.map((n) => n.id));
-    const missing = mainNodes(record).filter((n) => !live.has(n.id)).map((n) => numbers.get(n.id));
-    lines.push(`A rewind set aside ${setAside === 1 ? "step" : "steps"} ${missing.join(", ")} of the trail. This list does not have ${setAside === 1 ? "it" : "them"}, and it counts only the steps that stay.`, "");
-  }
+  const numbers = stepNumbers(record.nodes());
+  const live = new Set(nodes.map((n) => n.id));
+  const missing = mainNodes(record).filter((n) => !live.has(n.id)).map((n) => numbers.get(n.id));
+  if (missing.length) lines.push(`A rewind set aside ${missing.length === 1 ? "step" : "steps"} ${missing.join(", ")} of the trail. This list does not have ${missing.length === 1 ? "it" : "them"}. The other steps keep the numbers of the trail.`, "");
   const groups = group(nodes);
   const sentences: string[] = [];
-  let num = 0;
   for (const g of groups) {
-    num++;
-    lines.push(`${num}. ${g.first.summary ? g.first.summary : g.first.tool}`);
+    const here = numbers.get(g.first.id)!;
+    lines.push(`${here}. ${g.first.summary ? g.first.summary : g.first.tool}`);
     for (const l of stepLines(adapters, g.first)) lines.push(`   ${l}`);
     sentences.push(methodsSentence(adapters, g.first).replace(/\.?$/, `${cite(nodeCitations(adapters, g.first).methods)}.`));
     if (g.rest.length && g.key) {
-      const here = num;
-      num += g.rest.length;
+      const rest = g.rest.map((n) => numbers.get(n.id)!);
       const paths = g.rest.map((n) => `\`${oneLine(show(n.args[g.key!]))}\``).join(", ");
-      const range = g.rest.length > 1 ? ` (steps ${here + 1} to ${num})` : "";
-      lines.push(`${here + 1}. Repeat step ${here} for ${paths}${range}.`);
+      const joined = rest.every((n, k) => k === 0 || n === rest[k - 1]! + 1);
+      const range = rest.length > 1 ? ` (steps ${joined ? `${rest[0]} to ${rest.at(-1)}` : rest.join(", ")})` : "";
+      lines.push(`${rest[0]}. Repeat step ${here} for ${paths}${range}.`);
       sentences.push(`The same step was repeated for ${g.rest.length} more input${g.rest.length === 1 ? "" : "s"}.`);
     }
   }

@@ -291,3 +291,17 @@ test("a decision value with a line break stays in one row of the protocol table"
   expect(md).toContain("| line one line two |");
   expect(md).not.toContain("line one\nline two");
 });
+
+test("after a rewind the protocol keeps the trail numbers, also in a repeated step", () => {
+  const r = new AnalysisRecord(join(dir, "s4"), "20260101-000000-abcf");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/1.tif" } }));
+  const upTo = r.entries().at(-1)!.id;
+  r.addNode(nodeIn({ tool: "blur", args: { path: "/w/x.tif", sigma: 5 } }));
+  r.append("rewind", { upTo });
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/2.tif" } }));
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/3.tif" } }));
+  const md = readFileSync(exportProtocol(r, [adapter], join(dir, "p4.md")), "utf8");
+  expect(md).toContain("A rewind set aside step 2 of the trail.");
+  expect(md).toContain("3. Repeat step 1 for `/w/2.tif`, `/w/3.tif` (steps 3 to 4).");
+});

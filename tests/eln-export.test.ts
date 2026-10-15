@@ -150,5 +150,7 @@ test("after a rewind the step folders keep the step numbers of the trail, and pr
   const folders = [...files.keys()].filter((k) => /\/steps\/\d+-[^/]+\/step\.md$/.test(k)).map((k) => k.split("/steps/")[1]!.split("/")[0]);
   expect(folders).toEqual(["01-count", "03-sharpen"]);
   expect(files.get(`${top}analysis/steps/03-sharpen/step.md`)!.toString()).toMatch(/^# Step 3: Sharpened\./);
-  expect(files.get(`${top}analysis/protocol.md`)!.toString()).toContain("A rewind set aside step 2 of the trail.");
+  const protocol = files.get(`${top}analysis/protocol.md`)!.toString();
+  expect(protocol).toContain("A rewind set aside step 2 of the trail.");
+  expect(protocol).toMatch(/^1\. .*\n(?:   .*\n)*3\. Sharpened\./m);
 });
