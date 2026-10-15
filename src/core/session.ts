@@ -386,7 +386,7 @@ export class Session {
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     const onInterrupt = () => {
       if (!opts.place) discardPlace(place);
-      process.exit(130);
+      if (!process.listenerCount("SIGINT")) process.exit(130);
     };
     if (!opts.place && !opts.home) process.once("SIGINT", onInterrupt);
     try {

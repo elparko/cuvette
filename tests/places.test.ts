@@ -293,6 +293,33 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("the index
   }
 });
 
+async function interruptDuringStart(extra: string) {
+  const cwd = project();
+  const held: import("node:http").ServerResponse[] = [];
+  const server = createServer((_, res) => void held.push(res));
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const host = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const code = `import { Session } from ${JSON.stringify(join(__dirname, "../src/core/session.ts"))}; ${extra} Session.create({ adapters: [], model: "ollama:slow", cwd: ${JSON.stringify(cwd)}, settings: { guidance: false, referee: "none" } });`;
+  const child = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, CUVETTE_HOME: home, OLLAMA_HOST: host }, stdio: "ignore" });
+  const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  const root = join(cwd, "cuvette");
+  const started = () => existsSync(root) && readdirSync(root).some((n) => n.startsWith(".new-")) && held.length > 0;
+  for (let i = 0; i < 600 && !started(); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(started()).toBe(true);
+  child.kill("SIGINT");
+  const code2 = await exit;
+  server.closeAllConnections();
+  await new Promise((r) => server.close(r));
+  return { code: code2, left: readdirSync(root).filter((n) => n.startsWith(".new-")) };
+}
+
+test.skipIf(process.platform === "win32")("Ctrl+C with another SIGINT handler lets that handler end the process", async () => {
+  const r = await interruptDuringStart(`process.on("SIGINT", () => setTimeout(() => process.exit(0), 500));`);
+  expect(r.code).toBe(0);
+  expect(r.left).toEqual([]);
+  expect(readIndex()).toEqual([]);
+}, 60_000);
+
 test.skipIf(process.platform === "win32")("Ctrl+C while a session starts removes the provisional folder and the index row", async () => {
   const cwd = project();
   const held: import("node:http").ServerResponse[] = [];

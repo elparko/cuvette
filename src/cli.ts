@@ -457,7 +457,7 @@ async function app(folder?: string) {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
   });
-  await a.close();
+  await Promise.race([a.close(), new Promise((r) => setTimeout(r, 2000).unref())]);
   process.exit(0);
 }
 
