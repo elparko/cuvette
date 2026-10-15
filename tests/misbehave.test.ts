@@ -813,6 +813,23 @@ test("write_file works in a new place and in a legacy place, and refuses the rec
   }
 });
 
+test("write_file refuses the record and the settings with any letter case in the name", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const steps: Bad[] = [{ text: "Ready." }];
+  const { provider, session: s } = await start(steps, {}, cwd);
+  await s.send("go");
+  steps.push(
+    call("write_file", { name: join(s.workDir, ".Record", "log.jsonl"), text: "evil" }),
+    call("write_file", { name: join(cwd, ".CUVETTE", "settings.json"), text: "evil" }),
+    call("write_file", { name: join(cwd, ".Ga", "settings.json"), text: "evil" }),
+    call("write_file", { name: join(cwd, "lab.MD"), text: "evil" }),
+    { text: "ok" },
+  );
+  await s.send("write");
+  for (const x of texts(provider).slice(0, 4)) expect(x).toMatch(GUARD_TEXT);
+  expect(existsSync(join(cwd, ".CUVETTE"))).toBe(false);
+});
+
 test.skipIf(windows)("a link to the record file does not open the record for writing", async () => {
   const cwd = mkdtempSync(join(work, "proj-"));
   const steps: Bad[] = [{ text: "Ready." }];
