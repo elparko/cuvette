@@ -457,6 +457,8 @@ async function app(folder?: string) {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
   });
+  console.log("Stopping. Press Ctrl+C again to quit now.");
+  process.once("SIGINT", () => process.exit(130));
   await Promise.race([a.close(), new Promise((r) => setTimeout(r, APP_CLOSE_LIMIT_MS).unref())]);
   process.exit(0);
 }

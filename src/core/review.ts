@@ -584,7 +584,7 @@ export function completeFindings(raw: string): FindingIn[] {
   }).filter((f): f is FindingIn => Boolean(f));
 }
 
-export const CUT_REPLY_NOTICE = "The referee ran, but the output limit cut its reply before the end. The reply was not complete, so the answer is not checked.";
+export const CUT_REPLY_NOTICE = "The referee ran, but the output limit cut its reply before the end. The reply is incomplete, so the answer is not checked.";
 
 export const CUT_REVIEW_NOTICE = "The output limit cut the review short. The findings here are the ones that the referee finished.";
 

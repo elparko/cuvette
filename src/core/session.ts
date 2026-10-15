@@ -437,6 +437,7 @@ export class Session {
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
     const replaced: string[] = [];
+    const sameFolder = new Set<string>();
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
@@ -446,7 +447,12 @@ export class Session {
           const found = findAdapter(a, cwd);
           const recordedPath = recorded.get(found.name);
           const before = [recordedPath && existsSync(recordedPath) && known.has(realpathSync(recordedPath)) ? recordedPath : undefined, dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
-          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) replaced.push(found.name);
+          const sameRecorded = !!recordedPath && existsSync(recordedPath) && realpathSync(recordedPath) === realpathSync(found.root);
+          const strayRecorded = sameRecorded && !before.includes(realpathSync(found.root));
+          if (recorded.has(found.name) && (strayRecorded || (!sameRecorded && !before.includes(realpathSync(found.root))))) {
+            replaced.push(found.name);
+            if (strayRecorded) sameFolder.add(found.name);
+          }
         } catch {}
       }
       adapters =
@@ -476,6 +482,7 @@ export class Session {
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
     for (const name of replaced) {
+      if (sameFolder.has(name)) continue;
       const before = recorded.get(name);
       const missing = !!before && !existsSync(before);
       s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });

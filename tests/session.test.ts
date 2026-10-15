@@ -3674,7 +3674,7 @@ test("a referee reply that is cut with no complete finding says that the reply w
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count the particles");
   const texts = session.record.entries(["notice"]).map((e) => String(e.data.text));
-  expect(texts.some((t) => /The referee ran, but the output limit cut its reply/.test(t) && /not complete/.test(t))).toBe(true);
+  expect(texts.some((t) => /The referee ran, but the output limit cut its reply/.test(t) && /is incomplete/.test(t))).toBe(true);
   expect(texts.some((t) => /The referee did not run/.test(t))).toBe(false);
 });
 
