@@ -69,6 +69,7 @@ export interface ProgramRow {
 export interface Plan {
   action: Action;
   name: string;
+  program?: string;
   title: string;
   lines: string[];
   command?: string;
@@ -432,7 +433,7 @@ function installLines(r: ProgramRow, i: Install, update: boolean, canRun: boolea
 }
 
 export async function planAction(r: ProgramRow, action: Action, opts: { path?: string; by?: string; locate?: ProgramsOpts["locate"]; manifest?: Manifest; exec?: RunOpts["exec"] } = {}): Promise<Plan> {
-  const base: Plan = { action, name: r.name, title: `${ACTION_LABEL[action]}: ${r.program} (${r.name})`, lines: [], runs: true };
+  const base: Plan = { action, name: r.name, program: r.program, title: `${ACTION_LABEL[action]}: ${r.program} (${r.name})`, lines: [], runs: true };
   const refuse = (why: string, more: Partial<Plan> = {}): Plan => ({ ...base, ...more, runs: false, refused: why });
   switch (action) {
     case "install":
@@ -640,7 +641,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
   switch (plan.action) {
     case "install":
     case "update": {
-      if (process.platform === "win32" && !opts.exec) return { ok: false, text: windowsInstallText(plan.name, plan.link) };
+      if (process.platform === "win32" && !opts.exec) return { ok: false, text: windowsInstallText(plan.program ?? plan.name, plan.link) };
       const claim = claimRun(home, plan);
       if ("busy" in claim) return { ok: false, text: claim.busy };
       try {

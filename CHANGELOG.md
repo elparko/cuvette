@@ -57,7 +57,7 @@ Release 0.1.1 includes all changes since 12 October.
 - Leave setup first sends the choice to the server. Then it shows the start page. Setup shows again after a session closes with no key.
 - An install job that throws an error ends as failed and shows the error message. A new install can start after it. The finish step runs once, so a late error cannot replace a good result.
 - `OLLAMA_HOST` can be a bare host, a host with a port, or a bare IPv6 address. Cuvette adds `http://` and the port 11434 if they are missing. It treats `0.0.0.0` as a local address. The model query has a time limit.
-- After Ctrl+C, the command line waits up to 20 seconds for the app to close. The app waits up to 6 seconds for an install to stop. So the session closes if an install runs.
+- After Ctrl+C, the command line waits up to 20 seconds for the app to close. The app waits up to 6 seconds for an install to stop. So Ctrl+C during an install still closes the session.
 - The app prints "Stopping. Press Ctrl+C again to quit now." if the close takes more than one second. A second Ctrl+C or a second stop signal quits at once.
 
 ### Data and statistics
@@ -72,7 +72,7 @@ Release 0.1.1 includes all changes since 12 October.
 ### Windows
 
 - A folder path with a backslash shows with no quotes in the trust card, `trust list`, the refusal notices and the LAB.md card.
-- A command in a notice quotes a path with single quotes on Windows, so PowerShell reads `%`, `$` and a backtick as text. The notice shows each backslash of a path as it is.
+- A command in a notice quotes a path with single quotes on Windows, but a plain path stays without quotes. The quotes make PowerShell read `%`, `$` and a backtick as text. The notice shows each backslash of a path as it is.
 - An exported script imports the replay module with a file URL, so Node on Windows can run it.
 - On Windows, the plan card of an install says that Cuvette cannot run the install command. It shows the download link and has no confirm button.
 - A session lock from a process that ended no longer blocks the session. Cuvette reads the start time of the process with PowerShell. If the lock stays, the message names the file to delete.
