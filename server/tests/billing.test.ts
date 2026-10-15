@@ -720,8 +720,11 @@ describe("webhook: invoice.paid", () => {
     const env = makeEnv();
     const keep = NOW.getTime() + 10 * DAY;
     const a = await addAccount(env, 4, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: keep });
-    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 3000, amount_paid: 3000, lines: { data: [line("price_lab_m", 3000, period(31))] } })));
-    expect(acc(env, a.id)).toMatchObject({ plan: "lab", allowance_remaining_usd: 4 + 31, allowance_granted_usd: 46, allowance_resets_at: keep, period_end: period(31) * 1000 });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 3000, amount_paid: 3000, lines: { data: [line("price_lab_m", 3000, period(41))] } })));
+    const added = 31 * (10 / 30);
+    expect(acc(env, a.id)).toMatchObject({ plan: "lab", allowance_resets_at: keep, period_end: period(41) * 1000 });
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + added, 6);
+    expect(acc(env, a.id).allowance_granted_usd).toBeCloseTo(15 + added, 6);
   });
 
   it("scales the added allowance by the share of the period that is left", async () => {
@@ -754,6 +757,28 @@ describe("webhook: invoice.paid", () => {
     await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 1500, amount_paid: 1500, lines: { data: [line("price_lab_m", 1500, sec(end))] } })));
     const share = (end - NOW.getTime()) / (end - Date.parse("2026-09-16T12:00:00Z"));
     expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + 31 * share, 6);
+  });
+
+  it("scales the added allowance of a yearly plan by the time left in the monthly window, late in the window", async () => {
+    freeze();
+    const env = makeEnv();
+    const resets = Date.parse("2026-10-04T12:00:00Z");
+    const end = Date.parse("2027-02-04T12:00:00Z");
+    const a = await addAccount(env, 4, { plan: "standard", interval: "year", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: resets, periodEnd: end });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 9000, amount_paid: 9000, lines: { data: [line("price_lab_y", 9000, sec(end))] } })));
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + 31 * (3 / 30), 6);
+    expect(acc(env, a.id).allowance_granted_usd).toBeCloseTo(15 + 31 * (3 / 30), 6);
+    expect(acc(env, a.id).allowance_resets_at).toBe(resets);
+  });
+
+  it("scales the added allowance of a yearly plan by the time left in the monthly window, early in the year", async () => {
+    freeze();
+    const env = makeEnv();
+    const resets = Date.parse("2026-10-30T12:00:00Z");
+    const end = Date.parse("2027-09-30T12:00:00Z");
+    const a = await addAccount(env, 4, { plan: "standard", interval: "year", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: resets, periodEnd: end });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 40000, amount_paid: 40000, lines: { data: [line("price_lab_y", 40000, sec(end))] } })));
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + 31 * (29 / 30), 6);
   });
 
   it("pays the difference of a trial that ended early", async () => {

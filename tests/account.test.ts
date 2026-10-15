@@ -218,10 +218,20 @@ describe("error texts", () => {
   test("the server error types have their own text", () => {
     expect(hostedError(503, body("hosted_off"))!.text).toBe("Cuvette hosted is not open yet.");
     expect(hostedError(409, body("trial_in_progress"))!.text).toContain("during the trial");
-    expect(hostedError(400, body("invalid_request_error"))!.text).toContain("Update Cuvette");
-    expect(hostedError(404, body("not_found_error"))!.text).toContain("does not have this item");
+    const bare = (type: string) => ({ type: "error", error: { type } });
+    expect(hostedError(400, bare("invalid_request_error"))!.text).toContain("Update Cuvette");
+    expect(hostedError(404, bare("not_found_error"))!.text).toContain("does not have this item");
     expect(hostedError(413, body("request_too_large"))!.text).toContain("too large");
-    expect(hostedError(500, body("api_error"))).toMatchObject({ transient: true, text: expect.stringContaining("had an error") });
+    expect(hostedError(500, bare("api_error"))).toMatchObject({ transient: true, text: expect.stringContaining("had an error") });
+  });
+
+  test("invalid_request_error, not_found_error and api_error show the message of the server", () => {
+    const msg = (type: string, message: string) => ({ type: "error", error: { type, message } });
+    expect(hostedError(400, msg("invalid_request_error", "prompt is too long: 250000 tokens > 200000 maximum"))!.text).toBe("prompt is too long: 250000 tokens > 200000 maximum");
+    expect(hostedError(400, msg("invalid_request_error", "The account is on this plan already."))!.text).toBe("The account is on this plan already.");
+    expect(hostedError(404, msg("not_found_error", "The device does not exist."))!.text).toBe("The device does not exist.");
+    expect(hostedError(502, msg("api_error", "The payment service did not accept the change. Check the card on the billing page."))).toMatchObject({ transient: true, text: "The payment service did not accept the change. Check the card on the billing page." });
+    expect(hostedError(400, msg("invalid_request_error", "   "))!.text).toContain("Update Cuvette");
   });
 
   test("overloaded shows the retry time if the server gives one", () => {

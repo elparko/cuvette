@@ -620,6 +620,23 @@ describe("spend order", () => {
     expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
   });
 
+  it("settles many expired holds in batches of at most 40 statements and debits each hold once", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 100);
+    for (let i = 0; i < 25; i++) addHold(env, a.id, 1, Date.now() - 20 * 60_000, `old${i}`);
+    const sizes: number[] = [];
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (async (statements: any[]) => {
+      sizes.push(statements.length);
+      return batch(statements);
+    }) as typeof env.DB.batch;
+    expect(await expireHolds(env, a.id, Date.now())).toBe(true);
+    expect(sizes).toEqual([40, 40, 20]);
+    expect(balanceOf(env, a.id)).toBe(75);
+    expect(env.fake.rows("SELECT * FROM usage")).toHaveLength(25);
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
+  });
+
   it("handles an expired hold at settle: it keeps the full amount and the status expired", async () => {
     const env = makeEnv();
     const a = await addAccount(env, 5);

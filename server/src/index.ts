@@ -257,8 +257,8 @@ async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flav
   if (!up.ok) {
     const text = await up.text();
     await refundAll("rejected");
-    if (isBusy(up.status)) return busy(up);
     if (flavor.isOurs(up.status, text)) return unavailable();
+    if (isBusy(up.status)) return busy(up);
     return new Response(text, { status: up.status, headers: passHeaders(up) });
   }
 
@@ -398,8 +398,8 @@ async function countTokens(req: Request, env: Env, account: Account): Promise<Re
     return fail(502, "api_error", "The inference service did not answer. Try again.");
   }
   const text = await up.text();
-  if (isBusy(up.status)) return busy(up);
   if (!up.ok && flavor.isOurs(up.status, text)) return unavailable();
+  if (isBusy(up.status)) return busy(up);
   return new Response(text, { status: up.status, headers: passHeaders(up) });
 }
 

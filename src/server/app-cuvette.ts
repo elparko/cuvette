@@ -50,7 +50,11 @@ export function cuvetteApi(o: CuvetteApiOptions) {
     if (cuvetteToken(o.env).from === "none") return json({ ...base, signedIn: false });
     try {
       const account = await getAccount(ctx());
-      await keepModelInPlan(modelCtx(), account.models);
+      try {
+        await keepModelInPlan(modelCtx(), account.models);
+      } catch (e) {
+        console.error(`Cuvette could not save the model: ${e instanceof Error ? e.message : String(e)}`);
+      }
       return json({ ...base, signedIn: true, account });
     } catch (e) {
       if (e instanceof AccountError) return json({ ...base, signedIn: true, account: null, error: e.message });

@@ -274,6 +274,19 @@ describe("chat completions usage", () => {
     }
   });
 
+  it("maps an OpenAI 429 with insufficient_quota to the operator error and a plain 429 to overloaded", async () => {
+    for (const stream of [true, false]) {
+      for (const [text, type] of [['{"error":{"code":"insufficient_quota"}}', "api_error"], ['{"error":{"message":"slow down"}}', "overloaded"]] as const) {
+        const env = makeOpenAiEnv();
+        const acct = await addAccount(env, 5);
+        mockFetch(() => new Response(text, { status: 429, headers: { "content-type": "application/json" } }));
+        const { res } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody({ stream })));
+        expect(res.status).toBe(503);
+        expect((await res.json() as any).error.type).toBe(type);
+      }
+    }
+  });
+
   it("refunds in full and answers 502 when the host cannot be reached", async () => {
     const env = makeOpenAiEnv();
     const acct = await addAccount(env, 5);

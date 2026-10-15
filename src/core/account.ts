@@ -108,6 +108,7 @@ export function hostedError(status: number, body: unknown, retryAfterHeader?: st
   const type = String(inner.type ?? "");
   const resets = inner.resets_at ?? top.resets_at;
   const seconds = Number(inner.retry_after ?? top.retry_after ?? retryAfterHeader);
+  const sent = typeof inner.message === "string" ? inner.message.trim().slice(0, 300) : "";
   if (type === "authentication_error" || (status === 401 && !type)) return { type: "authentication_error", text: SIGN_IN_REFUSED, transient: false };
   if (type === "allowance_used_up" || (status === 402 && !type))
     return {
@@ -129,18 +130,17 @@ export function hostedError(status: number, body: unknown, retryAfterHeader?: st
   if (type === "too_many_requests") return { type, text: TOO_MANY, transient: true };
   if (type === "hosted_off") return { type, text: HOSTED_OFF, transient: false };
   if (type === "trial_in_progress") return { type, text: "The plan cannot change during the trial. Change it after the trial ends.", transient: false };
-  if (type === "invalid_request_error") return { type, text: "Cuvette could not use the request. Update Cuvette, then try again.", transient: false };
-  if (type === "not_found_error") return { type, text: "The Cuvette server does not have this item. Select Refresh, then try again.", transient: false };
+  if (type === "invalid_request_error") return { type, text: sent || "Cuvette could not use the request. Update Cuvette, then try again.", transient: false };
+  if (type === "not_found_error") return { type, text: sent || "The Cuvette server does not have this item. Select Refresh, then try again.", transient: false };
   if (type === "request_too_large") return { type, text: "The request is too large. Send less data, then try again.", transient: false };
-  if (type === "api_error") return { type, text: "The Cuvette server had an error. Wait a moment and retry.", transient: true };
+  if (type === "api_error") return { type, text: sent || "The Cuvette server had an error. Wait a moment and retry.", transient: true };
   if (type === "overloaded")
     return {
       type,
       text: `The model service is busy. ${Number.isFinite(seconds) && seconds > 0 ? `Wait ${waitText(seconds)} and retry.` : "Wait a moment and retry."}`,
       transient: true,
     };
-  const message = typeof inner.message === "string" ? inner.message.trim().slice(0, 300) : "";
-  if (message) return { type: type || "error", text: message, transient: false, generic: true };
+  if (sent) return { type: type || "error", text: sent, transient: false, generic: true };
   return undefined;
 }
 

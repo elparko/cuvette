@@ -221,11 +221,9 @@ function linePriceId(line: any): string | undefined {
   return typeof price === "string" ? price : undefined;
 }
 
-function periodShare(invoice: any, interval: Interval, periodEnd: number, now: number): number {
-  const nominalStart = addMonths(periodEnd, interval === "year" ? -12 : -1, new Date(periodEnd).getUTCDate());
-  const given = seconds(invoice.period_start);
-  const start = given !== undefined && Math.abs(given - nominalStart) <= 2 * 86_400_000 ? given : nominalStart;
-  return Math.min(1, Math.max(0, (periodEnd - now) / (periodEnd - start)));
+function windowShare(resetsAt: number, periodEnd: number, now: number): number {
+  const start = addMonths(resetsAt, -1, new Date(periodEnd).getUTCDate());
+  return Math.min(1, Math.max(0, (resetsAt - now) / (resetsAt - start)));
 }
 
 async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Effect | undefined> {
@@ -248,10 +246,10 @@ async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Ef
   if (reason === "subscription_cycle" && account.period_end !== null && account.stripe_subscription_id === subscription && periodEnd < account.period_end) return undefined;
   if (reason === "subscription_update") {
     const total = Number(invoice.total ?? invoice.amount_paid ?? 0);
-    const share = periodShare(invoice, interval, periodEnd, now);
-    const delta = total > 0 ? Math.max(0, plan.allowanceUsd - account.allowance_granted_usd) * share : 0;
     const inTrial = account.sub_status === "trialing" || account.allowance_granted_usd === cfg.trial.allowanceUsd;
     const keepWindow = !inTrial && account.allowance_resets_at !== null && account.allowance_resets_at > now + 60_000;
+    const share = keepWindow ? windowShare(account.allowance_resets_at!, periodEnd, now) : 1;
+    const delta = total > 0 ? Math.max(0, plan.allowanceUsd - account.allowance_granted_usd) * share : 0;
     return {
       statements: [
         env.DB

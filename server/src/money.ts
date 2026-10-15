@@ -62,6 +62,7 @@ interface HeldRow {
 }
 
 const STATEMENTS_PER_HOLD = 4;
+const HOLDS_PER_BATCH = 10;
 
 function settleStatements(env: Env, hold: HeldRow, charge: number, status: string, model: string | null, t: Tokens, now: number): D1PreparedStatement[] {
   const live = hold.started_at > now - LIVE_HOLD_MS;
@@ -106,8 +107,12 @@ export async function settle(env: Env, requestId: string, charge: number, model:
 export async function expireHolds(env: Env, accountId: string, now: number): Promise<boolean> {
   const { results } = await env.DB.prepare("SELECT * FROM holds WHERE account_id = ?1 AND started_at <= ?2").bind(accountId, now - LIVE_HOLD_MS).all<HeldRow>();
   if (!results.length) return false;
-  const done = await env.DB.batch(results.flatMap((h) => settleStatements(env, h, 0, "expired", null, NO_TOKENS, now)));
-  return done.some((r, i) => i % STATEMENTS_PER_HOLD === STATEMENTS_PER_HOLD - 1 && r.meta.changes > 0);
+  let found = false;
+  for (let i = 0; i < results.length; i += HOLDS_PER_BATCH) {
+    const done = await env.DB.batch(results.slice(i, i + HOLDS_PER_BATCH).flatMap((h) => settleStatements(env, h, 0, "expired", null, NO_TOKENS, now)));
+    if (done.some((r, j) => j % STATEMENTS_PER_HOLD === STATEMENTS_PER_HOLD - 1 && r.meta.changes > 0)) found = true;
+  }
+  return found;
 }
 
 export async function lazyReset(env: Env, cfg: PlansConfig, a: Account, now: number): Promise<boolean> {

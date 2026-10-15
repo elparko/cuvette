@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -242,7 +242,7 @@ describe("hosted mode on", () => {
       const c = await start(env, s.fn);
       const r = await c.post("api/cuvette/link", { provider: "github" });
       expect(r.status).toBe(400);
-      expect((await r.json()).error).toContain("Update Cuvette");
+      expect((await r.json()).error).toBe("The provider must be google.");
     });
 
     test("a signed-in state moves a model that the plan does not include to the first listed plan model", async () => {
@@ -254,6 +254,24 @@ describe("hosted mode on", () => {
       expect(savedModel({ cwd: home, env: {} })).toBe("cuvette:claude-haiku-5-5");
       await c.post("api/cuvette", {});
       expect(savedModel({ cwd: home, env: {} })).toBe("cuvette:claude-haiku-5-5");
+    });
+
+    test("a signed-in state answers 200 and shows the account when the settings file cannot be written", async () => {
+      saveCuvetteToken("cuv_abc");
+      await changeSetting({ cwd: home, env: {} }, "model", "cuvette", "user");
+      const s = server({ "/v1/account": () => json(200, { ...ACCOUNT, models: ["claude-future-9", "claude-haiku-5-5"] }) });
+      const c = await start(env, s.fn);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      chmodSync(join(home, "settings.json"), 0o400);
+      try {
+        const r = await c.post("api/cuvette", {});
+        expect(r.status).toBe(200);
+        expect((await r.json()).account.plan).toBe("basic");
+        expect(error).toHaveBeenCalledWith(expect.stringContaining("could not save the model"));
+      } finally {
+        chmodSync(join(home, "settings.json"), 0o600);
+        error.mockRestore();
+      }
     });
 
     test("a signed-in state keeps a plan model, and does not touch a Claude model", async () => {
