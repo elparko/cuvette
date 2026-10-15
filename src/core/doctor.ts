@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { ollamaHost } from "./ollama-host.ts";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { locate, which } from "../adapters/locate.ts";
@@ -217,7 +218,7 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
   );
 
   progress("Ollama");
-  const host = (env.OLLAMA_HOST || "http://localhost:11434").replace(/\/$/, "");
+  const host = ollamaHost(env);
   let models: string[] | undefined;
   try {
     const res = await (opts.fetch ?? fetch)(`${host}/api/tags`, { signal: AbortSignal.timeout(1500) });

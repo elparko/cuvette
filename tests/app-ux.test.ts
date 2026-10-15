@@ -654,6 +654,20 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await goPage("Analysis");
   });
 
+  test("first start: Leave setup stays on the page and shows a message if the call fails", async () => {
+    await page.eval(`(() => {
+      window.__mocks.push({ part: "api/leave-setup", reply: () => ({ status: 500, body: { error: "The app did not answer." } }) });
+      window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { needed: true, hasKey: false, model: "claude", ollama: { reachable: false, models: [] }, choices: [{ id: "claude", label: "Use Claude", help: "" }, { id: "local", label: "Use a local model", help: "" }], recommended: "qwen3:8b", sample: "/tmp/Cuvette sample", keyGuide: { title: "", intro: "", steps: [], notes: [] } } }) });
+      window.cuvetteApp.show("setup");
+    })()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Leave setup")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Leave setup").click()`);
+    expect(await until(page, `document.querySelector("[data-sonner-toast]")?.textContent.includes("The app did not answer.")`)).toBe(true);
+    expect(await page.eval(`[...document.querySelectorAll("main button")].some((b) => b.textContent === "Leave setup")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart") && m.part !== "api/leave-setup")`);
+    await goPage("Analysis");
+  });
+
   test("first start: a saved local model shows the next steps and the new model, also if Ollama does not run", async () => {
     await page.eval(`(() => {
       window.__model = "claude";

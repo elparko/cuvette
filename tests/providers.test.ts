@@ -10,6 +10,7 @@ import { ClaudeProvider } from "../src/providers/claude.ts";
 import { DEFAULTS } from "../src/core/config.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
+import { showModel } from "../src/providers/ollama.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 import { keySafe, parseArgs } from "../src/providers/openai.ts";
 import { retryReason } from "../src/providers/retry.ts";
@@ -714,6 +715,28 @@ describe("ollama", () => {
     expect(err).toBeInstanceOf(ProviderError);
     expect(err.transient).toBe(true);
     expect(seen.filter((s) => s.url.endsWith("/api/chat"))).toHaveLength(4);
+  });
+
+  test("OLLAMA_HOST with no scheme and no port uses port 11434", async () => {
+    vi.stubEnv("OLLAMA_HOST", "127.0.0.1");
+    const seen = stubOllama(() => json({}));
+    await makeProvider("ollama:x");
+    expect(seen[0].url).toBe("http://127.0.0.1:11434/api/show");
+  });
+
+  const hang = () => vi.stubGlobal("fetch", (_u: string, init: { signal: AbortSignal }) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason))));
+
+  test("showModel stops with a clear message if Ollama does not answer", async () => {
+    hang();
+    await expect(showModel("x", undefined, 50)).rejects.toThrow(/did not answer in 0.05 s/);
+  });
+
+  test("showModel stops if the caller aborts, and the error is the abort", async () => {
+    hang();
+    const stop = new AbortController();
+    const p = showModel("x", stop.signal);
+    stop.abort(new Error("stopped by caller"));
+    await expect(p).rejects.toThrow("stopped by caller");
   });
 
   test("OLLAMA_HOST overrides the address", async () => {

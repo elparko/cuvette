@@ -125,6 +125,17 @@ test("missing: each item gives the exact install command or a download link", as
   expect(safeFixes(checks)).toEqual([]);
 });
 
+test("the Ollama check uses the shared host: no scheme, default port 11434", async () => {
+  const seen: string[] = [];
+  const spy = (async (u: string) => {
+    seen.push(String(u));
+    return new Response(JSON.stringify({ models: [{ name: "qwen3:8b" }] }));
+  }) as unknown as typeof fetch;
+  const c = await runDoctor(base({ fetch: spy, env: { ANTHROPIC_API_KEY: "sk-ant-test", OLLAMA_HOST: "127.0.0.1" } }));
+  expect(seen).toEqual(["http://127.0.0.1:11434/api/tags"]);
+  expect(byId(c, "ollama").status).toBe("ok");
+});
+
 test("missing: Ollama runs without a model, or is installed but stopped", async () => {
   const empty = (async () => new Response(JSON.stringify({ models: [] }))) as unknown as typeof fetch;
   let c = await runDoctor(base({ fetch: empty }));
