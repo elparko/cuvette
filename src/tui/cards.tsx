@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
-import { Box, useInput } from "ink";
+import { Box, useBoxMetrics, useInput, type DOMElement } from "ink";
 import { Text } from "./text.tsx";
 import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
@@ -18,7 +18,7 @@ import type { PlanResponse } from "../core/types.ts";
 
 export type { Card } from "../ui/cards.ts";
 
-function Frame({ title, color, children, arrows }: { title: string; color: string; children: React.ReactNode; arrows?: boolean }) {
+function Frame({ title, color, children, arrows, follow }: { title: string; color: string; children: React.ReactNode; arrows?: boolean; follow?: number }) {
   const max = useContext(CardRows);
   const parts = React.Children.toArray(children);
   const tail = parts.length > 1 ? parts.pop() : undefined;
@@ -33,7 +33,7 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
       <CardRows.Provider value={Infinity}>
-        <Fit max={max - 2} head={head} tail={tail} arrows={arrows} />
+        <Fit max={max - 2} head={head} tail={tail} arrows={arrows} follow={follow} />
       </CardRows.Provider>
     </Box>
   );
@@ -52,9 +52,9 @@ function useOnce() {
     };
 }
 
-function Hang({ head, lead, children }: { head: React.ReactNode; lead: number; children: React.ReactNode }) {
+function Hang({ head, lead, children, boxRef }: { head: React.ReactNode; lead: number; children: React.ReactNode; boxRef?: React.Ref<DOMElement> }) {
   return (
-    <Box>
+    <Box ref={boxRef}>
       <Box width={lead} flexShrink={0}>
         <Text>{head}</Text>
       </Box>
@@ -203,6 +203,11 @@ export function QuestionCard(props: {
   const head = questionHead(q);
   const compact = useCompact();
   const gap = compact ? 0 : 1;
+  const optsRef = useRef<DOMElement>(null);
+  const rowRef = useRef<DOMElement>(null);
+  const opts = useBoxMetrics(optsRef);
+  const row = useBoxMetrics(rowRef);
+  const follow = opts.hasMeasured && row.hasMeasured ? opts.top + row.top + (cursor === q.options.length - 1 && !free ? 1 : 0) : undefined;
   useInput(
     (input, key) => {
       if (!guardPass()) return;
@@ -221,7 +226,7 @@ export function QuestionCard(props: {
     { isActive: !other },
   );
   return (
-    <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta">
+    <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta" arrows={false} follow={follow}>
       {props.progress ? <Text dimColor>{props.progress}</Text> : null}
       {head.text ? <Text>{head.text}</Text> : null}
       {q.evidence && !compact ? (
@@ -230,51 +235,49 @@ export function QuestionCard(props: {
         </Box>
       ) : null}
       {props.note ? <Text color="yellow">{props.note}</Text> : null}
-      <Box flexDirection="column">
-        <Box flexDirection="column" marginTop={gap}>
-          {q.options.map((o, i) => (
-            <Hang key={i} head={<Text color={i === cursor && !other ? "magenta" : undefined}>{i === cursor && !other ? "▸" : " "} <Text color="magenta">{i + 1}</Text> </Text>} lead={4}>
-              <Text color={i === cursor && !other ? "magenta" : undefined}>
-                {o.label}
-                {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
-              </Text>
-            </Hang>
-          ))}
-          {free ? null : (
-            <Text>
-              {"  "}
-              <Text color="magenta">o</Text> other: type your own answer
+      <Box ref={optsRef} flexDirection="column" marginTop={gap}>
+        {q.options.map((o, i) => (
+          <Hang key={i} boxRef={i === cursor ? rowRef : undefined} head={<Text color={i === cursor && !other ? "magenta" : undefined}>{i === cursor && !other ? "▸" : " "} <Text color="magenta">{String(i + 1).padStart(String(q.options.length).length)}</Text> </Text>} lead={String(q.options.length).length + 3}>
+            <Text color={i === cursor && !other ? "magenta" : undefined}>
+              {o.label}
+              {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
             </Text>
-          )}
-        </Box>
-        {q.recommendation?.reason && !compact ? (
-          <Box marginTop={1}>
-            <Text dimColor>Recommended: {q.recommendation.reason}</Text>
-          </Box>
-        ) : null}
-        {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
-        {other ? (
-          <Prompt
-            label="Your answer:"
-            initial={free ? questionStartText(q, props.current) : ""}
-            onSubmit={(v) => {
-              const t = v.trim();
-              if (t) return onAnswer(t);
-              const r = questionEnter(q, cursor);
-              if ("value" in r && free) onAnswer(r.value);
-              else setNeed(questionNeed(q) ?? "Type your answer.");
-            }}
-            onCancel={() => (free ? onDismiss() : setOther(false))}
-            onBack={onBack}
-          />
-        ) : (
-          <Text dimColor>
-            {compact
-              ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
-              : `↑↓ choose · Enter accepts · a number answers at once${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
+          </Hang>
+        ))}
+        {free ? null : (
+          <Text>
+            {"  "}
+            <Text color="magenta">o</Text> other: type your own answer
           </Text>
         )}
       </Box>
+      {q.recommendation?.reason && !compact ? (
+        <Box marginTop={1}>
+          <Text dimColor>Recommended: {q.recommendation.reason}</Text>
+        </Box>
+      ) : null}
+      {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
+      {other ? (
+        <Prompt
+          label="Your answer:"
+          initial={free ? questionStartText(q, props.current) : ""}
+          onSubmit={(v) => {
+            const t = v.trim();
+            if (t) return onAnswer(t);
+            const r = questionEnter(q, cursor);
+            if ("value" in r && free) onAnswer(r.value);
+            else setNeed(questionNeed(q) ?? "Type your answer.");
+          }}
+          onCancel={() => (free ? onDismiss() : setOther(false))}
+          onBack={onBack}
+        />
+      ) : (
+        <Text dimColor>
+          {compact
+            ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
+            : `↑↓ choose · Enter accepts · a number answers at once${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
+        </Text>
+      )}
     </Frame>
   );
 }

@@ -327,6 +327,25 @@ describe("a short or narrow terminal", () => {
     expect(h.term.wraps).toBe(0);
   });
 
+  test("in a short terminal a card with many options scrolls to keep the cursor in view", async () => {
+    const { h, s } = start(80, 14);
+    await until(() => h.all().includes("Type /plan"));
+    const options = Array.from({ length: 15 }, (_, i) => ({ value: `v${i + 1}`, label: `Choice number ${i + 1}` }));
+    s.askMany([{ qid: "qm", session: s.id, decisionKey: "k", title: "Which choice?", text: "Pick one.", options, status: "open", created: new Date().toISOString() } as never]);
+    await until(() => h.term.view().includes("Your decision: Which choice?"));
+    await sleep(200);
+    expect(h.term.view()).toMatch(/▸ +1 Choice number 1\b/);
+    for (let i = 0; i < 11; i++) {
+      h.type("\x1b[B");
+      await sleep(40);
+    }
+    await until(() => h.term.view().includes("▸ 12 Choice number 12"));
+    expect(h.term.view()).not.toMatch(/ 1 Choice number 1\b/);
+    h.type("\r");
+    await until(() => s.record.entries(["answer"]).length === 1);
+    expect(s.record.entries(["answer"])[0]!.data).toMatchObject({ value: "v12" });
+  });
+
   test("at 40 columns a long option and a long setup field continue under their text", async () => {
     const { h, s } = start(40, 30);
     await until(() => h.all().includes("Type /plan"));
