@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { assumptionBlock, fileFits, withoutWaits } from "../src/core/answers.ts";
+import { assumptionBlock, fileFits, fitAnswer, withoutWaits } from "../src/core/answers.ts";
 import type { Question } from "../src/core/types.ts";
 
 test("withoutWaits takes the list under the heading and keeps the rest", () => {
@@ -39,4 +39,19 @@ test("fileFits accepts an option value, an option label and a close label, and r
   expect(fileFits(q, "Otsu method")).toBe(true);
   expect(fileFits(q, "otsu")).toBe(true);
   expect(fileFits(q, "banana")).toBe(false);
+});
+
+test("a file value that only contains an option word does not match that option", () => {
+  const q = { options: [{ value: "yes", label: "yes" }, { value: "no", label: "no" }], default: "yes" } as unknown as Question;
+  expect(fileFits(q, "not sure")).toBe(false);
+  expect(fitAnswer(q, "not sure", { first: false })).toBe("yes");
+  expect(fileFits(q, " No ")).toBe(true);
+  expect(fitAnswer(q, " No ")).toBe("no");
+});
+
+test("a file value matches the start of one option label only if the start is unique", () => {
+  const q = { options: [{ value: "otsu", label: "Otsu method" }, { value: "tri", label: "Triangle method" }, { value: "tri2", label: "Triangle two" }] } as unknown as Question;
+  expect(fileFits(q, "Ots")).toBe(true);
+  expect(fitAnswer(q, "Ots")).toBe("otsu");
+  expect(fileFits(q, "Triangle")).toBe(false);
 });
