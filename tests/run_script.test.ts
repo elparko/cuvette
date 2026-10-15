@@ -347,6 +347,29 @@ test("write steps lock the folder of a hook script and the folder of a hook glob
   expect(bwrapCommand(["tool"], steps).join(" ")).toContain(`--ro-bind ${join(l.project, "hooks")} ${join(l.project, "hooks")}`);
 });
 
+test("a hook script in the project root locks the file only, so other project folders and an output folder inside the project stay writable", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "results"));
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "check.py"] }, { command: ["sh", "-c", "./guard.sh"] }] } }));
+  writeFileSync(join(l.project, "check.py"), "pass\n");
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  const dirs = { ...l.dirs, outputDir: join(l.project, "results") };
+  const steps = writeSteps(dirs);
+  const locked = steps.filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toEqual(expect.arrayContaining([join(l.project, "check.py"), join(l.project, "guard.sh")]));
+  expect(locked).not.toContain(l.project);
+  const covers = (path: string) => locked.some((p) => path === p || path.startsWith(`${p}/`));
+  expect(covers(dirs.outputDir)).toBe(false);
+  expect(covers(join(l.project, "data"))).toBe(false);
+  expect(covers(l.out)).toBe(false);
+  const rules = writeRules(steps);
+  expect(rules).not.toContain(`(deny file-write* (subpath "${l.project}"))`);
+  expect(rules).toContain(`(deny file-write* (subpath "${join(l.project, "check.py")}"))`);
+  const bwrap = bwrapCommand(["tool"], steps).join(" ");
+  expect(bwrap).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "check.py")} ${join(l.project, "check.py")}`);
+});
+
 test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
   const record = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-legacy-")));
   const work = join(record, "work");

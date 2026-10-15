@@ -501,7 +501,11 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   const all = commands.map((c) => ({ argv: c, tokens: tokens(c, key), dynamic: DYNAMIC.test(c.join(" ")) }));
   const named: string[] = [];
   for (const c of all) for (const t of c.tokens) for (const b of t.base) named.push(resolve(b, t.word.replace(/[*?[\]{}].*$/, "")));
-  const globFolders = all.flatMap((c) => c.tokens.filter((t) => hasGlob(t.word)).flatMap((t) => t.base.map((b) => globPrefix(b, t.word)))).filter((g) => g !== key);
+  const insideKey = (g: string) => {
+    const r = relative(key, g);
+    return r !== "" && !r.startsWith("..") && !isAbsolute(r);
+  };
+  const globFolders = all.flatMap((c) => c.tokens.filter((t) => hasGlob(t.word)).flatMap((t) => t.base.map((b) => globPrefix(b, t.word)))).filter(insideKey);
   const roots = [resolve(key, "cuvette")];
   const userRoots: string[] = [];
   const userValue = userOutputFolder();
@@ -525,13 +529,32 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
     result.linked.push(rel);
     result.linkText[rel] = real;
   };
-  const addInLink = (p: string) => {
-    result.inLinks.push(p);
+  const seenLinks = new Set<string>();
+  const addInLink = (p: string): boolean => {
+    if (seenLinks.has(p)) return true;
+    seenLinks.add(p);
+    let real = "";
+    let inside = "";
+    let isFile = false;
+    let isDir = false;
     try {
-      const real = realpathSync(p);
-      const inside = relative(realKey, real);
-      if (!inside.startsWith("..") && !isAbsolute(inside) && statSync(real).isFile()) found.add(join(key, inside));
+      real = realpathSync(p);
+      inside = relative(realKey, real);
+      const st = statSync(real);
+      isFile = st.isFile();
+      isDir = st.isDirectory();
     } catch {}
+    const target = inside !== "" && !inside.startsWith("..") && !isAbsolute(inside);
+    const volatile = inside.split(sep).some((part) => VOLATILE_DIR.test(part)) && !(isFile && (SCRIPT_EXT.test(real) || isExec(real)));
+    if (target && (skip(inside) || volatile)) {
+      result.linkText[relative(key, p)] = real;
+      return false;
+    }
+    result.inLinks.push(p);
+    if (!target) return true;
+    if (isFile) found.add(join(key, inside));
+    else if (isDir && own(join(key, inside))) addFolder(join(key, inside), inside);
+    return true;
   };
   const addFolder = (path: string, rel: string, quiet = false) => {
     const r = walkFiles(path, skip, key, realKey);
@@ -586,7 +609,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           let matches = 0;
           const w = walkFiles(prefix, skip, key, realKey, true);
           if (w.exceeded && t.allowed) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
-          if (existsSync(prefix) && prefix !== key) result.folders.push(prefix);
+          if (t.allowed && existsSync(prefix) && prefix !== key) result.folders.push(prefix);
           for (const o of w.outside) {
             if (!re.test(o.split(sep).join("/"))) continue;
             result.linked.push(o);
@@ -604,7 +627,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
               }
               if (relative(key, f).split(sep).some((part) => VOLATILE_DIR.test(part)) && !SCRIPT_EXT.test(f) && !isExec(f)) continue;
               matches++;
-              if (w.inLinks.includes(f)) addInLink(f);
+              if (w.inLinks.includes(f) && !addInLink(f)) continue;
               consider(f, t, true);
             }
           }
