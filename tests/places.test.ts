@@ -394,12 +394,21 @@ test("a stale lock from a crash is replaced, and the write goes through at once"
   expect(existsSync(lock)).toBe(false);
 });
 
-test("a live lock of another process stays after a write that gave up waiting", () => {
+test("a write waits for a live lock of another process, then takes the lock and releases it", async () => {
   const lock = `${indexPath()}.lock`;
   mkdirSync(lock, { recursive: true });
+  const child = spawn(process.execPath, ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}, { recursive: true }), 1500)`], { stdio: "ignore" });
+  const exit = new Promise((done) => child.on("exit", done));
   saveIndexRow(rowOf("b"));
   expect(readIndex().map((r) => r.id)).toEqual(["b"]);
-  expect(existsSync(lock)).toBe(true);
+  expect(existsSync(lock)).toBe(false);
+  await exit;
+});
+
+test("a steal of a stale lock leaves no moved-aside file", () => {
+  staleLock();
+  saveIndexRow(rowOf("c"));
+  expect(readdirSync(home).filter((n) => n.includes(".lock"))).toEqual([]);
 });
 
 test("two processes that find the same stale lock both save their rows", async () => {

@@ -89,7 +89,7 @@ function writeIndex(rows: IndexRow[]): void {
   });
 }
 
-const LOCK_WAIT_MS = 1000;
+const LOCK_WAIT_MS = 6000;
 const LOCK_STALE_MS = 5000;
 
 function stealStale(dir: string): void {
@@ -97,10 +97,7 @@ function stealStale(dir: string): void {
     if (Date.now() - statSync(dir).mtimeMs <= LOCK_STALE_MS) return;
     const aside = `${dir}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
     renameSync(dir, aside);
-    try {
-      if (Date.now() - statSync(aside).mtimeMs <= LOCK_STALE_MS) renameSync(aside, dir);
-      else rmSync(aside, { recursive: true, force: true });
-    } catch {}
+    rmSync(aside, { recursive: true, force: true });
   } catch {}
 }
 
@@ -109,7 +106,7 @@ function withIndexLock<T>(fn: () => T): T {
   mkdirSync(dirname(dir), { recursive: true });
   const start = Date.now();
   let held = false;
-  for (let wait = 2; !held; wait = Math.min(wait * 2, 50)) {
+  for (let wait = 20; !held; wait = Math.min(wait + 10, 50)) {
     try {
       mkdirSync(dir);
       held = true;
