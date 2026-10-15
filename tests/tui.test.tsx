@@ -63,6 +63,16 @@ describe("transcript", () => {
     expect(h.all()).toContain("There are 42 cells.");
   });
 
+  test("a resumed session with a confirmed plan does not show the plan intro", async () => {
+    const h = makeHarness();
+    const s = new FakeSession({ delayMs: 0 });
+    s.record.append("plan_approved", { phase: "Confirmed", version: 1, text: "Question: Q1", plan: {}, mode: "watch", answers: [] });
+    const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+    live = { h, s, done };
+    await until(() => h.all().includes("Type /help for commands."));
+    expect(h.all()).not.toContain("Type /plan to get questions");
+  });
+
   test("shows steps with route, settings, fidelity, deviation and failure", async () => {
     const { h } = start();
     await sleep(100);

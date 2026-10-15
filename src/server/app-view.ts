@@ -67,7 +67,8 @@ export class WebView {
     if (st) this.status = { state: st.state, tool: st.tool, purpose: st.purpose, since: st.since };
     if (this.status.state === "idle") this.settled.push(...this.collapser.flush());
     this.pending = this.status.state === "idle" ? [] : this.collapser.preview();
-    this.line("▸", planIntro(session), undefined, true, false);
+    const intro = planIntro(session);
+    if (intro) this.line("▸", intro, undefined, true, false);
     this.ctx = this.makeCtx();
     for (const c of startCards(session, host.env)) this.openCard(c, false);
     if (needsSetup(session)) void openSetup(this.ctx);

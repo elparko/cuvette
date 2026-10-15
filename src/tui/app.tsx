@@ -190,7 +190,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
 
   useEffect(() => {
     const first = startCards(session, env);
-    line("▸", planIntro(session), undefined, true);
+    const intro = planIntro(session);
+    if (intro) line("▸", intro, undefined, true);
     if (opts.firstMessage) session.send(opts.firstMessage).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
     if (!opts.firstMessage && opts.autoSetup !== false && needsSetup(session)) void openSetup({ openCard: addCard } as CommandCtx);
     for (const c of first) addCard(c);

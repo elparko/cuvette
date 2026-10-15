@@ -91,7 +91,8 @@ export const needsSetup = (session: SessionLike) => session.decisions.fields().s
 
 export const NO_KEY = "There is no Claude API key. Add one now, or press Esc if you use `ant auth login`.";
 
-export function planIntro(session: SessionLike): string {
+export function planIntro(session: SessionLike): string | undefined {
+  if (session.record.entries(["plan_approved"]).length) return undefined;
   return session.planFirst ? "The agent asks a few questions, proposes the metrics, and shows them on one sample. You confirm before the batch runs." : "Type /plan to get questions, proposed metrics and a demonstration before any step runs.";
 }
 
