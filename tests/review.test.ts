@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Findings, parseReferee, referee, refereePrompt, runChecks } from "../src/core/review.ts";
+import { Findings, logText, parseReferee, referee, refereePrompt, runChecks } from "../src/core/review.ts";
 import type { Claim, Entry, EntryKind, Provider } from "../src/core/types.ts";
 
 function makeRecord(seed: { kind: EntryKind; data: Record<string, unknown>; node?: string }[] = [], nodes: any[] = [], stale: string[] = []) {
@@ -401,4 +401,13 @@ test("a tool result that says no p value was computed is not a test in the recor
   expect(await flagged("The test failed to compute a p value")).toBe(true);
   expect(await flagged("Welch t test\np value = 0.03")).toBe(false);
   expect(await flagged("Not a large effect, p = 0.03")).toBe(false);
+});
+
+test("the finding and the log text keep the integer digits of a number", async () => {
+  const held = { id: "n1", entry: 2, tool: "stats", outputs: [], parents: [], args: {}, result: { metrics: { p_value: 0.01, mean_diff: 12345.67 }, data: { test: "Welch t-test" }, table: { columns: ["a"], rows: [[1234567.89]] } } };
+  const seed = [{ kind: "tool_call" as EntryKind, data: { callId: "c1", tool: "stats", args: {} } }, { kind: "tool_result" as EntryKind, data: { callId: "c1", ok: true, summary: "Done." }, node: "n1" }];
+  const record = makeRecord(seed, [held]);
+  const out = await runChecks(ctx(record, "Drug 2 is better, p = 0.01.", { claims: [{ text: "p = 0.01", value: 0.01, label: "measured", node: "n1" } as Claim] }));
+  expect(out.find((f) => f.check === "p_without_effect")!.message).toContain("mean_diff = 12346");
+  expect(logText(record)).toContain("1234568");
 });

@@ -8,7 +8,7 @@ import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook } from "../src/core/results.ts";
 import { runChecks } from "../src/core/review.ts";
 import { Session } from "../src/core/session.ts";
-import { currentFromDisk, outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
+import { num, currentFromDisk, outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, rerunText } from "../src/ui/commands.ts";
@@ -278,4 +278,9 @@ test("the status line says that skipped steps are not checked", () => {
   expect(statusText([row(1, note)] as never)).toMatch(/The step is not checked\./);
   expect(statusText([row(1, note), row(2)] as never)).toMatch(/1 of 2 steps are up to date\. 1 not checked\./);
   expect(statusText([row(1), row(2)] as never)).toMatch(/All 2 steps are up to date\./);
+});
+
+test("the status numbers keep the integer digits", () => {
+  expect(num(12345.67)).toBe("12346");
+  expect(num(0.123456)).toBe("0.1235");
 });

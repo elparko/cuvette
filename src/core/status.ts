@@ -9,6 +9,7 @@ import { captureEnv, envTarget, packageChanges, type EnvLock } from "./envlock.t
 import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
+import { fmtSig } from "./plain.ts";
 
 export const REVIEW_PURPOSE = "Reviewing the answer";
 
@@ -293,7 +294,7 @@ export function changeRows(before: unknown, after: unknown): { rows: ChangeRow[]
 export function num(v: number | null): string {
   if (v === null) return "none";
   if (Number.isInteger(v)) return String(v);
-  return String(Number(v.toPrecision(4)));
+  return fmtSig(v, 4);
 }
 
 export function changeCell(r: ChangeRow): string {

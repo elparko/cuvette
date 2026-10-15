@@ -3,6 +3,7 @@ import { basename, extname, join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { encodePng } from "../bench/png.ts";
 import { readCsvTable } from "./datacheck.ts";
+import { fmtSig } from "./plain.ts";
 
 export interface Sheet {
   name: string;
@@ -206,7 +207,7 @@ export function referenceValues(ref: Reference, sample: string): Record<string, 
   return Object.keys(out).length ? out : undefined;
 }
 
-const fmt = (v: number) => (Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(4))));
+const fmt = (v: number) => (Number.isInteger(v) ? String(v) : fmtSig(v, 4));
 
 export function compareLine(measure: string, ours: number, ref: number, refColumn: string): string {
   const pct = ref ? ` (${Math.round((ours / ref) * 100)}% of the reference)` : "";
