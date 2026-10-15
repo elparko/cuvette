@@ -1170,7 +1170,7 @@ export class Session {
     let stuckSig = "";
     let forceAnswer = false;
     let stopBlocks = 0;
-    let held: { said: string; nodes: number; open: string[] } | undefined;
+    let held: { said: string; tools: number; open: string[] } | undefined;
     let stopHooked = false;
     const turnStart = this.record.entries().length;
     let results: Part[] = [];
@@ -1255,11 +1255,10 @@ export class Session {
           continue;
         }
         let keptFirst = false;
-        if (!calls.length && held && !this.draft && said && this.record.nodes().length === held.nodes) {
+        if (!calls.length && held && !this.draft && said && !held.tools) {
           keptFirst = true;
-          const latest = (this.record.entries(["note"]).filter((e) => Array.isArray(e.data.plan)).at(-1)?.data.plan ?? []) as PlanStep[];
-          const notDone = held.open.filter((step) => ["todo", "doing"].includes(latest.find((x) => x.step === step)?.status ?? "todo"));
-          if (notDone.length) this.record.append("notice", { text: `Not done from the plan: ${notDone.join("; ")}. The agent gave no result for ${notDone.length > 1 ? "these steps" : "this step"}. The first answer stays.`, plan: "skipped" });
+          this.record.append("assistant", { text: said, final: false });
+          this.record.append("notice", { text: `Not done from the plan: ${held.open.join("; ")}. The agent gave no result for ${held.open.length > 1 ? "these steps" : "this step"}. The first answer stays.`, plan: "skipped" });
           said = held.said;
           held = undefined;
         }
@@ -1270,10 +1269,11 @@ export class Session {
           const turnStart = this.lastRequest()?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
-          const plan = (this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as PlanStep[] | undefined) ??
-            (this.plan && this.approvedEntry > turnStart && !this.planning ? this.plan.steps.filter((p) => p.tool) : undefined);
-          const ran = this.record.nodes().filter((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
-          const open = (plan ?? []).filter((p) => (p.status === "todo" || p.status === "doing") && (!!p.tool || !ran.length) && !ran.some((n) => matchStep({ steps: [p] }, n.tool, n.adapter) === 0));
+          const planNote = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1);
+          const approvedSteps = !planNote && this.plan && this.approvedEntry > turnStart && !this.planning ? this.plan.steps.filter((p) => p.tool) : undefined;
+          const ran = planNote ? this.record.entries(["tool_result"]).filter((e) => e.id > planNote.id && e.data.ok === true && e.data.tool !== "plan" && e.data.tool !== "calculate") : [];
+          const covered = (p: PlanStep) => (p.tool ? ran.some((e) => matchStep({ steps: [p] }, String(e.data.tool), e.data.adapter ? String(e.data.adapter) : undefined) === 0) : ran.length > 0);
+          const open = (approvedSteps ?? (planNote?.data.plan as PlanStep[] | undefined) ?? []).filter((p) => (p.status === "todo" || p.status === "doing") && (approvedSteps || !covered(p)));
           if (promise || asksLeave || noWork || open.length) {
             nudges++;
             this.record.append("assistant", { text: said, final: false });
@@ -1283,8 +1283,10 @@ export class Session {
                 ? "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer."
                 : noWork
                   ? "No program step has run in this turn, so the request is not answered yet. Run the next step now with a tool. If a tool failed, fix the input and try again."
-                  : `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, the harness records it as not done. Then give the answer, with every number the request asks for.`;
-            if (open.length && !promise && !asksLeave && !noWork && !held && !this.draft && said) held = { said, nodes: this.record.nodes().length, open: open.map((p) => p.step) };
+                  : approvedSteps
+                    ? `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, call plan and mark it skipped with the reason. Then give the answer, with every number the request asks for.`
+                    : `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, the harness records it as not done. Then give the answer, with every number the request asks for.`;
+            if (open.length && !approvedSteps && !promise && !asksLeave && !noWork && !held && !this.draft && said) held = { said, tools: 0, open: open.map((p) => p.step) };
             this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
             continue;
           }
@@ -1320,6 +1322,7 @@ export class Session {
           return out.text;
         }
         if (said) this.record.append("assistant", { text: said, final: false });
+        if (held) held.tools += calls.length;
         nudges = 0;
         results = [];
         this.callOrder.clear();

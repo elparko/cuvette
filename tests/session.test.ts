@@ -320,8 +320,8 @@ test("an answer while plan steps are open gets one reminder to finish them", asy
   const answer = await session.send("Count and blur");
   const notes = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps that are not done: Blur the image/.test((p as { text: string }).text));
   expect(notes.length).toBeGreaterThan(0);
-  expect(answer).toMatch(/There are particles\./);
-  expect(answer).not.toMatch(/Done\./);
+  expect(answer).toMatch(/Done\./);
+  expect(session.record.entries(["assistant"]).map((e) => e.data.text)).toContain("There are particles.");
 });
 
 const SIX_STEPS = [
@@ -370,6 +370,46 @@ test("a plan step with no result at all gets one reminder that names it, and the
   expect(nudges[0]).not.toMatch(/call plan/);
   expect(answer).toMatch(/^The image holds particles/);
   expect(session.record.entries(["notice"]).some((e) => /Not done from the plan: Count the particles/.test(String(e.data.text)))).toBe(true);
+});
+
+test("an approved plan with a step that the model skips keeps the old reminder and shows the skip reason", async () => {
+  const two = { ...PLAN, steps: [PLAN.steps[0], { step: "Count the particles", method: "Threshold count", tool: "count", decisions: [{ key: "method", label: "Threshold method", recommendation: "Otsu" }] }] };
+  const provider = new FakeProvider([
+    CLARIFY,
+    { calls: [{ name: "plan", args: two }] },
+    { calls: [blur] },
+    { text: "Blurred with sigma 2." },
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", tool: "count", status: "skipped", reason: "The scientist asked only for the blur." }] } }] },
+    { text: "Blurred with sigma 2. No count was needed." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  const texts = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done: Count the particles\. Do the next one now with a tool\. If a step cannot be done, call plan and mark it skipped with the reason\./.test(t))).toBe(true);
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices).toContain("Skipped from the approved plan: Count the particles. Reason: The scientist asked only for the blur.");
+  expect(notices.some((t) => /Reason: none given/.test(t))).toBe(false);
+});
+
+test("an unapproved plan step with a tool that never ran gets a reminder that names it", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Blur the image", tool: "blur", status: "todo" }, { step: "Make one plot", tool: "make_plot", status: "todo" }] } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: "The image is blurred." },
+    { text: "The plot did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Blur and plot");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text)).map((p) => (p as { text: string }).text);
+  expect(nudges).toHaveLength(1);
+  expect(nudges[0]).toContain("Make one plot");
+  expect(nudges[0]).not.toContain("Blur the image");
+  expect(answer).toMatch(/^The image is blurred/);
+  expect(session.record.entries(["assistant"]).map((e) => e.data.text)).toContain("The plot did not run.");
 });
 
 test("a revision that loses results and fixes nothing is replaced by the first answer", async () => {
