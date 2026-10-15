@@ -22,7 +22,7 @@ import { pathRefusalReason } from "./refusals.ts";
 import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
-import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
+import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
@@ -2033,7 +2033,7 @@ export class Session {
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const { answer, block } = this.headlessSplit(pre.answer ?? text);
     this.noteSkippedSteps();
-    const claims = checkAnswer(answer, this.record.liveView());
+    const claims = checkAnswer(answer, this.record.liveView(), { log: false });
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const refereeCtx = block ? { ...ctx, answer: `${answer}\n\n[Text of the harness, not of the model. The harness wrote it from the answers that it chose.]\n${block}` } : ctx;
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
@@ -2047,6 +2047,7 @@ export class Session {
       this.assumptions = block;
       this.lastAnswer = answer;
       this.markAnswerReady();
+      logClaimCheck(this.record, claims, entry.id);
       first = { id: entry.id, annotated: p.annotated };
     }
     if (this.refereeBlocked() && !this.refereeOffNoted) {
@@ -2090,6 +2091,7 @@ export class Session {
       const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results, ...(block ? { assumed: block } : {}) });
       this.assumptions = block;
       this.lastAnswer = answer;
+      logClaimCheck(this.record, claims, entry.id);
       shown = { id: entry.id, annotated: p.annotated };
     }
     this.appendReview(shown.id, state, findings);

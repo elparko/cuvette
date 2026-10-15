@@ -3475,3 +3475,23 @@ test("after a step-limit pause and continue, the reminder and the not-done audit
   expect(texts.some((t) => /Your plan still has steps that are not done: Count the particles/.test(t))).toBe(true);
   expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan: Count the particles/.test(String(e.data.text)))).toBe(true);
 });
+
+test("the claim check belongs to the answer entry that it checked, also if the harness keeps the first answer", async () => {
+  const first = "The ratio is 0.938. Also 999 cells.";
+  const provider = new FakeProvider([
+    { calls: [{ name: "calculate", args: { items: [{ name: "ratio", expression: "4696 / 5007" }] } }] },
+    { text: first },
+    { text: "Also 999 cells." },
+    { text: "Also 999 cells." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("What is the ratio?");
+  const finals = session.record.entries(["assistant"]).filter((e) => e.data.final);
+  const checks = session.record.entries(["claim_check"]);
+  expect(checks.length).toBeGreaterThan(0);
+  expect(checks.every((e) => finals.some((f) => f.id === e.data.answerEntry))).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /kept the first answer/.test(String(e.data.text)))).toBe(true);
+  const kept = checks.filter((e) => e.data.answerEntry === finals.at(-1)!.id);
+  expect(kept.at(-1)!.data.claims).toEqual(expect.arrayContaining([expect.objectContaining({ value: 0.938, label: "measured" })]));
+});
