@@ -50,6 +50,19 @@ test("putBlob stores a file once under its sha", () => {
   expect(readFileSync(r.blobPath(sha2)!, "utf8")).toBe("xyz");
 });
 
+test("blobPath refuses a sha that is not hexadecimal text", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  writeFileSync(join(dir, "secret.txt"), "private");
+  writeFileSync(join(dir, "rec", "secret.txt"), "private");
+  expect(r.blobPath("../secret.txt")).toBeUndefined();
+  expect(r.blobPath("../../" + dir.split("/").pop() + "/secret.txt")).toBeUndefined();
+  expect(r.blobPath("../secret")).toBeUndefined();
+  expect(r.blobRef("../x")).toBeUndefined();
+  expect(r.blobPath("")).toBeUndefined();
+  expect(r.blobPath("a".repeat(65))).toBeUndefined();
+});
+
 test("nodes, edges, descendants and stale marks", () => {
   const r = new AnalysisRecord(tmp(), "s1");
   const n1 = r.addNode(nodeIn({ decisions: { thr: 1 } }));

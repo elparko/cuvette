@@ -6,6 +6,7 @@ import { extractNumbers } from "./claims.ts";
 import type { EnvLock } from "./envlock.ts";
 import { ENTRY_KINDS, type Entry, type EntryKind, type Message, type Node, type NodeIn } from "./types.ts";
 
+const SHA_TEXT = /^[0-9a-f]{1,64}$/i;
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
 // A table or text file that a script wrote holds its results. A code file holds typed numbers, not results.
@@ -271,6 +272,7 @@ export class AnalysisRecord {
   }
 
   blobRef(sha: string): { path: string; size: number; mtime: string; sha256: string } | undefined {
+    if (!SHA_TEXT.test(sha)) return undefined;
     const ref = join(this.blobDir, `${sha}.ref.json`);
     return existsSync(ref) ? (local(JSON.parse(readFileSync(ref, "utf8")), this.project) as { path: string; size: number; mtime: string; sha256: string }) : undefined;
   }
@@ -291,6 +293,7 @@ export class AnalysisRecord {
   }
 
   blobPath(sha: string): string | undefined {
+    if (!SHA_TEXT.test(sha)) return undefined;
     const bare = join(this.blobDir, sha);
     if (existsSync(bare)) return bare;
     const hit = this.blobName(sha);
