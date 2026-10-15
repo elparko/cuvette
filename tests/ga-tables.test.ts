@@ -1,6 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { openAdapter, type OpenAdapter } from "./independent.ts";
 
@@ -52,5 +53,17 @@ describe.skipIf(!python)("tables summarize_table with placeholders in a numeric 
     expect(r.summary).toMatch(/y: mean 2/);
     expect(r.summary).toMatch(/3 cells in numeric columns hold a placeholder \(-, \? or \.\)/);
     expect(r.metrics.n_placeholder_cells).toBe(3);
+  });
+});
+
+describe.skipIf(!python)("tables load with ID columns", () => {
+  test("an ID column with a leading zero and a 17-digit barcode column stay text", () => {
+    const root = mkdtempSync(join(tmpdir(), "cuvette-ga-tables-"));
+    const path = join(root, "ids.csv");
+    writeFileSync(path, "id,barcode,y\n007,12345678901234567,1\n008,12345678901234568,2\n-,12345678901234569,3\n");
+    const code = `import json, sys\nsys.path.insert(0, ${JSON.stringify(resolve("catalog/tables"))})\nimport ga_tables as t\nf = t.load(sys.argv[1])\nprint(json.dumps([[str(v) for v in f[c]] for c in ["id", "barcode"]]))`;
+    const out = execFileSync(python!, ["-c", code, path], { encoding: "utf8", env: { ...process.env, PYTHONWARNINGS: "ignore" } });
+    expect(JSON.parse(out.trim().split("\n").at(-1)!)).toEqual([["007", "008", "nan"], ["12345678901234567", "12345678901234568", "12345678901234569"]]);
+    rmSync(root, { recursive: true, force: true });
   });
 });

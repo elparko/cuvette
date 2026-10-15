@@ -41,6 +41,15 @@ describe.skipIf(!existsSync(PY))("cellpose_tools image reading", () => {
     expect(r.channels).toBe(3);
     expect(r.warnings.join(" ")).toMatch(/3 planes and no axes information/);
   });
+
+  test.each([2, 3, 4])("a plain %i-page file written without metadata is read as channels and the result warns", (n) => {
+    const r = inspect(`with tifffile.TiffWriter(d + "/a.tif") as w:
+    for i in range(${n}):
+        w.write(np.random.randint(0, 200, (40, 50), dtype=np.uint16), contiguous=False, metadata=None)`);
+    expect(r.ok).toBe(true);
+    expect(r.channels).toBe(n);
+    expect(r.warnings.join(" ")).toMatch(/no axes information/);
+  });
 });
 
 describe.skipIf(!existsSync(PY))("cellpose_tools saturation and label files", () => {
