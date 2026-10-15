@@ -43,6 +43,27 @@ test("elision shortens only old bulky tool output, keeps its first lines, and do
   expect(estimateTokens(messages)).toBeLessThan(estimateTokens(h) / 2);
 });
 
+test("the shortening of old output waits for a batch, so that the prompt cache holds between steps", () => {
+  const changedSteps = (batch: number) => {
+    let h = oneLongTurn(8);
+    let changed = 0;
+    for (let step = 9; step <= 40; step++) {
+      h = [...h, call(`c${step}`), result(`c${step}`, `file ${step} mean 12.${step}\n${"row\n".repeat(1000)}`)];
+      const next = elideOld(h, 20_000, batch).messages;
+      if (h.slice(0, -2).some((m, i) => JSON.stringify(m) !== JSON.stringify(next[i]))) changed++;
+      h = next;
+    }
+    return changed;
+  };
+  const each = changedSteps(1);
+  const batched = changedSteps(10);
+  expect(each).toBeGreaterThan(25);
+  expect(batched).toBeLessThanOrEqual(4);
+  const h = oneLongTurn(12);
+  expect(elideOld(h, 20_000, 10)).toEqual({ messages: h, elided: 0 });
+  expect(elideOld(h, 20_000, 1).elided).toBeGreaterThan(0);
+});
+
 test("the estimate counts the tool schemas", () => {
   const tools = [{ name: "read_file", description: "x".repeat(3500), inputSchema: {} }];
   expect(estimateTokens([], "", tools) - estimateTokens([])).toBeGreaterThanOrEqual(1000);
