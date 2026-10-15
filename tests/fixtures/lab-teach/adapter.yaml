@@ -37,3 +37,6 @@ map:
     route: Process > Blur
     fidelity: exact
     summary: "Blurred with sigma {sigma}."
+tools:
+  - { name: state, description: Program state., read_only: true }
+  - { name: history, description: Steps the scientist did., read_only: true }

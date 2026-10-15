@@ -11,6 +11,9 @@ connection:
   call_timeout_s: 20
   startup_timeout_s: 30
 tools:
+  - name: echo
+    description: Repeat the text.
+    read_only: true
   - name: add
     description: Add two numbers.
     approval: true

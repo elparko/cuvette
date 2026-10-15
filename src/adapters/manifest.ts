@@ -62,7 +62,7 @@ const Connection = z.strictObject({
   state_tool: z.string().default(""),
   history_tool: z.string().default(""),
   startup_timeout_s: z.number().default(60),
-  call_timeout_s: z.number().default(600),
+  call_timeout_s: z.number().positive("call_timeout_s must be more than 0 and at most 86400 seconds.").max(86400, "call_timeout_s must be more than 0 and at most 86400 seconds.").default(600),
 });
 
 const DecisionLink = z.strictObject({ tool: z.string(), arg: z.string() });
