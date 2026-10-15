@@ -24,7 +24,7 @@ def _read(path, notes=None):
         axes = "".join(axes[i] for i in keep) if len(axes) == img.ndim else ""
         img = img.reshape([img.shape[i] for i in keep])
         if img.ndim == 3 and img.shape[0] <= 4 < img.shape[-1]:
-            if axes[:1] in ("Z", "T", "R", "L", "I", "H"):
+            if axes[:1] in ("Z", "T", "R", "L", "H"):
                 raise ValueError("%s is a stack of %d planes (axes %s). The tool segments one 2D image with up to 4 channels. Give one plane, or a projection of the stack" % (path, img.shape[0], axes))
             if axes[:1] != "C" and notes is not None:
                 notes.append("The file has %d planes and no axes information. The tool read them as %d channels. If they are z planes or time points, give one plane or a projection." % (img.shape[0], img.shape[0]))

@@ -381,8 +381,8 @@ export function numberOrString(s: string): number | string {
   const t = s.trim();
   if (t === "" || !/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return s;
   if (/^[-+]?0\d/.test(t)) return s;
-  const digits = t.split(/e/i)[0]!.replace(/\D/g, "").replace(/^0+/, "");
-  return digits.length > 15 ? s : Number(t);
+  if (/^[-+]?\d+$/.test(t) && t.replace(/\D/g, "").replace(/^0+/, "").length > 15) return s;
+  return Number(t);
 }
 
 export function parseCsv(text: string, delim = ","): string[][] {

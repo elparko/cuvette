@@ -195,3 +195,12 @@ test("coerceSetting reads a negated exclude phrase as false", () => {
   for (const text of ["don't exclude", "never exclude", "do not exclude", "doesn't exclude them", "without exclude"]) expect(coerceSetting(d, text)).toEqual({ ok: true, value: false });
   expect(coerceSetting(d, "exclude")).toEqual({ ok: true, value: true });
 });
+
+test("coerceSetting reads without as a negation only at the start or before pairing", () => {
+  const ex = { key: "exclude_missing", label: "Exclude samples", kind: "bool", tools: [] };
+  expect(coerceSetting(ex, "Yes, exclude samples without a value")).toEqual({ ok: true, value: true });
+  expect(coerceSetting(ex, "exclude samples without a value")).toEqual({ ok: true, value: true });
+  const d = { key: "paired", label: "Paired test", kind: "bool", tools: [] };
+  expect(coerceSetting(d, "paired test without pairing")).toEqual({ ok: true, value: false });
+  expect(coerceSetting(d, "without pairing")).toEqual({ ok: true, value: false });
+});

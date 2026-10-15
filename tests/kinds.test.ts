@@ -451,6 +451,13 @@ test("numberOrString keeps an ID with a leading zero and a number with more than
   expect(numberOrString("1.5e3")).toBe(1500);
 });
 
+test("numberOrString keeps a decimal with 17 digits as a number", async () => {
+  const { numberOrString } = await import("../src/adapters/kinds/common.ts");
+  expect(numberOrString("0.30000000000000004")).toBe(0.30000000000000004);
+  expect(numberOrString("1234567890.12345678")).toBe(1234567890.12345678);
+  expect(numberOrString("1234567890123456")).toBe("1234567890123456");
+});
+
 test("fmtNumber keeps integers exact and rounds fractions to 6 significant digits", async () => {
   const { fmtNumber } = await import("../src/adapters/kinds/common.ts");
   expect(fmtNumber(3258788)).toBe("3258788");
