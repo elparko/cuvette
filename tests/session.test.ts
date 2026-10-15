@@ -3666,6 +3666,18 @@ test("a referee reply that is cut after complete findings makes the review done 
   expect(session.record.entries(["notice"]).some((e) => /The output limit cut the review short/.test(String(e.data.text)))).toBe(true);
 });
 
+test("a referee reply that is cut with no complete finding says that the reply was not complete", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  vi.spyOn(referee, "complete").mockRejectedValue(new CutReplyError("cut", '{"severity":"warn'));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { reviseOnFindings: false } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  const texts = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(texts.some((t) => /The referee ran, but the output limit cut its reply/.test(t) && /is incomplete/.test(t))).toBe(true);
+  expect(texts.some((t) => /The referee did not run/.test(t))).toBe(false);
+});
+
 test("a manual review with an empty referee reply keeps the rule findings and gives the failure text", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The treated cells are significantly larger." }]);
   const referee = new FakeProvider({ steps: [], complete: "" });

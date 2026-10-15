@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { cutText, discardPlace, readIndex, type IndexRow } from "./places.ts";
 
-export type SessionStatus = "answered" | "waiting for you" | "running" | "not started";
+export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started";
 
 export interface SessionInfo {
   id: string;
@@ -173,7 +173,7 @@ export function scanLog(log: string): { first: any; ask: any; title?: { title: s
   const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
-  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : "not started";
+  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : worked ? "in progress" : "not started";
   return { first, ask, title, status, figure, owner, worked };
 }
 

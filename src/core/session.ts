@@ -62,13 +62,14 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { CUT_REVIEW_NOTICE, EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
+import { CUT_REPLY_NOTICE, CUT_REVIEW_NOTICE, EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
 import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, REVIEW_PURPOSE, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import {
+  CutReplyError,
   ProviderError,
   type Args,
   type StepResult,
@@ -439,6 +440,7 @@ export class Session {
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
     const replaced: string[] = [];
+    const sameFolder = new Set<string>();
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
@@ -446,8 +448,13 @@ export class Session {
       for (const a of opts.addAdapters ?? []) {
         try {
           const found = findAdapter(a, cwd);
-          const before = [recorded.get(found.name), dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
-          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) replaced.push(found.name);
+          const recordedPath = recorded.get(found.name);
+          const before = [recordedPath && existsSync(recordedPath) && known.has(realpathSync(recordedPath)) ? recordedPath : undefined, dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
+          const sameRecorded = !!recordedPath && existsSync(recordedPath) && realpathSync(recordedPath) === realpathSync(found.root);
+          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) {
+            replaced.push(found.name);
+            if (sameRecorded) sameFolder.add(found.name);
+          }
         } catch {}
       }
       adapters =
@@ -477,6 +484,7 @@ export class Session {
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
     for (const name of replaced) {
+      if (sameFolder.has(name)) continue;
       const before = recorded.get(name);
       const missing = !!before && !existsSync(before);
       s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
@@ -492,7 +500,7 @@ export class Session {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? `Cuvette did not load the adapter folder ${plainPath(stray)} from the record. Run: cuvette resume ${id} --adapter ${shellQuote(plainPath(stray))}`
+        ? `Cuvette did not load the adapter folder ${plainPath(stray)} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(plainPath(stray))}`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
@@ -2138,7 +2146,7 @@ export class Session {
         if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
-        this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
+        this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : e instanceof CutReplyError && !signal.aborted ? CUT_REPLY_NOTICE : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
       }
       this.bus.emit({ type: "status", state: "thinking" });
     } else if (this.refereeProvider && signal.aborted) state = "stopped";
@@ -4712,7 +4720,7 @@ export class Session {
         for (const f of await referee(this.refereeProvider, ctx, undefined, () => (cutShort = true))) out.push(this.findings.add(f, "referee"));
         if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
-        this.reviewFailure = e instanceof EmptyReview ? e.message : `The referee did not run: ${(e as Error).message}`;
+        this.reviewFailure = e instanceof EmptyReview ? e.message : e instanceof CutReplyError ? CUT_REPLY_NOTICE : `The referee did not run: ${(e as Error).message}`;
       }
     }
     return out;

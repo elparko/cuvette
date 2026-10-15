@@ -334,6 +334,19 @@ test("write steps lock a hook script of the project", () => {
   expect(settingsScope(l.dirs).files).toContain(join(l.project, "guard.sh"));
 });
 
+test("write steps lock the folder of a hook script and the folder of a hook glob", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "hooks"), { recursive: true });
+  mkdirSync(join(l.project, "empty"), { recursive: true });
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "./hooks/guard.sh"] }, { command: ["sh", "-c", "empty/*.sh"] }] } }));
+  writeFileSync(join(l.project, "hooks", "guard.sh"), "exit 0\n");
+  const steps = writeSteps(l.dirs);
+  const locked = steps.filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toEqual(expect.arrayContaining([join(l.project, "hooks"), join(l.project, "empty")]));
+  expect(writeRules(steps)).toContain(`(deny file-write* (subpath "${join(l.project, "hooks")}"))`);
+  expect(bwrapCommand(["tool"], steps).join(" ")).toContain(`--ro-bind ${join(l.project, "hooks")} ${join(l.project, "hooks")}`);
+});
+
 test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
   const record = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-legacy-")));
   const work = join(record, "work");

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -304,7 +304,7 @@ describe("the files of a hook command, found with no shell parsing", () => {
   });
 
   test("a glob root with too many files makes the folder not trustable", () => {
-    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat hooks/*.sh"] }] } });
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/*.sh"] }] } });
     put("hooks/a.sh");
     for (let i = 0; i < 5100; i++) writeFileSync(join(cwd, "hooks", `f${i}.dat`), "");
     expect(scanFolder(cwd).incomplete.join(" ")).toContain("Too many files");
@@ -338,9 +338,63 @@ describe("the files of a hook command, found with no shell parsing", () => {
   });
 
   test("a glob with more than 500 matches makes the folder not trustable", () => {
-    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat hooks/*.sh"] }] } });
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/*.sh"] }] } });
     for (let i = 0; i < 520; i++) writeFileSync(join(cwd, ...(i === 0 ? [(mkdirSync(join(cwd, "hooks")), "hooks")] : ["hooks"]), `m${i}.sh`), "x");
     expect(scanFolder(cwd).incomplete.join(" ")).toContain("Too many files match");
+  });
+
+  test("a glob in the cuvette folder that a loop names is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in cuvette/*.sh; do sh $f; done"] }] } });
+    put("cuvette/a.sh");
+    expect(hooked()).toEqual(["cuvette/a.sh"]);
+    trustFolder(cwd);
+    put("cuvette/a.sh", "evil\n");
+    expect(trustStatus(cwd).state).toBe("changed");
+  });
+
+  test("a glob in a folder under the cuvette folder is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in cuvette/hooks/*.sh; do sh $f; done"] }] } });
+    put("cuvette/hooks/a.sh");
+    put("cuvette/s1/step.py");
+    expect(hooked()).toEqual(["cuvette/hooks/a.sh"]);
+  });
+
+  test("a glob that is not in a command position and has too many files gives no incomplete entry", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat data/*.csv"] }] } });
+    mkdirSync(join(cwd, "data"));
+    for (let i = 0; i < 5100; i++) writeFileSync(join(cwd, "data", `f${i}.dat`), "");
+    expect(scanFolder(cwd).incomplete).toEqual([]);
+    put("data/a.csv");
+    for (let i = 0; i < 520; i++) writeFileSync(join(cwd, "data", `m${i}.csv`), "x");
+    expect(scanFolder(cwd).incomplete).toEqual([]);
+  });
+
+  test("a glob with a double star and a slash matches a file in the first folder", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "src/**/*.py"] }] } });
+    put("src/a.py");
+    put("src/deep/b.py");
+    expect(hooked()).toEqual(["src/a.py", "src/deep/b.py"]);
+  });
+
+  test("a fifo in a script folder is not read", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/run.sh"] }] } });
+    put("hooks/run.sh");
+    if (spawnSync("mkfifo", [join(cwd, "hooks", "pipe.sh")]).status !== 0) return;
+    expect(hooked()).toEqual(["hooks/run.sh"]);
+  });
+
+  test("a link inside a script folder is in the hash, with its target", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/run.sh"] }] } });
+    put("hooks/run.sh");
+    put("lib/real.sh");
+    symlinkSync(join(cwd, "lib", "real.sh"), join(cwd, "hooks", "link.sh"));
+    const before = scanFolder(cwd);
+    expect(hooked()).toEqual(expect.arrayContaining(["lib/real.sh"]));
+    expect(Object.keys(before.files)).toContain("(hook link) hooks/link.sh");
+    rmSync(join(cwd, "hooks", "link.sh"));
+    put("lib/other.sh");
+    symlinkSync(join(cwd, "lib", "other.sh"), join(cwd, "hooks", "link.sh"));
+    expect(scanFolder(cwd).files["(hook link) hooks/link.sh"]).not.toBe(before.files["(hook link) hooks/link.sh"]);
   });
 
   test("a glob match with a script extension in a logs folder is in the hash, and a text file there is not", () => {

@@ -26,23 +26,39 @@ def plane_list(path):
             axes = s.axes
             ij = tf.imagej_metadata or {}
         labels = ij.get("Labels") if isinstance(ij.get("Labels"), list) else None
-        while arr.ndim > 3 or (arr.ndim == 3 and axes[0] not in "CS" and axes[-1] not in "CS"):
-            arr = arr.max(axis=0) if axes[0] in "ZTQ" else arr[0]
-            axes = axes[1:]
+        warnings = []
+        while arr.ndim > 2:
+            if arr.ndim == 3 and any(a in "CS" for a in axes):
+                break
+            z = next((k for k, a in enumerate(axes) if a in "ZTQ"), None)
+            if z is not None:
+                arr = arr.max(axis=z)
+                axes = axes[:z] + axes[z + 1:]
+                continue
+            if arr.ndim == 3:
+                break
+            k = next((k for k, a in enumerate(axes) if a not in "CSYX"), 0)
+            warnings.append("The file has %d planes on the axis %s. Cuvette read only the first plane of this axis." % (arr.shape[k], axes[k]))
+            arr = np.take(arr, 0, axis=k)
+            axes = axes[:k] + axes[k + 1:]
         if arr.ndim == 2:
-            return [arr], False, labels, str(arr.dtype)
-        if axes[-1] in "CS" and arr.shape[-1] <= 4:
+            return [arr], False, labels, str(arr.dtype), warnings
+        p = next((k for k, a in enumerate(axes) if a in "CS"), None)
+        if p is None:
+            p = next(k for k, a in enumerate(axes) if a not in "YX")
+        if p == arr.ndim - 1 and arr.shape[-1] <= 4:
             rgb = arr.shape[-1] in (3, 4) and axes[-1] == "S"
-            return [arr[..., i] for i in range(3 if rgb else arr.shape[-1])], rgb, labels, str(arr.dtype)
-        return [arr[i] for i in range(arr.shape[0])], False, labels, str(arr.dtype)
+            return [arr[..., i] for i in range(3 if rgb else arr.shape[-1])], rgb, labels, str(arr.dtype), warnings
+        arr = np.moveaxis(arr, p, 0)
+        return [arr[i] for i in range(arr.shape[0])], False, labels, str(arr.dtype), warnings
     from PIL import Image
 
     im = Image.open(path)
     if im.mode in ("RGB", "RGBA", "P", "CMYK"):
         arr = np.asarray(im.convert("RGB"))
-        return [arr[..., i] for i in range(3)], True, None, str(arr.dtype)
+        return [arr[..., i] for i in range(3)], True, None, str(arr.dtype), []
     arr = np.asarray(im)
-    return [arr], False, None, str(arr.dtype)
+    return [arr], False, None, str(arr.dtype), []
 
 
 def full_range(planes, dtype):
@@ -107,7 +123,7 @@ def preview(planes, rgb, out_dir, name):
 def describe_image(path, out_dir):
     if np is None:
         raise RuntimeError("numpy is not installed")
-    planes, rgb, labels, dtype = plane_list(path)
+    planes, rgb, labels, dtype, warnings = plane_list(path)
     full = full_range(planes, dtype)
     stem = os.path.splitext(os.path.basename(path))[0]
     m = TOKEN.search(stem)
@@ -124,7 +140,7 @@ def describe_image(path, out_dir):
         prev = preview(planes, rgb, out_dir, stem)
     except Exception:
         prev = None
-    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": np.dtype(dtype).itemsize * 8 if dtype.startswith("float") else int(round(np.log2(full + 1))), "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
+    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": np.dtype(dtype).itemsize * 8, "warnings": warnings, "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
 
 
 def image_phrase(d):
@@ -290,7 +306,9 @@ def summary(d, path):
                 out.append("Column %s has the values %s." % (c["name"], ", ".join("%s (%d)" % kv for kv in list(c["values"].items())[:12])))
     else:
         out.append("%s is a file of %d bytes." % (name, d["size"]))
-    if d["images_seen"] and "blue" not in d["colors"] and (d["colors"] or "fluorescence" not in d["kinds"]):
+    for w in dict.fromkeys(w for i in (d["sample"] if d["kind"] == "folder" else [d]) for w in i.get("warnings", [])):
+        out.append(w)
+    if d["images_seen"] and not d["dropped"] and "blue" not in d["colors"] and (d["colors"] or "fluorescence" not in d["kinds"]):
         out.append("There is no nuclear stain (no blue channel, and no DAPI or Hoechst in the names).")
     return " ".join(out)
 
@@ -324,6 +342,7 @@ def main():
     d["colors"] = sorted({c["color"] for i in imgs for c in i["channels"] if c.get("color")} | {COLOR_WORDS[t.lower()] for t in tokens if t.lower() in COLOR_WORDS})
     d["kinds"] = sorted({c["kind"] for i in imgs for c in i["channels"]})
     d["images_seen"] = bool(imgs)
+    d["dropped"] = any(i.get("warnings") for i in imgs)
     d["previews"] = [i["preview"] for i in imgs if i.get("preview")]
     d["summary"] = summary(d, path)
     d["ok"] = True

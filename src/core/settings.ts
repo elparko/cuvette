@@ -6,13 +6,13 @@ import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
 import { CLAUDE_MODELS, modelSpecProblem } from "../providers/index.ts";
 import { DEFAULTS, settingFits, wellTyped } from "./config.ts";
-import { claudeKey, elabftwConfig } from "./credentials.ts";
+import { antLogin, claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
 import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, oneLine, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
 import { folderHasNoPatientData, setFolderNoPatientData } from "./phi.ts";
 
 export type Scope = "session" | "user" | "project";
-export type Source = "default" | "user" | "project" | "session" | "env" | "";
+export type Source = "default" | "user" | "project" | "session" | "env" | "ant" | "";
 
 export interface SettingSession {
   mode: string;
@@ -431,7 +431,9 @@ export const SETTINGS: SettingDef[] = [
     edit: "key",
     read: (ctx) => {
       const k = claudeKey(ctx.env ?? process.env);
-      return k.from === "env" ? { value: "set by environment", source: "env" } : k.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
+      if (k.from === "env") return { value: "set by environment", source: "env" };
+      if (k.from === "file") return { value: "saved", source: "user" };
+      return antLogin(ctx.env ?? process.env) ? { value: "signed in with ant auth login", source: "ant" } : { value: "not set", source: "" };
     },
   },
   {

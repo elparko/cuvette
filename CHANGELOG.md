@@ -15,23 +15,44 @@ Release 0.1.1 includes all changes since 12 October.
 - `eln push` and `eln link` take `--adapter`.
 - Resume says so if an installed adapter replaces a recorded folder of the same name.
 - The default session is a session with work, also if it has no request. Work is a message, a tool call, a result, a step, a decision or an answer. A notice is not work.
+- A resume with the same adapter folder that the record names gives no false "another folder" notice.
+- The notice says to run the command in a terminal.
+- A session with work and no request has the status "in progress".
 
 ### Hook scripts
 
 - The hook hash covers each script that a hook command names, and the code folder of the script. It does not cover files that a hook writes.
 - The hash finds a script behind any launcher. It expands globs, and it does not follow links out of the project.
 - Project settings can no longer hide a hook script from the hash.
+- A folder that a hook names with a glob is in the scan, also inside the cuvette folder.
+- The sandbox denies writes to the folder of each locked hook script and to each hook glob folder.
+- A glob that is not in a command position gives no incomplete entry.
+- The folder walk adds only regular files. A link inside the project gets a link hash, and the scan adds its target. The pattern `**/` matches zero folders.
 
 ### Referee and key status
 
 - A referee reply that the output limit cut keeps its complete findings, and a notice says so.
 - The referee accepts "No findings." as the first line of a reply.
+- A reply that starts with "None." and then lists findings keeps the findings.
+- A cut reply with no complete finding gives a notice that the reply is incomplete.
 - Cuvette sends `reasoning_effort` only to o3, o4 and gpt-5 models. It retries without the setting after an HTTP 400.
+- Effort `auto` sends no `reasoning_effort` to OpenAI models. The retry limit allows three refusals in a row.
 - The key status and the key card show the `ant auth login` line.
+- The Claude API key setting and the setup key step tell about `ant auth login`.
 - The status row of an unchecked step shows "Not checked".
 - A large output that someone deleted shows "missing", not "changed".
 - The table route hint no longer shows if the table adapter is a default adapter.
 - The browser app does not show first setup again after you leave it.
+- Leave setup waits for the server before it goes to start. Setup comes back after a session closes with no key.
+- A job whose run throws ends as failed with the message. Later installs can start.
+- The command line waits longer than the install stop wait, so Ctrl+C during an install still closes the session.
+- The app prints a message after the first Ctrl+C. A second Ctrl+C quits at once.
+
+### Data and statistics
+
+- The power tool reads "unpaired" as the two-sample design.
+- `inspect_data` keeps the channel axis of a TIFF file, warns if it drops planes, and shows the bit depth of the dtype.
+- A table cell that is not finite stays text, and the column stays a number column. An ID such as `5E3` stays text.
 
 ### Record guard and tests
 
