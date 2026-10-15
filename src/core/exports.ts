@@ -5,6 +5,7 @@ import { isAbsolute, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
+import { stepNumbers } from "./housekeeping.ts";
 import { ownerOf, type AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
 import { describeRoute, fillTemplate, show, writeOut } from "./trail.ts";
@@ -166,6 +167,13 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     for (const e of loads) lines.push(`- ${oneLine(show(e.data.name))} adapter ${oneLine(show(e.data.version))}, program ${oneLine(show(e.data.programVersion)) || "version unknown"}: ${oneLine(show(e.data.reason))}`);
   }
   lines.push("", "## Steps", "");
+  const setAside = mainNodes(record).length - nodes.length;
+  if (setAside > 0) {
+    const numbers = stepNumbers(record.nodes());
+    const live = new Set(nodes.map((n) => n.id));
+    const missing = mainNodes(record).filter((n) => !live.has(n.id)).map((n) => numbers.get(n.id));
+    lines.push(`A rewind set aside ${setAside === 1 ? "step" : "steps"} ${missing.join(", ")} of the trail. This list does not have ${setAside === 1 ? "it" : "them"}, and it counts only the steps that stay.`, "");
+  }
   const groups = group(nodes);
   const sentences: string[] = [];
   let num = 0;

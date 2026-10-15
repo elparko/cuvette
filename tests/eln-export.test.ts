@@ -138,3 +138,17 @@ test("the archive leaves out the saved key file, folders and keys in the log, an
     expect(name.endsWith("credentials.json")).toBe(false);
   }
 });
+
+test("after a rewind the step folders keep the step numbers of the trail, and protocol.md names the missing steps", async () => {
+  const upTo = s.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)!.id;
+  s.record.append("rewind", { upTo });
+  s.record.addNode({
+    entry: 0, adapter: "lab", adapterVersion: "0.2.0", programVersion: "1.0", tool: "sharpen", args: { input: "/data/a.tif" },
+    decisions: {}, codeHash: "c", inputHashes: [], outputs: [], result: {}, parents: [], summary: "Sharpened.", model: "m", manualRoute: "", fidelity: "exact",
+  });
+  const { files, top } = await exported();
+  const folders = [...files.keys()].filter((k) => /\/steps\/\d+-[^/]+\/step\.md$/.test(k)).map((k) => k.split("/steps/")[1]!.split("/")[0]);
+  expect(folders).toEqual(["01-count", "03-sharpen"]);
+  expect(files.get(`${top}analysis/steps/03-sharpen/step.md`)!.toString()).toMatch(/^# Step 3: Sharpened\./);
+  expect(files.get(`${top}analysis/protocol.md`)!.toString()).toContain("A rewind set aside step 2 of the trail.");
+});
