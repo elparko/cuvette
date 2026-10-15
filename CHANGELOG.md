@@ -24,7 +24,7 @@ Release 0.1.1 includes all changes since 12 October.
 - Cuvette stores each row of the session list in its own file in the folder `sessions-index`. Two windows that save at the same time no longer lose a row.
 - Cuvette still reads the old file `sessions-index.json`. It does not write to it.
 - Remove writes a removal row for a session in the old sessions folder. It keeps the files.
-- Cuvette moves a row file that has bad JSON or a wrong ID aside. A read error does not move it.
+- Cuvette moves a row file that has bad JSON (JavaScript Object Notation) or a wrong identifier (ID) aside. A read error does not move it.
 
 ### Hook scripts
 
@@ -52,6 +52,7 @@ Release 0.1.1 includes all changes since 12 October.
 - Cuvette sends `reasoning_effort` only to o3, o4 and gpt-5 models. It retries without the setting after an HTTP 400.
 - Effort `auto` sends no `reasoning_effort` to OpenAI models. The app sends a request again up to three times after the server refuses a setting. A fourth refusal gives the error "The model server refused the request."
 - The key status and the key card show the `ant auth login` line.
+- In the programs panel, Esc stops a running install or update. The screen says so.
 - The setup page has a Check again control for `ant auth login`.
 - The browser app answers a new POST request with HTTP 409 while it closes. `cuvette app` treats SIGHUP like SIGTERM and Ctrl+C.
 - The Claude API key setting and the setup key step show the `ant auth login` command.
@@ -72,6 +73,9 @@ Release 0.1.1 includes all changes since 12 October.
 - `inspect_data` keeps the channel axis of a TIFF file, warns if it drops planes, and shows the bit depth of the dtype.
 - The statistics tools treat a column with the placeholders `-`, `?` and `.` as numeric. The summary gives the count of placeholder cells.
 - `cellpose_tools` writes labels as uint32 if a label is above 65535.
+- `/window` in the browser app opens the window and shows its address.
+- `/resume` in the browser app tells you to open the Sessions page. In the terminal it shows the command `cuvette resume`.
+- An xlsx export refuses a sheet with more than 16384 columns or 1048576 rows, because Excel allows no more. The message says to use the CSV file.
 - `/rewind` clears the last answer and the assumptions.
 - The referee reads a reply of "None." followed by a formatted object as findings.
 - `inspect_data` warns if a TIFF file has more than one image series, if a folder has an image that it cannot read, and if it used a maximum projection.
