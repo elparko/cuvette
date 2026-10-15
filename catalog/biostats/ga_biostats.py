@@ -557,12 +557,14 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
         loglik = float(res.llf)
         ph_p = {}
     metrics = {"n": len(data), "events": int(data[event].sum()), "concordance": concordance, "log_likelihood": loglik, "n_dropped": dropped}
+    term_keys = []
     for _, r in table.iterrows():
         key = _key(r["term"])
         metrics["coef_" + key] = r["coef"]
         metrics["hr_" + key] = r["hazard_ratio"]
         metrics["se_" + key] = r["se"]
         metrics["p_" + key] = r["p"]
+        term_keys.append("p_" + key)
     if ph_p:
         metrics["ph_test_min_p"] = min(ph_p.values())
         for k, v in ph_p.items():
@@ -581,7 +583,7 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
     if low:
         summary += " Proportional hazards test p below alpha for: %s." % ", ".join("%s (p = %.3g)" % (k, ph_p[k]) for k in low)
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics),
-            "data": {"ties": ties, "alpha": alpha, "ph_test_p": ph_p, "ph_violations": low, "reference_levels": refs, "subset": subset or "all"},
+            "data": {"ties": ties, "alpha": alpha, "ph_test_p": ph_p, "ph_violations": low, "reference_levels": refs, "subset": subset or "all", "p_terms": term_keys},
             "table": _table(table, "cox")}
 
 

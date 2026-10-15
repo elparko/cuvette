@@ -24,10 +24,7 @@ export const CORRECTIONS = ["holm", "benjamini_hochberg", "not_part_of_analysis"
 const EXACT = /^(p|pvalue|p_value|pval|p_val)$/i;
 const SUFFIX = /(^|_)(p|pvalue|p_value)$/i;
 const NOT_A_TEST = /^(levene|ph_|shapiro|normality|bartlett|mauchly|min_)|_(levene|shapiro|bartlett|mauchly)|adjust/i;
-const TERM = /^p_(.+)$/i;
 const PATHISH = /\.(csv|tsv|txt|xlsx?|parquet|h5ad|fcs|json)$/i;
-
-const SAME_TEST = /^p_(reported|uncorrected|gg|interaction_gg)$/i;
 
 function mainKey(metrics: Record<string, unknown> | undefined): string | undefined {
   if (!metrics) return undefined;
@@ -41,14 +38,13 @@ export function pValueOf(metrics: Record<string, unknown> | undefined): number |
   return key === undefined ? undefined : (metrics![key] as number);
 }
 
-export function termPValuesOf(metrics: Record<string, unknown> | undefined): { term: string; p: number }[] {
-  if (!metrics) return [];
-  const key = mainKey(metrics);
-  if (key !== undefined && key !== "p_reported") return [];
-  return Object.entries(metrics).flatMap(([k, v]) => {
-    const term = TERM.exec(k)?.[1];
-    const skip = key === "p_reported" && SAME_TEST.test(k);
-    return term && !skip && typeof v === "number" && v >= 0 && v <= 1 && !NOT_A_TEST.test(k) ? [{ term: term.replace(/_x_/g, " x ").replace(/_/g, " "), p: v }] : [];
+export function termPValuesOf(metrics: Record<string, unknown> | undefined, keys: unknown): { term: string; p: number }[] {
+  if (!metrics || !Array.isArray(keys)) return [];
+  return keys.flatMap((k) => {
+    const v = typeof k === "string" ? metrics[k] : undefined;
+    if (typeof k !== "string" || typeof v !== "number" || !(v >= 0 && v <= 1)) return [];
+    const term = k === "p_reported" ? "" : k.replace(/^p_/, "").replace(/_reported$/, "").replace(/_x_/g, " x ").replace(/_/g, " ");
+    return [{ term, p: v }];
   });
 }
 
@@ -73,6 +69,11 @@ export function latestValue(record: AnalysisRecord, key: string): unknown {
   return value;
 }
 
+interface Info {
+  test?: unknown;
+  p_terms?: unknown;
+}
+
 export function collectTests(record: AnalysisRecord): TestEntry[] {
   const mode = String(latestValue(record, "test_family") ?? "same_data");
   const steps = new Map(record.nodes().filter((n) => !n.sensitivityOf).map((n, i) => [n.id, i + 1]));
@@ -80,12 +81,14 @@ export function collectTests(record: AnalysisRecord): TestEntry[] {
   for (const n of record.nodes()) {
     const step = steps.get(n.id);
     if (!step || record.replacedBy?.(n.id) || n.tool === "adjust_pvalues") continue;
-    const result = n.result as { metrics?: Record<string, unknown>; data?: { test?: unknown } } | undefined;
+    const result = n.result as { metrics?: Record<string, unknown>; data?: Info & { data?: Info } } | undefined;
+    const listed = termPValuesOf(result?.metrics, result?.data?.p_terms ?? result?.data?.data?.p_terms);
     const single = pValueOf(result?.metrics);
-    const found = [...(single !== undefined ? [{ term: "", p: single }] : []), ...termPValuesOf(result?.metrics)];
+    const found = listed.length ? listed : single !== undefined ? [{ term: "", p: single }] : [];
     if (!found.length) continue;
     const source = sourceOf(n);
-    const name = typeof result?.data?.test === "string" && result.data.test ? result.data.test : n.tool.replace(/_/g, " ");
+    const label = result?.data?.test ?? result?.data?.data?.test;
+    const name = typeof label === "string" && label ? label : n.tool.replace(/_/g, " ");
     const family = mode === "one_family" ? "all tests" : mode === "separate" ? `step ${step}` : source ? basename(source) : "no data file";
     for (const f of found) out.push({ node: n.id, step, test: f.term ? `${name}: ${f.term}` : name, tool: n.tool, source, p: f.p, family });
   }

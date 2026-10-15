@@ -210,17 +210,19 @@ def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compar
     full = int(np.prod([d[f].nunique() for f in factors]))
     balanced = bool(counts.nunique() == 1 and len(counts) == full)
     metrics = {"n": len(d), "n_dropped": dropped, "df_residual": df_res, "mse": mse, "n_cells": int(len(counts)), "balanced": int(balanced)}
+    term_keys = []
     for r in out.itertuples():
         if r.term == "Residual":
             continue
         k = _key(r.term.replace(" x ", "_x_"))
         metrics["F_" + k] = float(r.F)
         metrics["p_" + k] = float(r.p)
+        term_keys.append("p_" + k)
         metrics["df_" + k] = float(r.df)
     levene = stats.levene(*[g[outcome].values for _, g in d.groupby(factors, observed=True)], center="mean")
     metrics["levene_p"] = float(levene.pvalue)
     result = {"ok": True, "metrics": metrics,
-              "data": {"ss_type": ss_type, "factors": factors, "balanced": balanced, "alpha": alpha, "posthoc": posthoc},
+              "data": {"ss_type": ss_type, "factors": factors, "balanced": balanced, "alpha": alpha, "posthoc": posthoc, "p_terms": term_keys},
               "table": _table(out, "anova_factorial")}
     summary = "%d-way ANOVA of %s (type %s sums of squares, n = %d%s, %s design): %s. Residual df %g. Levene p = %s." % (
         len(factors), outcome, {1: "I", 2: "II", 3: "III"}[ss_type], len(d), ", %d rows dropped for a missing value" % dropped if dropped else "",
@@ -310,12 +312,14 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
     n_subj = int(d[subject].nunique())
     metrics = {"F": F, "df_effect": df1, "df_error": df2, "p_uncorrected": p_unc, "epsilon_gg": eps, "p_gg": p_gg, "p_reported": p_rep,
                "mauchly_W": W, "mauchly_p": p_spher, "n_subjects": n_subj, "n_levels": levels, "n_subjects_removed": incomplete}
+    p_terms = ["p_reported"]
     summary = "Repeated-measures ANOVA of %s over %s (%d levels, %d subjects): F(%g, %g) = %.4g, p = %s uncorrected; Greenhouse-Geisser epsilon %.4f, corrected df %.3g and %.4g, p = %s. Mauchly W = %.4g, p = %s. Reported (%s): p = %s." % (
         outcome, within, levels, n_subj, df1, df2, F, _fmt_p(p_unc), eps, df1 * eps, df2 * eps, _fmt_p(p_gg), W, _fmt_p(p_spher),
         "Greenhouse-Geisser" if use_gg else "no correction", _fmt_p(p_rep))
     if between:
         metrics.update({"F_between": float(brow["F"]), "p_between": float(brow["p_unc"]), "df_between": float(brow["DF1"]),
-                        "F_interaction": Fi, "p_interaction": pi, "p_interaction_gg": pi_gg})
+                        "F_interaction": Fi, "p_interaction": pi, "p_interaction_gg": pi_gg, "p_interaction_reported": pi_gg if use_gg else pi})
+        p_terms += ["p_between", "p_interaction_reported"]
         summary += " Between-subject factor %s: F(%g, %g) = %.4g, p = %s. Interaction: F = %.4g, p = %s (GG %s)." % (
             between, float(brow["DF1"]), float(brow["DF2"]), float(brow["F"]), _fmt_p(float(brow["p_unc"])), Fi, _fmt_p(pi), _fmt_p(pi_gg))
     summary += note
@@ -334,7 +338,7 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
     ax.set_ylabel(outcome)
     ax.set_title("Each line is one subject", fontsize=8)
     return {"ok": True, "summary": summary, "metrics": metrics,
-            "data": {"correction": correction, "used_greenhouse_geisser": bool(use_gg), "alpha": alpha},
+            "data": {"correction": correction, "used_greenhouse_geisser": bool(use_gg), "alpha": alpha, "p_terms": p_terms},
             "table": _table(table.round(10), "anova_repeated"), "outputs": _save(fig, "repeated_measures")}
 
 

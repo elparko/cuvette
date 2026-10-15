@@ -294,3 +294,45 @@ print(json.dumps({"n_tests": r["metrics"]["n_tests"], "adjusted": [None if v is 
     }
   });
 });
+
+describe.skipIf(!python)("biostats tools list their test keys", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-terms-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a mixed ANOVA lists its within, between and corrected interaction p values", { timeout: slow }, async () => {
+    const file = join(root, "mixed.csv");
+    const rows = ["subject,arm,visit,score"];
+    for (let s = 0; s < 12; s++)
+      for (let v = 0; v < 3; v++) rows.push(`s${s},${s % 2 ? "drug" : "control"},v${v},${10 + v * (1 + (s % 2) * 0.8) + ((s * 7 + v * 3) % 5) * 0.6}`);
+    writeFileSync(file, rows.join("\n") + "\n");
+    const base = { path: file, outcome: "score", within: "visit", subject: "subject", between: "arm" };
+    const gg = await stats.run("anova_repeated", { ...base, correction: "greenhouse-geisser" });
+    expect(gg.data.data.p_terms).toEqual(["p_reported", "p_between", "p_interaction_reported"]);
+    close(gg.metrics.p_interaction_reported, gg.metrics.p_interaction_gg, 1e-12);
+    const plain = await stats.run("anova_repeated", { ...base, correction: "none" });
+    close(plain.metrics.p_interaction_reported, plain.metrics.p_interaction, 1e-12);
+  });
+
+  test("a factorial ANOVA and a Cox model list one p key for each term", { timeout: slow }, async () => {
+    const file = join(root, "factorial.csv");
+    const rows = ["drug,dose,y"];
+    for (const drug of ["a", "b"]) for (const dose of ["lo", "hi"]) for (let k = 0; k < 5; k++) rows.push(`${drug},${dose},${5 + (drug === "b" ? 2 : 0) + (dose === "hi" ? 1 : 0) + ((k * 3) % 4) * 0.5}`);
+    writeFileSync(file, rows.join("\n") + "\n");
+    const f = await stats.run("anova_factorial", { path: file, outcome: "y", factors: ["drug", "dose"], ss_type: 2 });
+    expect([...f.data.data.p_terms].sort()).toEqual(["p_dose", "p_drug", "p_drug_x_dose"]);
+    const cox = join(root, "cox.csv");
+    const crows = ["time,event,age,dose"];
+    for (let i = 0; i < 40; i++) crows.push(`${5 + ((i * 7) % 23) + (i % 3)},${i % 4 === 0 ? 0 : 1},${40 + ((i * 5) % 30)},${(i * 3) % 7}`);
+    writeFileSync(cox, crows.join("\n") + "\n");
+    const c = await stats.run("fit_cox", { path: cox, duration: "time", event: "event", covariates: "age, dose" });
+    expect(c.data.data.p_terms).toEqual(["p_age", "p_dose"]);
+  });
+});
