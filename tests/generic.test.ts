@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
@@ -169,4 +169,22 @@ test("the text after a change of the record or the settings says what changed, t
   const reason = integrityReason("program", "/home/.cuvette/settings.json");
   expect(reason).toBe("The program changed /home/.cuvette/settings.json. This file belongs to the record or the settings of Cuvette. Cuvette did not undo the change. Check the file. If it is wrong, restore it from a backup.");
   for (const text of [one, reason]) expect(checkText(text.replace(/\S*[\\/]\S*/g, "X"))).toEqual([]);
+});
+
+test("write_file refuses a hook script of the project and the folder of a hook script", async () => {
+  const project = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-generic-hook-")));
+  mkdirSync(join(project, ".cuvette"));
+  mkdirSync(join(project, "hooks"));
+  writeFileSync(join(project, "hooks", "check.py"), "pass\n");
+  writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "hooks/check.py"] }] } }));
+  const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;
+  const logs: string[] = [];
+  const c = { ...ctx(), log: (k: string) => void logs.push(k) } as unknown as ToolContext;
+  for (const name of ["hooks/check.py", "hooks/new.py"]) {
+    const r = await write.execute({ name: join(project, name), text: "evil" }, c);
+    expect(r).toMatchObject({ ok: false, error: expect.stringMatching(/belongs to the record or to the settings/) });
+  }
+  expect(readFileSync(join(project, "hooks", "check.py"), "utf8")).toBe("pass\n");
+  expect(existsSync(join(project, "hooks", "new.py"))).toBe(false);
+  expect((await write.execute({ name: join(project, "results", "t.csv"), text: "a" }, c)).ok).toBe(true);
 });
