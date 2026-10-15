@@ -4,7 +4,7 @@ import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { hideKeys } from "../core/credentials.ts";
-import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
@@ -104,7 +104,7 @@ export class OpenAIProvider implements Provider {
     idle.touch();
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
-    const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
+    const res = await longFetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
     if (res.status === 429 || res.status === 408 || res.status === 409 || res.status >= 500) {
       const txt = hideKeys(await res.text()).text;
       if (body.stream && NO_STREAM.test(txt)) return new Response(txt, { status: 400 });
@@ -183,12 +183,7 @@ export class OpenAIProvider implements Provider {
     let sse = /event-stream/i.test(res.headers.get("content-type") ?? "");
     let decided = sse;
     const reply: Reply = { content: "", thinking: "", calls: [], finish: "" };
-    const textOut: string[] = [];
-    const thinkOut: string[] = [];
-    const splitter = new ThinkSplitter((kind, s) => {
-      (kind === "text" ? textOut : thinkOut).push(s);
-      onDelta?.({ type: kind, text: s });
-    });
+    const splitter = new ThinkSplitter((kind, s) => onDelta?.({ type: kind, text: s }));
     const slots = new Map<string, CallDraft>();
     let ended = false;
     const chunk = (j: any) => {
@@ -269,8 +264,8 @@ export class OpenAIProvider implements Provider {
       if (buf.trim()) line(buf);
       splitter.end();
       if (!ended && !reply.finish) throw partial("the reply ended without a finish reason");
-      reply.text = textOut.join("");
-      reply.thinking = [reply.thinking.trim(), thinkOut.join("").trim()].filter(Boolean).join("\n\n");
+      reply.text = splitter.text;
+      reply.thinking = [reply.thinking.trim(), splitter.thinking.trim()].filter(Boolean).join("\n\n");
       return reply;
     }
     let j: any;

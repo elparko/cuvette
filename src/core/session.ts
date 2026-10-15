@@ -23,7 +23,7 @@ import { COPY_LIMIT_BYTES, cutText, discardPlace, findPlace, inProject, isRecord
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
-import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText, summarizeOld, summaryMessage } from "./compaction.ts";
+import { ELIDE_AT, ELIDE_BATCH, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
@@ -1740,7 +1740,7 @@ export class Session {
     let shortened = false;
     if (!force && size() <= win * ELIDE_AT) return false;
     if (!force || tooLong) {
-      const { messages, elided } = elideOld(this.history, win);
+      const { messages, elided } = elideOld(this.history, win, force || tooLong || size() > win * SUMMARIZE_AT ? 1 : ELIDE_BATCH);
       if (elided) {
         shortened = tooLong;
         this.history = messages;
