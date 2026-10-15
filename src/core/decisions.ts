@@ -178,7 +178,7 @@ function profileVersions(name: string): number[] {
     .sort((a, b) => a - b);
 }
 
-const PLAN_FLOW_REASON = /^(set in the confirmed analysis|the scientist approved plan version|from the method|from the answers file|changed during the demonstration|the scientist asked:)/;
+const PLAN_FLOW_REASON = /^(set in the confirmed analysis|the scientist approved plan version|from the method|from the answers file|changed during the demonstration)/;
 const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
 
 export class DecisionRecord {
@@ -293,6 +293,14 @@ export class DecisionRecord {
       else this.unput(k);
     }
     return out;
+  }
+
+  revert(key: string, to: { value: unknown } | undefined, reason: string): void {
+    const s = this.state(key);
+    if (!to ? !s.set : s.set && same(to.value, s.value)) return;
+    this.record.append("decision", { key, old: s.set ? s.value : null, new: to ? to.value : null, by: "human", reason, rewind: true, ...(to ? {} : { unset: true }) });
+    if (to) this.put(key, to.value);
+    else this.unput(key);
   }
 
   private putOwner(key: string, owner: Owner): void {
