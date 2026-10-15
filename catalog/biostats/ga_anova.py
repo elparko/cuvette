@@ -1,4 +1,6 @@
 import itertools
+import functools
+import inspect
 import os
 import warnings
 
@@ -134,6 +136,31 @@ def _cell_comparisons(d, outcome, factors, mse, df_resid, compare_within, method
     return out
 
 
+def _note_missing_group(*arguments):
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            if not isinstance(result, dict) or not result.get("ok"):
+                return result
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            bound.apply_defaults()
+            columns = []
+            for name in arguments:
+                value = bound.arguments.get(name)
+                columns += [value] if isinstance(value, str) else list(value or [])
+            frame = _read(bound.arguments["path"])
+            columns = [c for c in columns if c in frame.columns]
+            dropped = int(frame[columns].isna().any(axis=1).sum()) if columns else 0
+            result.setdefault("metrics", {})["n_dropped_missing_group"] = dropped
+            if dropped:
+                result["summary"] = result.get("summary", "") + " %d %s no group and %s left out." % (dropped, "row has" if dropped == 1 else "rows have", "is" if dropped == 1 else "are")
+            return result
+        return run
+    return wrap
+
+
+@_note_missing_group("factors")
 def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compare_within=None, alpha=0.05):
     factors = _list(factors)
     if len(factors) < 2:
@@ -231,6 +258,7 @@ def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compar
     return result
 
 
+@_note_missing_group("between")
 def anova_repeated(path, outcome, within, subject, between=None, correction=None, alpha=0.05):
     if correction not in ("greenhouse-geisser", "none", "auto"):
         return _fail("correction is missing or not known. Use greenhouse-geisser, none or auto. The sphericity correction is a decision.")
@@ -310,6 +338,7 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
             "table": _table(table.round(10), "anova_repeated"), "outputs": _save(fig, "repeated_measures")}
 
 
+@_note_missing_group("group")
 def kruskal_dunn(path, outcome, group, p_adjust=None, alpha=0.05):
     if p_adjust not in ADJUST:
         return _fail("p_adjust is missing or not known. Use bonferroni, holm, sidak, fdr_bh or none. The correction is a decision.")
@@ -407,6 +436,7 @@ def friedman_test(path, outcome, within, subject, p_adjust=None, alpha=0.05):
             "table": _table(post, "friedman_pairs"), "outputs": _save(fig, "friedman")}
 
 
+@_note_missing_group("group")
 def rank_test(path, outcome, group, paired=False, id_column=None, alternative="two-sided", method=None):
     if method not in ("exact", "asymptotic"):
         return _fail("method is missing or not exact or asymptotic. The p value method is a decision.")

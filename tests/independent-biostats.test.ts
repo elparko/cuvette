@@ -199,8 +199,23 @@ describe.skipIf(!python)("biostats adapter group labels and missing group marks"
       const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
       expect(out.metrics.n_groups).toBe(3);
       expect(out.metrics.n).toBe(18);
+      expect(out.metrics.n_dropped_missing_group).toBe(6);
+      expect(out.summary).toContain("6 rows have no group and are left out.");
     });
   }
+
+  test("the other group tools count the rows without a group", { timeout: slow }, async () => {
+    const kw = await stats.run("kruskal_dunn", { path: write("kw-missing.csv", ["NA", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
+    expect(kw.metrics.n_dropped_missing_group).toBe(6);
+    expect(kw.summary).toContain("6 rows have no group and are left out.");
+    const two = await stats.run("compare_two_groups", { path: write("two-missing.csv", ["NA", "A", "B"]), outcome: "value", group: "group" });
+    expect(two.metrics.n_dropped_missing_group).toBe(6);
+    const rank = await stats.run("rank_test", { path: write("rank-missing.csv", ["null", "A", "B"]), outcome: "value", group: "group", method: "asymptotic" });
+    expect(rank.metrics.n_dropped_missing_group).toBe(6);
+    const none = await stats.run("compare_two_groups", { path: write("two-clean.csv", ["A", "B"]), outcome: "value", group: "group" });
+    expect(none.metrics.n_dropped_missing_group).toBe(0);
+    expect(none.summary).not.toContain("no group");
+  });
 
   test("a group named None stays a group in the Kruskal-Wallis test and the two-group test", { timeout: slow }, async () => {
     const kw = await stats.run("kruskal_dunn", { path: write("kw.csv", ["None", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });

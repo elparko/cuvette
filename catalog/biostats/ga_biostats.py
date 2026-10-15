@@ -1,3 +1,5 @@
+import functools
+import inspect
 import os
 import re
 import warnings
@@ -162,6 +164,31 @@ def inspect_table(path):
     }
 
 
+def _note_missing_group(*arguments):
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            if not isinstance(result, dict) or not result.get("ok"):
+                return result
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            bound.apply_defaults()
+            columns = []
+            for name in arguments:
+                value = bound.arguments.get(name)
+                columns += [value] if isinstance(value, str) else list(value or [])
+            frame = _read(bound.arguments["path"])
+            columns = [c for c in columns if c in frame.columns]
+            dropped = int(frame[columns].isna().any(axis=1).sum()) if columns else 0
+            result.setdefault("metrics", {})["n_dropped_missing_group"] = dropped
+            if dropped:
+                result["summary"] = result.get("summary", "") + " %d %s no group and %s left out." % (dropped, "row has" if dropped == 1 else "rows have", "is" if dropped == 1 else "are")
+            return result
+        return run
+    return wrap
+
+
+@_note_missing_group("group")
 def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=None, alternative="two-sided", alpha=0.05, equal_variance=False):
     from scipy import stats
     frame = _read(path)
@@ -248,6 +275,7 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
             "table": _table(pd.DataFrame([row]), "two_group_test")}
 
 
+@_note_missing_group("group")
 def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0.05):
     import pingouin as pg
     posthoc = {"bonferroni": "bonf"}.get(posthoc, posthoc)
@@ -409,6 +437,7 @@ def _event_problem(series, name):
     return "The event column %s must hold 1 for an event and 0 for a censored subject. Its values are: %s. If the file uses 1 for censored and 2 for an event (as in R), recode it first." % (name, shown)
 
 
+@_note_missing_group("group")
 def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None, subset=None):
     import matplotlib
     matplotlib.use("Agg")
