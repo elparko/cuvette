@@ -571,7 +571,7 @@ tools:
       label_column: { type: string, description: "Column with the gene name for the plot and the tables. Default: Gene names if the table has it." }
       keep_columns: { type: [array, string], items: { type: string }, description: "Extra columns to carry into the result, such as the FASTA header, as a list or as comma text." }
       exclude_flags: { type: string, description: "Leave out. The harness sets it from the decision record. Flag columns that remove a row that has a plus sign." }
-      zero_as_missing: { type: boolean, description: "true (default) treats a zero as a missing value, as MaxQuant writes a missing LFQ value." }
+      zero_as_missing: { type: boolean, description: "true treats a zero as a missing value, as MaxQuant writes a missing LFQ value. The default is true for intensities and false if already_log2 is true, because a zero log2 value is a real value." }
       already_log2: { type: boolean, description: "true if the values are already log2 values. Default false: the tool takes log2 of intensities." }
       min_peptides: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Count of peptides that a protein needs. 0 keeps all." }
       peptide_column: { type: string, description: "Column with the peptide count of a protein. Default Peptides." }

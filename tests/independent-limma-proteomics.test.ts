@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -152,5 +152,17 @@ print(json.dumps({"lfc": beta[:, 1].tolist(), "t": t.tolist(), "p": p.tolist(), 
     const out = await limma.run("prepare_protein_table", { data: pxd, sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 2, valid_rule: "each group", normalization: "none", imputation: "none" });
     expect(out.metrics.n_after_flags).toBe(6566);
     expect(out.metrics.n_kept).toBe(5022);
+  });
+  test("a log2 table keeps its zero values unless zero_as_missing is true", { timeout: slow }, async () => {
+    const file = join(root, "log2.tsv");
+    writeFileSync(file, "Protein IDs\ta1\ta2\ta3\tb1\tb2\tb3\nP1\t0\t1.5\t1.0\t3.0\t3.5\t2.5\nP2\t2.0\t2.5\t2.2\t0\t0.4\t0.2\n");
+    const kept = await limma.run("prepare_protein_table", { data: file, sample_columns: "a1,a2,a3,b1,b2,b3", groups: "a,a,a,b,b,b", already_log2: true, exclude_flags: "none", min_valid: 3, valid_rule: "each group", normalization: "none", imputation: "none" });
+    expect(kept.metrics.n_missing_before_imputation).toBe(0);
+    expect(kept.metrics.n_kept).toBe(2);
+    const rows = cells(await readFile(kept.data.prepared_file, "utf8"));
+    expect(Number(rows[1][rows[0].indexOf("a1")])).toBe(0);
+    const dropped = await limma.run("prepare_protein_table", { data: file, sample_columns: "a1,a2,a3,b1,b2,b3", groups: "a,a,a,b,b,b", already_log2: true, zero_as_missing: true, exclude_flags: "none", min_valid: 2, valid_rule: "each group", normalization: "none", imputation: "none" });
+    expect(dropped.metrics.n_missing_before_imputation).toBe(2);
+    expect(dropped.metrics.n_kept).toBe(2);
   });
 });
