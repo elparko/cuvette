@@ -307,7 +307,7 @@ export function designChecks(rows: SampleRow[], opts: { n?: string; test?: strin
     if (rank && lo >= 2) {
       const [a, b] = [...ns].sort((x, y) => x - y);
       const name = opts.test ?? "";
-      const signed = !/unpaired|independent/i.test(name) && (/\b(signed|paired)\b/i.test(name) || (/wilcoxon/i.test(name) && !/rank.?sum|mann|whitney/i.test(name)));
+      const signed = !/(un|non)[- ]?paired|independent/i.test(name) && (/\b(signed|paired)\b/i.test(name) || (/wilcoxon/i.test(name) && !/rank.?sum|mann|whitney/i.test(name)));
       const p = signed ? minPossibleSignedRankP(a!) : minPossibleP(a!, b!);
       const text = signed ? `With n = ${a} pairs, the smallest possible two-sided p of the Wilcoxon signed-rank test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.` : `With n = ${a} and n = ${b}, the smallest possible two-sided p of the Mann-Whitney test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.`;
       if (p > 0.05) out.push({ id: "too_few_rank", check: "too_few", level: "warn", text });

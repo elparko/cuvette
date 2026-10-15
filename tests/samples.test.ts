@@ -134,7 +134,7 @@ describe("design checks", () => {
 
   test("an unpaired rank test uses the Mann-Whitney limit", () => {
     const four = ["1", "2", "3", "4"].flatMap((m) => [row(`a${m}`, "Ctrl", `M${m}`), row(`b${m}`, "Drug", `N${m}`)]);
-    for (const test of ["unpaired Mann-Whitney", "unpaired Wilcoxon test"]) {
+    for (const test of ["unpaired Mann-Whitney", "unpaired Wilcoxon test", "un-paired Wilcoxon test", "non-paired Wilcoxon test", "non paired Wilcoxon test"]) {
       expect(designChecks(four, { test }).some((i) => i.id === "too_few_rank")).toBe(false);
     }
     const three = ["1", "2", "3"].flatMap((m) => [row(`a${m}`, "Ctrl", `M${m}`), row(`b${m}`, "Drug", `N${m}`)]);

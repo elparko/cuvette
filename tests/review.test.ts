@@ -271,6 +271,11 @@ describe("referee", () => {
     expect(got.map((f) => f.message)).toEqual(["The claim has no node."]);
   });
 
+  test("a first line of none followed by a pretty-printed object gives the finding", () => {
+    const got = parseReferee('None\n{\n  "severity": "warning",\n  "message": "The claim has no node."\n}');
+    expect(got.map((f) => f.message)).toEqual(["The claim has no node."]);
+  });
+
   test("parses fenced JSON lines and arrays", () => {
     const lines = '```json\n{"severity":"warning","message":"A","entries":[3]}\n{"severity":"bogus","message":"B"}\n```';
     expect(parseReferee(lines)).toEqual([

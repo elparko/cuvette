@@ -514,7 +514,8 @@ export function parseReferee(raw: string): FindingIn[] {
   const body = raw.replace(/```[a-z]*\n?/gi, "").trim();
   const firstLine = body.split("\n")[0]!.trim();
   const laterFinding = body.split("\n").slice(1).some((l) => l.trim().startsWith("{"));
-  if (!body || (/^(none|no findings|no problems( found)?|\[\s*\])\.?$/i.test(firstLine) && !laterFinding)) return [];
+  const noneLine = /^(none|no findings|no problems( found)?|\[\s*\])\.?$/i.test(firstLine);
+  if (!body || (noneLine && !laterFinding)) return [];
   const tryParse = (s: string): unknown => {
     try {
       return JSON.parse(s);
@@ -522,7 +523,7 @@ export function parseReferee(raw: string): FindingIn[] {
       return undefined;
     }
   };
-  const whole = tryParse(body);
+  const whole = tryParse(body) ?? (noneLine ? tryParse(body.split("\n").slice(1).join("\n")) : undefined);
   let items: unknown[] | undefined;
   if (Array.isArray(whole)) items = whole;
   else if (whole && typeof whole === "object") items = Array.isArray((whole as any).findings) ? (whole as any).findings : [whole];

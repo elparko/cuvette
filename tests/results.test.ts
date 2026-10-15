@@ -327,3 +327,11 @@ test("one cell with a signed exponent or a value that is not finite does not tur
   expect(typed([["1E-05"], ["2"]], 1)).toEqual([[0.00001], [2]]);
   expect(typed([["1e999"], ["2"], ["3.5"]], 1)).toEqual([["1e999"], [2], [3.5]]);
 });
+
+test("a value that underflows to zero stays text and the column stays numeric", () => {
+  expect(typed([["1e-999"], ["2"], ["0e5"], ["0.0"]], 1)).toEqual([["1e-999"], [2], [0], [0]]);
+});
+
+test("inf, -inf and Infinity stay text and the column stays numeric", () => {
+  expect(typed([["inf"], ["-inf"], ["Infinity"], ["+INF"], ["2"]], 1)).toEqual([["inf"], ["-inf"], ["Infinity"], ["+INF"], [2]]);
+});
