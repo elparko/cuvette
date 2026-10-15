@@ -148,7 +148,15 @@ test("a hook script with no extension and no slash, and a python module, are in 
   mkdirSync(join(cwd, "pkgone"));
   for (const f of ["hook", "other", "plain", "checks/run.py", "checks/__init__.py", "pkgone/__main__.py"]) writeFileSync(join(cwd, f), "x");
   const keys = Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort();
-  expect(keys).toEqual(["hook", "other", "checks/run.py", "pkgone/__main__.py"].sort().map((f) => `(hook script) ${f}`));
+  expect(keys).toEqual(["hook", "other", "checks/__init__.py", "checks/run.py", "pkgone/__main__.py"].sort().map((f) => `(hook script) ${f}`));
+});
+
+test("a python module with a dotted name adds the __init__.py of each parent package", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["python3", "-m", "pkg.sub.run"] }] } });
+  mkdirSync(join(cwd, "pkg", "sub"), { recursive: true });
+  for (const f of ["pkg/__init__.py", "pkg/sub/__init__.py", "pkg/sub/run.py"]) writeFileSync(join(cwd, f), "x");
+  const keys = Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort();
+  expect(keys).toEqual(["pkg/__init__.py", "pkg/sub/__init__.py", "pkg/sub/run.py"].map((f) => `(hook script) ${f}`));
 });
 
 test("a hook command that names a file outside the project adds no file to the trust hash", () => {

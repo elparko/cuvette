@@ -244,8 +244,10 @@ const PATH_LIKE = /[\\/]|^\.|\.\w+$/;
 const INTERPRETER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell)(\.exe)?$/i;
 
 function moduleFiles(name: string): string[] {
-  const base = name.split(".").join("/");
-  return [`${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
+  const parts = name.split(".");
+  const base = parts.join("/");
+  const parents = parts.slice(0, -1).map((_, i) => `${parts.slice(0, i + 1).join("/")}/__init__.py`);
+  return [...parents, `${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
 }
 
 function segmentWords(words: string[]): string[] {
