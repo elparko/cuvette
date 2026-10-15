@@ -56,6 +56,15 @@ describe("table checks", () => {
     expect(item(c, "missing:dose").text).toContain("row 5");
   });
 
+  test("a time or visit label in brackets after a column name is not a unit", () => {
+    const rows = Array.from({ length: 6 }, (_, i) => [`M${i + 1}`, String(20 + i), String(22 + i), String(25 + i)]);
+    const c = checkTable(t(["Animal", "weight (baseline)", "weight (week 4)", "weight (day 7)"], rows), "plate.csv");
+    expect(ids(c)).not.toContain("units:weight");
+    expect(c.units).toEqual([]);
+    const real = checkTable(t(["Animal", "length (mm)", "length (cm)"], rows.map((r) => r.slice(0, 3))), "plate.csv");
+    expect(ids(real)).toContain("units:length");
+  });
+
   test("an empty column is shown, not asked", () => {
     const c = checkTable(t(["id", "value", "spare"], [["a", "1", ""], ["b", "2", ""], ["c", "3", ""]]), "x.csv");
     expect(item(c, "empty:spare")).toMatchObject({ level: "note", text: "Column 'spare' is empty. The harness does not use it." });

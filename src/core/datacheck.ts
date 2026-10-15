@@ -143,6 +143,7 @@ const UNIT_FAMILIES: [string, string[]][] = [
   ["percent", ["%", "percent", "pct"]],
 ];
 
+const TIME_LABEL = /^(baseline|base|screening|pre|post|before|after|follow[- ]?up|final|end|start|(visit|v|week|wk|w|day|d|month|mo|m|year|yr|y|time|t|timepoint|tp|session|cycle|c)\s*-?\s*\d+|\d+\s*(h|hr|hrs|hours?|min|d|days?|wk|weeks?|mo|months?|y|yr|years?)?)$/i;
 const MOLAR = /^[pnum]?M$/;
 
 function unitKey(u: string): string {
@@ -158,7 +159,8 @@ export function unitFamily(u: string): string | undefined {
 
 export function unitOf(column: string): string | undefined {
   const m = UNIT_IN_NAME.exec(column.trim());
-  return m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
+  const unit = m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
+  return unit && !TIME_LABEL.test(unit) ? unit : undefined;
 }
 
 export function median(xs: number[]): number {
