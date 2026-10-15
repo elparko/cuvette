@@ -54,12 +54,12 @@ export class StripeError extends Error {
   }
 }
 
-export async function stripeCall(secretKey: string, method: "GET" | "POST", path: string, params: Record<string, string> = {}, idempotencyKey?: string): Promise<any> {
+export async function stripeCall(secretKey: string, method: "GET" | "POST" | "DELETE", path: string, params: Record<string, string> = {}, idempotencyKey?: string): Promise<any> {
   const query = new URLSearchParams(params).toString();
   const headers: Record<string, string> = { authorization: `Bearer ${secretKey}` };
   if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
   const init: RequestInit = { method, headers };
-  if (method === "POST") {
+  if (method !== "GET") {
     headers["content-type"] = "application/x-www-form-urlencoded";
     init.body = query;
   }

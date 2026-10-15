@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPlans } from "../src/plans.ts";
-import { reserve } from "../src/money.ts";
-import { DAY, SONNET, TEST_PLANS, addAccount, addHold, addTopup, addUsage, balanceOf, call, chatBody, heldStream, heldTotal, holdsOf, makeEnv, mockFetch, post, reserveFor, topupsOf, type TestEnv } from "./helpers.ts";
+import { expireHolds, reserve } from "../src/money.ts";
+import { DAY, SONNET, TEST_PLANS, addAccount, addHold, addTopup, addUsage, balanceOf, call, chatBody, heldStream, heldTotal, holdsOf, makeEnv, mockFetch, post, reserveFor, messageDelta, messageStart, sse, topupsOf, type TestEnv } from "./helpers.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -571,6 +571,53 @@ describe("spend order", () => {
     await Promise.all([ask(env, a.token), ask(env, a.token)]);
     expect(balanceOf(env, a.id)).toBeCloseTo(5 - 2 - 2 * COST, 9);
     expect(env.fake.rows("SELECT * FROM usage WHERE request_id = 'old'")).toHaveLength(1);
+  });
+
+  it("debits a stream that runs longer than 15 minutes once, when a new request expires its hold first", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const first = await call(env, "/v1/messages", post(a.token, chatBody()));
+    env.fake.sqlite.prepare("UPDATE holds SET started_at = started_at - ?").run(16 * 60_000);
+    jsonUpstream(10, 10);
+    await ask(env, a.token);
+    expect(balanceOf(env, a.id)).toBeCloseTo(5 - reserveFor(chatBody(), 2, 10) - (10 * 2 + 10 * 10) / 1e6, 9);
+    held.push(sse([messageStart(SONNET, { input_tokens: 100 }), messageDelta({ output_tokens: 50 })]));
+    held.end();
+    await first.res.text();
+    await first.settled();
+    expect(balanceOf(env, a.id)).toBeCloseTo(5 - reserveFor(chatBody(), 2, 10) - (10 * 2 + 10 * 10) / 1e6, 9);
+    expect(env.fake.rows("SELECT status FROM usage ORDER BY id")).toEqual([{ status: "expired" }, { status: "ok" }]);
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
+  });
+
+  it("debits from top-ups once for a stream that settles after its hold expired", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 0, { plan: "none" });
+    const t = addTopup(env, a.id, 5, Date.now() + DAY, "t1");
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const first = await call(env, "/v1/messages", post(a.token, chatBody()));
+    env.fake.sqlite.prepare("UPDATE holds SET started_at = started_at - ?").run(16 * 60_000);
+    jsonUpstream(10, 10);
+    await ask(env, a.token);
+    held.push(sse([messageStart(SONNET, { input_tokens: 100 }), messageDelta({ output_tokens: 50 })]));
+    held.end();
+    await first.res.text();
+    await first.settled();
+    expect(topup(env, t)).toBeCloseTo(5 - reserveFor(chatBody(), 2, 10) - (10 * 2 + 10 * 10) / 1e6, 9);
+  });
+
+  it("debits an expired hold once when two expireHolds calls run at the same time", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    addHold(env, a.id, 2, Date.now() - 20 * 60_000, "old");
+    const found = await Promise.all([expireHolds(env, a.id, Date.now()), expireHolds(env, a.id, Date.now())]);
+    expect(found.filter(Boolean)).toHaveLength(1);
+    expect(balanceOf(env, a.id)).toBe(3);
+    expect(env.fake.rows("SELECT * FROM usage WHERE request_id = 'old'")).toHaveLength(1);
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
   });
 
   it("handles an expired hold at settle: it keeps the full amount and the status expired", async () => {

@@ -166,10 +166,38 @@ async function topupPaid(env: Env, cfg: PlansConfig, session: any): Promise<Effe
   };
 }
 
+function hasOtherLiveSubscription(account: Account, subscription: string | null): boolean {
+  return !!subscription && !!account.stripe_subscription_id && account.stripe_subscription_id !== subscription && SUBSCRIBED.includes(account.sub_status);
+}
+
+async function paymentOf(env: Env, invoice: any): Promise<{ payment_intent?: string; charge?: string } | undefined> {
+  const intent = typeof invoice.payment_intent === "string" ? invoice.payment_intent : invoice.payment_intent?.id;
+  if (typeof intent === "string") return { payment_intent: intent };
+  if (typeof invoice.charge === "string") return { charge: invoice.charge };
+  if (typeof invoice.id !== "string") return undefined;
+  const payments = await stripeCall(env.STRIPE_SECRET_KEY, "GET", "/invoice_payments", { invoice: invoice.id, status: "paid" });
+  const paid = payments.data?.[0]?.payment;
+  return typeof paid?.payment_intent === "string" ? { payment_intent: paid.payment_intent } : typeof paid?.charge === "string" ? { charge: paid.charge } : undefined;
+}
+
+async function cancelAndRefund(env: Env, eventId: string, subscription: string): Promise<void> {
+  const key = env.STRIPE_SECRET_KEY;
+  const sub = await stripeCall(key, "GET", `/subscriptions/${subscription}`, { "expand[]": "latest_invoice" });
+  await stripeCall(key, "DELETE", `/subscriptions/${subscription}`, {}, `${eventId}:cancel`);
+  const invoice = sub.latest_invoice;
+  if (!invoice || typeof invoice !== "object" || !(Number(invoice.amount_paid) > 0)) return;
+  const payment = await paymentOf(env, invoice);
+  if (payment) await stripeCall(key, "POST", "/refunds", payment, `${eventId}:refund`);
+}
+
 async function subscriptionStarted(env: Env, eventId: string, session: any): Promise<Effect | undefined> {
   if (session?.mode !== "subscription" || typeof session.subscription !== "string") return undefined;
   const account = (await byId(env, session.client_reference_id)) ?? (await byCustomer(env, session.customer));
   if (!account) return undefined;
+  if (hasOtherLiveSubscription(account, session.subscription)) {
+    await cancelAndRefund(env, eventId, session.subscription);
+    return { statements: [] };
+  }
   const statements: Statement[] = [env.DB.prepare("UPDATE accounts SET stripe_subscription_id = ?1, stripe_customer_id = COALESCE(stripe_customer_id, ?2) WHERE id = ?3").bind(session.subscription, typeof session.customer === "string" ? session.customer : null, account.id)];
   if (session.metadata?.trial === "1") {
     const fingerprint = await cardFingerprint(env, session);
@@ -193,6 +221,13 @@ function linePriceId(line: any): string | undefined {
   return typeof price === "string" ? price : undefined;
 }
 
+function periodShare(invoice: any, interval: Interval, periodEnd: number, now: number): number {
+  const nominalStart = addMonths(periodEnd, interval === "year" ? -12 : -1, new Date(periodEnd).getUTCDate());
+  const given = seconds(invoice.period_start);
+  const start = given !== undefined && Math.abs(given - nominalStart) <= 2 * 86_400_000 ? given : nominalStart;
+  return Math.min(1, Math.max(0, (periodEnd - now) / (periodEnd - start)));
+}
+
 async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Effect | undefined> {
   const reason = invoice?.billing_reason;
   if (reason !== "subscription_create" && reason !== "subscription_cycle" && reason !== "subscription_update") return undefined;
@@ -206,13 +241,15 @@ async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Ef
   const periodEnd = seconds(chosen.line.period?.end);
   if (periodEnd === undefined) return undefined;
   const subscription = invoiceSubscription(invoice);
+  if (hasOtherLiveSubscription(account, subscription)) return undefined;
   const now = Date.now();
   const resets = Math.min(addMonths(now, 1), periodEnd);
   const paid = Number(invoice.amount_paid ?? 0);
   if (reason === "subscription_cycle" && account.period_end !== null && account.stripe_subscription_id === subscription && periodEnd < account.period_end) return undefined;
   if (reason === "subscription_update") {
     const total = Number(invoice.total ?? invoice.amount_paid ?? 0);
-    const delta = total > 0 ? Math.max(0, plan.allowanceUsd - account.allowance_granted_usd) : 0;
+    const share = periodShare(invoice, interval, periodEnd, now);
+    const delta = total > 0 ? Math.max(0, plan.allowanceUsd - account.allowance_granted_usd) * share : 0;
     const inTrial = account.sub_status === "trialing" || account.allowance_granted_usd === cfg.trial.allowanceUsd;
     const keepWindow = !inTrial && account.allowance_resets_at !== null && account.allowance_resets_at > now + 60_000;
     return {

@@ -562,6 +562,76 @@ describe("webhook: checkout.session.completed for a subscription", () => {
     expect(acc(env, a.id).stripe_subscription_id).toBeNull();
   });
 
+  describe("a second subscription", () => {
+    const second = (account: string, over: Record<string, unknown> = {}) => session(account, { id: "cs_2", subscription: "sub_2", setup_intent: null, metadata: {}, ...over });
+    const secondRoutes = (amountPaid: number) => ({
+      "GET /subscriptions/sub_2": () => ({ id: "sub_2", latest_invoice: { id: "in_2", amount_paid: amountPaid, payment_intent: "pi_2" } }),
+      "DELETE /subscriptions/sub_2": () => ({ id: "sub_2", status: "canceled" }),
+      "POST /refunds": () => ({ id: "re_1" }),
+    });
+
+    it("cancels the new subscription at once, refunds its payment, and keeps the stored subscription", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1" });
+      const calls = stripeMock(secondRoutes(2000));
+      const e = event("checkout.session.completed", second(a.id));
+      expect((await send(env, e)).status).toBe(200);
+      const cancel = calls.find((c) => c.init.method === "DELETE")!;
+      expect(cancel.url).toBe("https://api.stripe.com/v1/subscriptions/sub_2");
+      expect(cancel.headers.get("idempotency-key")).toBe(`${e.id}:cancel`);
+      const refund = calls.find((c) => c.url.endsWith("/refunds"))!;
+      expect(form(refund.body).get("payment_intent")).toBe("pi_2");
+      expect(refund.headers.get("idempotency-key")).toBe(`${e.id}:refund`);
+      expect(acc(env, a.id)).toMatchObject({ stripe_subscription_id: "sub_1", plan: "standard", allowance_remaining_usd: 9 });
+      expect(env.fake.row("SELECT event_id FROM stripe_events")).toEqual({ event_id: e.id });
+    });
+
+    it("cancels the new subscription of a trial and refunds nothing when it paid nothing", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", subStatus: "trialing" });
+      const calls = stripeMock(secondRoutes(0));
+      await send(env, event("checkout.session.completed", second(a.id)));
+      expect(calls.some((c) => c.init.method === "DELETE")).toBe(true);
+      expect(calls.some((c) => c.url.endsWith("/refunds"))).toBe(false);
+      expect(env.fake.rows("SELECT * FROM card_trials")).toHaveLength(0);
+      expect(acc(env, a.id).stripe_subscription_id).toBe("sub_1");
+    });
+
+    it("refunds the charge when the invoice has a charge and no payment intent", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1" });
+      const calls = stripeMock({ ...secondRoutes(2000), "GET /subscriptions/sub_2": () => ({ latest_invoice: { id: "in_2", amount_paid: 2000, charge: "ch_2" } }) });
+      await send(env, event("checkout.session.completed", second(a.id)));
+      expect(form(calls.find((c) => c.url.endsWith("/refunds"))!.body).get("charge")).toBe("ch_2");
+    });
+
+    it("answers 500 so that Stripe tries again when the refund fails", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1" });
+      stripeMock({ ...secondRoutes(2000), "POST /refunds": () => new Response("{}", { status: 500 }) });
+      expect((await send(env, event("checkout.session.completed", second(a.id)))).status).toBe(500);
+      expect(env.fake.rows("SELECT * FROM stripe_events")).toHaveLength(0);
+    });
+
+    it("keeps the same subscription when Stripe sends the event again for the stored id", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1" });
+      const calls = stripeMock({});
+      await send(env, event("checkout.session.completed", second(a.id, { subscription: "sub_1" })));
+      expect(calls).toHaveLength(0);
+      expect(acc(env, a.id).stripe_subscription_id).toBe("sub_1");
+    });
+
+    it("takes the new subscription when the stored one is canceled", async () => {
+      const env = makeEnv();
+      const a = await addAccount(env, 0, { plan: "none", customer: "cus_1", subscription: "sub_old", subStatus: "canceled" });
+      const calls = stripeMock({});
+      await send(env, event("checkout.session.completed", second(a.id)));
+      expect(calls).toHaveLength(0);
+      expect(acc(env, a.id).stripe_subscription_id).toBe("sub_2");
+    });
+  });
+
   it("finds the account by customer when the reference is missing", async () => {
     const env = makeEnv();
     const a = await addAccount(env, 0, { plan: "none", customer: "cus_1" });
@@ -654,6 +724,38 @@ describe("webhook: invoice.paid", () => {
     expect(acc(env, a.id)).toMatchObject({ plan: "lab", allowance_remaining_usd: 4 + 31, allowance_granted_usd: 46, allowance_resets_at: keep, period_end: period(31) * 1000 });
   });
 
+  it("scales the added allowance by the share of the period that is left", async () => {
+    freeze();
+    const env = makeEnv();
+    const end = NOW.getTime() + DAY;
+    const a = await addAccount(env, 4, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: end });
+    const start = Date.parse("2026-09-02T12:00:00Z");
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 100, amount_paid: 100, period_start: sec(start), period_end: sec(end), lines: { data: [line("price_lab_m", 100, sec(end))] } })));
+    const added = 31 / 30;
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + added, 6);
+    expect(acc(env, a.id).allowance_granted_usd).toBeCloseTo(15 + added, 6);
+    expect(acc(env, a.id).allowance_remaining_usd).toBeLessThan(5.5);
+  });
+
+  it("scales the added allowance when the invoice period starts at the change and not at the cycle", async () => {
+    freeze();
+    const env = makeEnv();
+    const end = NOW.getTime() + DAY;
+    const a = await addAccount(env, 4, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: end });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 100, amount_paid: 100, period_start: sec(NOW.getTime()), period_end: sec(end), lines: { data: [line("price_lab_m", 100, sec(end))] } })));
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + 31 / 30, 6);
+  });
+
+  it("scales the added allowance when the invoice has no period of its own", async () => {
+    freeze();
+    const env = makeEnv();
+    const end = NOW.getTime() + 15 * DAY;
+    const a = await addAccount(env, 4, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: end });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 1500, amount_paid: 1500, lines: { data: [line("price_lab_m", 1500, sec(end))] } })));
+    const share = (end - NOW.getTime()) / (end - Date.parse("2026-09-16T12:00:00Z"));
+    expect(acc(env, a.id).allowance_remaining_usd).toBeCloseTo(4 + 31 * share, 6);
+  });
+
   it("pays the difference of a trial that ended early", async () => {
     freeze();
     const env = makeEnv();
@@ -676,6 +778,49 @@ describe("webhook: invoice.paid", () => {
     const a = await addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1" });
     await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 18000, amount_paid: 18000, lines: { data: [line("price_standard_y", 20000, period(365))] } })));
     expect(acc(env, a.id)).toMatchObject({ plan: "standard", plan_interval: "year", allowance_remaining_usd: 9, allowance_granted_usd: 15 });
+  });
+
+  describe("an invoice for another subscription", () => {
+    const account = (env: TestEnv, over: Parameters<typeof addAccount>[2] = {}) => addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", ...over });
+
+    for (const reason of ["subscription_create", "subscription_cycle", "subscription_update"]) {
+      it(`ignores ${reason} while the account has a live subscription with another id`, async () => {
+        freeze();
+        const env = makeEnv();
+        const a = await account(env);
+        const before = acc(env, a.id);
+        const res = await send(env, event("invoice.paid", invoice({ billing_reason: reason, subscription: "sub_2", total: 6000, amount_paid: 6000, lines: { data: [line("price_lab_m", 6000, period(31))] } })));
+        expect((await json(res)).ignored).toBe(true);
+        expect(acc(env, a.id)).toEqual(before);
+        expect(env.fake.rows("SELECT * FROM stripe_events")).toHaveLength(0);
+      });
+    }
+
+    it("reads the subscription from the parent in the newer invoice shape", async () => {
+      freeze();
+      const env = makeEnv();
+      const a = await account(env);
+      const before = acc(env, a.id);
+      const res = await send(env, event("invoice.paid", invoice({ subscription: undefined, parent: { subscription_details: { subscription: "sub_2" } }, billing_reason: "subscription_cycle", lines: { data: [line("price_lab_m", 6000, period(31))] } })));
+      expect((await json(res)).ignored).toBe(true);
+      expect(acc(env, a.id)).toEqual(before);
+    });
+
+    it("accepts the invoice of the stored subscription", async () => {
+      freeze();
+      const env = makeEnv();
+      const a = await account(env);
+      await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_cycle", subscription: "sub_1", lines: { data: [line("price_standard_m", 2000, period(31))] } })));
+      expect(acc(env, a.id).allowance_remaining_usd).toBe(15);
+    });
+
+    it("accepts the first invoice of a new subscription when the stored one is canceled", async () => {
+      freeze();
+      const env = makeEnv();
+      const a = await account(env, { subStatus: "canceled", plan: "none" });
+      await send(env, event("invoice.paid", invoice({ subscription: "sub_2" })));
+      expect(acc(env, a.id)).toMatchObject({ plan: "standard", sub_status: "active", stripe_subscription_id: "sub_2" });
+    });
   });
 
   for (const reason of ["manual", "subscription_threshold", "upcoming", "quote_accept", "automatic_pending_invoice_item_invoice", undefined, 5]) {
@@ -745,6 +890,18 @@ describe("webhook: invoice.paid", () => {
 describe("webhook: subscription changes", () => {
   const sub = (over: Record<string, unknown> = {}) => ({ id: "sub_1", customer: "cus_1", status: "active", current_period_end: sec(NOW.getTime() + 20 * DAY), ...over });
   const account = (env: TestEnv, over: Parameters<typeof addAccount>[2] = {}) => addAccount(env, 9, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", ...over });
+
+  it("ignores an update or a deletion for a subscription id that is not the stored one", async () => {
+    const env = makeEnv();
+    const a = await account(env);
+    const before = acc(env, a.id);
+    for (const [type, status] of [["customer.subscription.updated", "canceled"], ["customer.subscription.updated", "unpaid"], ["customer.subscription.deleted", "canceled"]] as const) {
+      const res = await send(env, event(type, sub({ id: "sub_2", status })));
+      expect((await json(res)).ignored).toBe(true);
+    }
+    expect(acc(env, a.id)).toEqual(before);
+    expect(env.fake.rows("SELECT * FROM stripe_events")).toHaveLength(0);
+  });
 
   it("copies the status and the period end", async () => {
     const env = makeEnv();

@@ -180,6 +180,57 @@ describe("chat completions usage", () => {
     expect(env.fake.row("SELECT status, cost_usd FROM usage").status).toBe("cut");
   });
 
+  it("answers an upstream 429 with the own overloaded error and keeps retry-after", async () => {
+    const env = makeOpenAiEnv();
+    const acct = await addAccount(env, 5);
+    mockFetch(() => new Response('{"error":{"message":"slow down vendor/real-model"}}', { status: 429, headers: { "content-type": "application/json", "retry-after": "7" } }));
+    const { res } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("7");
+    expect(await res.json()).toEqual({ type: "error", error: { type: "overloaded", message: "The model service is busy. Try again in a short time." } });
+  });
+
+  it("refunds the full hold when the stream fails before the first chunk", async () => {
+    const env = makeOpenAiEnv();
+    const acct = await addAccount(env, 5);
+    const broken = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.error(new TypeError("connection reset"));
+      },
+    });
+    mockFetch(() => new Response(broken, { headers: { "content-type": "text/event-stream" } }));
+    const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
+    await res.text().catch(() => undefined);
+    await settled();
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(holdsOf(env, acct.id)).toBe(0);
+    expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "error", cost_usd: 0 });
+  });
+
+  it("refunds the full hold when the stream closes with no chunk", async () => {
+    const env = makeOpenAiEnv();
+    const acct = await addAccount(env, 5);
+    mockFetch(() => sseResponse(""));
+    const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(env.fake.row("SELECT status FROM usage").status).toBe("error");
+  });
+
+  it("keeps the reservation when the client aborts before the first chunk", async () => {
+    const env = makeOpenAiEnv();
+    const acct = await addAccount(env, 5);
+    const body = openAiBody();
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, body));
+    await res.body!.cancel();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 1000), 9);
+    expect(env.fake.row("SELECT status FROM usage").status).toBe("cut");
+  });
+
   it("keeps the reservation when a non-stream response has no usage", async () => {
     const env = makeOpenAiEnv();
     const acct = await addAccount(env, 5);
@@ -210,13 +261,13 @@ describe("chat completions usage", () => {
   });
 
   it("refunds in full when the host returns an HTTP error and hides a host key problem", async () => {
-    for (const [status, text, expected] of [[500, '{"error":{"message":"boom"}}', 500], [401, '{"error":{"message":"bad key sk-host"}}', 503], [402, "pay", 503], [429, '{"error":{"code":"insufficient_quota"}}', 503], [429, '{"error":{"message":"slow down"}}', 429]] as const) {
+    for (const [status, text, expected] of [[500, '{"error":{"message":"boom"}}', 500], [401, '{"error":{"message":"bad key sk-host"}}', 503], [402, "pay", 503], [429, '{"error":{"code":"insufficient_quota"}}', 503], [429, '{"error":{"message":"slow down"}}', 503], [529, '{"error":{"message":"slow down"}}', 503]] as const) {
       const env = makeOpenAiEnv();
       const acct = await addAccount(env, 5);
       mockFetch(() => new Response(text, { status, headers: { "content-type": "application/json" } }));
       const { res } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
       expect(res.status).toBe(expected);
-      if (expected === 503) expect(await res.text()).not.toContain("sk-host");
+      if (expected === 503) expect(await res.text()).not.toMatch(/sk-host|slow down|insufficient_quota/);
       expect(balanceOf(env, acct.id)).toBe(5);
       expect(holdsOf(env, acct.id)).toBe(0);
       expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "rejected", cost_usd: 0 });

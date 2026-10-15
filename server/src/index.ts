@@ -137,7 +137,7 @@ interface Flavor {
   url: string;
   headers: Record<string, string>;
   body: string;
-  tracker(): { push(chunk: Uint8Array): void; outcome(completed: boolean): Outcome };
+  tracker(): { push(chunk: Uint8Array): void; outcome(completed: boolean, failed: boolean): Outcome };
   fromJson(json: any): Outcome | undefined;
   isOurs(status: number, text: string): boolean;
 }
@@ -167,6 +167,13 @@ async function readBody(req: Request): Promise<{ raw: ArrayBuffer; body: any } |
   }
 }
 
+const isBusy = (status: number) => status === 429 || status === 529;
+
+function busy(up: Response): Response {
+  const retry = up.headers.get("retry-after");
+  return fail(503, "overloaded", "The model service is busy. Try again in a short time.", retry ? { "retry-after": retry } : {});
+}
+
 const unavailable = () => fail(503, "api_error", "The inference service is not available. Try again later.");
 
 function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked: Checked, key: string, path: string): Flavor {
@@ -188,12 +195,13 @@ function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked
       const sse = new SseUsage();
       return {
         push: (chunk) => sse.push(chunk),
-        outcome() {
+        outcome(completed, failed) {
           const seen = sse.seen;
           if (seen.finished && seen.total) {
             const model = seen.model ?? hold.requestedModel;
             return { charge: finalCharge(model, seen.total), model, tokens: seen.total, status: "ok" };
           }
+          if (!seen.started && (completed || failed || seen.failed)) return { charge: 0, model: hold.requestedModel, tokens: NO_TOKENS, status: "error" };
           if (!seen.started || !seen.start) return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_TOKENS, status: "cut" };
           const model = seen.model ?? hold.requestedModel;
           return { charge: finalCharge(model, { ...seen.start, output: 0 }) + hold.outputReserve, model, tokens: seen.start, status: "cut" };
@@ -220,8 +228,9 @@ function openAiFlavor(hold: Hold, checked: Checked, key: string): Flavor {
       const usage = new OpenAiUsage();
       return {
         push: (chunk) => usage.push(chunk),
-        outcome(completed) {
+        outcome(completed, failed) {
           if (usage.tokens && (usage.done || completed)) return { charge: cost(usage.tokens), model: hold.requestedModel, tokens: usage.tokens, status: "ok" };
+          if (!usage.chunks && (completed || failed)) return { charge: 0, model: hold.requestedModel, tokens: NO_TOKENS, status: "error" };
           return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_TOKENS, status: "cut" };
         },
       };
@@ -248,6 +257,7 @@ async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flav
   if (!up.ok) {
     const text = await up.text();
     await refundAll("rejected");
+    if (isBusy(up.status)) return busy(up);
     if (flavor.isOurs(up.status, text)) return unavailable();
     return new Response(text, { status: up.status, headers: passHeaders(up) });
   }
@@ -256,18 +266,20 @@ async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flav
     const tracker = flavor.tracker();
     const reader = up.body.getReader();
     let finished = false;
+    let cancelled = false;
     let release!: () => void;
     ctx.waitUntil(new Promise<void>((r) => (release = r)));
-    const finish = (completed: boolean) => {
+    const finish = (completed: boolean, failed = false) => {
       if (finished) return;
       finished = true;
-      const o = tracker.outcome(completed);
+      const o = tracker.outcome(completed, failed);
       void settleSafe(env, hold, o.charge, o.model, o.status, o.tokens).finally(release);
     };
     const stream = new ReadableStream<Uint8Array>({
       async pull(controller) {
         try {
           const { done, value } = await reader.read();
+          if (cancelled) return;
           if (done) {
             controller.close();
             finish(true);
@@ -276,12 +288,14 @@ async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flav
           tracker.push(value);
           controller.enqueue(value);
         } catch (e) {
+          if (cancelled) return;
           logError("stream", e);
           controller.error(e);
-          finish(false);
+          finish(false, true);
         }
       },
       async cancel(reason) {
+        cancelled = true;
         try {
           await reader.cancel(reason);
         } catch {}
@@ -384,6 +398,7 @@ async function countTokens(req: Request, env: Env, account: Account): Promise<Re
     return fail(502, "api_error", "The inference service did not answer. Try again.");
   }
   const text = await up.text();
+  if (isBusy(up.status)) return busy(up);
   if (!up.ok && flavor.isOurs(up.status, text)) return unavailable();
   return new Response(text, { status: up.status, headers: passHeaders(up) });
 }

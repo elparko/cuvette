@@ -14,6 +14,7 @@ export function openAiTokens(u: any): Tokens | undefined {
 export class OpenAiUsage {
   tokens?: Tokens;
   done = false;
+  chunks = 0;
   private buffer = "";
   private decoder = new TextDecoder();
 
@@ -40,6 +41,7 @@ export class OpenAiUsage {
     } catch {
       return;
     }
+    this.chunks++;
     const t = openAiTokens(json?.usage);
     if (t) this.tokens = t;
   }

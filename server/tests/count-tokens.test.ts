@@ -124,3 +124,17 @@ describe("count_tokens limit", () => {
     expect(env.fake.rows("SELECT * FROM count_tokens_calls")).toHaveLength(0);
   });
 });
+
+describe("count_tokens upstream busy", () => {
+  it("replaces an upstream 429 or 529 with the own overloaded error and keeps retry-after", async () => {
+    for (const status of [429, 529]) {
+      const env = makeEnv();
+      const acct = await addAccount(env, 5);
+      mockFetch(() => new Response('{"error":{"message":"org limit"}}', { status, headers: { "content-type": "application/json", "retry-after": "5" } }));
+      const { res } = await call(env, "/v1/messages/count_tokens", post(acct.token, countBody()));
+      expect(res.status).toBe(503);
+      expect(res.headers.get("retry-after")).toBe("5");
+      expect(await res.json()).toEqual({ type: "error", error: { type: "overloaded", message: "The model service is busy. Try again in a short time." } });
+    }
+  });
+});

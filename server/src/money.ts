@@ -52,9 +52,18 @@ export async function allowedModels(env: Env, cfg: PlansConfig, a: Account, now:
   return (await topupBalance(env, a.id, now)) > 0 ? allModels(env) : [];
 }
 
-async function settleSql(env: Env, requestId: string, charge: number, status: string, model: string | null, t: Tokens, now: number) {
-  const cut = now - LIVE_HOLD_MS;
-  const amount = "CASE WHEN h.started_at > ?3 THEN ?4 ELSE h.amount_usd END";
+interface HeldRow {
+  request_id: string;
+  account_id: string;
+  amount_usd: number;
+  started_at: number;
+  model: string;
+  session_id: string | null;
+}
+
+async function debit(env: Env, hold: HeldRow, charge: number, status: string, model: string | null, t: Tokens, now: number) {
+  const live = hold.started_at > now - LIVE_HOLD_MS;
+  const amount = live ? charge : hold.amount_usd;
   const effective = `CASE WHEN a.sub_status IN ${SERVING} AND a.allowance_resets_at > ?2 THEN MAX(a.allowance_remaining_usd, 0) ELSE 0 END`;
   const topups = "COALESCE((SELECT SUM(t.remaining_usd) FROM topups t WHERE t.account_id = a.id AND t.expires_at > ?2 AND t.remaining_usd > 0), 0)";
   const db = env.DB;
@@ -62,10 +71,10 @@ async function settleSql(env: Env, requestId: string, charge: number, status: st
     db
       .prepare(
         `INSERT INTO usage (request_id, account_id, session_id, model, status, input_tokens, output_tokens, cache_read_tokens, cache_write_5m_tokens, cache_write_1h_tokens, cost_usd, topup_cost_usd, at)
-         SELECT h.request_id, h.account_id, h.session_id, COALESCE(?5, h.model), CASE WHEN h.started_at > ?3 THEN ?6 ELSE 'expired' END, ?7, ?8, ?9, ?10, ?11, ${amount}, MIN(MAX(0, ${amount} - ${effective}), ${topups}), ?12
-         FROM holds h JOIN accounts a ON a.id = h.account_id WHERE h.request_id = ?1`,
+         SELECT ?1, a.id, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, MIN(MAX(0, ?11 - ${effective}), ${topups}), ?12
+         FROM accounts a WHERE a.id = ?13`,
       )
-      .bind(requestId, now, cut, charge, model, status, t.input, t.output, t.cacheRead, t.cacheWrite5m, t.cacheWrite1h, new Date(now).toISOString()),
+      .bind(hold.request_id, now, hold.session_id, model ?? hold.model, live ? status : "expired", t.input, t.output, t.cacheRead, t.cacheWrite5m, t.cacheWrite1h, amount, new Date(now).toISOString(), hold.account_id),
     db
       .prepare(
         `WITH spent AS (SELECT account_id, topup_cost_usd AS need FROM usage WHERE request_id = ?1),
@@ -76,23 +85,23 @@ async function settleSql(env: Env, requestId: string, charge: number, status: st
          UPDATE topups SET remaining_usd = MAX(0, remaining_usd - MIN(remaining_usd, MAX(0, (SELECT need FROM spent) - (SELECT prior FROM live WHERE live.id = topups.id))))
          WHERE id IN (SELECT id FROM live) AND (SELECT need FROM spent) > 0`,
       )
-      .bind(requestId, now),
+      .bind(hold.request_id, now),
     db
       .prepare("UPDATE accounts SET allowance_remaining_usd = allowance_remaining_usd - (SELECT cost_usd - topup_cost_usd FROM usage WHERE request_id = ?1) WHERE id = (SELECT account_id FROM usage WHERE request_id = ?1)")
-      .bind(requestId),
-    db.prepare("DELETE FROM holds WHERE request_id = ?1").bind(requestId),
+      .bind(hold.request_id),
   ]);
 }
 
 export const NO_TOKENS: Tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
 
 export async function settle(env: Env, requestId: string, charge: number, model: string | null, status: string, t: Tokens): Promise<void> {
-  await settleSql(env, requestId, charge, status, model, t, Date.now());
+  const { results } = await env.DB.prepare("DELETE FROM holds WHERE request_id = ?1 RETURNING *").bind(requestId).all<HeldRow>();
+  if (results[0]) await debit(env, results[0], charge, status, model, t, Date.now());
 }
 
 export async function expireHolds(env: Env, accountId: string, now: number): Promise<boolean> {
-  const { results } = await env.DB.prepare("SELECT request_id FROM holds WHERE account_id = ?1 AND started_at <= ?2").bind(accountId, now - LIVE_HOLD_MS).all<{ request_id: string }>();
-  for (const h of results) await settleSql(env, h.request_id, 0, "expired", null, NO_TOKENS, now);
+  const { results } = await env.DB.prepare("DELETE FROM holds WHERE account_id = ?1 AND started_at <= ?2 RETURNING *").bind(accountId, now - LIVE_HOLD_MS).all<HeldRow>();
+  for (const h of results) await debit(env, h, 0, "expired", null, NO_TOKENS, now);
   return results.length > 0;
 }
 

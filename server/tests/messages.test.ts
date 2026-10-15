@@ -105,14 +105,41 @@ describe("reservation and refund", () => {
     expect(balanceOf(env, acct.id)).toBeCloseTo(5 - ((1000 * 10 + 1000 * 50) / 1e6), 9);
   });
 
-  it("refunds the full reservation when the upstream returns an HTTP error", async () => {
+  it("replaces an upstream 429 or 529 with the own overloaded error, keeps retry-after, and refunds the hold", async () => {
+    const OWN = { type: "error", error: { type: "overloaded", message: "The model service is busy. Try again in a short time." } };
+    for (const status of [429, 529]) {
+      const env = makeEnv();
+      const acct = await addAccount(env, 5);
+      const err = JSON.stringify({ type: "error", error: { type: "rate_limit_error", message: "org sk-ant-org limit" } });
+      mockFetch(() => new Response(err, { status, headers: { "content-type": "application/json", "retry-after": "3", "request-id": "req_up" } }));
+      const { res } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+      expect(res.status).toBe(503);
+      expect(res.headers.get("retry-after")).toBe("3");
+      expect(res.headers.get("request-id")).toBeNull();
+      expect(await res.json()).toEqual(OWN);
+      expect(balanceOf(env, acct.id)).toBe(5);
+      expect(holdsOf(env, acct.id)).toBe(0);
+      expect(env.fake.row("SELECT cost_usd, status FROM usage")).toEqual({ cost_usd: 0, status: "rejected" });
+    }
+  });
+
+  it("sends no retry-after when the upstream sends none", async () => {
     const env = makeEnv();
     const acct = await addAccount(env, 5);
-    const err = JSON.stringify({ type: "error", error: { type: "overloaded_error", message: "busy" } });
-    mockFetch(() => new Response(err, { status: 529, headers: { "content-type": "application/json", "retry-after": "3" } }));
+    mockFetch(() => new Response("upstream text", { status: 529 }));
     const { res } = await call(env, "/v1/messages", post(acct.token, chatBody()));
-    expect(res.status).toBe(529);
-    expect(res.headers.get("retry-after")).toBe("3");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBeNull();
+    expect(await res.text()).not.toContain("upstream text");
+  });
+
+  it("refunds the hold in full when the upstream returns another HTTP error", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const err = JSON.stringify({ type: "error", error: { type: "api_error", message: "boom" } });
+    mockFetch(() => new Response(err, { status: 500, headers: { "content-type": "application/json" } }));
+    const { res } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    expect(res.status).toBe(500);
     expect(await res.text()).toBe(err);
     expect(balanceOf(env, acct.id)).toBe(5);
     expect(holdsOf(env, acct.id)).toBe(0);
@@ -294,6 +321,45 @@ describe("client abort", () => {
     await settled();
     expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 2, 10), 9);
     expect(holdsOf(env, acct.id)).toBe(0);
+  });
+
+  it("refunds the full hold when the stream fails before message_start", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const broken = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.error(new TypeError("connection reset"));
+      },
+    });
+    mockFetch(() => new Response(broken, { headers: { "content-type": "text/event-stream" } }));
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    await res.text().catch(() => undefined);
+    await settled();
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(holdsOf(env, acct.id)).toBe(0);
+    expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "error", cost_usd: 0 });
+  });
+
+  it("refunds the full hold when the stream ends with an error event and no message_start", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    mockFetch(() => sseResponse(sse([["error", { type: "error", error: { type: "overloaded_error", message: "busy" } }]])));
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "error", cost_usd: 0 });
+  });
+
+  it("refunds the full hold when the stream closes with no event at all", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    mockFetch(() => sseResponse(""));
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(env.fake.row("SELECT status FROM usage").status).toBe("error");
   });
 
   it("treats an upstream failure in the middle of a stream like an abort", async () => {
