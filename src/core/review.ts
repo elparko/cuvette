@@ -329,6 +329,16 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
   }];
 }
 
+const TEST_IN_TEXT = /\bp[- ]?values?\b|\bp\s*(?:=|<|>|≤)\s*\d|\bq[- ]?values?\b|\badjusted p\b/i;
+
+function testInResults(record: ReviewContext["record"]): boolean {
+  const named = record.nodes().some((n) => {
+    const d = (n.result as { data?: { test?: unknown } } | undefined)?.data;
+    return typeof d?.test === "string" && d.test.trim() !== "";
+  });
+  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && TEST_IN_TEXT.test(String(e.data.text ?? "")));
+}
+
 function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
   if (!/\bsignifican(t|tly|ce)\b/i.test(ctx.answer)) return [];
   if (/\bnot (statistically )?significan|\bno (statistical )?test|\bwithout a (statistical )?test|cannot (be )?test/i.test(ctx.answer)) return [];
@@ -337,7 +347,7 @@ function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
     const m = (n.result as { metrics?: Record<string, number> } | undefined)?.metrics ?? {};
     return Object.keys(m).some((k) => testKey.test(k) || /(^|_)(p|q)_?value/i.test(k));
   }) || ctx.record.numbers().some((x) => /(^|[._\[])(p|q|p_?value|q_?value|padj|fdr)($|[._\]])/i.test(x.path));
-  if (tested) return [];
+  if (tested || testInResults(ctx.record)) return [];
   return [{
     check: "significance_without_test",
     severity: "error",

@@ -358,3 +358,17 @@ test("the review gets the approved plan: the referee reads it and the rule check
   expect(found.filter((f) => f.check.startsWith("plan_")).map((f) => f.check)).toEqual(["plan_step_missing", "plan_step_extra"]);
   expect(refereePrompt(ctx(makeRecord(), "x")).text).not.toContain("APPROVED PLAN");
 });
+
+test("significant is not an error if the script output shows a p value or a test result names its test", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const answer = "The treated cells are significantly larger.";
+  const base = { stale: () => new Set(), numbers: () => [] as unknown[], live: () => [] as unknown[], entries: () => [] as unknown[] };
+  const nodes = [{ id: "n1", result: { metrics: { mean_area: 3 } } }];
+  const scripted = { ...base, nodes: () => nodes, live: (kinds?: string[]) => [{ id: 1, kind: "tool_result", data: { ok: true, tool: "run_script", text: "Mann-Whitney U = 12.0, p = 0.004" } }].filter((e) => !kinds || kinds.includes(e.kind)) };
+  const named = { ...base, nodes: () => [{ id: "n1", result: { data: { test: "Mann-Whitney U" } } }] };
+  const none = { ...base, nodes: () => nodes };
+  const make = (record: unknown) => ({ record, decisions: { values: () => ({}) }, adapters: [], answer, claims: [] }) as never;
+  expect((await run(make(scripted))).some((f) => f.check === "significance_without_test")).toBe(false);
+  expect((await run(make(named))).some((f) => f.check === "significance_without_test")).toBe(false);
+  expect((await run(make(none))).some((f) => f.check === "significance_without_test")).toBe(true);
+});
