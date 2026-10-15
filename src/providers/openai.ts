@@ -190,7 +190,7 @@ export class OpenAIProvider implements Provider {
         if (res.reply) return res.reply;
         const err = await this.httpError(res.r, body);
         if (err !== "again") throw err;
-        if (again > 1) throw new ProviderError("The model server refused the request.");
+        if (again > 2) throw new ProviderError("The model server refused the request.");
       }
     } catch (e) {
       throw this.failure(e, idle.signal);
@@ -378,7 +378,7 @@ export class OpenAIProvider implements Provider {
     const effort = opts?.effort ?? this.effort;
     const make = () => {
       const body = this.body(native, [], cap);
-      if (this.effortOk && !this.effortRefused && effort) body.reasoning_effort = reasoningEffort(effort);
+      if (this.effortOk && !this.effortRefused && effort && effort !== "auto") body.reasoning_effort = reasoningEffort(effort);
       return body;
     };
     const reply = await this.exchange(make, signal, undefined, undefined);

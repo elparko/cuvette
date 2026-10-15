@@ -394,6 +394,24 @@ describe("the browser app", () => {
   });
 });
 
+describe("a long install that throws", () => {
+  test("the job ends as failed with the message, and a new install can start", async () => {
+    const s = new FakeSession();
+    const append = vi.spyOn(s.record, "append").mockImplementationOnce(() => {
+      throw new Error("disk full");
+    });
+    app = await startApp({ session: s, env: {}, programs: { ...fakes(), exec: async () => 0 } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const first = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const stream = await fetch(`${base}api/programs/progress?job=${first.job}&t=${app.token}`).then((r) => r.text());
+    expect(stream).toMatch(/"done":true,"ok":false,"text":"The install did not finish: disk full/);
+    append.mockRestore();
+    const second = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    expect(second.job).not.toBe(first.job);
+  });
+});
+
 describe("a long install: stop, password, and a second action at the same time", () => {
   const server = async (exec: (c: string, l: (x: string) => void, s?: AbortSignal) => Promise<number | null>) => {
     app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });

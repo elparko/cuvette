@@ -1257,6 +1257,27 @@ describe("the output cap name of the openai provider", () => {
     expect(bodies[0].max_tokens).toBe(8000);
   });
 
+  test("effort auto sends no reasoning_effort", async () => {
+    const bodies = capture([ok()]);
+    await (await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "auto" })).complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect("reasoning_effort" in bodies[0]).toBe(false);
+  });
+
+  test("three refusals in a row still end in a good reply", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (_u: string, init: { body: string }) => {
+      const b = JSON.parse(init.body);
+      bodies.push(b);
+      if (b.stream_options) return new Response(JSON.stringify({ error: { message: "Unrecognized request argument supplied: stream_options" } }), { status: 400 });
+      if ("max_completion_tokens" in b) return refuse("max_completion_tokens");
+      if ("reasoning_effort" in b) return refuse("reasoning_effort");
+      return ok();
+    });
+    const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "low" });
+    expect(await p.complete("S", "Q", undefined, { maxTokens: 8000 })).toBe("No findings.");
+    expect(bodies).toHaveLength(4);
+  });
+
   test("a chat or o1-mini model gets no reasoning_effort, and a 400 that names it makes one retry without it", async () => {
     for (const model of ["gpt-5-chat-latest", "o1-mini"]) {
       const bodies = capture([ok()]);
