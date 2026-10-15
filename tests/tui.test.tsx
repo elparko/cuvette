@@ -909,6 +909,19 @@ describe("plan card", () => {
     expect(s.planResponses[0]).toEqual({ action: "approve", mode: "follow" });
   });
 
+  test("the plan card and the permission card name the Esc key", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.proposePlan("Question: Q1");
+    await until(() => h.all().includes("approve and start"));
+    expect(h.term.view()).toContain("x or Esc cancel");
+    await type(h, "x");
+    await until(() => s.planResponses.length === 1);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    expect(h.term.view()).toContain("Esc stops the agent.");
+  });
+
   test("c sends a change, p offers the other program, x cancels", async () => {
     const { h, s } = start();
     await sleep(100);

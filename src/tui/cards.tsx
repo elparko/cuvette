@@ -136,11 +136,14 @@ export function PermissionCard(props: {
           onCancel={() => setAsking(false)}
         />
       ) : (
-        <Text>
-          <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
-          {always ? ` · a always allow ${card.tool} in this session` : ""}
-          {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
-        </Text>
+        <Box flexDirection="column">
+          <Text>
+            <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
+            {always ? ` · a always allow ${card.tool} in this session` : ""}
+            {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
+          </Text>
+          <Text dimColor>Esc stops the agent.</Text>
+        </Box>
       )}
     </Frame>
   );
@@ -779,7 +782,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
                   <Text color="green">a</Text> approve and start
                 </Text>
               )}{" "}
-              · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel
+              · <Text color="cyan">c</Text> change · <Text color="red">x</Text> or <Text color="red">Esc</Text> cancel
               {items ? <Text> · <Text color="cyan">1-{Math.min(9, items)}</Text>{items > 9 ? <Text>/<Text color="cyan">e</Text></Text> : null} edit</Text> : null}
               {card.details ? <Text> · <Text color="cyan">d</Text> {st.details ? "hide" : "show"} details</Text> : null}
               {" "}· <Text color="cyan">m</Text> mode {mode}
