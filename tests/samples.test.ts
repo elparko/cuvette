@@ -132,6 +132,15 @@ describe("design checks", () => {
     expect(designChecks(sheet, { n: "One Set", test: "Welch t-test" }).some((i) => i.id === "too_few_rank")).toBe(false);
   });
 
+  test("an unpaired rank test uses the Mann-Whitney limit", () => {
+    const four = ["1", "2", "3", "4"].flatMap((m) => [row(`a${m}`, "Ctrl", `M${m}`), row(`b${m}`, "Drug", `N${m}`)]);
+    for (const test of ["unpaired Mann-Whitney", "unpaired Wilcoxon test"]) {
+      expect(designChecks(four, { test }).some((i) => i.id === "too_few_rank")).toBe(false);
+    }
+    const three = ["1", "2", "3"].flatMap((m) => [row(`a${m}`, "Ctrl", `M${m}`), row(`b${m}`, "Drug", `N${m}`)]);
+    expect(designChecks(three, { test: "unpaired Mann-Whitney" }).find((i) => i.id === "too_few_rank")!.text).toContain("Mann-Whitney test");
+  });
+
   test("a paired rank test with 5 pairs cannot reach p below 0.05", () => {
     const five = ["1", "2", "3", "4", "5"].flatMap((m) => [row(`a${m}`, "Pre", `M${m}`), row(`b${m}`, "Post", `M${m}`)]);
     const issue = designChecks(five, { test: "Wilcoxon signed-rank test" }).find((i) => i.id === "too_few_rank")!;
