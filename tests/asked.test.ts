@@ -99,3 +99,14 @@ test("a value for another target in a later clause is not the value of the setti
   expect(namesValue("Set window, then use 7 for the threshold", window, 7)).toBe(false);
   expect(namesValue("Do not use window 5, use 7", window, 7)).toBe(true);
 });
+
+test("a retry number after a negated value is not the value when it belongs to something else", () => {
+  const cells = { key: "min_cells", label: "Minimum cells" };
+  const threads = { key: "threads", label: "Threads" };
+  expect(namesValue("Do not rerun to change the min cells to 5; use 10 threads.", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
+  expect(namesValue("Do not set min cells to 5; use 10 threads", { key: "min_cells", label: "Min cells" }, 10)).toBe(false);
+  expect(namesValue("Do not set min cells to 5. Use 10 for the threads", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
+  expect(namesValue("Do not set min cells to 5, use 10 threads", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
+  expect(namesValue("Do not set min cells to 5, use 10", { key: "min_cells", label: "Min cells" }, 10)).toBe(true);
+  expect(namesValue("Do not set min cells to 5, use 10 please", cells, 10)).toBe(true);
+});

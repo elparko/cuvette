@@ -30,6 +30,7 @@ const CLAUSE_END = /[,;.!?][)"'\]]*$/;
 const BOUNDARY = new Set(["and", "but", "so", "then", "because", "since", "while", "instead"]);
 const AFTER_WORD = new Set(["to", "as", "of", "at", "is", "="]);
 const WANTING = new Set(["to", "want", "need", "like"]);
+const AFTER_RETRY = new Set([...FILLER, "of", "for", "as", "on", "in", "please", "instead", "now", "then", "and", "but", "or", "rather", "again"]);
 const REASK = new Set(["use", "set", "take", "apply", "run", "try", "make"]);
 const OWN = 1;
 const OTHER = 2;
@@ -216,18 +217,28 @@ function reasked(words: Item[], i: number): boolean {
   return REASK.has(words[cs]!.w) && i - cs <= 4 && words[i + 1]?.w !== "for";
 }
 
+function retryFits(words: Item[], l: Layout, from: number, i: number): boolean {
+  for (let j = from; j < i; j++) if (words[j]!.ce === "x") return false;
+  if (l.starts[i + 1]! & OTHER) return false;
+  if (l.prevEnd[i] === i - 1 && l.prevMask[i]! & OTHER) return false;
+  const next = words[i + 1];
+  return !next || words[i]!.ce !== undefined || next.clause !== words[i]!.clause || AFTER_RETRY.has(next.w) || !!l.named[i + 1];
+}
+
 function numberNamed(words: Item[], l: Layout, [b, e]: [number, number], value: number): boolean {
   const same = (i: number) => words[i]!.num === value && !negatedAt(l, words, i, true);
   let limit = e + AFTER;
   let skip = SKIP;
   let retry = false;
+  let first = e;
   for (let i = e + 1; i <= Math.min(words.length - 1, limit); i++) {
     const it = words[i]!;
     if (l.starts[i]! & OTHER) return false;
     if (it.num !== undefined) {
       const here = it.clause === words[e]!.clause || AFTER_WORD.has(words[i - 1]!.w);
-      if (retry ? !reasked(words, i) : !here) return false;
+      if (retry ? !reasked(words, i) || !retryFits(words, l, first, i) : !here) return false;
       if (!negatedAt(l, words, i, true)) return same(i);
+      first = i;
       limit = i + 10;
       skip = new Set([...SKIP, ...LEAD]);
       retry = true;
