@@ -203,12 +203,15 @@ for pat, send in steps:
         break
 read(1.5)
 code = None
-for _ in range(50):
+end = time.time() + 10
+while time.time() < end:
     p, st = os.waitpid(pid, os.WNOHANG)
     if p:
         code = os.waitstatus_to_exitcode(st)
         break
-    read(0.1)
+    if read(0.1):
+        continue
+    time.sleep(0.05)
 if code is None:
     os.kill(pid, signal.SIGKILL)
     os.waitpid(pid, 0)
