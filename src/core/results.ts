@@ -363,6 +363,7 @@ export interface FigureFile {
   note?: string;
 }
 
+const CHANGED_NOTE_LOST = "The file changed after the run, and the record kept no copy. The workbook has no figure for this file.";
 const CHANGED_NOTE = "The file changed after the run. The workbook uses the copy that the record kept.";
 
 function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string }): { path?: string; changed: boolean } {
@@ -372,7 +373,7 @@ function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string 
   return { path: existsSync(o.path) ? o.path : undefined, changed: false };
 }
 
-function figureSources(n: Node, record: AnalysisRecord): { path: string; sha?: string }[] {
+function figureSources(n: Node, record: AnalysisRecord, keepAll = false): { path: string; sha?: string }[] {
   const out: { path: string; sha?: string }[] = [];
   const seen = new Set<string>();
   const add = (path: string, sha?: string) => {
@@ -390,7 +391,7 @@ function figureSources(n: Node, record: AnalysisRecord): { path: string; sha?: s
       for (const v of [".svg", ".pdf", ".eps"]) if (existsSync(stem + v)) add(stem + v);
     }
   }
-  return out.filter((f) => recordedSource(record, f).path);
+  return keepAll ? out : out.filter((f) => recordedSource(record, f).path);
 }
 
 export function copyFigures(record: AnalysisRecord, dir: string): FigureFile[] {
@@ -630,6 +631,11 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
 
   const fileRows: Cell[][] = [];
   const listed = new Set<string>();
+  for (const n of nodes)
+    for (const f of figureSources(n, record, true)) {
+      const found = recordedSource(record, f);
+      if (!found.path && found.changed) summary.push(["Note", `${basename(f.path)} (step ${steps.get(n.id)})`, "changed after the run", `${CHANGED_NOTE_LOST}`]);
+    }
   for (const f of w.figures) {
     listed.add(f.path);
     if (f.note) summary.push(["Note", `${basename(f.source)} (step ${f.step})`, "changed after the run", f.note]);

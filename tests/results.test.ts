@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
+import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook, copyFigures, decodeText, typed, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
 import type { NodeIn } from "../src/core/types.ts";
@@ -114,6 +115,24 @@ test("a figure that changed after the run is copied from the recorded blob, with
   expect(figs.find((f) => f.path.endsWith("box.png"))!.note).toBeUndefined();
   const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures: figs });
   expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /changed after the run/.test(String(r[2])))).toBe(true);
+});
+
+test("a large figure that changed after the run gives a Note row", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s4");
+  const path = join(mkdtempSync(join(tmpdir(), "cuvette-res-big-")), "big.png");
+  writeFileSync(path, Buffer.alloc(COPY_LIMIT_BYTES + 1, 7));
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "image", sha }], result: { metrics: {} }, summary: "Plot." }));
+  const bytes = readFileSync(path);
+  bytes[5] = 9;
+  writeFileSync(path, bytes);
+  utimesSync(path, new Date(), new Date(Date.now() + 5000));
+  const out = record.workDir;
+  const figures = copyFigures(record, out);
+  expect(figures).toEqual([]);
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures });
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /big\.png \(step 1\)/.test(String(r[1])) && /changed after the run/.test(String(r[2])))).toBe(true);
 });
 
 test("a table that changed after the run is read from the recorded blob, with a note", () => {
