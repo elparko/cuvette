@@ -146,6 +146,36 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(MOCK);
   });
 
+  test("with 10 or more options a digit moves the selection and Enter answers", async () => {
+    await page.eval(`(() => {
+      document.activeElement.blur();
+      const card = document.createElement("div");
+      card.dataset.card = "many";
+      card.dataset.type = "question";
+      card.id = "many-card";
+      const opts = document.createElement("div");
+      opts.className = "opts";
+      window.__clicks = [];
+      for (let i = 1; i <= 12; i++) {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = "Option " + i;
+        b.addEventListener("click", () => window.__clicks.push(i));
+        opts.append(b);
+      }
+      card.append(opts);
+      document.querySelector("[data-card]").parentElement.prepend(card);
+    })()`);
+    const key = (k: string) => page.eval(`document.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
+    await key("1");
+    await key("2");
+    expect(await page.eval(`document.querySelector("#many-card").dataset.sel`)).toBe("11");
+    expect(await page.eval(`window.__clicks.length`)).toBe(0);
+    await key("Enter");
+    expect(await page.eval(`window.__clicks`)).toEqual([12]);
+    await page.eval(`document.querySelector("#many-card").remove()`);
+  });
+
   test("card keys: Enter on a focused card button is that button, arrows move the focus, Enter in Other answers", async () => {
     const q = `document.querySelector('[data-card][data-type="question"]')`;
     const key = (k: string) => page.eval<boolean>(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);

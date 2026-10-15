@@ -556,7 +556,7 @@ function markSel(card, i) {
   bs.forEach((b, j) => b.classList.toggle("sel", j === i));
   card.dataset.sel = String(i);
 }
-let cardEl = null, cardAt = 0;
+let cardEl = null, cardAt = 0, manyDigits = "";
 function focusCard() {
   const card = activeCard();
   for (const c of document.querySelectorAll("#cards [data-card]")) c.classList.toggle("active", c === card);
@@ -579,6 +579,13 @@ document.addEventListener("keydown", (e) => {
   const bs = optionButtons(card);
   let i = Number(card.dataset.sel || 0);
   if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }
+  if (bs.length >= 10 && /^[0-9]$/.test(e.key)) {
+    const n = Number(manyDigits + e.key);
+    manyDigits = n >= 1 && n <= bs.length ? manyDigits + e.key : e.key;
+    if (bs[Number(manyDigits) - 1]) { e.preventDefault(); markSel(card, Number(manyDigits) - 1); }
+    return;
+  }
+  manyDigits = "";
   if (/^[1-9]$/.test(e.key)) { const b = bs[Number(e.key) - 1]; if (b) { e.preventDefault(); markSel(card, Number(e.key) - 1); b.click(); } return; }
   const nav = (act) => card.querySelector('[data-act="' + act + '"]');
   if (e.key === "ArrowLeft" && nav("back")) { e.preventDefault(); nav("back").click(); return; }

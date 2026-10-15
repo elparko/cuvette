@@ -318,6 +318,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
   useEffect(() => {
+    let digits = "";
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
@@ -351,6 +352,18 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         }
         return;
       }
+      if (bs.length >= 10 && /^[0-9]$/.test(e.key)) {
+        const n = Number(digits + e.key);
+        digits = n >= 1 && n <= bs.length ? digits + e.key : e.key;
+        const at = Number(digits) - 1;
+        if (bs[at]) {
+          e.preventDefault();
+          markSel(card, at);
+          if (a === card || bs.includes(a as HTMLButtonElement)) bs[at]!.focus();
+        }
+        return;
+      }
+      digits = "";
       if (/^[1-9]$/.test(e.key)) {
         const b = bs[Number(e.key) - 1];
         if (b) {
