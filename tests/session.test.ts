@@ -3041,7 +3041,7 @@ test("full session: plan first from the request to the results, a continue after
   expect(JSON.stringify(provider.requests[4]!.messages)).toContain("The scientist answered the questions above. Call plan now");
   const id = s.id;
   await s.close();
-  session = await Session.resume(id, { provider: new FakeProvider([{ calls: [COUNT] }, { text: "Still 41 particles (step 2)." }, { text: "Still 41 particles (step 2)." }]), cwd, interactive: true, settings: { referee: "none" } });
+  session = await Session.resume(id, { adapters: [LAB], provider: new FakeProvider([{ calls: [COUNT] }, { text: "Still 41 particles (step 2)." }, { text: "Still 41 particles (step 2)." }]), cwd, interactive: true, settings: { referee: "none" } });
   const r = session;
   expect(r.plan?.steps[0]?.step).toBe("Count the particles");
   expect(r["approvedEntry"]).toBeGreaterThan(0);

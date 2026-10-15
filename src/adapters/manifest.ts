@@ -432,7 +432,12 @@ export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   return found;
 }
 
-export function findAdapter(nameOrPath: string, cwd = process.cwd()): LoadedAdapter {
+export function findAdapter(nameOrPath: string, cwd = process.cwd(), opts: { byName?: boolean } = {}): LoadedAdapter {
+  if (opts.byName) {
+    const dirs = adapterDirs(cwd);
+    if (!Object.hasOwn(dirs, nameOrPath)) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
+    return loadAdapter(dirs[nameOrPath]);
+  }
   const inProject = [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
   if (existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
   if (inProject) nameOrPath = basename(resolve(nameOrPath));

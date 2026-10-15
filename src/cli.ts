@@ -377,7 +377,7 @@ async function interactive(resumeId?: string, folder?: string) {
     if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
   }
   const s = resumeId
-    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
+    ? await Session.resume(resumeId, { adapters: adapters.length ? adapters : undefined, model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
