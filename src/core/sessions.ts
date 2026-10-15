@@ -87,10 +87,19 @@ export function openLock(recordDir: string, startOf?: (pid: number) => number | 
 export function claimLock(recordDir: string, extra: Record<string, unknown> = {}, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const path = join(recordDir, LOCK);
   const body = () => JSON.stringify({ pid: process.pid, procStart: ownStart(), started: new Date().toISOString(), ...extra });
+  const fresh = () => {
+    const tmp = `${path}.new.${process.pid}.${randomBytes(4).toString("hex")}`;
+    try {
+      writeFileSync(tmp, body(), { mode: 0o600 });
+      linkSync(tmp, path);
+      return true;
+    } finally {
+      rmSync(tmp, { force: true });
+    }
+  };
   for (let i = 0; i < 5; i++) {
     try {
-      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
-      return undefined;
+      if (fresh()) return undefined;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
     }
