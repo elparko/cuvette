@@ -131,6 +131,7 @@ function toNumber(v: unknown): number | undefined {
 function same(a: unknown, b: unknown): boolean {
   const x = toNumber(a);
   const y = toNumber(b);
+  if (typeof a === "string" && typeof b === "string") return a === b;
   if (x !== undefined && y !== undefined) return Math.abs(x - y) <= 1e-9 + 1e-9 * Math.max(Math.abs(x), Math.abs(y));
   if (typeof a === "object" || typeof b === "object") return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
   return String(a) === String(b);
