@@ -644,9 +644,17 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return send(res, 400, { error: "bad request" });
     }
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
+    if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
+      try {
+        if (!sendAsset(res, url.pathname)) send(res, 404, { error: "not found" });
+      } catch {
+        if (!res.headersSent) send(res, 500, { error: "The server could not read the file." });
+        else res.destroy();
+      }
+      return;
+    }
     if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return req.method === "GET" && url.pathname === "/" ? send(res, 401, WRONG_LINK, "text/html; charset=utf-8") : send(res, 401, { error: "missing or wrong token" });
     try {
-      if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
       await route(req, res, url);
     } catch (e) {
       if (!(e instanceof HttpError)) process.stderr.write(`${(e as Error)?.stack ?? e}\n`);
