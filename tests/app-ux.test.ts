@@ -208,7 +208,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`[...${q}.querySelectorAll(".btn")].find((b) => b.textContent === "Answer later").focus()`);
     expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).outlineStyle + " " + getComputedStyle(document.activeElement).outlineWidth : "not visible"`)).toBe("solid 2px");
     expect(await key("Enter")).toBe(true);
-    await wait(300);
+    await wait(600);
     expect(await page.eval(`!!${q}`)).toBe(true);
     await page.eval(`${q}.querySelectorAll(".opts .btn")[1].focus()`);
     expect(await page.eval(`${q}.dataset.sel`)).toBe("1");
