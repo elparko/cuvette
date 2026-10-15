@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, hookScriptScan, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, globEre, hookScriptScan, literalEre, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -1112,3 +1112,32 @@ test.skipIf(process.platform === "win32")("trust remove writes out a control cod
   expect(out.stdout).not.toMatch(CONTROL);
   expect(out.stdout).toContain(String.raw`a\\u202eb\nc" was not in the list.`);
 }, 120000);
+
+describe("Seatbelt patterns for glob and path text", () => {
+  test("a non-ASCII character matches a whole name part, not one byte", () => {
+    expect(literalEre("/p/caf\u00e9")).toBe("/p/caf[^/]+");
+    expect(literalEre("/p/\u65e5\u672c/x")).toBe("/p/[^/]+/x");
+    expect(globEre("caf\u00e9*.sh")).toBe("caf[^/]+[^/]*[.]sh");
+  });
+
+  test("a POSIX class in a bracket keeps the whole bracket", () => {
+    expect(globEre("a[[:space:]]b")).toBe("a[[:space:]]b");
+    expect(globEre("a[![:digit:]]b")).toBe("a[^[:digit:]]b");
+    expect(() => new RegExp(globEre("a[[:space:]]b").replace(/\[:space:\]/g, "\\s"))).not.toThrow();
+  });
+
+  const sandboxOk = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
+  test.skipIf(!sandboxOk)("the profile denies a non-ASCII name and a name with a space class, and allows other names", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-glob-")));
+    const touch = (glob: string, name: string) => {
+      const profile = `(version 1)(allow default)(deny file-write* (regex #"^${literalEre(dir)}/${globEre(glob)}$"))`;
+      return spawnSync("/usr/bin/sandbox-exec", ["-p", profile, "/usr/bin/touch", join(dir, name)]).status === 0;
+    };
+    expect(touch("*.sh", "caf\u00e9.sh")).toBe(false);
+    expect(touch("caf\u00e9*", "caf\u00e9x")).toBe(false);
+    expect(touch("a[[:space:]]b", "a b")).toBe(false);
+    expect(touch("a[[:space:]]b", "axb")).toBe(true);
+    expect(touch("*.sh", "other.txt")).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
