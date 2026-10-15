@@ -500,7 +500,7 @@ export class Session {
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings), headless: this.settings.headless }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
-    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
+    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort, headless: this.settings.headless });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
@@ -3271,7 +3271,7 @@ export class Session {
       ? next.referee === "same"
         ? provider
         : next.referee && next.referee !== "none"
-          ? await makeProvider(next.referee, { effort: next.effort })
+          ? await makeProvider(next.referee, { effort: next.effort, headless: next.headless })
           : undefined
       : this.refereeProvider;
     const wasCloud = isCloud(this.provider.info);

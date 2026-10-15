@@ -3664,3 +3664,13 @@ test("a manual review with an empty referee reply keeps the rule findings and gi
   expect(session.reviewFailure).toBe("The review gave no text. The answer is not checked.");
   expect(list.length).toBeGreaterThan(0);
 });
+
+test("a headless run gives the headless flag to the referee model", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const s = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, referee: "claude:claude-haiku-5-5", settings: { headless: true } });
+  expect((s as any).refereeProvider.headless).toBe(true);
+  await s.close();
+  const t = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, referee: "claude:claude-haiku-5-5" });
+  expect((t as any).refereeProvider.headless).toBe(false);
+  await t.close();
+});
