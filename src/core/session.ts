@@ -2103,7 +2103,7 @@ export class Session {
   private offerChecklist(): void {
     const id = setGuideline(this.record);
     if (!id || this.record.entries(["notice"]).some((e) => e.data.checklist === "offer")) return;
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     if (!this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf)) return;
     if (this.plan?.steps.some((s) => s.tool && s.status !== "done" && s.status !== "skipped")) return;
     this.record.append("notice", { text: offerText(buildChecklist(this.record, id)), checklist: "offer" });
