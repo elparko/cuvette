@@ -85,24 +85,6 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   expect(session.record.entries(["notice"]).map((n) => String(n.data.text))).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(dir)}`);
 });
 
-unix("the resume command in the notice quotes the path for a shell and strips control characters", async () => {
-  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
-  try {
-    const dir = evilAdapter(join(away, "o'brien\tlab"));
-    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
-    const id = session.id;
-    await session.close();
-    session = undefined;
-    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
-    const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
-    const plain = dir.replace(/\t/g, "");
-    expect(text).not.toMatch(/[\u0000-\u001f]/);
-    expect(text).toContain(`Run in a terminal: cuvette resume ${id} --adapter '${plain.replace(/'/g, "'\\''")}'`);
-  } finally {
-    rmSync(away, { recursive: true, force: true });
-  }
-});
-
 unix("resume does not load an adapter from a recorded path outside the project and names the path in a notice", async () => {
   const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
   try {
@@ -309,4 +291,35 @@ unix("the notice for a recorded adapter folder quotes a path with a space", asyn
   } finally {
     rmSync(away, { recursive: true, force: true });
   }
+});
+
+async function strayNotice(folderName: string): Promise<{ dir: string; id: string; text: string }> {
+  const away = join(mkdtempSync(join(tmpdir(), "cuvette-away-")), folderName);
+  const dir = evilAdapter(away);
+  session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("did not load the adapter folder"))!;
+  return { dir, id, text };
+}
+
+unix("the resume notice shows a path with control characters as plain text and gives no command", async () => {
+  const { text } = await strayNotice("a\u0001b");
+  expect(text).toContain("The path has control characters, so Cuvette shows no command.");
+  expect(text).not.toContain("cuvette resume");
+});
+
+unix("the resume notice gives no command for a path with a newline or a tab", async () => {
+  for (const name of ["a\nb", "a\tb"]) {
+    const { text } = await strayNotice(name);
+    expect(text).toContain("The path has control characters, so Cuvette shows no command. Start the session again. Give the folder with --adapter.");
+    expect(text).not.toContain("cuvette resume");
+  }
+});
+
+unix("the resume notice puts a path with a special character in single quotes", async () => {
+  const { dir, id, text } = await strayNotice("it's!ok");
+  expect(text).toContain(`cuvette resume ${id} --adapter '${dir.replace(/'/g, "'\\''")}'`);
 });

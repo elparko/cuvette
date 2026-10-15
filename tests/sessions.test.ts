@@ -113,22 +113,25 @@ test("a damaged index does not stop the list: the good rows and the old sessions
   }
 });
 
-test("a write to a damaged index keeps the damaged file next to it", () => {
+test("a write leaves a damaged old index as it is and a damaged row file moves aside", () => {
   const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-keep-"));
   const old = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = h;
   try {
-    writeFileSync(join(h, "sessions-index.json"), '[{"id":"20261001-000000-aaaa","folder":"/p/cuvette/a"},');
+    const damaged = '[{"id":"20261001-000000-aaaa","folder":"/p/cuvette/a"},';
+    writeFileSync(join(h, "sessions-index.json"), damaged);
     saveIndexRow({ id: "20261002-000000-bbbb", recordDir: "/p/cuvette/b/.record", outDir: "/p/cuvette/b", project: "/p", title: "b", created: "2026-10-02T00:00:00Z", legacy: false, fallback: false });
-    expect(JSON.parse(readFileSync(join(h, "sessions-index.json"), "utf8")).map((r: { id: string }) => r.id)).toEqual(["20261002-000000-bbbb"]);
-    const kept = readdirSync(h).filter((f) => f.startsWith("sessions-index.json.damaged-"));
-    expect(kept).toHaveLength(1);
-    expect(readFileSync(join(h, kept[0]!), "utf8")).toContain("20261001-000000-aaaa");
-    expect(readdirSync(h).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    expect(readFileSync(join(h, "sessions-index.json"), "utf8")).toBe(damaged);
+    expect(readIndex().map((r) => r.id)).toEqual(["20261002-000000-bbbb"]);
+    expect(readdirSync(join(h, "sessions-index")).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    writeFileSync(join(h, "sessions-index", "20261003-000000-cccc.json"), '{"id":"20261003-000000-cccc","folder":"/p/c"');
+    expect(readIndex().map((r) => r.id)).toEqual(["20261002-000000-bbbb"]);
     writeFileSync(join(h, "sessions-index.json"), JSON.stringify([{ id: "20261003-000000-cccc", folder: "/p/c", extra: 1 }, { id: 5 }]));
-    renameIndexRow("20261003-000000-cccc", "named");
-    expect(JSON.parse(readFileSync(join(h, "sessions-index.json"), "utf8"))).toMatchObject([{ id: "20261003-000000-cccc", custom: "named", extra: 1 }]);
-    expect(readdirSync(h).filter((f) => f.startsWith("sessions-index.json.damaged-")).length).toBeGreaterThanOrEqual(1);
+    expect(renameIndexRow("20261003-000000-cccc", "named")).toBe(true);
+    expect(readIndex().find((r) => r.id === "20261003-000000-cccc")).toMatchObject({ custom: "named", extra: 1 });
+    const kept = readdirSync(join(h, "sessions-index")).filter((f) => f.includes(".json.damaged-"));
+    expect(kept).toHaveLength(1);
+    expect(readFileSync(join(h, "sessions-index", kept[0]!), "utf8")).toContain('"folder":"/p/c"');
   } finally {
     if (old === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = old;

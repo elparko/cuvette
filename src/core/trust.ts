@@ -455,6 +455,55 @@ function globRegex(pattern: string): RegExp {
   }
 }
 
+const NON_ASCII = /[^\x00-\x7f]/;
+const ANY_NAME = "[^/]+";
+const plain = (c: string) => (/[\w/\-]/.test(c) ? c : /[.+$()|{}*?[\]]/.test(c) ? `[${c}]` : NON_ASCII.test(c) ? ANY_NAME : ".");
+const joinRuns = (re: string) => re.replace(/(\[\^\/\]\+)+/g, ANY_NAME);
+
+export const literalEre = (text: string) => joinRuns([...text].map(plain).join(""));
+
+function bracketEnd(pattern: string, start: number): number {
+  let j = start + 1;
+  if (pattern[j] === "!" || pattern[j] === "^") j++;
+  if (pattern[j] === "]") j++;
+  while (j < pattern.length && pattern[j] !== "]") {
+    const close = pattern[j] === "[" && pattern[j + 1] === ":" ? pattern.indexOf(":]", j + 2) : -1;
+    j = close >= 0 ? close + 2 : j + 1;
+  }
+  return j < pattern.length ? j : -1;
+}
+
+export function globEre(pattern: string): string {
+  let re = "";
+  let depth = 0;
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    if (c === "*") {
+      if (pattern[i + 1] === "*") {
+        re += pattern[i + 2] === "/" ? "(.*/)?" : ".*";
+        i += pattern[i + 2] === "/" ? 2 : 1;
+      } else re += "[^/]*";
+    } else if (c === "?") re += ANY_NAME;
+    else if (c === "[") {
+      const end = bracketEnd(pattern, i);
+      if (end < 0) re += plain(c);
+      else {
+        const body = pattern.slice(i + 1, end).replace(/^!/, "^").replace(/[\\"]/g, "");
+        re += NON_ASCII.test(body) || body.startsWith("^") ? ANY_NAME : `[${body}]`;
+        i = end;
+      }
+    } else if (c === "{") {
+      depth++;
+      re += "(";
+    } else if (c === "}" && depth) {
+      depth--;
+      re += ")";
+    } else if (c === "," && depth) re += "|";
+    else re += plain(c);
+  }
+  return joinRuns(re + ")".repeat(depth));
+}
+
 const hasGlob = (w: string) => /[*?[\]{}]/.test(w);
 const globPrefix = (base: string, word: string) => resolve(base, word.split(/[/\\]/).filter((_, i, a) => !a.slice(0, i + 1).some(hasGlob)).join("/"));
 const DYNAMIC = /\$\(|`|\beval\b|\b(source|\.)\s+["']?\$|(^|[\s;&|])["']?\$\{?\w/;
@@ -476,12 +525,13 @@ export interface HookScan {
   linkText: Record<string, string>;
   inLinks: string[];
   folders: string[];
+  rootGlobs: string[];
 }
 
 export function hookScriptScan(folder: string, layers?: Record<string, unknown>[]): HookScan {
   const key = folderKey(folder);
   const found = new Set<string>();
-  const result: HookScan = { files: [], large: [], linked: [], incomplete: [], linkText: {}, inLinks: [], folders: [] };
+  const result: HookScan = { files: [], large: [], linked: [], incomplete: [], linkText: {}, inLinks: [], folders: [], rootGlobs: [] };
   try {
     layers ??= projectSettings(key);
   } catch {
@@ -501,7 +551,11 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   const all = commands.map((c) => ({ argv: c, tokens: tokens(c, key), dynamic: DYNAMIC.test(c.join(" ")) }));
   const named: string[] = [];
   for (const c of all) for (const t of c.tokens) for (const b of t.base) named.push(resolve(b, t.word.replace(/[*?[\]{}].*$/, "")));
-  const globFolders = all.flatMap((c) => c.tokens.filter((t) => hasGlob(t.word)).flatMap((t) => t.base.map((b) => globPrefix(b, t.word)))).filter((g) => g !== key);
+  const insideKey = (g: string) => {
+    const r = relative(key, g);
+    return r !== "" && !r.startsWith("..") && !isAbsolute(r);
+  };
+  const globFolders = all.flatMap((c) => c.tokens.filter((t) => hasGlob(t.word)).flatMap((t) => t.base.map((b) => globPrefix(b, t.word)))).filter(insideKey);
   const roots = [resolve(key, "cuvette")];
   const userRoots: string[] = [];
   const userValue = userOutputFolder();
@@ -525,13 +579,38 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
     result.linked.push(rel);
     result.linkText[rel] = real;
   };
-  const addInLink = (p: string) => {
-    result.inLinks.push(p);
+  const seenLinks = new Map<string, boolean>();
+  const addInLink = (p: string): boolean => {
+    const seen = seenLinks.get(p);
+    if (seen !== undefined) return seen;
+    seenLinks.set(p, true);
+    const ok = checkInLink(p);
+    seenLinks.set(p, ok);
+    return ok;
+  };
+  const checkInLink = (p: string): boolean => {
+    let real = "";
+    let inside = "";
+    let isFile = false;
+    let isDir = false;
     try {
-      const real = realpathSync(p);
-      const inside = relative(realKey, real);
-      if (!inside.startsWith("..") && !isAbsolute(inside) && statSync(real).isFile()) found.add(join(key, inside));
+      real = realpathSync(p);
+      inside = relative(realKey, real);
+      const st = statSync(real);
+      isFile = st.isFile();
+      isDir = st.isDirectory();
     } catch {}
+    const target = inside !== "" && !inside.startsWith("..") && !isAbsolute(inside);
+    const volatile = inside.split(sep).some((part) => VOLATILE_DIR.test(part)) && !(isFile && (SCRIPT_EXT.test(real) || isExec(real)));
+    if (target && (skip(inside) || volatile)) {
+      result.linkText[relative(key, p)] = real;
+      return false;
+    }
+    result.inLinks.push(p);
+    if (!target) return true;
+    if (isFile) found.add(join(key, inside));
+    else if (isDir && own(join(key, inside))) addFolder(join(key, inside), inside);
+    return true;
   };
   const addFolder = (path: string, rel: string, quiet = false) => {
     const r = walkFiles(path, skip, key, realKey);
@@ -585,8 +664,10 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           const re = globRegex(relative(key, path).split(sep).join("/"));
           let matches = 0;
           const w = walkFiles(prefix, skip, key, realKey, true);
-          if (w.exceeded && t.allowed) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
-          if (existsSync(prefix) && prefix !== key) result.folders.push(prefix);
+          const runs = t.allowed || c.dynamic;
+          if (w.exceeded && runs) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
+          if (runs && existsSync(prefix) && prefix !== key) result.folders.push(prefix);
+          if (runs && prefix === key) result.rootGlobs.push(relative(key, path).split(sep).join("/"));
           for (const o of w.outside) {
             if (!re.test(o.split(sep).join("/"))) continue;
             result.linked.push(o);
@@ -599,12 +680,12 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           for (const f of [...w.files, ...w.inLinks]) {
             if (re.test(relative(key, f).split(sep).join("/"))) {
               if (matches >= GLOB_CAP) {
-                if (t.allowed) result.incomplete.push(`Too many files match ${t.word}`);
+                if (runs) result.incomplete.push(`Too many files match ${t.word}`);
                 break;
               }
               if (relative(key, f).split(sep).some((part) => VOLATILE_DIR.test(part)) && !SCRIPT_EXT.test(f) && !isExec(f)) continue;
               matches++;
-              if (w.inLinks.includes(f)) addInLink(f);
+              if (w.inLinks.includes(f) && !addInLink(f)) continue;
               consider(f, t, true);
             }
           }
@@ -625,6 +706,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   result.linked = [...new Set(result.linked)];
   result.inLinks = [...new Set(result.inLinks)];
   result.folders = [...new Set(result.folders)];
+  result.rootGlobs = [...new Set(result.rootGlobs)];
   return result;
 }
 

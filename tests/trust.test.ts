@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { commandText, folderLines, longLabRefusal, scanFolder, shellQuote, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustedNotice, untrustFolder } from "../src/core/trust.ts";
+import { commandText, folderLines, globEre, hookScriptScan, literalEre, longLabRefusal, scanFolder, shellQuote, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustedNotice, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -395,6 +395,62 @@ describe("the files of a hook command, found with no shell parsing", () => {
     put("lib/other.sh");
     symlinkSync(join(cwd, "lib", "other.sh"), join(cwd, "hooks", "link.sh"));
     expect(scanFolder(cwd).files["(hook link) hooks/link.sh"]).not.toBe(before.files["(hook link) hooks/link.sh"]);
+  });
+
+  test("a glob word that a command only reads does not lock its folder, and a glob word that the hook runs does", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat results/*.csv"] }, { command: ["sh", "-c", "git add data/*.csv"] }, { command: ["sh", "-c", "hooks/*.sh"] }] } });
+    put("results/a.csv");
+    put("data/b.csv");
+    put("hooks/run.sh");
+    expect(hookScriptScan(cwd).folders).toEqual([join(realpathSync(cwd), "hooks")]);
+  });
+
+  test("a glob that leaves the project does not open the output folders of the project", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./run.sh"] }, { command: ["sh", "-c", "ls ../*.sh"] }, { command: ["sh", "-c", "cd .. && ls *.sh"] }] } });
+    put("run.sh", "python cuvette/out/helper.py\n");
+    put("cuvette/out/helper.py");
+    expect(hooked()).toEqual(["run.sh"]);
+  });
+
+  test("a link to a log or to an output file is not read, and a link to a folder puts the files of the folder in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/run.sh"] }] } });
+    put("hooks/run.sh");
+    put("logs/x.log", "one");
+    put("cuvette/out/result.csv", "one");
+    put("lib/a.sh");
+    symlinkSync(join(cwd, "logs", "x.log"), join(cwd, "hooks", "log.sh"));
+    symlinkSync(join(cwd, "cuvette", "out", "result.csv"), join(cwd, "hooks", "out.sh"));
+    symlinkSync(join(cwd, "lib"), join(cwd, "hooks", "lib"));
+    symlinkSync(join(cwd, "hooks"), join(cwd, "lib", "back"));
+    const before = scanFolder(cwd);
+    expect(hooked()).toEqual(["hooks/run.sh", "lib/a.sh"]);
+    expect(Object.keys(before.files)).not.toContain("(hook link) hooks/log.sh");
+    expect(Object.keys(before.files)).not.toContain("(hook link) hooks/out.sh");
+    put("logs/x.log", "two");
+    put("cuvette/out/result.csv", "two");
+    expect(scanFolder(cwd).hash).toBe(before.hash);
+    put("lib/a.sh", "changed");
+    expect(scanFolder(cwd).hash).not.toBe(before.hash);
+  });
+
+  test("a glob in a for loop locks the folder of the glob, and warns when the folder has too many files", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in tools/*/*; do $f; done"] }] } });
+    put("tools/x/a.sh");
+    expect(hookScriptScan(cwd).folders).toEqual([join(realpathSync(cwd), "tools")]);
+    for (let i = 0; i < 5100; i++) writeFileSync(join(cwd, "tools", "x", `f${i}.dat`), "");
+    expect(scanFolder(cwd).incomplete.join(" ")).toContain("Too many files in the script folder tools");
+  });
+
+  unixOnly("a link that a first hook rejected stays rejected for a second hook with the same glob", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "hooks/*.sh"] }, { command: ["sh", "-c", "for f in hooks/*.sh; do sh $f; done"] }] } });
+    put("hooks/run.sh");
+    put("cuvette/out/result.csv", "one");
+    symlinkSync(join(cwd, "cuvette", "out", "result.csv"), join(cwd, "hooks", "out.sh"));
+    expect(hooked()).toEqual(["hooks/run.sh"]);
+    put("cuvette/out/result.csv", "two");
+    const before = scanFolder(cwd).hash;
+    put("cuvette/out/result.csv", "three");
+    expect(scanFolder(cwd).hash).toBe(before);
   });
 
   test("a glob match with a script extension in a logs folder is in the hash, and a text file there is not", () => {
@@ -1098,5 +1154,45 @@ describe("shellQuote", () => {
     } finally {
       Object.defineProperty(process, "platform", { value: real });
     }
+  });
+});
+
+describe("Seatbelt patterns for glob and path text", () => {
+  test("a non-ASCII character matches a whole name part, not one byte", () => {
+    expect(literalEre("/p/caf\u00e9")).toBe("/p/caf[^/]+");
+    expect(literalEre("/p/\u65e5\u672c/x")).toBe("/p/[^/]+/x");
+    expect(globEre("caf\u00e9*.sh")).toBe("caf[^/]+[^/]*[.]sh");
+  });
+
+  test("a POSIX class in a bracket keeps the whole bracket", () => {
+    expect(globEre("a[[:space:]]b")).toBe("a[[:space:]]b");
+    expect(globEre("a[![:digit:]]b")).toBe("a[^/]+b");
+    expect(() => new RegExp(globEre("a[[:space:]]b").replace(/\[:space:\]/g, "\\s"))).not.toThrow();
+  });
+
+  test("a question mark and a negated bracket match a whole name part, so the deny only gets wider", () => {
+    expect(globEre("hook?.sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[!a].sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[^a].sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[ab].sh")).toBe("hook[ab][.]sh");
+  });
+
+  const sandboxOk = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
+  test.skipIf(!sandboxOk)("the profile denies a non-ASCII name and a name with a space class, and allows other names", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-glob-")));
+    const touch = (glob: string, name: string) => {
+      const profile = `(version 1)(allow default)(deny file-write* (regex #"^${literalEre(dir)}/${globEre(glob)}$"))`;
+      return spawnSync("/usr/bin/sandbox-exec", ["-p", profile, "/usr/bin/touch", join(dir, name)]).status === 0;
+    };
+    expect(touch("*.sh", "caf\u00e9.sh")).toBe(false);
+    expect(touch("caf\u00e9*", "caf\u00e9x")).toBe(false);
+    expect(touch("a[[:space:]]b", "a b")).toBe(false);
+    expect(touch("a[[:space:]]b", "axb")).toBe(true);
+    expect(touch("*.sh", "other.txt")).toBe(true);
+    expect(touch("hook?.sh", "hook\u00e9.sh")).toBe(false);
+    expect(touch("hook[!a].sh", "hook\u00e9.sh")).toBe(false);
+    expect(touch("hook?.sh", "hookx.sh")).toBe(false);
+    expect(touch("hook?.sh", "hook.sh")).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

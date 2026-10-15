@@ -1,10 +1,10 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { trustFolder } from "../src/core/trust.ts";
-import { UI_DIST } from "../src/server/app.ts";
+import { ensureUiBuild } from "./ui-dist.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
@@ -23,7 +23,7 @@ describe.skipIf(!CHROME)("the new app page in headless Chrome", () => {
   let proj = "";
 
   beforeAll(async () => {
-    if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+    ensureUiBuild();
     const home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
     proj = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
     writeJson(join(home, "settings.json"), { model: "claude:claude-sonnet-5-5", budgetUsd: 50 });

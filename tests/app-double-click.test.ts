@@ -1,9 +1,9 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { UI_DIST } from "../src/server/app.ts";
+import { ensureUiBuild } from "./ui-dist.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
@@ -18,7 +18,7 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
   let project = "";
 
   beforeAll(async () => {
-    if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+    ensureUiBuild();
     home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
     data = mkdtempSync(join(tmpdir(), "cuvette-data-"));
     writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");

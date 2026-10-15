@@ -57,7 +57,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectAdapterDirs, projectSettings, shellQuote, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, labDisplayText, longLabRefusal, folderTrusted, labLong, oneLine, projectAdapterDirs, projectSettings, shellQuote, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -225,7 +225,6 @@ export function announcesStep(text: string): boolean {
   return new RegExp(`\\b(?:I will|I'll|we will|we'll) (?:now )?(?:${ACTION})\\b|\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i").test(tail);
 }
 
-const plainPath = (p: string) => p.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
 
 export class Session {
   id: string;
@@ -499,7 +498,9 @@ export class Session {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? `Cuvette did not load the adapter folder ${plainPath(stray)} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(plainPath(stray))}`
+        ? labDisplayText(stray) !== stray || /[\t\n]/.test(stray)
+          ? `Cuvette did not load the adapter folder ${oneLine(stray)} from the record. The path has control characters, so Cuvette shows no command. Start the session again. Give the folder with --adapter.`
+          : `Cuvette did not load the adapter folder ${stray} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(stray)}`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
@@ -2748,7 +2749,7 @@ export class Session {
       return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
     });
     const home = [cuvetteHome(), realPath(cuvetteHome())];
-    const private_ = home.flatMap((h) => [join(h, "sessions"), join(h, "projects")]);
+    const private_ = home.flatMap((h) => [join(h, "sessions"), join(h, "projects"), join(h, "sessions-index")]);
     const indexed = (p: string) => home.some((h) => dirname(p) === h && basename(p).startsWith("sessions-index.json"));
     const ownRecord = realPath(this.dir).toLowerCase();
     const recordOf = (p: string) => {
@@ -4654,6 +4655,8 @@ export class Session {
     const nodes = this.record.entries(["node"]).filter((e) => e.id > point.upTo && !this.record.setAside(e.id)).map((e) => String(e.node ?? e.data.id));
     const asked = new Set(this.record.entries(["question"]).filter((e) => e.id > point.upTo).map((e) => String(e.data.qid)));
     this.scientistAsked = undefined;
+    this.lastAnswer = "";
+    this.assumptions = "";
     this.askedUsed.clear();
     this.record.append("rewind", { upTo: point.upTo, entry: point.entry, kind: point.kind, point: point.label, nodes });
     for (const q of this.questions.open()) if (asked.has(q.qid)) this.questions.withdraw(q.qid, "The scientist rewound the conversation to a point before this question.");
@@ -4707,7 +4710,7 @@ export class Session {
   }
 
   async review(): Promise<Finding[]> {
-    const answer = this.lastAnswer || (this.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string) || "";
+    const answer = this.lastAnswer || (this.record.live(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string) || "";
     const claims = checkAnswer(answer, this.record.liveView());
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
