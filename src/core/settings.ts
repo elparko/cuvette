@@ -401,6 +401,17 @@ export const SETTINGS: SettingDef[] = [
     confirm: (v) => (v === "off" ? "With the check off, patient identifiers can go to a cloud model with no card. Choose off again to confirm." : undefined),
   },
   {
+    name: "openai_key_hosts",
+    group: "Model",
+    label: "Hosts that get the OpenAI key",
+    brief: "Host names that can receive OPENAI_API_KEY.",
+    help: "Host names, separated by commas, that can receive OPENAI_API_KEY over https. Cuvette always sends the key to api.openai.com and to this computer. Add the host of an Azure or OpenRouter server here. Type none for no extra host. Only your user settings can set this. A project settings file cannot.",
+    scopes: ["user"],
+    free: true,
+    list: true,
+    def: [],
+  },
+  {
     name: "no_patient_data",
     group: "Patient data",
     label: "No patient data here",
@@ -557,7 +568,7 @@ function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source
   let source: Source = "default";
   let file: string | undefined;
   for (const [s, layer, p] of layers(cwd))
-    if (d.name in layer && settingFits(d.name, layer[d.name]) && (s === "user" || d.name !== "phi_check")) {
+    if (d.name in layer && settingFits(d.name, layer[d.name]) && (s === "user" || (d.name !== "phi_check" && d.name !== "openai_key_hosts"))) {
       value = layer[d.name];
       source = s;
       file = p;

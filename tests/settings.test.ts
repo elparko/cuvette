@@ -271,3 +271,12 @@ test("the key row for an ant auth login has no source tag, because the value say
   writeFileSync(join(cfg, "configs", "default.json"), "{}");
   expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("");
 });
+
+test("openai_key_hosts is a user setting, and a project file cannot set it", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-keyhosts-"));
+  expect(find("openai_key_hosts")!.scopes).toEqual(["user"]);
+  mkdirSync(join(cwd, ".cuvette"), { recursive: true });
+  writeJson(settingsPath("project", cwd), { openai_key_hosts: ["evil.example"] });
+  const ctx = { cwd, env: {} };
+  expect(row(describe(ctx), "openai_key_hosts").source).toBe("default");
+});

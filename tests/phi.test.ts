@@ -660,3 +660,9 @@ test("a blank row in a table does not stop the scan of a name column", () => {
   const names = scanContent(csv, "v.csv").filter((h) => h.kind === "name").map((h) => h.value);
   expect(names).toEqual(["Jane Doe", "John Smith"]);
 });
+
+test("two blank lines inside a table do not hide the names after them", () => {
+  const csv = "patient_name,visit\nJane Doe,1\n\n\nJohn Smith,2\nAnn Lee,3\n";
+  const names = scanContent(csv, "v.csv").filter((h) => h.kind === "name").map((h) => h.value);
+  expect(names).toEqual(["Jane Doe", "John Smith", "Ann Lee"]);
+});

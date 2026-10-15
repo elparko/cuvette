@@ -1,6 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { ensureHome } from "./atomic.ts";
 import { harnessWrite } from "./harness-writes.ts";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { assertUserFileSound, folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
@@ -267,6 +268,7 @@ function delimited(text: string): { columns: string[]; rows: string[][]; lines: 
   const rows: string[][] = [];
   const at: number[] = [];
   const quotes = (l: string) => l.split('"').length - 1;
+  let afterBlank = false;
   for (let i = start + 1; i < lines.length; i++) {
     const first = i;
     let l = lines[i]!;
@@ -283,9 +285,10 @@ function delimited(text: string): { columns: string[]; rows: string[][]; lines: 
       r = splitRow(l, d);
     }
     if (!l.trim()) {
-      if (!lines[first - 1]!.trim()) break;
+      afterBlank = true;
       continue;
     }
+    if (afterBlank && (!l.includes(d) || l.startsWith("Note: "))) break;
     if (Math.abs(r.length - columns.length) > 1) continue;
     rows.push(r);
     at.push(first + 1);
@@ -562,7 +565,7 @@ export function setFolderNoPatientData(folder: string, on: boolean): void {
   if (on) list.push(k);
   if (list.length) data[NO_PHI_KEY] = list;
   else delete data[NO_PHI_KEY];
-  mkdirSync(dirname(userFile()), { recursive: true });
+  ensureHome();
   harnessWrite(userFile(), () => writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n"));
 }
 

@@ -831,6 +831,29 @@ describe("openai", () => {
     expect(headers.authorization).toBe("Bearer sk-test-0123456789abcdef0123");
   });
 
+  test("a host in the openai_key_hosts user setting gets the key, and a host outside it does not", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
+    const home = mkdtempSync(join(tmpdir(), "cuvette-keyhosts-"));
+    vi.stubEnv("CUVETTE_HOME", home);
+    writeFileSync(join(home, "settings.json"), JSON.stringify({ openai_key_hosts: ["Models.Azure-Test.example"] }));
+    expect(keySafe("https://models.azure-test.example/v1")).toBe(true);
+    expect(keySafe("http://models.azure-test.example/v1")).toBe(false);
+    expect(keySafe("https://other.azure-test.example/v1")).toBe(false);
+    const project = mkdtempSync(join(tmpdir(), "cuvette-keyhosts-proj-"));
+    mkdirSync(join(project, ".cuvette"));
+    writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ openai_key_hosts: ["evil.example"] }));
+    expect(keySafe("https://evil.example/v1")).toBe(false);
+    let headers: Record<string, string> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: any) => {
+      headers = init.headers;
+      return new Response("{}", { status: 400 });
+    });
+    await (await makeProvider("openai:https://models.azure-test.example/v1|m")).step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBe("Bearer sk-test-0123456789abcdef0123");
+    await (await makeProvider("openai:https://other.azure-test.example/v1|m")).step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBeUndefined();
+  });
+
   test("a key that is not sent gives one notice", async () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
     vi.stubGlobal("fetch", async () => new Response("{}", { status: 400 }));
