@@ -322,14 +322,16 @@ function planHtml(plan: { step: string; status: string }[], id: number, label: s
   return `<div class="ev plan" id="e${id}"><p class="step-head"><span class="tag">plan</span> ${esc(label)}</p><ol>${plan.map((p) => `<li><span class="st st-${esc(p.status)}">${esc(p.status)}</span> ${esc(p.step)}</li>`).join("")}</ol></div>`;
 }
 
-function answerDraftIds(entries: Entry[]): Set<number> {
+const REJECTED_REVISION = /^(The correction was empty|The turn stopped during the correction|The revision lost results)/;
+
+export function answerDraftIds(entries: Entry[]): Set<number> {
   const ids = new Set<number>();
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     if (e.kind !== "message" || (e.data.message as { role: string }).role !== "assistant") continue;
     for (let j = i + 1; j < entries.length; j++) {
       const k = entries[j].kind;
-      if (k === "claim_check") {
+      if (k === "claim_check" || (k === "assistant" && entries[j].data.final === true) || (k === "notice" && REJECTED_REVISION.test(String(entries[j].data.text ?? "")))) {
         ids.add(e.id);
         break;
       }

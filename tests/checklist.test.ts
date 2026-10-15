@@ -240,6 +240,22 @@ test("after the last step, the session offers the checklist once when a guidelin
   await t.close();
 });
 
+test("the session offers the checklist after a step-limit pause and continue", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "count", args: { input: "/data/b.tif", method: "Otsu", min_size: 10 } }] },
+    { text: "There are 41 particles (step 1)." },
+    { text: "There are 41 particles (step 1)." },
+  ]);
+  const t = await Session.create({ adapters: [join(__dirname, "fixtures", "lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { maxSteps: 1 } });
+  t.decisions.applySetup({ question: "How many particles?", method: "Otsu" });
+  t.decisions.change(REPORTING_KEY, "arrive");
+  await t.send("Count the particles in b.tif");
+  expect(t.record.entries(["notice"]).some((e) => /Paused after 1 steps/.test(String(e.data.text)))).toBe(true);
+  await t.send("continue");
+  expect(t.record.entries(["notice"]).filter((e) => e.data.checklist === "offer")).toHaveLength(1);
+  await t.close();
+});
+
 const compareNode = () =>
   node({
     adapter: "patch-clamp",

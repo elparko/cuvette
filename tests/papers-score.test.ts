@@ -5,7 +5,7 @@ import { beforeEach, expect, test } from "vitest";
 import { checkAnswer } from "../src/core/claims.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import type { NodeIn } from "../src/core/types.ts";
-import { checkComputed, processMetrics, scoreItems } from "../src/bench/papers-score.ts";
+import { checkComputed, finalClaims, processMetrics, scoreItems } from "../src/bench/papers-score.ts";
 import type { PaperItem } from "../src/bench/papers-spec.ts";
 
 let record: AnalysisRecord;
@@ -237,4 +237,21 @@ test("modelAnswer drops the harness-written tails", async () => {
   const { modelAnswer } = await import("../src/bench/papers-score.ts");
   expect(modelAnswer("There are 47 cells.\n\nStep results that the answer does not mention, from the record:\n- n1\n\nSettings used, from the decision record: x.")).toBe("There are 47 cells.");
   expect(modelAnswer("Plain answer.")).toBe("Plain answer.");
+});
+
+test("finalClaims reads the check of the final answer in the new record shape and in the old one", () => {
+  const rec = (entries: unknown[]) => ({ entries: (kinds?: string[]) => (entries as { kind: string }[]).filter((e) => !kinds || kinds.includes(e.kind)) }) as never;
+  const claim = (value: number) => [{ text: "x", value, label: "measured" }];
+  const next = rec([
+    { id: 1, kind: "assistant", data: { final: true } },
+    { id: 2, kind: "claim_check", data: { answerEntry: 1, claims: claim(1) } },
+    { id: 3, kind: "assistant", data: { final: true } },
+    { id: 4, kind: "claim_check", data: { answerEntry: 3, claims: claim(3) } },
+  ]);
+  expect(finalClaims(next)?.claims[0]!.value).toBe(3);
+  const old = rec([
+    { id: 1, kind: "claim_check", data: { claims: claim(1) } },
+    { id: 2, kind: "assistant", data: { final: true } },
+  ]);
+  expect(finalClaims(old)?.claims[0]!.value).toBe(1);
 });

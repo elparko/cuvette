@@ -1,20 +1,26 @@
 import type { Question } from "./types.ts";
 
+function pick(q: Question, wanted: unknown): { value: unknown; strict: boolean } | undefined {
+  const w = String(wanted).trim().toLowerCase();
+  const strict = q.options.find((op) => String(op.value) === String(wanted) || op.label === String(wanted));
+  if (strict) return { value: strict.value, strict: true };
+  const same = q.options.find((op) => String(op.value).trim().toLowerCase() === w || String(op.label).trim().toLowerCase() === w);
+  if (same) return { value: same.value, strict: false };
+  if (typeof wanted !== "string" || w.length < 3) return undefined;
+  const starts = q.options.filter((op) => String(op.label).trim().toLowerCase().startsWith(w) || String(op.value).trim().toLowerCase().startsWith(w));
+  return starts.length === 1 ? { value: starts[0]!.value, strict: false } : undefined;
+}
+
 export function fileFits(q: Question, wanted: unknown): boolean {
   if (!q.options.length) return true;
-  const text = String(wanted).toLowerCase();
-  if (q.options.some((op) => String(op.value) === String(wanted) || op.label === String(wanted))) return true;
-  return typeof wanted === "string" && wanted.length > 2 && q.options.some((op) => String(op.label).toLowerCase().includes(text) || text.includes(String(op.label).toLowerCase()));
+  return pick(q, wanted) !== undefined;
 }
 
 export function fitAnswer(q: Question, wanted: unknown, opts: { first?: boolean } = {}): unknown {
   const fits = (x: unknown) => !q.options.length || q.options.some((op) => String(op.value) === String(x) || op.label === String(x));
-  const loose = (x: unknown) => q.options.find((op) => String(op.label).toLowerCase().includes(String(x).toLowerCase()) || String(x).toLowerCase().includes(String(op.label).toLowerCase()))?.value;
-  if (wanted !== undefined && fits(wanted)) return wanted;
-  if (wanted !== undefined && q.options.length && typeof wanted === "string" && wanted.length > 2) {
-    const v = loose(wanted);
-    if (v !== undefined) return v;
-  }
+  if (wanted !== undefined && !q.options.length) return wanted;
+  const hit = wanted !== undefined ? pick(q, wanted) : undefined;
+  if (hit) return hit.strict ? wanted : hit.value;
   return [q.recommendation?.value, q.default, opts.first === false ? undefined : q.options[0]?.value].find((x) => x !== undefined && fits(x));
 }
 
