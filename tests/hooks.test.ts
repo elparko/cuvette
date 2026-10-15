@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -136,13 +136,22 @@ test("a timeout kills the grandchild of a shell hook and blocks the call", async
 });
 
 test("an abort kills the grandchild of a shell hook", async () => {
-  const marker = join(dir, "grandchild-abort");
-  const h = new HookRunner([], { PreToolUse: [{ command: sh(`(sleep 1; echo x > ${marker}) & wait`) }] }, dir);
+  const pidFile = join(dir, "grandchild-pid");
+  const h = new HookRunner([], { PreToolUse: [{ command: sh(`sh -c 'echo $$ > ${pidFile}; sleep 30' & wait`) }] }, dir);
   const ctl = new AbortController();
-  setTimeout(() => ctl.abort(), 200);
+  setTimeout(() => ctl.abort(), 500);
   await h.pre(input, ctl.signal);
-  await new Promise((res) => setTimeout(res, 1500));
-  expect(existsSync(marker)).toBe(false);
+  const pid = Number(readFileSync(pidFile, "utf8").trim());
+  const alive = () => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  for (let i = 0; i < 20 && alive(); i++) await new Promise((res) => setTimeout(res, 100));
+  expect(alive()).toBe(false);
 });
 
 test("a command hook does not get environment variables with secret names", async () => {
@@ -201,4 +210,16 @@ test("a matcher that is not a valid regex skips a hook of another event with one
   await h.post(p);
   expect(ran).toBe(0);
   expect(seen).toHaveLength(1);
+});
+
+test("the same bad matcher is reported once for each event", async () => {
+  const h = new HookRunner([
+    hook("b", () => ({}), { matcher: "(" }),
+    { name: "p", event: "PostToolUse", matcher: "(", run: () => ({}) },
+  ]);
+  const seen: string[] = [];
+  h.onError = (m) => seen.push(m);
+  await h.pre(input);
+  await h.post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
+  expect(seen).toHaveLength(2);
 });

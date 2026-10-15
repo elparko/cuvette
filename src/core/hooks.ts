@@ -25,8 +25,9 @@ function matches(matcher: string | undefined, name: unknown, event: HookEvent, r
   try {
     return new RegExp(matcher).test(name);
   } catch {
-    if (!reported.has(matcher)) {
-      reported.add(matcher);
+    const key = `${event}\n${matcher}`;
+    if (!reported.has(key)) {
+      reported.add(key);
       const fate = event === "PreToolUse" ? "The hook runs for every tool." : "The hook does not run.";
       report?.(`The matcher "${oneLine(matcher)}" of a ${event} hook is not a valid regular expression. ${fate}`);
     }
