@@ -302,6 +302,13 @@ function exact(v: string): boolean {
   return /[.eE]/.test(v) || v.replace(/\D/g, "").length <= 15;
 }
 
+function staysText(v: string): boolean {
+  if (/^\s*[-+]?(inf|infinity)\s*$/i.test(v)) return true;
+  if (!NUMBER.test(v)) return false;
+  const n = Number(v);
+  return !Number.isFinite(n) || (n === 0 && /[1-9]/.test(v.split(/e/i)[0]!));
+}
+
 export function typed(rows: unknown[][], width: number): Cell[][] {
   const kinds = Array.from({ length: width }, (_, j) => {
     let numeric = true;
@@ -311,7 +318,7 @@ export function typed(rows: unknown[][], width: number): Cell[][] {
       const v = r[j];
       if (v === null || v === undefined || (typeof v === "string" && MISSING.has(v.trim()))) continue;
       any = true;
-      const huge = typeof v === "string" && NUMBER.test(v) && !Number.isFinite(Number(v));
+      const huge = typeof v === "string" && staysText(v);
       if (!huge && !(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim()) && exact(v)))) numeric = false;
       if (!(typeof v === "boolean" || (typeof v === "string" && /^(true|false)$/i.test(v.trim())))) bool = false;
     }
@@ -321,7 +328,7 @@ export function typed(rows: unknown[][], width: number): Cell[][] {
     Array.from({ length: width }, (_, j) => {
       const v = r[j];
       if (v === null || v === undefined) return null;
-      if (kinds[j] === "number") return typeof v === "number" ? v : typeof v === "string" && MISSING.has(v.trim()) ? null : typeof v === "string" && !Number.isFinite(Number(v)) ? v : Number(v);
+      if (kinds[j] === "number") return typeof v === "number" ? v : typeof v === "string" && MISSING.has(v.trim()) ? null : typeof v === "string" && staysText(v) ? v : Number(v);
       if (kinds[j] === "bool") return typeof v === "boolean" ? v : typeof v === "string" && MISSING.has(v.trim()) ? null : /^true$/i.test(String(v).trim());
       if (typeof v === "number" || typeof v === "boolean" || typeof v === "string") return v;
       return JSON.stringify(v);

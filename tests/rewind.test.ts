@@ -167,3 +167,25 @@ test("the browser app shows the rewind list as buttons, and a button returns to 
   expect(view.recordHtml()).toContain("Returned to: You wrote: Count the particles in a.tif.");
   view.close();
 });
+
+test("review after a rewind does not check the answer that the rewind set aside", async () => {
+  const { s } = await twoTurns();
+  session = s;
+  const seen: string[] = [];
+  const spy = new FakeProvider([]);
+  spy.complete = async (_system?: string, text?: string) => {
+    seen.push(String(text));
+    return "None";
+  };
+  (s as unknown as { refereeProvider: FakeProvider }).refereeProvider = spy;
+  await s.review();
+  expect(seen.join("\n")).toContain("The count with Triangle is done.");
+  seen.length = 0;
+  s.rewind(2);
+  await s.review();
+  expect(seen.join("\n")).not.toContain("The count with Triangle is done.");
+  seen.length = 0;
+  s.rewind(1);
+  await s.review();
+  expect(seen.join("\n")).not.toContain("The count with Otsu is done.");
+});

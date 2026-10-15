@@ -169,7 +169,7 @@ function tShapeInfo(m: Record<string, unknown>, name: string): Shape | undefined
   const n1 = num(m.n_a);
   const n2 = num(m.n_b);
   if (t === undefined || !n1 || !n2) return undefined;
-  const design: TDesign = /unpaired/i.test(name) ? { kind: "two", n1, n2 } : /(^|[^a-z])paired/i.test(name) ? { kind: "paired", n1 } : /one[- ]sample/i.test(name) ? { kind: "one", n1 } : { kind: "two", n1, n2 };
+  const design: TDesign = /(un|non)[- ]?paired/i.test(name) ? { kind: "two", n1, n2 } : /(^|[^a-z])paired/i.test(name) ? { kind: "paired", n1 } : /one[- ]sample/i.test(name) ? { kind: "one", n1 } : { kind: "two", n1, n2 };
   if (design.kind === "two" ? n1 + n2 < 4 : n1 < 3) return undefined;
   const d = Math.abs(design.kind === "two" ? t * Math.sqrt(1 / n1 + 1 / n2) : t / Math.sqrt(n1));
   const minimum = minEffectT(design);
