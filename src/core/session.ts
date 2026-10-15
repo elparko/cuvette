@@ -62,7 +62,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { Findings, logText, referee, runChecks } from "./review.ts";
+import { Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -2003,7 +2003,7 @@ export class Session {
     this.record.append("notice", { text: contextWarning(used, win), warn: true });
   }
 
-  private draft?: { answer: string; assumed: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
+  private draft?: { answer: string; assumed: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number; asked?: boolean };
 
   private stoppedText(): string {
     return this.draft ? this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.") : "";
@@ -2048,6 +2048,12 @@ export class Session {
     }
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const { answer, block } = this.headlessSplit(pre.answer ?? text);
+    const earlier = this.draft;
+    if (earlier && readsLikeReply(answer, earlier.found.map((x) => x.f.message))) {
+      if (earlier.asked) return { text: this.keepDraft("The correction reads like a reply to the review, so the harness kept the first answer, with the problems that the review found.") };
+      earlier.asked = true;
+      return { text: "", revise: "[Notes from the harness]\n- Your answer reads like a reply to the review. Write the complete answer for the scientist again. Start with the result. Do not mention the review or the referee. Do not number the problems." };
+    }
     this.noteSkippedSteps();
     const claims = checkAnswer(answer, this.record.liveView(), { log: false });
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
@@ -2097,7 +2103,7 @@ export class Session {
       this.record.append("notice", { text: `Review found ${errors.length} problem(s) in the answer above:\n${errors.map((x) => `- ${x.f.message}`).join("\n")}\nThe first answer stays. The agent revises the answer and marks the new one as the correction.` });
       return {
         text: "",
-        revise: "[Review of your answer. The scientist has already read it.]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then give the answer again. The scientist sees it as the correction.",
+        revise: "[Review of your answer. The scientist has already read it.]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then write the complete answer again for the scientist. Start with the result. Do not mention the review, the referee or the problems. Do not number the problems. The scientist sees the new answer as the correction.",
       };
     }
     const findings = found.map(({ f, source }) => this.findings.add(f, source).fid);

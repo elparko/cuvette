@@ -142,8 +142,9 @@ export class OpenAIProvider implements Provider {
     return new ProviderError(`Cannot reach the model server at ${this.base.replace(/\/\/[^@/]*@/, "//")}. Check that it is running.`, true);
   }
 
-  private body(messages: unknown[], tools: StepRequest["tools"]): Record<string, unknown> {
+  private body(messages: unknown[], tools: StepRequest["tools"], maxTokens?: number): Record<string, unknown> {
     const body: Record<string, unknown> = { model: this.model, messages, stream: this.stream };
+    if (maxTokens) body.max_tokens = maxTokens;
     if (this.stream && this.usageOption) body.stream_options = { include_usage: true };
     if (tools.length) body.tools = tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
     return body;
@@ -349,9 +350,9 @@ export class OpenAIProvider implements Provider {
     return out;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { maxTokens?: number }): Promise<string> {
     const native = [{ role: "system", content: system }, { role: "user", content: text }];
-    const reply = await this.exchange(() => this.body(native, []), signal, undefined, undefined);
+    const reply = await this.exchange(() => this.body(native, [], opts?.maxTokens), signal, undefined, undefined);
     return (reply.text ?? splitThink(reply.content).text).trim();
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Findings, parseReferee, referee, refereePrompt, runChecks } from "../src/core/review.ts";
+import { Findings, REFEREE_MAX_TOKENS, parseReferee, readsLikeReply, referee, refereePrompt, runChecks } from "../src/core/review.ts";
 import type { Claim, Entry, EntryKind, Provider } from "../src/core/types.ts";
 
 function makeRecord(seed: { kind: EntryKind; data: Record<string, unknown>; node?: string }[] = [], nodes: any[] = [], stale: string[] = []) {
@@ -281,6 +281,21 @@ describe("referee", () => {
     expect(out[0].message).toContain("I think it is fine overall.");
   });
 
+  test("the referee call carries the output cap and the same effort", async () => {
+    let got: { effort?: string; maxTokens?: number } | undefined;
+    const provider = { complete: async (_s: string, _t: string, _g?: AbortSignal, opts?: { effort?: string; maxTokens?: number }) => ((got = opts), "[]") } as unknown as Provider;
+    await referee(provider, ctx(makeRecord(seed), "a"));
+    expect(got).toEqual({ effort: "low", maxTokens: REFEREE_MAX_TOKENS });
+    expect(REFEREE_MAX_TOKENS).toBeLessThanOrEqual(2000);
+  });
+
+  test("the referee prompt asks for five findings of one line each, most severe first", () => {
+    const { system } = refereePrompt(ctx(makeRecord(seed), "a"));
+    expect(system).toMatch(/at most five findings/);
+    expect(system).toMatch(/each finding on one line/);
+    expect(system).toMatch(/most severe first/);
+  });
+
   test("the referee call gets the stop signal of the turn", async () => {
     let got: AbortSignal | undefined;
     const provider = { complete: async (_s: string, _t: string, signal?: AbortSignal) => ((got = signal), "[]") } as unknown as Provider;
@@ -385,4 +400,22 @@ test("a p value in the text of a read_file result does not count as a test", asy
   };
   const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
   expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
+});
+
+describe("an answer that reads like a reply to the referee", () => {
+  const found = ["The missing weight is in row S15, and the answer does not say which row.", "The group sizes are not in the answer."];
+  test("a numbered item that repeats a finding is a reply", () => {
+    expect(readsLikeReply("1. The missing weight is row S15 (treated). The group sizes are 8 and 9.", found)).toBe(true);
+  });
+  test("a numbered list that is not about a finding is an answer", () => {
+    expect(readsLikeReply("1. Mean weight: 21 g\n2. Mean weight of controls: 19 g", found)).toBe(false);
+  });
+  test("the words referee, the review found and as noted above are a reply", () => {
+    expect(readsLikeReply("The referee is right. The mean is 21 g.", [])).toBe(true);
+    expect(readsLikeReply("The review found a problem. The mean is 21 g.", [])).toBe(true);
+    expect(readsLikeReply("As noted above, the mean is 21 g.", [])).toBe(true);
+  });
+  test("an answer that starts with the result is not a reply", () => {
+    expect(readsLikeReply("The mean weight is 21 g (n = 17). One animal has no weight.", found)).toBe(false);
+  });
 });

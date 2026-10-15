@@ -466,7 +466,7 @@ Write your report as JSON lines. One finding for each line, with no other text:
 {"severity": "info" | "warning" | "error", "message": "<one or two plain sentences>", "entries": [<log entry numbers>]}
 Cite the log entry numbers (the number after #) that support each finding.
 Report only problems. Do not write a finding for a check that passed.
-Write at most five findings. Write the most severe first.
+Write at most five findings. Write each finding on one line, with one sentence in the message. Write the most severe first.
 If you find nothing, write [].`;
 
 export function refereePrompt(ctx: ReviewContext): { system: string; text: string } {
@@ -528,8 +528,19 @@ export function parseReferee(raw: string): FindingIn[] {
 }
 
 export const REFEREE_EFFORT = "low";
+export const REFEREE_MAX_TOKENS = 1500;
+
+const REPLY_WORDS = /\breferee\b|\bthe review found\b|\bas noted above\b/i;
+
+export function readsLikeReply(answer: string, findings: string[]): boolean {
+  if (REPLY_WORDS.test(answer)) return true;
+  if (!/^\s*\d+[.)]\s/.test(answer)) return false;
+  const words = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []);
+  const head = words(answer.slice(0, 400));
+  return findings.some((m) => [...words(m)].filter((w) => head.has(w)).length >= 2);
+}
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT }));
+  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS }));
 }

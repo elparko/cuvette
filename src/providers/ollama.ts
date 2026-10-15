@@ -364,13 +364,13 @@ export class OllamaProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { maxTokens?: number }): Promise<string> {
     const body: Record<string, unknown> = {
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: text }],
       stream: true,
       truncate: false,
-      options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
+      options: { num_ctx: this.numCtx, num_predict: opts?.maxTokens ?? MAX_OUTPUT_TOKENS },
     };
     if (this.thinkOk) body.think = false;
     const idle = idleSignal(TIMEOUT_MS, signal);

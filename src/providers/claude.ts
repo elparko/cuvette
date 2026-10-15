@@ -258,10 +258,10 @@ export class ClaudeProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string }): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; maxTokens?: number }): Promise<string> {
     const params = {
       model: this.model,
-      max_tokens: 16000,
+      max_tokens: opts?.maxTokens ?? 16000,
       system: [{ type: "text", text: system }],
       messages: [{ role: "user", content: text }],
       thinking: { type: "adaptive", display: "omitted" },
