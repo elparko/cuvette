@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
 import { Box, useBoxMetrics, useInput, type DOMElement } from "ink";
@@ -188,6 +188,7 @@ export function QuestionCard(props: {
   note?: string;
   title?: string;
   escText?: string;
+  onTyping?: (on: boolean) => void;
 }) {
   const q = props.card.q;
   const once = useOnce();
@@ -198,6 +199,11 @@ export function QuestionCard(props: {
   const [other, setOther] = useState(free);
   const [cursor, setCursor] = useState(() => questionCursor(q, props.current));
   const [need, setNeed] = useState("");
+  const onTyping = props.onTyping;
+  useEffect(() => {
+    onTyping?.(other);
+    return () => onTyping?.(false);
+  }, [other]);
   const recIndex = recommendedIndex(q);
   const missing = questionNeed(q);
   const head = questionHead(q);
@@ -657,6 +663,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const [raw, setSt] = useState<PlanState>(() => planInit(card));
   const [, setTick] = useState(0);
   const [refused, setRefused] = useState("");
+  const [typing, setTyping] = useState(false);
   const all = props.session.questions.open();
   const st = planResolve(card, raw, all);
   const step = st.step;
@@ -695,7 +702,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       else if (input === "m") act({ a: "mode" });
       else if (input === "p" && switches.length) act({ a: "programs" });
     },
-    { isActive: (card.stage === "plan" && (step === "actions" || step === "program")) || (card.stage === "pilot" && step === "decisions") },
+    { isActive: (card.stage === "plan" && (step === "actions" || step === "program")) || (card.stage === "pilot" && step === "decisions" && !typing) },
   );
   const ask = (key: string, question: Question, onAnswer: (v: unknown) => void) => (
     <QuestionCard key={key} card={{ t: "question", q: question }} onAnswer={onAnswer} onDismiss={() => act({ a: "back" })} />
@@ -728,7 +735,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       {editor ??
         (card.stage === "pilot" ? (
           <Box flexDirection="column">
-            <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} />
+            <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} onTyping={setTyping} />
             {items ? <Text dimColor>e change a setting by its number{card.details ? ` · d ${st.details ? "hide" : "show"} details` : ""}</Text> : null}
           </Box>
         ) : q ? (

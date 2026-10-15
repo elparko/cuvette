@@ -6,6 +6,7 @@ import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } fro
 import { liveTail, tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/ui/commands.ts";
+import { PICK_LABEL } from "../src/ui/cards.ts";
 import React from "react";
 import { Static, render } from "ink";
 import { ItemView, activityText, busyHint, runningText } from "../src/tui/view.tsx";
@@ -1055,6 +1056,25 @@ describe("proposed analysis card", () => {
     await type(h, "1");
     await until(() => s.planResponses.length === 2);
     expect(s.planResponses[1]).toEqual({ action: "confirm" });
+  });
+});
+
+describe("the demonstration card", () => {
+  test("letters that the scientist types after o go to the text, not to the card keys", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "plan", stage: "pilot", version: 1, text: "Pilot sample: Set 1", update: false, qids: [], programs: [], mode: "watch", settings: [{ index: 1, step: 1, label: "Threshold", value: 40 }] });
+    await until(() => h.all().includes("Confirm and run all?"));
+    await type(h, "o");
+    await until(() => h.term.view().includes("Your answer:"));
+    await type(h, "d");
+    await type(h, "e");
+    await type(h, "e");
+    await until(() => h.term.view().includes("Your answer: dee"));
+    expect(h.term.view()).not.toContain(PICK_LABEL);
+    h.type("\r");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toMatchObject({ action: "change", text: "dee" });
   });
 });
 
