@@ -292,6 +292,29 @@ describe("cards", () => {
     }
   });
 
+  test("a question card with no options ignores Enter and text that follow typing", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      s.askMany([{ qid: "qf", session: s.id, decisionKey: "k", title: "Which name?", text: "Type a name.", options: [], status: "open", created: new Date().toISOString() } as never]);
+      await until(() => h.term.view().includes("Your answer:"));
+      await type(h, "hello");
+      await type(h, "\r");
+      expect(s.record.entries(["answer"])).toHaveLength(0);
+      expect(h.term.view()).not.toContain("Your answer: hello");
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      await type(h, "ok");
+      await until(() => h.term.view().includes("Your answer: ok"));
+      h.type("\r");
+      await until(() => s.record.entries(["answer"]).length === 1);
+      expect(s.record.entries(["answer"])[0]!.data).toMatchObject({ value: "ok" });
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
+  });
+
   test("permission: n asks for a note and denies", async () => {
     const { h, s } = start();
     await sleep(100);

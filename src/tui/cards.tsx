@@ -65,7 +65,7 @@ function Hang({ head, lead, children, boxRef }: { head: React.ReactNode; lead: n
   );
 }
 
-function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
+function Prompt(props: { guarded?: boolean; label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
   const [v, setV] = useState(props.initial ?? "");
   useInput((_, key) => {
     if (key.tab && key.shift && props.onBack) props.onBack();
@@ -73,7 +73,7 @@ function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) 
   return (
     <Box>
       <Text>{props.label} </Text>
-      <Field value={v} onChange={setV} onSubmit={props.onSubmit} onCancel={props.onCancel} indent={props.label.length + 1} />
+      <Field gate={props.guarded ? guardPass : undefined} value={v} onChange={setV} onSubmit={props.onSubmit} onCancel={props.onCancel} indent={props.label.length + 1} />
     </Box>
   );
 }
@@ -277,6 +277,7 @@ export function QuestionCard(props: {
       {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
       {other ? (
         <Prompt
+          guarded
           label="Your answer:"
           initial={free ? questionStartText(q, props.current) : ""}
           onSubmit={(v) => {
