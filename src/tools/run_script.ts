@@ -349,12 +349,13 @@ export function writeRules(steps: WriteStep[]): string {
   return steps.map((x) => (x.pattern ? `(deny file-write* (regex #"${x.pattern}"))` : x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
 }
 
-const POSIX_CLASSES: Record<string, string> = { space: "\\s", digit: "\\d", alpha: "a-zA-Z", alnum: "a-zA-Z0-9", upper: "A-Z", lower: "a-z", punct: "!-/:-@\\[-`{-~" };
+const POSIX_CLASSES: Record<string, string> = { space: "\\s", digit: "\\d", alpha: "a-zA-Z", alnum: "a-zA-Z0-9", upper: "A-Z", lower: "a-z", punct: "!-/:-@\\[-`{-~", xdigit: "0-9a-fA-F", blank: " \\t", cntrl: "\\x00-\\x1f\\x7f", graph: "!-~", print: " -~" };
 
 function patternMatches(pattern: string, dir: string): string[] {
   try {
-    const re = new RegExp(pattern.replace(/\[:(\w+):\]/g, (m, name: string) => POSIX_CLASSES[name] ?? m));
-    return readdirSync(dir).slice(0, 5000).map((n) => join(dir, n)).filter((p) => re.test(p));
+    const unknown = [...pattern.matchAll(/\[:(\w+):\]/g)].some((m) => !Object.hasOwn(POSIX_CLASSES, m[1]!));
+    const re = unknown ? /./ : new RegExp(pattern.replace(/\[:(\w+):\]/g, (_m, name: string) => POSIX_CLASSES[name]!));
+    return readdirSync(dir).slice(0, 5000).map((n) => join(dir, n)).filter((p) => re.test(p) && statSync(p, { throwIfNoEntry: false })?.isFile());
   } catch {
     return [];
   }

@@ -463,6 +463,22 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a row fil
   expect(readIndex()[0]!.custom).toBe("mine");
 });
 
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("discard finishes when the row file cannot be read", () => {
+  const id = rowId("aaaa", 1);
+  const outDir = join(home, "work", ".new-aaaa");
+  mkdirSync(join(outDir, ".record"), { recursive: true });
+  const place = { ...rowPlace(id), recordDir: join(outDir, ".record"), outDir };
+  saveIndexRow(place);
+  const file = join(rowDir(), `${id}.json`);
+  chmodSync(file, 0o000);
+  try {
+    expect(() => discardPlace(place)).not.toThrow();
+  } finally {
+    chmodSync(file, 0o600);
+  }
+  expect(existsSync(outDir)).toBe(false);
+});
+
 test.skipIf(process.platform === "win32")("two processes that save 50 rows each at the same time lose no row", async () => {
   const save = (tag: string) => `for (let i = 0; i < 50; i++) saveIndexRow(place("20261001-0000" + String(i).padStart(2, "0") + "-${tag}"));`;
   expect(await twoProcesses(save("aaaa"), save("bbbb"))).toEqual([0, 0]);

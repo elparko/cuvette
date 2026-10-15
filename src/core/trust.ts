@@ -483,13 +483,13 @@ export function globEre(pattern: string): string {
         re += pattern[i + 2] === "/" ? "(.*/)?" : ".*";
         i += pattern[i + 2] === "/" ? 2 : 1;
       } else re += "[^/]*";
-    } else if (c === "?") re += "[^/]";
+    } else if (c === "?") re += ANY_NAME;
     else if (c === "[") {
       const end = bracketEnd(pattern, i);
       if (end < 0) re += plain(c);
       else {
         const body = pattern.slice(i + 1, end).replace(/^!/, "^").replace(/[\\"]/g, "");
-        re += NON_ASCII.test(body) ? ANY_NAME : `[${body}]`;
+        re += NON_ASCII.test(body) || body.startsWith("^") ? ANY_NAME : `[${body}]`;
         i = end;
       }
     } else if (c === "{") {
