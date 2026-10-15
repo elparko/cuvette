@@ -116,8 +116,8 @@ test("a key file that is replaced by a new file inside the cache time is still f
 
 function antConfig(): string {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
-  mkdirSync(join(cfg, "credentials"), { recursive: true });
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  mkdirSync(join(cfg, "configs"), { recursive: true });
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   return cfg;
 }
 
