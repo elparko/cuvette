@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
@@ -333,7 +333,14 @@ for (const how of ["throw", "reject"])
       expect(out).toContain("Cuvette app:");
       child.kill("SIGUSR2");
       expect(await exit).toBe(70);
-      expect(err.trim().split("\n")).toEqual(["Cuvette stopped because of an error: boom"]);
+      const lines = err.trim().split("\n");
+      expect(lines).toHaveLength(1);
+      const file = /^Cuvette stopped because of an error: Error: boom\. Details: (.+crash-.+\.log)$/.exec(lines[0]!)?.[1];
+      expect(lines[0]).toMatch(/Details: /);
+      expect(file).toBeTruthy();
+      expect(file!.startsWith(h)).toBe(true);
+      expect(readFileSync(file!, "utf8")).toContain("Error: boom\n    at");
+      expect(statSync(file!).mode & 0o777).toBe(0o600);
     } finally {
       child.kill("SIGKILL");
     }

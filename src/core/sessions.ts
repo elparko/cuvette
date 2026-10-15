@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { cutText, discardPlace, readIndex, readRowMarks, type IndexRow } from "./places.ts";
 
-export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started";
+export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started" | "log too large to read";
 
 export interface SessionInfo {
   id: string;
@@ -122,31 +122,31 @@ interface Parsed {
   waiting: boolean;
   lastFinal: boolean;
   worked: boolean;
+  partial?: boolean;
 }
 
-export const LOG_READ_LIMIT = 256 * 1024 * 1024;
-const LOG_EDGE = 1024 * 1024;
+export const logLimits = { read: 256 * 1024 * 1024, edge: 1024 * 1024 };
 
 function readLog(log: string, size: number): string {
-  if (size <= LOG_READ_LIMIT) return readFileSync(log, "utf8");
+  if (size <= logLimits.read) return readFileSync(log, "utf8");
   const fd = openSync(log, "r");
   try {
     const part = (at: number) => {
-      const buf = Buffer.alloc(LOG_EDGE);
-      return buf.subarray(0, readSync(fd, buf, 0, LOG_EDGE, at)).toString("utf8");
+      const buf = Buffer.alloc(logLimits.edge);
+      return buf.subarray(0, readSync(fd, buf, 0, logLimits.edge, at)).toString("utf8");
     };
-    return `${part(0)}\n${part(size - LOG_EDGE)}`;
+    return `${part(0)}\n${part(size - logLimits.edge)}`;
   } finally {
     closeSync(fd);
   }
 }
 
-const parsed = new Map<string, { mtime: number; size: number; ino: number; p: Parsed }>();
+const parsed = new Map<string, { mtime: number; size: number; ino: number; limit: number; p: Parsed }>();
 
 function parseLog(log: string): Parsed {
   const st = statSync(log);
   const hit = parsed.get(log);
-  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino) return hit.p;
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino && hit.limit === logLimits.read) return hit.p;
   let first: any;
   let owner: string | undefined;
   let ask: any;
@@ -181,17 +181,17 @@ function parseLog(log: string): Parsed {
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
     else if (figures.length < 20 && e.kind === "node" && !d.sensitivityOf) figures.push(...((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).filter((p) => IMAGE.test(p)));
   }
-  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal, worked };
-  parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, p });
+  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal, worked, ...(st.size > logLimits.read ? { partial: true } : {}) };
+  parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, limit: logLimits.read, p });
   return p;
 }
 
-export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string; worked: boolean } {
-  const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked } = parseLog(log);
+export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string; worked: boolean; partial?: boolean } {
+  const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked, partial } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
-  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask || worked ? "in progress" : "not started";
-  return { first, ask, title, status, figure, owner, worked };
+  const status: SessionStatus = partial ? "log too large to read" : waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask || worked ? "in progress" : "not started";
+  return { first, ask, title, status, figure, owner, worked, ...(partial ? { partial } : {}) };
 }
 
 function firstFigure(folder: string | undefined): string | undefined {

@@ -103,7 +103,7 @@ export class ClaudeProvider implements Provider {
   private headless = false;
   private apiKey?: string;
   private made?: { client: any; version: number; login: boolean };
-  private effort: string;
+  effort: string;
   private display: "summarized" | "omitted";
   private fallbacks = true;
   private sleep?: Sleep;

@@ -3830,7 +3830,7 @@ test("a reply with 20 tool calls runs the first 16 and returns an error result f
   expect(results.slice(0, 16).some((r) => r.isError)).toBe(false);
   for (const r of results.slice(16)) {
     expect(r.isError).toBe(true);
-    expect(r.text).toContain("not run: more than 16 tool calls in one reply");
+    expect(r.text).toContain("not run: more than 16 tool calls in one reply. Call the tool again in the next reply.");
   }
 });
 
@@ -3880,6 +3880,7 @@ test("the session entry records the version, the model limits, the effort and a 
   session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false, effort: "high" } as never });
   const data = session.record.entries(["session"])[0]!.data;
   expect(data).toMatchObject({ cuvetteVersion: JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version, model: "claude-test", maxTokens: 64000, effort: "high" });
+  expect(Object.keys(data)).toContain("effort");
   expect(data.systemSha256).toBe(createHash("sha256").update(session["system"]).digest("hex"));
 });
 
@@ -3922,4 +3923,31 @@ test("the tokens of the helper agent count in the usage and not in the context s
   expect(usage).toHaveLength(3);
   expect(usage.filter((e) => e.data.helper)).toHaveLength(1);
   expect(session.usage().total.steps).toBe(3);
+  const before = session.contextTokens();
+  session.record.append("usage", { inputTokens: 999_999, outputTokens: 1, model: provider.info.model, provider: "fake", helper: true });
+  expect(session.contextTokens()).toBe(before);
+  expect(before).toBeLessThan(999_999);
+});
+
+test("a rebuild of the system prompt records the new hash, and the hash is the one of the text that goes out", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { phi_check: false, referee: "none" } as never });
+  const first = session.record.entries(["session"])[0]!.data.systemSha256;
+  expect(session.record.entries(["session"])[0]!.data.effort).toBe("auto");
+  session.settings.text_style = "plain";
+  session["rebuildSystem"]();
+  const rows = session.record.entries(["setting"]).filter((e) => e.data.name === "system_prompt");
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.data).toMatchObject({ old: first, new: createHash("sha256").update(session["system"]).digest("hex") });
+  expect(rows[0]!.data.new).not.toBe(first);
+  session["rebuildSystem"]();
+  expect(session.record.entries(["setting"]).filter((e) => e.data.name === "system_prompt")).toHaveLength(1);
+});
+
+test("the permission entry says always false when the tool cannot be always allowed", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false } as never });
+  session.bus.on((e) => {
+    if (e.type === "permission") setTimeout(() => session!.respondPermission(e.rid, true, "", true), 0);
+  });
+  await session["requestPermission"]({ name: "run_command", source: "generic", inputSchema: { type: "object" } } as never, { argv: ["ls"] }, new AbortController().signal);
+  expect(session.record.entries(["permission"]).at(-1)!.data.always).toBe(false);
 });
