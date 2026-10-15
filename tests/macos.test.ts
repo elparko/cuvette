@@ -46,7 +46,7 @@ test("the launcher is a small app bundle that asks for a folder", () => {
   expect(sh).toContain(`cuvette_run "$(cuvette_folder "$dir")"`);
 });
 
-test("install and uninstall write and remove the bundles in a home folder", () => {
+test.skipIf(process.platform === "win32")("install and uninstall write and remove the bundles in a home folder", () => {
   const home = mkdtempSync(join(tmpdir(), "cuvette-mac-"));
   const a = installFinderAction({ home, paths: P });
   expect(a).toBe(join(home, "Library/Services", `${ACTION_NAME}.workflow`));

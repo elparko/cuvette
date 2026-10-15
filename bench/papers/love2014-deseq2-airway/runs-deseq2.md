@@ -84,7 +84,7 @@ What happened:
 
 Change after the run: the prompt now says to start from the tximeta object. This agrees with the answers file.
 
-## Blind run with the new prompt (2026-10-08, main a7d7964)
+## Blind run with the new prompt (2026-10-08, main cb4be47)
 
 Before this run, I ran the 14 adapter tests under the blind policy of this paper (sandbox on). All 14 tests passed. In the same sandbox:
 

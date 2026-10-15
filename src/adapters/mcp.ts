@@ -1,4 +1,4 @@
-import { createWriteStream, writeFileSync, type WriteStream } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -73,8 +73,11 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
   const conn = c.adapter.manifest.connection;
   const live = inflight();
   const overrides = new Map(c.adapter.manifest.tools.map((d) => [d.name, d]));
-  const logPath = join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`);
-  let log: WriteStream | undefined;
+  const log = (d: Buffer) => {
+    try {
+      appendFileSync(join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`), d);
+    } catch {}
+  };
   let client: Client | undefined;
   let transport: StdioClientTransport | StreamableHTTPClientTransport | undefined;
   let stderrTail = "";
@@ -102,10 +105,10 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph);
       Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
       addOldEnv(env);
+      log(Buffer.alloc(0));
       t = new StdioClientTransport({ command: argv[0], args: argv.slice(1), env, cwd: conn.cwd ? expand(conn.cwd, c.ph) : c.adapter.root, stderr: "pipe" });
-      log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
       t.stderr?.on("data", (d: Buffer) => {
-        log?.write(d);
+        log(d);
         stderrTail = tail(stderrTail + d.toString("utf8"), 2000);
       });
     }
@@ -216,7 +219,6 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       client = undefined;
       transport = undefined;
       await t?.close().catch(() => {});
-      log?.end();
     },
   });
 }

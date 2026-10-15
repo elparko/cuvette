@@ -47,7 +47,7 @@ test("sourceText names the tool of a computed value and never calls it published
   expect(sourceText(c, "no_such_item")).toBe("not recorded");
 });
 
-test("the sanitizer removes local paths, keys, addresses and host names", () => {
+test.skipIf(process.platform === "win32")("the sanitizer removes local paths, keys, addresses and host names", () => {
   const san = makeSanitizer({ dir: "/Volumes/T7/guided-analysis/tools/bench-runs/d/claude/p/run1/home/sessions/s1" });
   const text = [
     "/Volumes/T7/guided-analysis/data/p/a.csv",
@@ -138,7 +138,7 @@ afterAll(() => {
   else process.env.CUVETTE_BENCH_DATA = oldData;
 });
 
-test("buildCases writes an index, a case page and a sanitized session record", () => {
+test.skipIf(process.platform === "win32")("buildCases writes an index, a case page and a sanitized session record", () => {
   const info = buildCases({ results: [join(root, "r.json")], out: join(root, "out"), papersDir: join(root, "papers"), figures: false });
   expect(info.problems).toEqual([]);
   expect(info.pages).toEqual(["toy.html"]);

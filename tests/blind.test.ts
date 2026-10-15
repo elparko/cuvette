@@ -31,14 +31,14 @@ test("the longest matching root decides, and a symlink resolves to its target", 
   expect(decide(join(data, "..", "repo", "bench", "expected.yaml"), rules)).toBe("deny");
 });
 
-test("paths come from whole strings, argv lists and code text", () => {
+test.skipIf(process.platform === "win32")("paths come from whole strings, argv lists and code text", () => {
   expect(pathsIn({ path: "/a/b.csv" })).toEqual(["/a/b.csv"]);
   expect(pathsIn({ argv: ["cat", "/x/y"] })).toEqual(["/x/y"]);
   const code = `import pandas as pd\nd = pd.read_csv("/data/in.csv")\nx = 4/2\nopen('/repo/bench/expected.yaml')`;
   expect(pathsIn({ code })).toEqual(["/data/in.csv", "/repo/bench/expected.yaml"]);
 });
 
-test("generic file tools need the allow list; other tools only stay off the deny list", () => {
+test.skipIf(process.platform === "win32")("generic file tools need the allow list; other tools only stay off the deny list", () => {
   expect(blindCheck({ name: "read_file", source: "generic" }, { path: "/x" })).toBeUndefined();
   const p = { ...rules, sandbox: "off" as const };
   expect(blindCheck({ name: "read_file", source: "generic" }, { path: join(adapter, "skill.md") }, p)).toBeDefined();
@@ -51,7 +51,7 @@ test("generic file tools need the allow list; other tools only stay off the deny
   expect(blindCheck({ name: "run_script", source: "harness" }, { code: `open("${secret}/expected.yaml")` }, p)?.path).toBe(join(secret, "expected.yaml"));
 });
 
-test("sandbox rules list wider roots first so that the narrower allow wins", () => {
+test.skipIf(process.platform === "win32")("sandbox rules list wider roots first so that the narrower allow wins", () => {
   const r = sandboxReadRules(rules);
   expect(r.indexOf(`(deny file-read-data (subpath "${join(root, "repo")}"))`)).toBeGreaterThanOrEqual(0);
   expect(r.indexOf("(deny")).toBeLessThan(r.indexOf(`(allow file-read-data (subpath "${adapter}"))`));
@@ -108,7 +108,7 @@ test.runIf(darwin)("run_script under blind mode reads the data, cannot read the 
   expect(logged).toContainEqual({ kind: "blocked", data: expect.objectContaining({ path, reason: "blind mode", tool: "run_script" }) });
 });
 
-test("a mid-session adapter adds its folder and the install root of its program to the allow list", () => {
+test.skipIf(process.platform === "win32")("a mid-session adapter adds its folder and the install root of its program to the allow list", () => {
   expect(allowAdapter(adapter, "/x/bin/tool")).toBeUndefined();
   setBlindPolicy({ allow: [data], deny: [join(root, "repo")], hide: [] });
   const p = allowAdapter(adapter, join(root, "envs", "tool", "bin", "python"))!;

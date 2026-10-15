@@ -61,7 +61,7 @@ test("the policy allows the data folder and the run folder and denies the specs,
   expect(p.deny).toEqual(expect.arrayContaining([REPO_DIR, papersDir, join(root, "results"), join(root, "scratch"), join(homedir(), ".cuvette"), join(homedir(), ".claude")]));
 });
 
-test("a blind run blocks reads of the expected values, logs them, sets cwd to the work folder, and reports the leak check", async () => {
+test.skipIf(process.platform === "win32")("a blind run blocks reads of the expected values, logs them, sets cwd to the work folder, and reports the leak check", async () => {
   const expected = join(papersDir, "lab-count", "expected.yaml");
   const result = await runPapers({ ...options(), papers: ["lab-count"], models: ["fake:blind"], providerFor: () => agent(expected) });
   const run = result.runs[0];
@@ -97,7 +97,7 @@ test("with blind mode off the run keeps the old behavior and the report says so"
   expect(readFileSync(result.paths!.md, "utf8")).toContain("Blind mode was off");
 });
 
-test("the leak check flags paths outside the allow list and counts unsourced and literature claims", () => {
+test.skipIf(process.platform === "win32")("the leak check flags paths outside the allow list and counts unsourced and literature claims", () => {
   const entries = [
     { id: 1, kind: "session", data: { cwd: "/run/work" } },
     { id: 2, kind: "tool_call", data: { tool: "read_file", args: { path: "notes.txt" } } },

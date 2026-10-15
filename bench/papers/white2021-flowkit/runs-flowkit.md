@@ -55,7 +55,7 @@ Verdict: PARTIAL, fail on a strict reading. 9 of 11 items pass. The model gave t
 
 ## Rerun after harness fixes (2026-10-08)
 
-Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+Model: `ollama:qwen3:8b`. Harness commit e44260a. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
 
 Scoring rules for the tables below:
 
@@ -104,7 +104,7 @@ Failure causes:
 
 ## Rerun after harness fixes (2026-10-08)
 
-Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+Model: `ollama:qwen3:8b`. Harness commit e44260a. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
 
 Scoring rules for the tables below:
 

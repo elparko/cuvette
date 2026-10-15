@@ -29,7 +29,7 @@ function model(pick: (c: DriveCase) => { name: string; args: Record<string, unkn
     });
 }
 
-const args = (c: DriveCase) => JSON.parse(JSON.stringify(c.target.args).replaceAll("{adapter_dir}", DIR));
+const args = (c: DriveCase) => JSON.parse(JSON.stringify(c.target.args).replaceAll("{adapter_dir}", DIR.replaceAll("\\", "\\\\")));
 
 describe("drive test", () => {
   test("one case for each tool, from its known-answer test", () => {

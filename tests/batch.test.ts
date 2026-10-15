@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { chainInputs, findSamples, metricsOf, pilotChain, planBatch, swapArgs, writeTable } from "../src/core/batch.ts";
 import type { Node } from "../src/core/types.ts";
@@ -61,9 +61,10 @@ test("with one input file and no other folders, the samples are the files of the
 });
 
 test("arguments: pilot files and pilot outputs become the ones for the sample, other values stay", () => {
-  const root = "/p";
-  const map = new Map([["/p/A/CH1.tif", "/p/B/CH1.tif"], ["/p/out/masks.tif", "/p/out2/masks.tif"]]);
-  expect(swapArgs({ path: "{project}/A/CH1.tif", cell_labels: "/p/out/masks.tif", list: ["A/CH1.tif"], min: 20, pattern: "*.tif" }, map, root)).toEqual({ path: "/p/B/CH1.tif", cell_labels: "/p/out2/masks.tif", list: ["/p/B/CH1.tif"], min: 20, pattern: "*.tif" });
+  const root = resolve("/p");
+  const at = (...parts: string[]) => join(root, ...parts);
+  const map = new Map([[at("A", "CH1.tif"), at("B", "CH1.tif")], [at("out", "masks.tif"), at("out2", "masks.tif")]]);
+  expect(swapArgs({ path: "{project}/A/CH1.tif", cell_labels: at("out", "masks.tif"), list: ["A/CH1.tif"], min: 20, pattern: "*.tif" }, map, root)).toEqual({ path: at("B", "CH1.tif"), cell_labels: at("out2", "masks.tif"), list: [at("B", "CH1.tif")], min: 20, pattern: "*.tif" });
 });
 
 test("the table has one row for each sample, with the numbers of each step", () => {

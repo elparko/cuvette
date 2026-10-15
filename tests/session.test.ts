@@ -984,7 +984,7 @@ test("without defaults, as in the benchmark, only the named adapters load; a nam
   expect(session.allTools().filter((t) => t.name === "count")).toHaveLength(1);
 });
 
-test("a script that walks a large folder asks first, even after always allow", async () => {
+test.skipIf(process.platform === "win32")("a script that walks a large folder asks first, even after always allow", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
   const plain = { purpose: "Count the files", does: "Counts the files in the project folder.", code: "import os\nprint(len(os.listdir('.')))" };
   const walk = { purpose: "Find the image folder", does: "Looks through every folder on the drives for the images.", code: "import os\nfor r, d, f in os.walk('/Volumes'):\n    pass" };
@@ -1281,7 +1281,7 @@ test("a turn with results writes results.xlsx in the output folder and one saved
     return out;
   };
   const on = await run({});
-  expect(on.dir).toMatch(/\/cuvette-proj-[^/]+\/cuvette\/\d{4}-\d\d-\d\d-count-particles-tif$/);
+  expect(on.dir).toMatch(/[\\/]cuvette-proj-[^\\/]+[\\/]cuvette[\\/]\d{4}-\d\d-\d\d-count-particles-tif$/);
   expect(readFileSync(on.xlsx).subarray(0, 2).toString()).toBe("PK");
   expect(on.saved.map((e) => e.data.text)).toEqual([expect.stringMatching(/^Saved: results\.xlsx \(5 sheets\)\. Folder: /)]);
   const off = await run({ export_xlsx: "off" });

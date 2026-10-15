@@ -253,7 +253,7 @@ describe.skipIf(!live)("live ImageJ", () => {
   test("the known-answer tests of the adapter pass", async () => {
     const rt = await startMacro(adapter, { workDir: join(work, "kat"), sessionDir: work });
     expect(rt.programVersion).toMatch(/^1\.\d+/);
-    const outcomes = await runTests(adapter, rt, { workDir: join(work, "kat") });
+    const outcomes = await runTests(adapter, rt, { workDir: join(work, "kat"), gui: true });
     expect(outcomes.length).toBe(adapter.manifest.tests.length);
     for (const o of outcomes) expect(o.failures, o.id).toEqual([]);
     await rt.close();

@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python packages for the data inspection
+        run: python -m pip install numpy tifffile pillow pandas openpyxl
       - name: Install pandoc (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y pandoc
@@ -78,6 +80,7 @@ jobs:
           CI: "false"
       - name: ImageJ live tests (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
           npx vitest run tests/imagej.test.ts tests/macro.test.ts
           node bin/cuvette.js adapter check imagej --run-tests --gui

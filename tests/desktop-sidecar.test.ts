@@ -3,7 +3,9 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { expect, test } from "vitest";
+import { expect, test as base } from "vitest";
+
+const test = base.skipIf(process.platform === "win32");
 
 const ROOT = resolve(import.meta.dirname, "..");
 

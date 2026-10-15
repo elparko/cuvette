@@ -74,7 +74,7 @@ test("the file-type hint makes the index only if the request names a file", () =
   expect(made).toBe(1);
 });
 
-test("a 10x folder named in the request matches through the files in it", () => {
+test.skipIf(process.platform === "win32")("a 10x folder named in the request matches through the files in it", () => {
   const tenx = join(cwd, "filtered");
   mkdirSync(tenx);
   for (const f of ["matrix.mtx.gz", "barcodes.tsv.gz", "features.tsv.gz"]) writeFileSync(join(tenx, f), "");

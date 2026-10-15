@@ -397,7 +397,7 @@ export function scanFolder(folder: string): FolderScan {
   }
   if (labBytes) files[LAB_FILE] = sha(labBytes);
   else if (labBig) files[LAB_FILE] = sha(`too large ${labBig}`);
-  for (const p of paths) files[relative(key, p)] = readHash(p);
+  for (const p of paths) files[relative(key, p).split(sep).join("/")] = readHash(p);
   for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
   for (const p of hookScripts(key, layers)) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = readHash(p);

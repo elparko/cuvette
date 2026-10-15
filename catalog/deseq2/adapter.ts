@@ -2,7 +2,7 @@ import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from
 import { join } from "node:path";
 import type { AdapterModule } from "../../src/adapters/manifest.ts";
 
-const QUANT = /(^|\/)(quant\.sf(\.gz)?|abundance\.(h5|tsv))$|\.(genes|isoforms)\.results(\.gz)?$/;
+const QUANT = /(^|[\\/])(quant\.sf(\.gz)?|abundance\.(h5|tsv))$|\.(genes|isoforms)\.results(\.gz)?$/;
 
 function program(file: string): string {
   if (/quant\.sf/.test(file)) return "Salmon quant.sf";

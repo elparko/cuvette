@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { extname, join, relative } from "node:path";
+import { extname, join, relative, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { checkText, type SteIssue } from "../core/ste.ts";
@@ -270,7 +270,7 @@ function visibleText(a: LoadedAdapter, tools: LintTool[]): TextPiece[] {
   push("standards", m.standards);
   const std = join(a.root, "STANDARDS.md");
   if (existsSync(std)) readFileSync(std, "utf8").split(/\r?\n/).forEach((l, i) => push(`STANDARDS.md:${i + 1}`, l));
-  for (const s of a.skills()) readFileSync(s.path, "utf8").split(/\r?\n/).forEach((l, i) => push(`skills/${relative(join(a.root, "skills"), s.path)}:${i + 1}`, l));
+  for (const s of a.skills()) readFileSync(s.path, "utf8").split(/\r?\n/).forEach((l, i) => push(`skills/${relative(join(a.root, "skills"), s.path).split(sep).join("/")}:${i + 1}`, l));
   for (const t of tools) {
     push(`tool "${t.name}" description`, t.description);
     for (const [p, schema] of Object.entries(t.params)) {
@@ -450,7 +450,7 @@ function proseText(a: LoadedAdapter, tools: LintTool[]): { where: string; text: 
   push("standards", m.standards);
   const std = join(a.root, "STANDARDS.md");
   if (existsSync(std)) push("STANDARDS.md", readFileSync(std, "utf8"), true);
-  for (const s of a.skills()) push(`skills/${relative(join(a.root, "skills"), s.path)}`, unfront(readFileSync(s.path, "utf8")), true);
+  for (const s of a.skills()) push(`skills/${relative(join(a.root, "skills"), s.path).split(sep).join("/")}`, unfront(readFileSync(s.path, "utf8")), true);
   for (const t of tools) {
     push(`tool "${t.name}" description`, t.description);
     for (const [p, schema] of Object.entries(t.params)) push(`tool "${t.name}", argument "${p}" description`, schema.description);
@@ -544,7 +544,7 @@ export function lint(input: LintInput): Finding[] {
       add(out, "manual-route", `map entry for "${e.tool}"`, "a code_only entry has no route and no difference. Give the code line or command that repeats the step, or say in difference why there is no manual route.");
   }
 
-  for (const f of codeFiles(a.root)) out.push(...scanErrors(readFileSync(f, "utf8"), relative(a.root, f)));
+  for (const f of codeFiles(a.root)) out.push(...scanErrors(readFileSync(f, "utf8"), relative(a.root, f).split(sep).join("/")));
 
   const known = [...katValues(a), ...(input.benchmark ?? []).filter((k) => !k.adapters?.length || k.adapters.includes(a.name))];
   if (known.length) {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome, loadAdapter, type Manifest } from "./manifest.ts";
 import { trustedRegistry } from "./registry.ts";
 
@@ -162,7 +162,7 @@ export function licenseOf(root: string): string {
 
 function inside(parent: string, p: string): boolean {
   const r = relative(realOf(parent), realOf(p));
-  return !!r && !r.startsWith("..") && !r.startsWith(sep);
+  return !!r && !isAbsolute(r) && r !== ".." && !r.startsWith(`..${sep}`);
 }
 
 export function adapterTrust(root: string): TrustInfo {

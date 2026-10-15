@@ -12,7 +12,7 @@ This file does not repeat that survey.
 - Method: official docs pages, papers, and shallow clones of the open repositories. Nobody ran the cloned code.
 - Clones: `/private/tmp/claude-501/-Users-parker-Code-guided-analysis/126f9c14-dc85-47a5-923d-e26fc34ce34a/scratchpad/survey/`.
 - "[unverified]" marks a claim that comes only from a vendor page or a third-party summary.
-- Cuvette state: `main` at `50d468b`, and `git log --since=2026-10-07`. Each "close in Cuvette today" line was checked in the source. The `file:line` references point to that commit.
+- Cuvette state: `main` at `07452e8`, and `git log --since=2026-10-07`. Each "close in Cuvette today" line was checked in the source. The `file:line` references point to that commit.
 - Two status facts: Roo Code's original team stopped work on 2026-05-15, and a community team maintains it now. Posit replaced Positron Assistant and Databot with Posit Assistant in Positron 2026.07.
 
 ## How to read the recommendations
@@ -278,7 +278,7 @@ Why this order:
 - **Problem it solves.** Silent exclusions. A model or a library drops rows with missing values, and the scientist does not know. An exclusion is a method decision, so the scientist must own it.
 - **Close in Cuvette today.**
   - `summarize_table` in the `tables` adapter gives n, mean, SD and quartiles. It does not report missing values or duplicates.
-  - `fit_mixed_model` reports the count of dropped rows (commit `0a27fc1`), but only after the fact.
+  - `fit_mixed_model` reports the count of dropped rows (commit `30b5eaa`), but only after the fact.
   - The plan can list exclusions.
 - **How it fits.** The check runs in the harness, under design rule one. Each flagged problem becomes an `exclusion` decision that the scientist owns. The answer goes into the decision record and the databook's exclusion table.
 - **Effort.** Medium. A first version for CSV and xlsx files is close to small.

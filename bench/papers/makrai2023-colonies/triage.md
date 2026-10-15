@@ -3,7 +3,7 @@
 Entry numbers (eNN) are ids in the log.jsonl of the session folder.
 Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault, d = model fault.
 
-- claude-haiku-5-5 run 1 (blind): `20261008-235054-c9e5`, adapter image-assays 0.1.0. Every tool call failed with "the program was not found". Cause (b): the version command of locate ran with the repository as its working folder, and blind mode denies the repository, so Python stopped on its first import. Fixed in `src/adapters/locate.ts` (the version command runs in the temporary folder), commit a686634.
+- claude-haiku-5-5 run 1 (blind): `20261008-235054-c9e5`, adapter image-assays 0.1.0. Every tool call failed with "the program was not found". Cause (b): the version command of locate ran with the repository as its working folder, and blind mode denies the repository, so Python stopped on its first import. Fixed in `src/adapters/locate.ts` (the version command runs in the temporary folder), commit 61b9de8.
 - claude-haiku-5-5 run 2 (blind): `20261008-235553-82f3`, 258 s, 13 tool calls (0 failed), computed 2/2, reported 1/1. Leak check: 0 paths outside the allow list, 0 blocked, 0 unsourced claims. Report: `bench/results/papers-2026-10-09-image-assays-haiku.md`.
 
 | Run | Item | Expected | Got | Class | Cause | Fix |

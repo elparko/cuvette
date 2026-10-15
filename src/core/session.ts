@@ -662,7 +662,14 @@ export class Session {
 
   private async nameFolder(request: string) {
     if (!provisional(this.place)) return;
-    const next = titlePlace(this.place, request, this.runtimes.length > 0);
+    let next: Place;
+    try {
+      next = titlePlace(this.place, request, this.runtimes.length > 0);
+    } catch (e) {
+      if (!(e as { renameFailed?: boolean }).renameFailed) throw e;
+      this.record.append("notice", { text: `The results folder keeps its temporary name. The rename failed: ${(e as Error).message}` });
+      return;
+    }
     this.place = next;
     this.dir = next.recordDir;
     this.workDir = next.outDir;
@@ -4371,7 +4378,10 @@ export class Session {
           const rels = listDataFiles(f.path, 5000, 5, [outputRoot(this.cwd, this.settings.output_folder), dirname(this.outputDir), this.outputDir, this.workDir]);
           if (rels.length < 2) continue;
           check = checkFiles(await fileInfos(f.path, rels), f.path);
-          const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
+          const inside = (p: string) => {
+            const r = relative(this.cwd, p);
+            return (r && !r.startsWith("..") && !isAbsolute(r) ? r : p).split(sep).join("/");
+          };
           if (!this.sheet) {
             const { files, tables } = sampleFiles(rels);
             if (files.length >= 2) sheet = sheetFromFiles(files.map((r) => inside(join(f.path, r))), f.path);

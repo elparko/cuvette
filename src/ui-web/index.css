@@ -1347,3 +1347,21 @@
     break-inside: avoid;
   }
 }
+
+.srv .btn:not(.primary):not(.quiet):not(.danger) {
+  background: var(--muted);
+  border-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
+}
+.srv .btn:not(.primary):not(.quiet):not(.danger):hover {
+  background: color-mix(in srgb, var(--foreground) 10%, var(--muted));
+}
+.srv .row.foot {
+  margin: 6px 0 0;
+}
+.srv .row.foot .btn.quiet {
+  margin-left: auto;
+}
+.srv .row.foot .btn.quiet {
+  border-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
+  color: var(--foreground);
+}

@@ -1,7 +1,7 @@
 # Paper benchmark, final runs of 9 October 2026
 
 This report gives the results of the final benchmark runs before the release of Cuvette.
-The result files are in `bench/results/final-2026-10-09/`. All runs used commit `1d5f392`.
+The result files are in `bench/results/final-2026-10-09/`. All runs used commit `31f71fb`.
 
 ## Summary
 
@@ -145,11 +145,11 @@ The local run has no API cost.
 3. **Reference items.** The caicedo2019 missed_fraction items, the cooley2020 "printed" Z' items and the hildyard2021 slope_actb_printed item are reference items or fail as they should.
    The value that the case page shows for a failed item can come from another row, because of the nearest-value matching.
 4. **Stored values.** `tests/papers-cases.test.ts` checks every committed result file for a stored value that disagrees with its difference. It passes for all 24 files.
-   The scoring is the scoring of `1d5f392`. A rescore with the scorer on `main` changed 0 of 66 items in a test, so no rescore was done.
+   The scoring is the scoring of `31f71fb`. A rescore with the scorer on `main` changed 0 of 66 items in a test, so no rescore was done.
 
 ## Papers that are not in the final runs
 
-These 18 papers came after commit `1d5f392`. They have their own Haiku runs on 9 October (`bench/results/papers-2026-10-09-*`), but they are not part of these results:
+These 18 papers came after commit `31f71fb`. They have their own Haiku runs on 9 October (`bench/results/papers-2026-10-09-*`), but they are not part of these results:
 
 argelaguet2018-mofa-cll, aulicino2022-baculovirus-hdr, elmasri2026-limit-maaslin2, gouwens2019-allen-ephys,
 hahne2009-flowcore-compdata, hochman1999-shock-trial, jahncke2025-dag1-mipsc, kochanek2023-deaths-final-data-2020,

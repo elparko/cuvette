@@ -208,13 +208,30 @@ export function branchPlace(parent: Place, name: string, id: string): Place {
   return p;
 }
 
+function renameFolder(from: string, to: string) {
+  const wait = new Int32Array(new SharedArrayBuffer(4));
+  for (let i = 0; ; i++) {
+    try {
+      return renameSync(from, to);
+    } catch (e) {
+      const busy = ["EPERM", "EBUSY", "EACCES"].includes((e as NodeJS.ErrnoException).code ?? "");
+      if (process.platform !== "win32" || !busy || i >= 30) throw e;
+      Atomics.wait(wait, 0, 0, 100);
+    }
+  }
+}
+
 export function titlePlace(p: Place, request: string, keepOldName: boolean): Place {
   const title = request.trim().split("\n")[0]!.slice(0, 120);
   const base = `${dayOf(p.created ? new Date(p.created) : new Date())}-${slug(title) || p.id}`;
   let name = base;
   for (let i = 2; existsSync(join(dirname(p.outDir), name)); i++) name = `${base}-${i}`;
   const outDir = join(dirname(p.outDir), name);
-  renameSync(p.outDir, outDir);
+  try {
+    renameFolder(p.outDir, outDir);
+  } catch (e) {
+    throw Object.assign(e as Error, { renameFailed: true });
+  }
   if (keepOldName) {
     try {
       symlinkSync(name, p.outDir);

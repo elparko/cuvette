@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { createWriteStream, type WriteStream } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
@@ -58,8 +58,11 @@ export function pythonLine(fn: string, args: Args): string {
 export function startPython(c: KindContext): AdapterRuntime {
   const conn = c.adapter.manifest.connection;
   const live = inflight();
-  const logPath = join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`);
-  let log: WriteStream | undefined;
+  const log = (d: Buffer) => {
+    try {
+      appendFileSync(join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`), d);
+    } catch {}
+  };
   let child: ChildProcess | undefined;
   let stderrTail = "";
   let nextId = 1;
@@ -93,7 +96,7 @@ export function startPython(c: KindContext): AdapterRuntime {
 
   const spawnWorker = async (): Promise<void> => {
     const mine = generation;
-    log ??= createWriteStream(logPath, { flags: "a" }).on("error", () => undefined);
+    log(Buffer.alloc(0));
     stderrTail = "";
     spawnedWith = JSON.stringify(interpreter());
     profile = profileKey();
@@ -111,7 +114,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     });
     child = p;
     p.stderr?.on("data", (d: Buffer) => {
-      log?.write(d);
+      log(d);
       stderrTail = tail(stderrTail + d.toString("utf8"), 2000);
     });
     p.stdin?.on("error", () => {});
@@ -343,7 +346,6 @@ export function startPython(c: KindContext): AdapterRuntime {
           p.once("close", () => (clearTimeout(timer), done()));
         });
       }
-      log?.end();
     },
   });
 }

@@ -61,6 +61,10 @@ async function core() {
       ].join("\n"),
     },
   });
+  for (const f of readdirSync(join(CORE, "dist")).filter((n) => n.endsWith(".mjs"))) {
+    const bad = /import\(\s*["'`][^"'`]*\.ts["'`]/.exec(readFileSync(join(CORE, "dist", f), "utf8"));
+    if (bad) throw new Error(`The bundle ${f} imports a .ts file at run time: ${bad[0]}. The app Node cannot run it. Import it with a plain string so that esbuild bundles it.`);
+  }
   const skip = (p) => /[\\/](data|__pycache__|node_modules)$/.test(p) || p.endsWith(".pyc") || basename(p) === ".DS_Store";
   cpSync(join(ROOT, "catalog"), join(CORE, "catalog"), { recursive: true, filter: (p) => !skip(p) });
   await adapterModules();
@@ -157,6 +161,8 @@ if (mode === "dev") {
   const appOut = join(OUT, "Cuvette.app");
   rmSync(appOut, { recursive: true, force: true });
   run("ditto", [app, appOut]);
+  run("codesign", ["--force", "--deep", "--sign", "-", appOut]);
+  run("codesign", ["--verify", "--deep", "--strict", appOut]);
   const file = dmg(appOut);
   console.log(`\nCuvette.app ${mb(appOut)}: ${appOut}`);
   console.log(`  node ${mb(join(appOut, "Contents", "MacOS", "node"))}, shell ${mb(join(appOut, "Contents", "MacOS", "cuvette"))}, core ${mb(join(appOut, "Contents", "Resources", "core"))}`);

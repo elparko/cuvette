@@ -1,6 +1,6 @@
 # Rerun after harness fixes (2026-10-08)
 
-Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. No code, adapter or expected.yaml file was changed. Ollama was free, so each run took 40 seconds to 5 minutes. Every run ended with exit code 0. No run crashed.
+Model: `ollama:qwen3:8b`. Harness commit e44260a. No code, adapter or expected.yaml file was changed. Ollama was free, so each run took 40 seconds to 5 minutes. Every run ended with exit code 0. No run crashed.
 
 Files for each run (prompt, setup, answers, `out.json`, `GA_HOME` with `log.jsonl`): `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/`.
 

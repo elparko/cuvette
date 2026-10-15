@@ -89,7 +89,7 @@ The project is in early development. Version numbers start at the first public r
 
 ### Benchmark
 
-- Final paper benchmark on commit 1d5f392, 53 papers, blind: Claude Opus, Sonnet and Haiku with three runs each, and qwen3:8b with one run. Computed items correct: 99.6% for each Claude model and 79.7% for qwen3:8b. The report is `docs/benchmark-2026-10-09.md`.
+- Final paper benchmark on commit 31f71fb, 53 papers, blind: Claude Opus, Sonnet and Haiku with three runs each, and qwen3:8b with one run. Computed items correct: 99.6% for each Claude model and 79.7% for qwen3:8b. The report is `docs/benchmark-2026-10-09.md`.
 
 ### Adapters from others
 - `cuvette adapter add <name | git address | folder | .zip>` installs an adapter in the user adapter folder. `update` shows the changed files, the new tools and the new permissions before it applies. `remove` deletes it. `list --installed` shows the source, the version, the commit and the SHA-256.

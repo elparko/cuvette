@@ -142,7 +142,7 @@ describe("the actions", () => {
     const r = await rows();
     const plan = await planAction(r.zeta!, "install");
     expect(plan).toMatchObject({ confirm: "Install", runs: true });
-    expect(plan.command).toMatch(/^uv venv --python 3.12 .*envs\/cellpose/);
+    expect(plan.command).toMatch(/^uv venv --python 3.12 .*envs[\\/]cellpose/);
     const exec = vi.fn(async (_c: string, line: (l: string) => void) => (line("Resolved 12 packages"), 0));
     const record = { append: vi.fn() };
     const no = await runAction(plan, { ...fakes(), via: "terminal", exec, record });
@@ -194,7 +194,7 @@ describe("the actions", () => {
   test("update installs the version that the adapter supports; install of an installed program says to update", async () => {
     const r = await rows();
     const up = await planAction(r.alpha!, "update");
-    expect(up.command).toMatch(/uv pip install --python .*biostats\/bin\/python --upgrade statsmodels/);
+    expect(up.command).toMatch(/uv pip install --python .*biostats[\\/](bin|Scripts)[\\/]python(\.exe)?.? --upgrade statsmodels/);
     expect((await planAction(r.alpha!, "install")).refused).toMatch(/already installed. Choose Update/);
     expect((await planAction(r.beta!, "update")).refused).toMatch(/not installed. Choose Install/);
   });
@@ -203,7 +203,7 @@ describe("the actions", () => {
     const r = await rows();
     const plan = await planAction(r.alpha!, "remove");
     expect(plan).toMatchObject({ confirm: "Delete", danger: true, paths: [join(home, "envs", "biostats")], size: 1300 });
-    expect(plan.lines.join("\n")).toMatch(/Cuvette deletes this folder:[\s\S]*envs\/biostats[\s\S]*Size: 1.3 KB[\s\S]*use the same environment and stop working too: tables/);
+    expect(plan.lines.join("\n")).toMatch(/Cuvette deletes this folder:[\s\S]*envs[\\/]biostats[\s\S]*Size: 1.3 KB[\s\S]*use the same environment and stop working too: tables/);
     const remove = vi.fn();
     expect((await runAction(plan, { ...fakes(), via: "terminal", remove })).ok).toBe(false);
     expect(remove).not.toHaveBeenCalled();

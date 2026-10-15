@@ -653,9 +653,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               {stream.think && <Thinking text={stream.think} done={!!stream.live || !busy} />}
               {stream.live && <LiveReply text={stream.live} />}
               {working && (
-                <div className="msg agent working" aria-live="off">
+                <div className="msg agent working" role="status">
                   <span className="caret working" aria-hidden="true" />
-                  <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
+                  <span title={busy ? line + (time ? " · " + time : "") + waits : undefined} className="min-w-0 flex-1 truncate">
+                    {busy ? line : "Sending"}
+                    {busy && time && <span aria-hidden="true"> · {time}</span>}
+                    {busy && waits}
+                  </span>
                 </div>
               )}
               <div ref={cardsRef} />
@@ -663,24 +667,25 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
           <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background from-75% to-transparent pt-8">
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
-            <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
-              <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
-              <span title={line + (time ? " · " + time : "") + waits} className={cn("line-clamp-2 min-w-0 flex-1 break-words sm:line-clamp-1", busy && "text-foreground")}>
-                {line}
-                {time && <span aria-hidden="true"> · {time}</span>}
-                {waits}
-              </span>
-              {showQ && (
-                <Button variant="link" size="sm" onClick={() => send("/questions")}>
-                  Show the open decisions
-                </Button>
-              )}
-              {busy && (
-                <Button variant="outline" size="sm" onClick={() => void stop()} className="h-7 text-destructive">
-                  <SquareIcon className="size-3 fill-current" /> Stop
-                </Button>
-              )}
-            </div>
+            {(!working || showQ) && (
+              <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
+                {!working && (
+                  <>
+                    <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
+                    <span title={line + (time ? " · " + time : "") + waits} className={cn("line-clamp-2 min-w-0 flex-1 break-words sm:line-clamp-1", busy && "text-foreground")}>
+                      {line}
+                      {time && <span aria-hidden="true"> · {time}</span>}
+                      {waits}
+                    </span>
+                  </>
+                )}
+                {showQ && (
+                  <Button variant="link" size="sm" onClick={() => send("/questions")}>
+                    Show the open decisions
+                  </Button>
+                )}
+              </div>
+            )}
             <form
               className="relative rounded-2xl border border-input bg-card shadow-card transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20"
               onSubmit={(e) => {
@@ -726,6 +731,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                     setSel((s) => (s + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length);
                     return;
                   }
+                  if (e.key === "ArrowUp" && !text && status.queue?.length) {
+                    e.preventDefault();
+                    void post<{ text: string }>("api/unqueue", {}).then((r) => r?.text && setText(r.text));
+                    return;
+                  }
                   if (sugg.length && e.key === "Tab") {
                     e.preventDefault();
                     pick(sugg[sel]);
@@ -746,6 +756,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 pb-2.5">
                 <span className={cn("line-clamp-2 min-w-0 pl-1.5 text-xs leading-snug break-words text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
                 <div className="flex min-w-0 flex-wrap justify-end gap-1.5">
+                  {busy && (
+                    <Tooltip content="Stops the current step. Esc does the same.">
+                      <Button type="button" size="sm" variant="destructive" onClick={() => void stop()} aria-label="Stop the agent">
+                        <SquareIcon className="size-3 fill-current" /> Stop
+                      </Button>
+                    </Tooltip>
+                  )}
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">
                       <Button variant="outline" size="sm" onClick={() => submit(true)} disabled={!text.trim()}>

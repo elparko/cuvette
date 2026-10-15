@@ -322,6 +322,13 @@ export class WebView {
 
   // ------------------------------------------------------------ input
 
+  unqueue(): string | undefined {
+    const text = this.queue.at(-1);
+    this.queue = this.queue.slice(0, -1);
+    this.sendStatus();
+    return text;
+  }
+
   async submit(raw: string, now = false): Promise<void> {
     const text = raw.trim();
     if (!text) return;
