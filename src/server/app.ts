@@ -17,7 +17,7 @@ import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock } from "../core/sessions.ts";
-import { findPlace, INDEX_BUSY, removeIndexRow, renameIndexRow } from "../core/places.ts";
+import { findPlace, removeIndexRow, renameIndexRow } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
 import { commands, decisionRows, freshStatus, noOpen, openWithOs } from "../ui/commands.ts";
@@ -561,26 +561,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return send(res, 200, { path: await chooseFolder(resolve(String(body.start || opts.folder || homedir()))) });
     }
     if (p === "/api/session-rename") {
-      let renamed = false;
-      try {
-        renamed = typeof body.id === "string" && renameIndexRow(body.id, String(body.name ?? ""));
-      } catch (e) {
-        if ((e as Error).message === INDEX_BUSY) return send(res, 503, { error: INDEX_BUSY });
-        throw e;
-      }
-      if (!renamed) return send(res, 404, { error: "No such session." });
+      if (typeof body.id !== "string" || !renameIndexRow(body.id, String(body.name ?? ""))) return send(res, 404, { error: "No such session." });
       return send(res, 200, { ok: true });
     }
     if (p === "/api/session-remove") {
       if (typeof body.id !== "string" || c?.session.id === body.id) return send(res, 409, { error: "Close this session before you remove it." });
-      let removed = false;
-      try {
-        removed = removeIndexRow(body.id);
-      } catch (e) {
-        if ((e as Error).message === INDEX_BUSY) return send(res, 503, { error: INDEX_BUSY });
-        throw e;
-      }
-      if (!removed) return send(res, 404, { error: "No such session." });
+      if (!removeIndexRow(body.id)) return send(res, 404, { error: "No such session." });
       return send(res, 200, { ok: true });
     }
     if (p === "/api/session-reveal") {
