@@ -455,9 +455,23 @@ function globRegex(pattern: string): RegExp {
   }
 }
 
-const plain = (c: string) => (/[\w/\-]/.test(c) ? c : /[.+$()|{}*?[\]]/.test(c) ? `[${c}]` : ".");
+const NON_ASCII = /[^\x00-\x7f]/;
+const ANY_NAME = "[^/]+";
+const plain = (c: string) => (/[\w/\-]/.test(c) ? c : /[.+$()|{}*?[\]]/.test(c) ? `[${c}]` : NON_ASCII.test(c) ? ANY_NAME : ".");
+const joinRuns = (re: string) => re.replace(/(\[\^\/\]\+)+/g, ANY_NAME);
 
-export const literalEre = (text: string) => [...text].map(plain).join("");
+export const literalEre = (text: string) => joinRuns([...text].map(plain).join(""));
+
+function bracketEnd(pattern: string, start: number): number {
+  let j = start + 1;
+  if (pattern[j] === "!" || pattern[j] === "^") j++;
+  if (pattern[j] === "]") j++;
+  while (j < pattern.length && pattern[j] !== "]") {
+    const close = pattern[j] === "[" && pattern[j + 1] === ":" ? pattern.indexOf(":]", j + 2) : -1;
+    j = close >= 0 ? close + 2 : j + 1;
+  }
+  return j < pattern.length ? j : -1;
+}
 
 export function globEre(pattern: string): string {
   let re = "";
@@ -471,11 +485,11 @@ export function globEre(pattern: string): string {
       } else re += "[^/]*";
     } else if (c === "?") re += "[^/]";
     else if (c === "[") {
-      const end = pattern.indexOf("]", i + 2);
+      const end = bracketEnd(pattern, i);
       if (end < 0) re += plain(c);
       else {
         const body = pattern.slice(i + 1, end).replace(/^!/, "^").replace(/[\\"]/g, "");
-        re += `[${body}]`;
+        re += NON_ASCII.test(body) ? ANY_NAME : `[${body}]`;
         i = end;
       }
     } else if (c === "{") {
@@ -487,7 +501,7 @@ export function globEre(pattern: string): string {
     } else if (c === "," && depth) re += "|";
     else re += plain(c);
   }
-  return re + ")".repeat(depth);
+  return joinRuns(re + ")".repeat(depth));
 }
 
 const hasGlob = (w: string) => /[*?[\]{}]/.test(w);
@@ -569,6 +583,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   const addInLink = (p: string): boolean => {
     const seen = seenLinks.get(p);
     if (seen !== undefined) return seen;
+    seenLinks.set(p, true);
     const ok = checkInLink(p);
     seenLinks.set(p, ok);
     return ok;

@@ -349,8 +349,20 @@ export function writeRules(steps: WriteStep[]): string {
   return steps.map((x) => (x.pattern ? `(deny file-write* (regex #"${x.pattern}"))` : x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
 }
 
+const POSIX_CLASSES: Record<string, string> = { space: "\\s", digit: "\\d", alpha: "a-zA-Z", alnum: "a-zA-Z0-9", upper: "A-Z", lower: "a-z", punct: "!-/:-@\\[-`{-~" };
+
+function patternMatches(pattern: string, dir: string): string[] {
+  try {
+    const re = new RegExp(pattern.replace(/\[:(\w+):\]/g, (m, name: string) => POSIX_CLASSES[name] ?? m));
+    return readdirSync(dir).slice(0, 5000).map((n) => join(dir, n)).filter((p) => re.test(p));
+  } catch {
+    return [];
+  }
+}
+
+// bwrap cannot deny a new file by pattern. It locks only the files that exist now. Seatbelt on macOS also denies new files.
 function bwrapLocks(steps: WriteStep[]): string[] {
-  return steps.filter((x) => !x.fixed).flatMap((x) => (!existsSync(x.path) ? [] : x.pattern ? ["--ro-bind", x.path, x.path, ...folderNames(x.path).flatMap((d) => ["--bind", d, d])] : [x.allow ? "--bind" : "--ro-bind", x.path, x.path]));
+  return steps.filter((x) => !x.fixed).flatMap((x) => (!existsSync(x.path) ? [] : x.pattern ? patternMatches(x.pattern, x.path).flatMap((p) => ["--ro-bind", p, p]) : [x.allow ? "--bind" : "--ro-bind", x.path, x.path]));
 }
 
 function programExists(cmd: string | undefined, cwd: string, env: Record<string, string | undefined>): boolean {

@@ -370,7 +370,7 @@ test("a hook script in the project root locks the file only, so other project fo
   expect(bwrap).toContain(`--ro-bind ${join(l.project, "check.py")} ${join(l.project, "check.py")}`);
 });
 
-test("a hook glob in the project root denies new files that match the glob, and keeps the other project folders writable", () => {
+test("a hook glob in the project root denies new files that match the glob, and keeps the other project folders writable (bwrap cannot deny a new file by pattern, so it locks the existing matches only)", () => {
   const l = layout();
   mkdirSync(join(l.project, "results"));
   writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "./*.sh"] }] } }));
@@ -380,9 +380,22 @@ test("a hook glob in the project root denies new files that match the glob, and 
   expect(rules).toContain(`(deny file-write* (regex #"^${l.project.replace(/[^\w/-]/g, ".")}/[^/]*[.]sh$"))`);
   expect(rules).not.toContain(`(deny file-write* (subpath "${l.project}"))`);
   const bwrap = bwrapCommand(["tool"], steps).join(" ");
-  expect(bwrap).toContain(`--ro-bind ${l.project} ${l.project} `);
-  expect(bwrap.indexOf(`--bind ${join(l.project, "results")} ${join(l.project, "results")}`)).toBeGreaterThan(bwrap.indexOf(`--ro-bind ${l.project} ${l.project} `));
-  expect(bwrap).toContain(`--bind ${join(l.project, "data")} ${join(l.project, "data")}`);
+  expect(bwrap).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "guard.sh")} ${join(l.project, "guard.sh")}`);
+  expect(bwrap).not.toContain(join(l.project, "notes.txt"));
+});
+
+test("Linux wrap: a hook glob in the project root locks only the existing matches, so the work folder and new files stay writable", () => {
+  const l = layout();
+  writeFileSync(l.settings, JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "./*.sh"] }] } }));
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  writeFileSync(join(l.project, "keep.txt"), "x");
+  const dirs = { ...l.dirs, workDir: l.project };
+  const b = linuxWrap("bwrap", ["true"], { network: false, writable: [l.project], cred: join(l.project, "none.json"), steps: writeSteps(dirs) }).join(" ");
+  expect(b).toContain(`--ro-bind ${join(l.project, "guard.sh")} ${join(l.project, "guard.sh")}`);
+  expect(b).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(b).not.toContain(join(l.project, "keep.txt"));
+  expect(b).toContain(`--bind ${l.project} ${l.project}`);
 });
 
 test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
