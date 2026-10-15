@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { statSync } from "node:fs";
+import { extname } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { pilotText } from "../core/pilot.ts";
 import { cutText } from "../core/places.ts";
@@ -286,7 +288,18 @@ export function renderGraph(session: SessionLike): string {
 
 export const noOpen = () => !!(process.env.VITEST || process.env.CUVETTE_NO_OPEN);
 
-export const RUNNABLE = /\.(command|sh|bat|cmd|exe|jar|app|ps1|scpt|py|pyw|vbs|js|jse|wsf|wsh|lnk|msi|pkg|dmg|rb|pl|reg)$/i;
+export const RUNNABLE = /\.(command|sh|bat|cmd|exe|jar|app|ps1|scpt|py|pyw|vbs|js|jse|wsf|wsh|lnk|msi|pkg|dmg|rb|pl|reg|hta|desktop|scr|com|terminal|applescript|workflow|docm|xlsm)$/i;
+
+export function programFile(path: string): boolean {
+  if (RUNNABLE.test(path)) return true;
+  if (process.platform === "win32" || extname(path)) return false;
+  try {
+    const st = statSync(path);
+    return st.isFile() && (st.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
 
 export const windowsOpenArgs = (path: string) => ["/c", "start", '""', `"${path.replace(/"/g, "")}"`];
 
@@ -847,7 +860,7 @@ const base: Command[] = [
       const outs = ctx.outputs();
       const ref = /^\+?\d+(\.0+)?$/.test(n ?? "") ? outs[Number(n) - 1] : undefined;
       if (!ref) return ctx.error(outs.length ? `Use a number from 1 to ${outs.length}.` : "No outputs yet.");
-      if (RUNNABLE.test(ref.path)) return ctx.error(`Cuvette does not open a program file. The file is at ${ref.path}`);
+      if (programFile(ref.path)) return ctx.error(`Cuvette does not open a program file. The file is at ${ref.path}`);
       openWithOs(ref.path);
       ctx.notice(`Opening ${ref.path}`);
     },

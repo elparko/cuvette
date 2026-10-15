@@ -160,6 +160,7 @@ can also use `{adapter_dir}`. On macOS, a path must match the file name with the
 | `transport` | `stdio` or `http` | `stdio` | For `mcp`. How to reach the server. |
 | `command` | list of text | `[]` | For `mcp` and `macro`. The command that starts the server or the program. |
 | `env` | text to text | `{}` | Environment variables for the child process. Values can use placeholders. |
+| `pass_env` | list of text | `[]` | Names of environment variables that `{env:NAME}` can read in `cli`, `python`, `script`, `macro`, `files` and `screen` adapters, and in `command` and `env` of `mcp` over `stdio`. |
 | `cwd` | text | `""` | Working folder of the child process. If empty, each call gets its own folder. |
 | `url` | text | `""` | For `mcp` over `http`. Address of the server. |
 | `interpreter` | list of text | `[]` | For `python` and `script`. The command that runs the code, such as `["Rscript"]`. |
@@ -183,10 +184,16 @@ Placeholders work in `command`, `env`, `cwd`, `interpreter` and in tool template
 | `{work_dir}` | The work folder of the session. |
 | `{session_dir}` | The folder of the session. |
 | `{program_path}` | The program path from `locate`. |
-| `{env:NAME}` | The value of an environment variable. |
+| `{env:NAME}` | The value of an environment variable. See the rule below. |
 
 The child process gets `CUVETTE_WORK_DIR`, `CUVETTE_SESSION_DIR`, `CUVETTE_ADAPTER_DIR` and `CUVETTE_PROGRAM_PATH`.
-Do not put a secret in `adapter.yaml`. Use `{env:NAME}`.
+The `{env:NAME}` rule applies to `cli`, `python`, `script`, `macro`, `files` and `screen` adapters. It also applies to `command` and `env` of an `mcp` adapter over `stdio`:
+
+- A name in the safe set always resolves. The safe set is `HOME`, `USER`, `PATH`, `TMPDIR`, `LANG`, `LC_ALL`, `SHELL`, `DISPLAY`, `JAVA_HOME`, `R_HOME`, `CONDA_PREFIX` and each `XDG_*` name. On Windows it also has `USERPROFILE`, `APPDATA`, `LOCALAPPDATA` and `TEMP`.
+- Any other name must be in `pass_env`. If it is not, `{env:NAME}` gives an empty text.
+- A name that looks like a secret never resolves in these kinds, also if it is in `pass_env`. A name looks like a secret if it has `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD` or `CREDENTIAL` in it. It also looks like a secret if it ends in `_PASS` or is `DATABASE_URL`.
+
+Do not put a secret in `adapter.yaml`. A secret in `{env:NAME}` works only in `http` headers and `mcp` headers.
 
 ### `tools`
 

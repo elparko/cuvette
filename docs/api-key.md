@@ -46,6 +46,17 @@ Cuvette uses the first key that it finds, in this order:
 1. The `ANTHROPIC_API_KEY` variable in the shell.
 2. The `anthropic_api_key` value in `~/.cuvette/credentials.json`. Only your user can read this file.
 
+## OpenAI key hosts
+
+Cuvette sends the OpenAI key (`OPENAI_API_KEY`) only to `api.openai.com` or to a local address.
+To send the key to another host, add the host name to the user setting `openai_key_hosts`. Cuvette then sends the key to that host over https.
+A project settings file cannot set `openai_key_hosts`.
+The setting is a list. Separate the host names with commas:
+
+```
+cuvette config set openai_key_hosts my-resource.openai.azure.com,openrouter.ai --user
+```
+
 ## Commands
 
 | Command | What it does |

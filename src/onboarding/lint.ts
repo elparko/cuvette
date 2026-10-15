@@ -469,11 +469,12 @@ function steMessage(issues: SteIssue[], file: boolean): string {
 
 function lintEnvNames(a: LoadedAdapter, out: Finding[]): void {
   const m = a.manifest;
-  if (m.connection.kind === "http" || m.connection.kind === "mcp") return;
+  if (m.connection.kind === "http" || (m.connection.kind === "mcp" && m.connection.transport === "http")) return;
   const { locate: _locate, tests: _tests, ...rest } = m;
+  const scanned = m.connection.kind === "mcp" ? { command: m.connection.command, env: m.connection.env } : rest;
   const allow = envAllowed(m);
   const bad = new Set<string>();
-  for (const [, name] of JSON.stringify(rest).matchAll(/\{env:([^{}"]+)\}/g)) if (!allow(name)) bad.add(name);
+  for (const [, name] of JSON.stringify(scanned).matchAll(/\{env:([^{}"]+)\}/g)) if (!allow(name)) bad.add(name);
   for (const name of bad) add(out, "env-name", `{env:${name}}`, `the name ${name} is not a safe variable and is not in connection.pass_env, so {env:${name}} gives an empty text. Add ${name} to connection.pass_env. A name that looks like a secret cannot be added.`);
 }
 

@@ -106,6 +106,14 @@ describe("lint: environment names", () => {
     expect(f.every((x) => x.severity === "warning")).toBe(true);
     expect((await findings(withEnv('  pass_env: [MY_TOKEN]\n  env: { A: "{env:MY_TOKEN}" }\n'), "env-name")).length).toBe(1);
   });
+
+  test("env-name: the command and env of an mcp stdio adapter follow the same rule, and http headers are skipped", async () => {
+    const mcp = (extra: string, transport = "stdio") => make((y) => y.replace("  kind: cli\n", `  kind: mcp\n  transport: ${transport}\n  command: ["node", "{env:MY_CMD}"]\n${extra}`));
+    const f = await findings(mcp('  env: { A: "{env:MY_VAR}", B: "{env:HOME}" }\n'), "env-name");
+    expect(f.map((x) => x.where).sort()).toEqual(["{env:MY_CMD}", "{env:MY_VAR}"]);
+    expect(await findings(mcp('  pass_env: [MY_CMD, MY_VAR]\n  env: { A: "{env:MY_VAR}" }\n'), "env-name")).toEqual([]);
+    expect(await findings(mcp('  url: "http://x"\n  headers: { Authorization: "Bearer {env:MY_TOKEN}" }\n', "http"), "env-name")).toEqual([]);
+  });
 });
 
 describe("lint: citations", () => {
