@@ -42,7 +42,7 @@ run_tool(function() {
     ok = TRUE,
     summary = sprintf("%s, %s: %s %.4f, %d obs, %s%s", formula, if (reml) "REML" else "ML", crit_name, crit, nobs(fit), paste(sprintf("%s %.3f", fixed$term, fixed$estimate), collapse = ", "), if (singular) ". The fit is singular" else ""),
     metrics = metrics,
-    data = list(model_file = out_path("model"), formula = formula, reml = reml, p_value_method = method, singular = singular, warnings = as.list(warns), random_effects = lapply(seq_len(nrow(rnd)), function(i) as.list(rnd[i, ])), lme4_version = lme4_version(), lmerTest_version = as.character(packageVersion("lmerTest"))),
+    data = list(model_file = out_path("model"), formula = formula, reml = reml, p_value_method = method, singular = singular, warnings = as.list(warns), random_effects = lapply(seq_len(nrow(rnd)), function(i) as.list(rnd[i, ])), lme4_version = lme4_version(), lmerTest_version = as.character(packageVersion("lmerTest")), p_terms = if (has_p) as.list(paste0("p_", clean_name(fixed$term[fixed$term != "(Intercept)"]))) else list()),
     table = table_of(fixed, out_path("fixed"), 20),
     manualRoute = sprintf("library(lmerTest); fit <- lmer(%s, data = d, REML = %s); summary(fit, ddf = \"%s\"); VarCorr(fit); isSingular(fit)", formula, if (reml) "TRUE" else "FALSE", ddf)
   ))

@@ -20,7 +20,13 @@ run_tool(function() {
   if (ga == gb) fail("group_a and group_b must differ")
   tm <- suppressWarnings(as.numeric(df[[time_col]]))
   ev_raw <- trimws(as.character(df[[event_col]])); ev_raw[ev_raw == ""] <- NA
-  evv <- as.character(pick(p, "event_value", "1"))
+  evv <- pick(p, "event_value", NULL)
+  if (is.null(evv)) {
+    vals <- sort(unique(ev_raw[!is.na(ev_raw)]))
+    if (!all(vals %in% c("0", "1"))) fail(sprintf("event_col '%s' has the values %s. Give event_value, the value that marks an event", event_col, paste(vals, collapse = ", ")))
+    evv <- "1"
+  }
+  evv <- as.character(evv)
   if (!evv %in% ev_raw) fail(sprintf("event_value '%s' is not a value of event_col '%s'. Values: %s", evv, event_col, paste(sort(unique(ev_raw[!is.na(ev_raw)])), collapse = ", ")))
   ev <- ifelse(is.na(ev_raw), NA, as.integer(ev_raw == evv))
   stratum <- NULL

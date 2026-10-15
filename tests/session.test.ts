@@ -3582,3 +3582,85 @@ test("a number that a small model did not see in a cut script output is not a me
   expect(claims.find((c) => c.value === 111.5)?.label).toBe("measured");
   expect(claims.find((c) => c.value === 222.5)?.label).toBe("unsourced");
 });
+
+const REVIEW_ERROR = JSON.stringify([{ severity: "error", message: "The answer does not give the number of particles that the count step found." }]);
+
+async function correctionTurn(steps: { text: string }[]) {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, ...steps]);
+  const referee = new FakeProvider({ steps: [], complete: REVIEW_ERROR });
+  const complete = vi.spyOn(referee, "complete");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count the particles");
+  return { provider, complete, answer };
+}
+
+const reviewTexts = (p: FakeProvider) => p.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((x) => x.type === "text").map((x) => (x as { text: string }).text);
+
+test("the correction request asks for a complete answer that does not mention the review", async () => {
+  const { provider } = await correctionTurn([{ text: "Counting finished." }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const ask = reviewTexts(provider).find((t) => t.startsWith("[Review of your answer"))!;
+  expect(ask).toMatch(/complete answer/);
+  expect(ask).toMatch(/Start with the result/);
+  expect(ask).toMatch(/Do not mention the review, the referee or the problems/);
+  expect(ask).toMatch(/Do not number the problems/);
+});
+
+test("a correction that replies to the referee gets one more request, and the next clean answer stays", async () => {
+  const { provider, answer } = await correctionTurn([
+    { text: "Counting finished." },
+    { text: "1. The number of particles that the count step found is 64. The referee is right." },
+    { text: "The count found 64 particles with the Default method (step 1)." },
+  ]);
+  expect(provider.requests).toHaveLength(4);
+  expect(answer).toMatch(/^The count found 64 particles/);
+  expect(reviewTexts(provider).filter((t) => /reads like a reply to the review/.test(t))).toHaveLength(1);
+});
+
+test("a correction that still replies to the referee after one more request keeps the first answer with a notice", async () => {
+  const { provider, complete, answer } = await correctionTurn([
+    { text: "Counting finished." },
+    { text: "The referee is right. The count found 64 particles." },
+    { text: "You are right. The count found 64 particles." },
+  ]);
+  expect(provider.requests).toHaveLength(4);
+  expect(answer).toContain("Counting finished.");
+  expect(answer).not.toMatch(/referee|You are right/);
+  expect(complete).toHaveBeenCalledTimes(1);
+  expect(session!.record.entries(["notice"]).some((e) => /reads like a reply to the review, so the harness kept the first answer/.test(String(e.data.text)))).toBe(true);
+  expect(session!.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
+});
+
+test("a referee that gives no text makes the review fail, with a notice", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  expect(session.reviewState).toBe("failed");
+  expect(session.record.entries(["notice"]).map((e) => e.data.text)).toContain("The review gave no text. The answer is not checked.");
+  expect(session.record.entries(["review"]).at(-1)!.data.state).toBe("failed");
+});
+
+test("a referee that says No findings. makes the review done with zero findings", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "No findings." });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  expect(session.reviewState).toBe("done");
+  expect(session.record.entries(["review"]).at(-1)!.data.findings).toEqual([]);
+});
+
+test("a manual review with an empty referee reply keeps the rule findings and gives the failure text", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The treated cells are significantly larger." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, reviseOnFindings: false } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("go");
+  const list = await session.review();
+  expect(list.some((f) => f.check === "significance_without_test")).toBe(true);
+  expect(list.every((f) => f.source === "rule")).toBe(true);
+  expect(session.reviewFailure).toBe("The review gave no text. The answer is not checked.");
+  expect(list.length).toBeGreaterThan(0);
+});
