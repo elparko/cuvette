@@ -46,9 +46,19 @@ function realish(p: string): string {
   return resolve(realpathSync.native(at), relative(at, p));
 }
 
+const holdsRecord = (dir: string) => existsSync(resolve(dir, "log.jsonl")) || existsSync(resolve(dir, "meta.json"));
+
+function recordSiblings(at: string): string[] {
+  try {
+    return readdirSync(dirname(at)).filter((n) => n.toLowerCase() === ".record").map((n) => resolve(dirname(at), n));
+  } catch {
+    return [];
+  }
+}
+
 function inRecordFolder(p: string): boolean {
   for (let at = dirname(p); dirname(at) !== at; at = dirname(at))
-    if (basename(at).toLowerCase() === ".record" && (existsSync(resolve(at, "log.jsonl")) || existsSync(resolve(at, "meta.json")))) return true;
+    if (basename(at).toLowerCase() === ".record" && (holdsRecord(at) || recordSiblings(at).some(holdsRecord))) return true;
   return false;
 }
 

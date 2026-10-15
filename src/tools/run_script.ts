@@ -297,8 +297,8 @@ function outputOpens(dirs: Dirs, scope: SettingsScope): boolean {
   if (!out || both([out]).some((x) => both([dirs.workDir]).includes(x))) return false;
   const mine = both([dirs.sessionDir]);
   const others = recordFolders(dirs).filter((r) => !mine.includes(r));
-  const sealed = [...scope.locked, ...others, ...(basename(dirs.sessionDir) === ".record" ? mine : [])];
-  return !both([out]).some((x) => sealed.some((l) => within(x, l)) || x.split(/[\\/]/).includes(".record") || holdsRecord(x));
+  const sealed = [...scope.locked, ...others, ...(basename(dirs.sessionDir).toLowerCase() === ".record" ? mine : [])];
+  return !both([out]).some((x) => sealed.some((l) => within(x, l)) || x.split(/[\\/]/).some((n) => n.toLowerCase() === ".record") || holdsRecord(x));
 }
 
 export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
