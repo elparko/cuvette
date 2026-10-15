@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { antLogin, savedClaudeKey } from "../src/core/credentials.ts";
+import { startCards } from "../src/ui/cards.ts";
 import { needsFirstSetup } from "../src/server/app.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
 import { settingsPath } from "../src/core/settings.ts";
@@ -111,7 +112,16 @@ test("a login from ant auth login counts as a credential, so the first start is 
 test("choose Claude warns when ANTHROPIC_API_KEY is set, because that key wins", async () => {
   const check = async () => ({ ok: true, text: "The key works." });
   const shadowed = await chooseClaude(KEY, { cwd, env: { ANTHROPIC_API_KEY: "sk-ant-other" }, check });
-  expect(shadowed.text).toContain("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
+  expect(shadowed.text).toContain("This shell also has ANTHROPIC_API_KEY. Cuvette uses that one first.");
   const plain = await chooseClaude(KEY, { cwd, env: {}, check });
   expect(plain.text).not.toContain("ANTHROPIC_API_KEY");
+});
+
+test("the key card does not show for a user of ant auth login", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-card-"));
+  const session = { model: { provider: "claude" }, questions: { open: () => [] } } as never;
+  expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg }).map((c) => c.t)).toEqual(["key"]);
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg })).toEqual([]);
 });

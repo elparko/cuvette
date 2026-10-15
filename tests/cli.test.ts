@@ -50,7 +50,7 @@ test("cuvette key saves the key and warns when ANTHROPIC_API_KEY is set", () => 
   };
   const set = run("sk-ant-other");
   expect(set.saved).toContain(key);
-  expect(set.out).toContain("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
+  expect(set.out).toContain("This shell also has ANTHROPIC_API_KEY. Cuvette uses that one first.");
   expect(run("").out).not.toContain("ANTHROPIC_API_KEY");
 }, 90_000);
 

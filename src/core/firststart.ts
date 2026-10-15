@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { KEY_GUIDE } from "./keyhelp.ts";
-import { antLogin, claudeKey, ENV_KEY_WARNING, keyProblem, saveClaudeKey } from "./credentials.ts";
+import { claudeKey, ENV_KEY_WARNING, noClaudeCredentials, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
 import { ROOT } from "../root.ts";
 
@@ -58,7 +58,7 @@ export function savedModel(ctx: Ctx = {}): string {
 
 export function needsFirstStart(ctx: Ctx = {}): boolean {
   const env = ctx.env ?? process.env;
-  return claudeKey(env).from === "none" && !antLogin(env) && savedModel(ctx).startsWith("claude");
+  return noClaudeCredentials(env) && savedModel(ctx).startsWith("claude");
 }
 
 export async function firstStartState(ctx: Ctx = {}): Promise<FirstStartState> {

@@ -1,6 +1,6 @@
 import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
 import type { PhiAction } from "../core/phi.ts";
-import { claudeKey, ENV_KEY_WARNING, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
+import { noClaudeCredentials, ENV_KEY_WARNING, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { codeOf, plainOf } from "./items.ts";
 import { commandText, visibleText } from "../core/plain.ts";
@@ -92,13 +92,13 @@ export function startCards(session: SessionLike, env: Record<string, string | un
     const c = cardFromEvent(e);
     if (c) list = pushCard(list, c);
   }
-  if (session.model.provider === "claude" && claudeKey(env).from === "none") list = pushCard(list, { t: "key", reason: NO_KEY });
+  if (session.model.provider === "claude" && noClaudeCredentials(env)) list = pushCard(list, { t: "key", reason: NO_KEY });
   return list;
 }
 
 export const needsSetup = (session: SessionLike) => session.decisions.fields().some((f) => f.essential && !f.set);
 
-export const NO_KEY = "There is no Claude API key. Add one now, or press Esc if you use `ant auth login`.";
+export const NO_KEY = "There is no Claude API key. Add one now.";
 
 export function planIntro(session: SessionLike): string | undefined {
   if (session.record.entries(["plan_approved"]).length) return undefined;
