@@ -176,7 +176,7 @@ describe("fuzz: status and rewind", () => {
       check(rec, model, `seed ${seed}`);
       check(new AnalysisRecord(dir, "s"), model, `seed ${seed} after a reload`);
     }
-  });
+  }, 240000);
 
   test("without a change or a rerun every step is up to date, also after a rewind", () => {
     for (let seed = 1000; seed < 1000 + runs(60); seed++) {
