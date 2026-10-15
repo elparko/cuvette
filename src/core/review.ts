@@ -8,6 +8,7 @@ import { outOfDateNodes } from "./status.ts";
 import { checkText, summary } from "./ste.ts";
 import { latestValue, testRows } from "./testcount.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
+import { fmtSig } from "./plain.ts";
 
 export interface ReviewContext {
   record: AnalysisRecord;
@@ -123,7 +124,7 @@ function recordHint(ctx: ReviewContext, keys: RegExp): string {
   for (const node of new Set(ctx.claims.filter((c) => c.node && steps.has(c.node)).map((c) => c.node!))) {
     const m = (ctx.record.node(node)?.result as { metrics?: Record<string, unknown> } | undefined)?.metrics ?? {};
     const held = Object.entries(m).filter(([k, v]) => keys.test(k) && typeof v === "number");
-    if (held.length) parts.push(`step ${steps.get(node)} holds ${held.slice(0, 4).map(([k, v]) => `${k} = ${Number((v as number).toPrecision(3))}`).join(", ")}`);
+    if (held.length) parts.push(`step ${steps.get(node)} holds ${held.slice(0, 4).map(([k, v]) => `${k} = ${fmtSig(v as number, 3)}`).join(", ")}`);
   }
   return parts.length ? ` The record: ${parts.join("; ")}.` : "";
 }
@@ -155,9 +156,9 @@ function familyUncorrected(ctx: ReviewContext): FindingIn[] {
     (r) => r.size > 1 && ctx.claims.some((c) => c.label === "measured" && c.node === r.node && c.value !== null && /\b[pP]\b|p[- ]?value/.test(c.text) && Math.abs(c.value - r.p) <= Math.max(0.01 * r.p, 0.0006)),
   );
   if (!raw.length) return [];
-  const list = raw.map((r) => `p = ${Number(r.p.toPrecision(3))} (step ${r.step}, ${r.size} tests on ${r.family})`).join("; ");
+  const list = raw.map((r) => `p = ${fmtSig(r.p, 3)} (step ${r.step}, ${r.size} tests on ${r.family})`).join("; ");
   const message = chosen
-    ? `The answer reports a raw p value from a family of tests: ${list}. The scientist chose ${chosen.replace(/_/g, " ")}. Report the corrected p value: ${raw.map((r) => Number((chosen === "holm" ? r.holm : r.bh).toPrecision(3))).join(", ")}.`
+    ? `The answer reports a raw p value from a family of tests: ${list}. The scientist chose ${chosen.replace(/_/g, " ")}. Report the corrected p value: ${raw.map((r) => fmtSig(chosen === "holm" ? r.holm : r.bh, 3)).join(", ")}.`
     : `The answer reports a raw p value from a family of tests with no correction: ${list}. Set the decision test_correction to Holm or Benjamini-Hochberg, or to not part of the analysis if the extra tests were not part of it. The table Tests in this session shows each test.`;
   return [{ check: "family_uncorrected", severity: "warning", message, nodes: raw.map((r) => r.node) }];
 }
@@ -331,12 +332,18 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
 
 const TEST_IN_TEXT = /\bp[- ]?values?\b|\bp\s*(?:=|<|>|≤)\s*\d|\bq[- ]?values?\b|\badjusted p\b/i;
 
+const NEGATED_P = /\b(?:no|not|without|(?:could not|cannot|can't|couldn't|failed to|did not|didn't|unable to) \w+)\s+(?:(?:a|an|the|any)\s+)?[pq][- ]?values?\b/gi;
+
+function testInText(text: string): boolean {
+  return text.split(/\r?\n/).some((line) => TEST_IN_TEXT.test(line.replace(NEGATED_P, " ")));
+}
+
 function testInResults(record: ReviewContext["record"]): boolean {
   const named = record.nodes().some((n) => {
     const d = (n.result as { data?: { test?: unknown } } | undefined)?.data;
     return typeof d?.test === "string" && d.test.trim() !== "";
   });
-  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && (e.data.tool === "run_script" || !!e.data.adapter) && TEST_IN_TEXT.test(String(e.data.text ?? "")));
+  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && (e.data.tool === "run_script" || !!e.data.adapter) && testInText(String(e.data.text ?? "")));
 }
 
 function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
@@ -416,7 +423,7 @@ export function logText(record: AnalysisRecord): string {
       if (result?.metrics) bits.push(`metrics ${clip(result.metrics, 1200)}`);
       const table = result?.table;
       if (table && Array.isArray(table.columns) && Array.isArray(table.rows) && table.rows.length) {
-        const rows = table.rows.slice(0, TABLE_ROWS).map((r) => r.map((v) => (v === null ? "" : typeof v === "number" ? String(Number(v.toPrecision(6))) : String(v))).join(", "));
+        const rows = table.rows.slice(0, TABLE_ROWS).map((r) => r.map((v) => (v === null ? "" : typeof v === "number" ? fmtSig(v, 6) : String(v))).join(", "));
         const more = table.rows.length > TABLE_ROWS ? ` (first ${TABLE_ROWS} of ${table.rows.length} rows)` : "";
         bits.push(`table ${table.columns.join(", ")}${more}: ${clip(rows.join(" | "), 2000)}`);
       }
@@ -466,8 +473,8 @@ Write your report as JSON lines. One finding for each line, with no other text:
 {"severity": "info" | "warning" | "error", "message": "<one or two plain sentences>", "entries": [<log entry numbers>]}
 Cite the log entry numbers (the number after #) that support each finding.
 Report only problems. Do not write a finding for a check that passed.
-Write at most five findings. Write the most severe first.
-If you find nothing, write [].`;
+Write at most five findings. Write each finding on one line, with one sentence in the message. Write the most severe first.
+If you find nothing, write exactly this line: No findings.`;
 
 export function refereePrompt(ctx: ReviewContext): { system: string; text: string } {
   const textChecks = ctx.adapters.flatMap((a) => a.manifest.checks.filter((c) => !c.rule && c.text.trim()).map((c) => `- ${c.id}: ${c.text.trim()}`));
@@ -528,8 +535,45 @@ export function parseReferee(raw: string): FindingIn[] {
 }
 
 export const REFEREE_EFFORT = "low";
+export const REFEREE_MAX_TOKENS = 8000;
+
+const ADDRESSES_REVIEWER = /\bas the referee noted\b|\bthe referee\b|\byou are right\b|\bi agree with the finding\b/i;
+const STOP_WORDS = new Set("the and for are was were with that this from not has have had its but all any can will would should does did than then into onto over under about after before also each which while there their they them what when where who whom whose why how".split(" "));
+
+const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+function quotesFinding(line: string, finding: string): boolean {
+  const need = wordsOf(finding).filter((w) => !STOP_WORDS.has(w));
+  if (need.length < 5) return false;
+  const have = wordsOf(line).filter((w) => !STOP_WORDS.has(w));
+  let at = 0;
+  let hit = 0;
+  for (const w of need) {
+    const next = have.indexOf(w, at);
+    if (next >= 0) {
+      hit++;
+      at = next + 1;
+    }
+  }
+  return hit >= 5 && hit >= need.length * 0.6;
+}
+
+export function readsLikeReply(answer: string, findings: string[]): boolean {
+  const first = answer.trim().split("\n")[0] ?? "";
+  if (ADDRESSES_REVIEWER.test(first)) return true;
+  if (!/^\d+[.)]\s/.test(first)) return false;
+  return /\bas noted above\b/i.test(first) || findings.some((m) => quotesFinding(first, m));
+}
+
+export class EmptyReview extends Error {
+  constructor() {
+    super("The review gave no text. The answer is not checked.");
+  }
+}
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT }));
+  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
+  if (!raw.trim()) throw new EmptyReview();
+  return parseReferee(raw);
 }

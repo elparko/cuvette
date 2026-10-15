@@ -34,3 +34,10 @@ test("default metrics", async () => {
   const r = await runSensitivity(d, "t", {}, "k", async () => ({ output: { ok: true, metrics: { n: 5 } } }), rec as any);
   expect(r.holds).toEqual(["n is about 5 with every option"]);
 });
+
+test("the table keeps the integer digits of a metric", async () => {
+  const d = Decision.parse({ key: "k", label: "K", kind: "choice", choices: [1, 2] });
+  const r = await runSensitivity(d, "t", {}, "k", async () => ({ output: { ok: true, metrics: { n: 12345.67 } } }), rec as any);
+  expect(r.holds).toEqual(["n is about 12346 with every option"]);
+  expect(r.table).toContain("12346");
+});

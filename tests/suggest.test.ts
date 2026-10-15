@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { adapterIndex, type AdapterSummary } from "../src/adapters/catalog.ts";
-import { suggestLines, suggestPrograms } from "../src/core/suggest.ts";
+import { suggestLines, suggestOutput, suggestPrograms } from "../src/core/suggest.ts";
 
 let list: AdapterSummary[] = [];
 beforeAll(() => {
@@ -154,4 +154,14 @@ test("the scan follows a link to a data file or a data folder", () => {
   const m = first(d);
   expect(m.adapter).toBe("flowkit");
   expect(m.count).toBe(3);
+});
+
+test("the hint to start with --adapter is left out for an adapter that loads by default", () => {
+  const d = folder();
+  for (let i = 0; i < 12; i++) put(d, `s${i}.fcs`, Buffer.concat([Buffer.from("FCS3.1    "), Buffer.alloc(20)]));
+  const r = suggestPrograms(d, list);
+  expect(suggestOutput(r, ["tables"]).at(-1)).toBe("To use it, run: cuvette --adapter flowkit");
+  expect(suggestOutput(r, ["tables", "flowkit"])).toEqual(suggestLines(r));
+  expect(suggestOutput(r, ["flowkit"]).join("\n")).not.toContain("To use it");
+  expect(suggestOutput(suggestPrograms(folder(), list), [])).toEqual([]);
 });

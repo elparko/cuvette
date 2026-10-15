@@ -2,11 +2,12 @@ import type { Decision } from "../adapters/manifest.ts";
 import { getPath, setPath } from "./decisions.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Args, SensitivityResult, ToolOutput } from "./types.ts";
+import { fmtSig } from "./plain.ts";
 
 type Call = (tool: string, args: Args, meta: { sensitivityOf: string }) => Promise<{ output: ToolOutput; node?: string }>;
 
 function fmt(n: number): string {
-  return String(Number.isInteger(n) ? n : +n.toPrecision(4));
+  return Number.isInteger(n) ? String(n) : fmtSig(n, 4);
 }
 
 function pad(cells: string[][]): string {

@@ -226,6 +226,7 @@ export function delimiterOf(text: string, path: string): string {
 export interface CsvNotes {
   stray: number[];
   multiline: number[];
+  starts?: number[];
 }
 
 // The parser reads a quote mark with no closing quote as a normal character. Then it does not join the rest of the file into one cell.
@@ -236,6 +237,8 @@ export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] 
   let field = "";
   let quoted = false;
   let line = 1;
+  let rowLine = 1;
+  const starts = notes?.starts;
   let open = { at: -1, line: 1, rows: 0, cells: 0 };
   let literal = -1;
   for (let i = 0; i < text.length; i++) {
@@ -257,6 +260,7 @@ export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] 
         i = open.at - 1;
         line = open.line;
         rows.length = open.rows;
+        if (starts) starts.length = open.rows;
         row.length = open.cells;
         field = "";
         quoted = false;
@@ -276,14 +280,17 @@ export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] 
       if (c === "\r" && text[i + 1] === "\n") i++;
       row.push(field);
       rows.push(row);
+      starts?.push(rowLine);
       row = [];
       field = "";
       line++;
+      rowLine = line;
     } else field += c;
   }
   if (field !== "" || row.length) {
     row.push(field);
     rows.push(row);
+    starts?.push(rowLine);
   }
   return rows;
 }

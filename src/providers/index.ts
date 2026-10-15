@@ -19,6 +19,7 @@ export interface ProviderOpts {
   cache?: "off" | "5m" | "1h";
   sleep?: Sleep;
   retries?: number;
+  headless?: boolean;
 }
 
 export interface ModelListing {
@@ -35,6 +36,19 @@ export const CLAUDE_MODELS: ModelListing[] = [
   { spec: "claude:claude-haiku-5-5", label: "Claude Haiku 5.5", local: false, tools: true, contextWindow: 1_000_000 },
   { spec: "claude:claude-fable-5-1", label: "Claude Fable 5.1", local: false, tools: true, contextWindow: 1_000_000 },
 ];
+
+export function modelSpecProblem(spec: string): string | undefined {
+  const i = spec.indexOf(":");
+  const kind = i < 0 ? spec : spec.slice(0, i);
+  const rest = i < 0 ? "" : spec.slice(i + 1);
+  if (kind === "claude" || kind === "fake") return undefined;
+  if (kind === "ollama") return rest ? undefined : "Name an Ollama model, for example ollama:qwen3:8b";
+  if (kind === "openai") {
+    const bar = rest.lastIndexOf("|");
+    return bar < 1 || bar === rest.length - 1 ? "Use openai:<base url>|<model>, for example openai:http://localhost:1234/v1|qwen3-8b" : undefined;
+  }
+  return "Use claude, claude:<id>, ollama:<model>, openai:<url>|<model>, or fake:<file>.";
+}
 
 export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promise<Provider> {
   const i = spec.indexOf(":");

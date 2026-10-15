@@ -8,7 +8,7 @@ import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook } from "../src/core/results.ts";
 import { runChecks } from "../src/core/review.ts";
 import { Session } from "../src/core/session.ts";
-import { currentFromDisk, outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
+import { num, currentFromDisk, outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, rerunText } from "../src/ui/commands.ts";
@@ -268,4 +268,23 @@ test("cuvette status checks an adapter folder that the user gives for this run",
   const given = await currentFromDisk(record, root, [dir]);
   expect([...given.unchecked]).toEqual([]);
   expect(given.current.get("mine")?.version).toBe("2.0.0");
+});
+
+test("the status line says that skipped steps are not checked", () => {
+  const row = (step: number, unchecked?: string) => ({ node: `n${step}`, step, tool: "run", title: "Step", current: true, reasons: [], unchecked });
+  const note = "not checked: adapter outside the trusted folders";
+  expect(statusText([row(1, note), row(2, note)] as never)).toMatch(/2 steps are not checked\./);
+  expect(statusText([row(1, note), row(2, note)] as never)).not.toMatch(/up to date\.$/);
+  expect(statusText([row(1, note)] as never)).toMatch(/The step is not checked\./);
+  expect(statusText([row(1, note), row(2)] as never)).toMatch(/1 of 2 steps is up to date\. 1 step is not checked\./);
+  expect(statusText([row(1, note), row(2), row(3)] as never)).toMatch(/2 of 3 steps are up to date\. 1 step is not checked\./);
+  expect(statusText([])).toBe("No steps yet.");
+  const out = { ...row(3), current: false };
+  expect(statusText([row(1, note), row(2, note), out] as never)).toMatch(/1 of 3 steps is out of date\. 2 steps are not checked\. Type \/rerun/);
+  expect(statusText([row(1), row(2)] as never)).toMatch(/All 2 steps are up to date\./);
+});
+
+test("the status numbers keep the integer digits", () => {
+  expect(num(12345.67)).toBe("12346");
+  expect(num(0.123456)).toBe("0.1235");
 });

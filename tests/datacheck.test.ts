@@ -37,6 +37,44 @@ describe("table checks", () => {
     expect(item(c, "missing:Notes").level).toBe("note");
   });
 
+  test("a group label None in a text column is a label, but None in a number column is a missing value", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => [`M${i + 1}`, ["None", "Drug", "Vehicle"][i % 3]!, i === 4 ? "None" : String(10 + i)]);
+    const c = checkTable(t(["Animal", "Group", "dose"], rows), "plate.csv");
+    expect(c.groups?.sizes.map((g) => g[0]).sort()).toEqual(["Drug", "None", "Vehicle"]);
+    expect(ids(c)).not.toContain("missing:Group");
+    expect(item(c, "missing:dose").level).toBe("ask");
+    expect(item(c, "missing:dose").rows).toEqual([6]);
+  });
+
+  test("a row number in a message is the line of the file, after a blank line and a cell on two lines", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-datacheck-lines-"));
+    const file = join(dir, "lines.csv");
+    const rows = ["id,note,dose", "a,\"two\nlines\",1", "", "b,x,", "c,y,3", "d,z,4"];
+    writeFileSync(file, rows.join("\n") + "\n");
+    const c = checkTable(readCsvTable(file), "lines.csv");
+    expect(item(c, "missing:dose").rows).toEqual([5]);
+    expect(item(c, "missing:dose").text).toContain("row 5");
+  });
+
+  test("a time or visit label in brackets after a column name is not a unit", () => {
+    const rows = Array.from({ length: 6 }, (_, i) => [`M${i + 1}`, String(20 + i), String(22 + i), String(25 + i)]);
+    const c = checkTable(t(["Animal", "weight (baseline)", "weight (week 4)", "weight (day 7)"], rows), "plate.csv");
+    expect(ids(c)).not.toContain("units:weight");
+    expect(c.units).toEqual([]);
+    const real = checkTable(t(["Animal", "length (mm)", "length (cm)"], rows.map((r) => r.slice(0, 3))), "plate.csv");
+    expect(ids(real)).toContain("units:length");
+  });
+
+  test("a group row written NA, N/A, null or empty is a missing group and not a group", () => {
+    for (const mark of ["NA", "Na", "N/A", "#N/A", "<NA>", "null", "NaN", "-", "?", "."]) {
+      const rows = Array.from({ length: 12 }, (_, i) => [`M${i + 1}`, i === 0 ? mark : ["Drug", "Vehicle"][i % 2]!, String(10 + i)]);
+      const c = checkTable(t(["Animal", "Group", "dose"], rows), "plate.csv");
+      expect(c.groups?.sizes.map((g) => g[0]).sort()).toEqual(["Drug", "Vehicle"]);
+      expect(item(c, "missing:Group").level).toBe("ask");
+      expect(item(c, "missing:Group").rows).toEqual([2]);
+    }
+  });
+
   test("an empty column is shown, not asked", () => {
     const c = checkTable(t(["id", "value", "spare"], [["a", "1", ""], ["b", "2", ""], ["c", "3", ""]]), "x.csv");
     expect(item(c, "empty:spare")).toMatchObject({ level: "note", text: "Column 'spare' is empty. The harness does not use it." });

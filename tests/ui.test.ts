@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { cardFromEvent, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { cardFromEvent, cardId, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { failureText, problemOf } from "../src/ui/commands.ts";
@@ -16,6 +16,10 @@ describe("card queue", () => {
     list = pushCard(list, plan({ version: 2, qids: ["q1"] }));
     expect(list.map((c) => c.t)).toEqual(["plan"]);
     expect(pushCard(list, { t: "question", q: q("q1") })).toBe(list);
+  });
+  test("each privacy-check card has its own card id", () => {
+    const phi = (rid: string): Card => ({ t: "phi", rid, model: "m", hits: [], more: 0 });
+    expect(cardId(phi("r1"))).not.toBe(cardId(phi("r2")));
   });
   test("the key card goes first and only once", () => {
     const list = pushCard(pushCard([{ t: "config" }], { t: "key" }), { t: "key" });

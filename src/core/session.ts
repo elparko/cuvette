@@ -14,12 +14,12 @@ import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, instal
 import { adapterDirs, findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { START_VERSION_TIMEOUT_MS } from "../adapters/locate.ts";
-import { makeProvider } from "../providers/index.ts";
+import { makeProvider, modelSpecProblem } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
 import { pathRefusalReason } from "./refusals.ts";
-import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { COPY_LIMIT_BYTES, cutText, discardPlace, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
@@ -62,7 +62,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { Findings, logText, referee, runChecks } from "./review.ts";
+import { EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -384,22 +384,35 @@ export class Session {
     const settings = loadSettings(cwd, overrides, notes);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
-    if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
-    const s = new Session(id, cwd, settings, place, record);
-    const held = claimLock(s.dir);
-    if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
-    s.overrides = overrides;
-    s.onceTrusted = !!opts.trustFolder;
+    const onInterrupt = () => {
+      if (!opts.place) discardPlace(place);
+      if (!process.listenerCount("SIGINT")) process.exit(130);
+    };
+    if (!opts.place && !opts.home) process.once("SIGINT", onInterrupt);
     try {
-      await s.init(opts);
-    } catch (e) {
-      s.releaseLock();
-      throw e;
+      if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
+      const s = new Session(id, cwd, settings, place, record);
+      const held = claimLock(s.dir);
+      if (held) {
+        if (!opts.place) discardPlace(place);
+        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
+      }
+      s.overrides = overrides;
+      s.onceTrusted = !!opts.trustFolder;
+      try {
+        await s.init(opts);
+      } catch (e) {
+        s.releaseLock();
+        if (!opts.place) discardPlace(place);
+        throw e;
+      }
+      if (opts.method) s.startMethod(opts.method);
+      for (const text of notes) s.record.append("notice", { text, warn: true });
+      if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
+      return s;
+    } finally {
+      process.off("SIGINT", onInterrupt);
     }
-    if (opts.method) s.startMethod(opts.method);
-    for (const text of notes) s.record.append("notice", { text, warn: true });
-    if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
-    return s;
   }
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
@@ -458,7 +471,11 @@ export class Session {
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
-    for (const name of replaced) s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. This session used another folder before.`, warn: true });
+    for (const name of replaced) {
+      const before = recorded.get(name);
+      const missing = !!before && !existsSync(before);
+      s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
+    }
     for (const [name, untrusted] of gone) {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
@@ -473,10 +490,21 @@ export class Session {
     const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a, i, all) => all.findIndex((x) => x.name === a.name) === i).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
+    const checkSetting = (name: "model" | "referee", skip: boolean) => {
+      const value = String(this.settings[name] ?? "");
+      if (skip || !value || (name === "referee" && (value === "same" || value === "none"))) return;
+      const problem = modelSpecProblem(value);
+      if (!problem) return;
+      const held = resolveSetting(findSetting(name)!, { cwd: this.cwd, env: process.env });
+      const project = held.source === "project";
+      throw new Error(`The setting ${name} has the value "${value}"${held.file ? ` in ${held.file}` : ""}. ${problem} Run: cuvette config set ${name} <name>${project ? " --project" : ""}`);
+    };
+    checkSetting("model", !!opts.provider || !!opts.model);
+    checkSetting("referee", !!opts.refereeProvider || !!opts.referee);
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings), headless: this.settings.headless }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
-    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
+    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort, headless: this.settings.headless });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
@@ -1465,6 +1493,7 @@ export class Session {
   private turnStartedAt = 0;
   reviewState: "done" | "stopped" | "failed" | "none" = "none";
   reviewFindings = 0;
+  reviewFailure?: string;
 
   private appendReview(answer: number, state: "done" | "stopped" | "failed" | "off", findings: string[], extra: Record<string, unknown> = {}): void {
     this.record.append("review", { answer, state, findings, ...extra });
@@ -2010,7 +2039,7 @@ export class Session {
     this.record.append("notice", { text: contextWarning(used, win), warn: true });
   }
 
-  private draft?: { answer: string; assumed: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
+  private draft?: { answer: string; assumed: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number; asked?: boolean };
 
   private stoppedText(): string {
     return this.draft ? this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.") : "";
@@ -2055,6 +2084,12 @@ export class Session {
     }
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const { answer, block } = this.headlessSplit(pre.answer ?? text);
+    const earlier = this.draft;
+    if (earlier && readsLikeReply(answer, earlier.found.map((x) => x.f.message))) {
+      if (earlier.asked) return { text: this.keepDraft("The correction reads like a reply to the review, so the harness kept the first answer, with the problems that the review found.") };
+      earlier.asked = true;
+      return { text: "", revise: "[Notes from the harness]\n- Your answer reads like a reply to the review. Write the complete answer for the scientist again. Start with the result. Do not mention the review or the referee. Do not number the problems." };
+    }
     this.noteSkippedSteps();
     const claims = checkAnswer(answer, this.record.liveView(), { log: false });
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
@@ -2087,7 +2122,7 @@ export class Session {
         state = "done";
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
-        this.record.append("notice", { text: `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
+        this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
       }
       this.bus.emit({ type: "status", state: "thinking" });
     } else if (this.refereeProvider && signal.aborted) state = "stopped";
@@ -2104,7 +2139,7 @@ export class Session {
       this.record.append("notice", { text: `Review found ${errors.length} problem(s) in the answer above:\n${errors.map((x) => `- ${x.f.message}`).join("\n")}\nThe first answer stays. The agent revises the answer and marks the new one as the correction.` });
       return {
         text: "",
-        revise: "[Review of your answer. The scientist has already read it.]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then give the answer again. The scientist sees it as the correction.",
+        revise: "[Review of your answer. The scientist has already read it.]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then write the complete answer again for the scientist. Start with the result. Do not mention the review, the referee or the problems. Do not number the problems. The scientist sees the new answer as the correction.",
       };
     }
     const findings = found.map(({ f, source }) => this.findings.add(f, source).fid);
@@ -3242,12 +3277,12 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next) }) : this.provider;
+    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next), headless: next.headless }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name) || (name === "show_thinking" && next.referee === "same")
       ? next.referee === "same"
         ? provider
         : next.referee && next.referee !== "none"
-          ? await makeProvider(next.referee, { effort: next.effort })
+          ? await makeProvider(next.referee, { effort: next.effort, headless: next.headless })
           : undefined
       : this.refereeProvider;
     const wasCloud = isCloud(this.provider.info);
@@ -4653,8 +4688,15 @@ export class Session {
     const claims = checkAnswer(answer, this.record.liveView());
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
+    this.reviewFailure = undefined;
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
-    if (this.refereeProvider && !this.refereeBlocked()) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+    if (this.refereeProvider && !this.refereeBlocked()) {
+      try {
+        for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+      } catch (e) {
+        this.reviewFailure = e instanceof EmptyReview ? e.message : `The referee did not run: ${(e as Error).message}`;
+      }
+    }
     return out;
   }
 
@@ -4775,8 +4817,9 @@ export class Session {
     this.interrupt();
     await this.titling?.catch(() => {});
     await this.starting.catch(() => {});
-    this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
+    if (this.record.entries().every((e) => e.kind === "session" || e.kind === "notice")) discardPlace(this.place);
+    this.releaseLock();
   }
 }
 

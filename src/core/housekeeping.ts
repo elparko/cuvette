@@ -63,6 +63,10 @@ export function stepNumbers(nodes: Node[]): Map<string, number> {
   return new Map(nodes.filter((n) => !n.sensitivityOf).map((n, i) => [n.id, i + 1]));
 }
 
+export function stepNumberOf(numbers: Map<string, number>, id: string, index: number): number {
+  return numbers.get(id) ?? index + 1;
+}
+
 export const PURPOSE = { type: "string", description: "Optional. In plain words, what this call does and why, for the scientist. No code." };
 
 function base(p: unknown): string {

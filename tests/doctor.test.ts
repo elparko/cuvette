@@ -197,7 +197,8 @@ test("the short list puts the missing environments on one line, with no install 
   expect(short).not.toContain("uv venv");
   expect(short).not.toContain("How to cite");
   expect(short).toContain("cuvette doctor --fix installs 2");
-  expect(doctorText(checks)).toContain("How to cite: Author (2020).");
+  expect(doctorText(checks)).not.toContain("Author (2020).");
+  expect(doctorText(checks, { cite: true })).toContain("How to cite\n  Java: Java (1995).\n  biostats: Author (2020).\n  science: Author (2020).");
   expect(doctorText(checks, { only: ["missing"] })).toContain("Download: https://qupath.github.io");
 });
 
@@ -302,7 +303,8 @@ test("the text shows ok, missing and old rows together, with the counts and the 
   const text = doctorText(checks);
   expect(text).toContain("Needed to start\n  ok       Node: version 24.1.0\n  missing  Claude API key: no key is saved.\n           Install: cuvette key\n           Or download: https://platform.claude.com/settings/keys");
   expect(text).toContain("  old      Java: version 1.6 is older than 8.\n           Install: brew install --cask temurin");
-  expect(text).toContain("  missing  cellprofiler: CellProfiler was not found.\n           Download: https://cellprofiler.org/releases\n           How to cite: Stirling 2021");
+  expect(text).toContain("  missing  cellprofiler: CellProfiler was not found.\n           Download: https://cellprofiler.org/releases");
+  expect(text).not.toContain("Stirling 2021");
   expect(text).toContain("3 ok, 3 missing, 1 old.");
   expect(text).toContain("Cuvette can start");
   expect(text).toContain("cuvette doctor --fix installs 1 missing Python environment or R package set.");
@@ -312,4 +314,17 @@ test("the text shows ok, missing and old rows together, with the counts and the 
   expect(short).toContain("old      Java");
   const none = doctorText(checks.map((c) => ({ ...c, status: "ok" as const })), { only: ["missing", "old"] });
   expect(none.trim().split("\n")[0]).toBe("7 ok, 0 missing, 0 old.");
+});
+
+test("a login from ant auth login counts as a Claude credential, so Cuvette can start", async () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-doctor-ant-"));
+  const env = { ANTHROPIC_CONFIG_DIR: cfg };
+  const none = await runDoctor(base({ env, fetch: ollamaDown }));
+  expect(byId(none, "claude-key").status).toBe("missing");
+  expect(canStart(none)).toBe(false);
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  const some = await runDoctor(base({ env, fetch: ollamaDown }));
+  expect(byId(some, "claude-key")).toMatchObject({ status: "ok", detail: "a login from ant auth login" });
+  expect(canStart(some)).toBe(true);
 });

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
 import { decodeText, delimiterOf, parseCsv, type CsvNotes } from "./results.ts";
+import { fmtSig } from "./plain.ts";
 
 export interface CheckOption {
   value: string;
@@ -35,10 +36,11 @@ export interface Table {
   rows: string[][];
   encoding?: string;
   ragged?: number[];
+  lines?: number[];
   quotes?: CsvNotes;
 }
 
-const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "?", "."]);
+const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "<na>", "?", "."]);
 const NUM = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
 const COMMA = /^[-+]?\d+,\d+$/;
 const ID_NAME = /^(sample|sample ?id|id|subject|subject ?id|patient|patient ?id|animal|animal ?id|mouse|mouse ?id|donor|donor ?id|specimen|well|image|file|field|name)$/;
@@ -46,6 +48,8 @@ const GROUP_NAME = /(group|treatment|condition|genotype|arm|cohort|drug|strain|s
 const UNIT_IN_NAME = /\(([^()]+)\)\s*$|\[([^\[\]]+)\]\s*$|[ _](mm|cm|um|µm|nm|mg|g|kg|ug|µg|ng|ml|ul|µl|mM|uM|µM|nM|s|sec|min|h|hr|px|pixels|percent|pct|%)$/i;
 
 export const isMissing = (v: string) => MISSING.has(v.trim().toLowerCase());
+const isNoneWord = (v: string) => v.trim().toLowerCase() === "none";
+const isMissingLabel = (v: string) => isMissing(v) && !isNoneWord(v);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const flat = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
 const quote = (s: string) => {
@@ -60,11 +64,14 @@ const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 export function readCsvTable(path: string): Table {
   const { text, encoding } = decodeText(readFileSync(path));
   const delim = delimiterOf(text, path);
-  const quotes: CsvNotes = { stray: [], multiline: [] };
-  const grid = parseCsv(/[\r\n]$/.test(text) ? text : `${text}\n`, delim, quotes).filter((r) => r.some((c) => c.trim() !== ""));
-  const [head = [], ...rows] = grid;
+  const quotes: CsvNotes = { stray: [], multiline: [], starts: [] };
+  const all = parseCsv(/[\r\n]$/.test(text) ? text : `${text}\n`, delim, quotes);
+  const kept = all.flatMap((r, i) => (r.some((c) => c.trim() !== "") ? [i] : []));
+  const [head = [], ...rows] = kept.map((i) => all[i]!);
+  const lines = kept.slice(1).map((i) => quotes.starts![i]!);
+  delete quotes.starts;
   const ragged = rows.flatMap((r, i) => (r.slice(head.length).some((c) => c.trim() !== "") ? [i] : []));
-  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}), ...(quotes.stray.length || quotes.multiline.length ? { quotes } : {}) };
+  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}), ...(lines.some((l, i) => l !== i + 2) ? { lines } : {}), ...(quotes.stray.length || quotes.multiline.length ? { quotes } : {}) };
 }
 
 type Kind = "num" | "comma" | "astext" | "text" | "missing";
@@ -101,7 +108,14 @@ export function columnInfo(t: Table): ColInfo[] {
     t.rows.forEach((r, i) => kinds[kindOf(r[c] ?? "")].push(i));
     const numberLike = kinds.num.length + kinds.comma.length + kinds.astext.length;
     const filled = t.rows.length - kinds.missing.length;
-    return { name, kinds, numeric: numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6 };
+    const numeric = numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6;
+    if (!numeric) {
+      const labels = kinds.missing.filter((i) => isNoneWord(t.rows[i]![c] ?? ""));
+      kinds.missing = kinds.missing.filter((i) => !labels.includes(i));
+      kinds.text.push(...labels);
+      kinds.text.sort((a, b) => a - b);
+    }
+    return { name, kinds, numeric };
   });
   infoCache.set(t, info);
   return info;
@@ -130,6 +144,7 @@ const UNIT_FAMILIES: [string, string[]][] = [
   ["percent", ["%", "percent", "pct"]],
 ];
 
+const TIME_LABEL = /^(baseline|base|screening|pre|post|before|after|follow[- ]?up|final|end|start|(visit|v|week|wk|w|day|d|month|mo|m|year|yr|y|time|t|timepoint|tp|session|cycle|c)\s*-?\s*\d+|\d+\s*(h|hr|hrs|hours?|min|d|days?|wk|weeks?|mo|months?|y|yr|years?)?)$/i;
 const MOLAR = /^[pnum]?M$/;
 
 function unitKey(u: string): string {
@@ -145,10 +160,9 @@ export function unitFamily(u: string): string | undefined {
 
 export function unitOf(column: string): string | undefined {
   const m = UNIT_IN_NAME.exec(column.trim());
-  return m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
+  const unit = m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
+  return unit && !TIME_LABEL.test(unit) ? unit : undefined;
 }
-
-const fileRow = (i: number) => i + 2;
 
 export function median(xs: number[]): number {
   const s = Float64Array.from(xs).sort();
@@ -164,7 +178,7 @@ export function extremes(values: number[]): number[] {
   return values.flatMap((v, i) => (Math.abs((0.6745 * (v - med)) / mad) > 3.5 ? [i] : []));
 }
 
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.toPrecision(4))));
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : fmtSig(n, 4));
 
 export function checkTable(t: Table, source: string): DataCheck {
   const items: CheckItem[] = [];
@@ -177,6 +191,7 @@ export function checkTable(t: Table, source: string): DataCheck {
   for (const c of t.columns) nameCount.set(c, (nameCount.get(c) ?? 0) + 1);
   for (const c of cols) if ((nameCount.get(c.name) ?? 0) > 1) c.name = `${c.name || "(no name)"} (column ${cols.indexOf(c) + 1})`;
   const at = (c: ColInfo) => cols.indexOf(c);
+  const fileRow = (i: number) => t.lines?.[i] ?? i + 2;
 
   if (t.ragged?.length) {
     const rows = t.ragged.map(fileRow);
@@ -273,11 +288,11 @@ export function checkTable(t: Table, source: string): DataCheck {
   let groups: DataCheck["groups"];
   if (group >= 0) {
     const name = t.columns[group]!;
-    const labels = t.rows.map((r) => (r[group] ?? "").trim()).filter((v) => !isMissing(v));
+    const labels = t.rows.map((r) => (r[group] ?? "").trim()).filter((v) => !isMissingLabel(v));
     const spell = new Map<string, Set<string>>();
     for (const r of t.rows) {
       const raw = r[group] ?? "";
-      if (isMissing(raw)) continue;
+      if (isMissingLabel(raw)) continue;
       const k = raw.trim().toLowerCase().replace(/\s+/g, " ");
       spell.set(k, (spell.get(k) ?? new Set()).add(raw));
     }
@@ -290,7 +305,7 @@ export function checkTable(t: Table, source: string): DataCheck {
     const count = new Map<string, Set<string>>();
     t.rows.forEach((r, i) => {
       const g = (r[group] ?? "").trim();
-      if (isMissing(g)) return;
+      if (isMissingLabel(g)) return;
       const u = unitCol >= 0 ? (r[unitCol] ?? "").trim() : "";
       count.set(g, (count.get(g) ?? new Set()).add(u && !isMissing(u) ? `id\u0001${u}` : `row\u0001${i}`));
     });

@@ -367,6 +367,7 @@ ul.dirs li button .dim { margin-left: 6px; }
     </div>
     <div id="localbox" class="hidden"><div id="models"></div></div>
     <p class="cardmsg" id="setuperr" role="alert"></p>
+    <div class="row"><button type="button" class="btn quiet" data-page-go="start">Leave setup</button></div>
     <p class="dim small">Model now: <span id="setupmodel"></span></p>
   </div>
   <div class="panel hidden" id="checkpanel">
@@ -561,7 +562,7 @@ function focusCard() {
   const card = activeCard();
   for (const c of document.querySelectorAll("#cards [data-card]")) c.classList.toggle("active", c === card);
   if (!card) return;
-  if (card !== cardEl) { cardEl = card; cardAt = Date.now(); }
+  if (card.dataset.card !== cardEl) { cardEl = card.dataset.card; cardAt = Date.now(); }
   const bs = optionButtons(card);
   markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
   const a = document.activeElement;
@@ -575,7 +576,7 @@ document.addEventListener("keydown", (e) => {
   if (document.querySelector("dialog[open]")) return;
   const card = activeCard();
   if (!card) return;
-  if (card === cardEl && Date.now() - cardAt < 400) return;
+  if (card.dataset.card === cardEl && Date.now() - cardAt < 400) return;
   const bs = optionButtons(card);
   let i = Number(card.dataset.sel || 0);
   if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }
@@ -974,6 +975,7 @@ async function useLocal(m) {
   } catch (e) { $("setuperr").textContent = e.message; }
 }
 $("savekey").addEventListener("click", async () => {
+  if (!$("setupkey").value.trim()) { $("setuperr").textContent = "You typed no key. Paste the key, or choose the local model."; return; }
   $("setuperr").textContent = "Checking the key...";
   try {
     const r = await call("api/firststart/claude", { key: $("setupkey").value });

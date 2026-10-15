@@ -90,3 +90,79 @@ test("a value for another target in a later clause is not the value of the setti
   expect(namesValue("Set window, then use 7 for the threshold", window, 7)).toBe(false);
   expect(namesValue("Do not use window 5, use 7", window, 7)).toBe(true);
 });
+
+const cells = { key: "min_cells", label: "Min cells" };
+const minimum = { key: "min_cells", label: "Minimum cells" };
+const oldWindow = { key: "window", label: "Window" };
+const threads = { key: "threads", label: "Threads" };
+const tree = { key: "tree_depth", label: "Tree depth" };
+
+test("a negation earlier in the same sentence makes a card", () => {
+  const card = (text: string, field: typeof cells, value: number, others = [threads]) => expect(namesValue(text, field, value, others), `${text} (${value})`).toBe(false);
+  card("Do not change the old runs window to 5", oldWindow, 5);
+  card("Do not bother to set the old runs window to 5", oldWindow, 5);
+  card("Do not set the old runs window to 5", oldWindow, 5);
+  card("I do not want to set the minimum cells to 5", minimum, 5);
+  card("Do not rerun to change the min cells to 5; use 10 threads", cells, 5);
+  card("Do not rerun to change the min cells to 5; use 10 threads", cells, 10);
+  card("Do not set min cells to 5, set the others to 10.", cells, 10);
+  card("Do not set min cells to 5, set everything else to 10.", cells, 10);
+  card("use 10 threads min cells as before", cells, 10);
+  card("Do not set min cells to 5, run 10 in parallel.", cells, 10);
+  card("Do not set min cells to 5, use 10 as the threads value.", cells, 10);
+  card("Do not set min cells to 5, use 10 of the 16 cores.", cells, 10);
+  card("Do not set min cells to 5, use 10 or more threads.", cells, 10);
+  card("Do not set min cells to 5, use 10 on the threads.", cells, 10);
+  card("Do not set min cells to 5, use 10 threads", cells, 10);
+  card("Do not set min cells to 5, use 10 please", cells, 10);
+  card("Do not set min cells to 5. Use 10 for the threads", cells, 10);
+  card("No need to rerun to set min cells to 5, use 10", cells, 10);
+  card("No need to rerun to set min cells to 5, use 10", cells, 5);
+  card("Do not set min cells to 5 and threads to 10", cells, 5);
+  card("Do not set min cells to 5 and threads to 10", threads as typeof cells, 10, [cells]);
+  card("Set min cells to 5 instead of 10", cells, 10);
+  card("min cells: 5, not 10", cells, 10);
+  card("min cells: 5 (not 10)", cells, 10);
+  card("Don't, under any circumstances, set alpha to 0.1", alpha, 0.1, []);
+});
+
+test("a retry in its own clause for the same setting applies, and a statement of doubt does not block", () => {
+  const apply = (text: string, field: typeof cells, value: number, others = [threads]) => expect(namesValue(text, field, value, others), `${text} (${value})`).toBe(true);
+  apply("Do not worry about the old runs window 5", oldWindow, 5, []);
+  apply("Use alpha 0.05 instead of 0.1", alpha, 0.05, []);
+  apply("Set minimum cells to 5 for 10 samples", minimum, 5);
+  apply("Set Minimum cells to 42 and Tree depth to 521", minimum, 42, [tree]);
+  apply("Set Minimum cells to 42 and Tree depth to 521", tree as typeof cells, 521, [minimum]);
+  apply("Set min cells to 5.", cells, 5);
+  apply("Do not set min cells to 5, use 10", cells, 10);
+  apply("Do not set min cells to 5, use 10.", cells, 10);
+  apply("Do not set min cells to 5, set to 10.", cells, 10);
+  apply("Do not set min cells to 5, use 10 min cells", cells, 10);
+  apply("Do not set min cells to 1,000, use 500", cells, 500);
+  apply("I don't have replicates so use window 5", oldWindow, 5, []);
+});
+
+test("a cause word, an abbreviation or a bullet does not end the reach of an opening negation wrongly", () => {
+  const window5 = { key: "window", label: "Window" };
+  const no = (text: string, field: typeof alpha, value: number, others: (typeof alpha)[] = []) => expect(namesValue(text, field, value, others), text).toBe(false);
+  const yes = (text: string, field: typeof alpha, value: number, others: (typeof alpha)[] = []) => expect(namesValue(text, field, value, others), text).toBe(true);
+  no("Do not, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Do not, since it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Do not, while the old runs stay, set alpha to 0.1", alpha, 0.1);
+  no("Do not, per Dr. Smith, set window to 5", window5, 5);
+  no("Do not, per Prof. Smith vs. Jones, set window to 5", window5, 5);
+  no("Do not, see Fig. 2, set window to 5", window5, 5);
+  no("Do not, as in No. 3, set window to 5", window5, 5);
+  no("Do not, per Smith et al. set window to 5", window5, 5);
+  no("Do not touch the plots. set window to 5", window5, 5);
+  yes("Do not touch the plots. Set window to 5", window5, 5);
+  yes("- Do not change alpha\n- Set min cells to 5", cells, 5, [alpha]);
+  no("Cannot, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("You cannot, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("You could not, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Please would not, since it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  yes("I don't have replicates, use window 5", window5, 5);
+  no("Skip QC, set min cells to 5", cells, 5);
+  no("Without rerunning, set window to 5", window5, 5);
+  no("Except for sample 3, use window 5", window5, 5);
+});

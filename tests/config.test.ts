@@ -63,3 +63,26 @@ test("a value of the wrong type gives a note in the session record", async () =>
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("a saved model that is not a model spec stops the start with the setting name and the fix", async () => {
+  const home = (process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-config-home-")));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-config-"));
+  writeFileSync(join(home, "settings.json"), JSON.stringify({ model: "gpt4" }));
+  await expect(Session.create({ adapters: [], cwd })).rejects.toThrow(`The setting model has the value "gpt4" in ${join(home, "settings.json")}. Use claude, claude:<id>, ollama:<model>, openai:<url>|<model>, or fake:<file>. Run: cuvette config set model <name>`);
+  writeFileSync(join(home, "settings.json"), JSON.stringify({ referee: "gpt4" }));
+  await expect(Session.create({ adapters: [], cwd, provider: new FakeProvider([]) })).rejects.toThrow('The setting referee has the value "gpt4" in ');
+  const s = await Session.create({ adapters: [], cwd, provider: new FakeProvider([]), referee: "none" });
+  await s.close();
+});
+
+test("the start error names the project scope and the file when the project settings hold the bad model", async () => {
+  const home = (process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-config-home-")));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-config-"));
+  writeFileSync(join(home, "settings.json"), JSON.stringify({ model: "claude" }));
+  mkdirSync(join(cwd, ".cuvette"));
+  const file = join(cwd, ".cuvette", "settings.json");
+  writeFileSync(file, JSON.stringify({ model: "gpt4" }));
+  trustFolder(cwd);
+  await expect(Session.create({ adapters: [], cwd })).rejects.toThrow(`The setting model has the value "gpt4" in ${file}.`);
+  await expect(Session.create({ adapters: [], cwd })).rejects.toThrow("Run: cuvette config set model <name> --project");
+});

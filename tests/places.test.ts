@@ -1,12 +1,27 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, rmSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { createServer } from "node:http";
+import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 import { join, sep } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vitest";
-import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug, titlePlace } from "../src/core/places.ts";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { COPY_LIMIT_BYTES, discardPlace, findPlace, listPlaces, readIndex, slug, titlePlace } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { trustFolder } from "../src/core/trust.ts";
+
+const lockAtDiscard: boolean[] = [];
+vi.mock("../src/core/places.ts", async (original) => {
+  const real = await original<typeof import("../src/core/places.ts")>();
+  return {
+    ...real,
+    discardPlace: (p: import("../src/core/places.ts").Place) => {
+      lockAtDiscard.push(existsSync(join(p.recordDir, "open.json")));
+      real.discardPlace(p);
+    },
+  };
+});
 
 let session: Session | undefined;
 let home = "";
@@ -235,4 +250,115 @@ test("a failed rename of the results folder carries the renameFailed mark", () =
     err = e;
   }
   expect((err as { renameFailed?: boolean }).renameFailed).toBe(true);
+});
+
+test("a start that fails leaves no provisional folder and no index row", async () => {
+  const cwd = project();
+  for (const bad of [{ adapters: ["no-such-adapter"], provider: new FakeProvider([]) }, { adapters: [], model: "gpt4" }]) {
+    await expect(Session.create({ ...bad, cwd, settings: { guidance: false, referee: "none" } })).rejects.toThrow();
+    expect(readdirSync(join(cwd, "cuvette")).filter((n) => n.startsWith(".new-"))).toEqual([]);
+    expect(readIndex()).toEqual([]);
+  }
+});
+
+test("a session that closes with no request leaves no provisional folder and no index row", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(readIndex()).toHaveLength(1);
+  await session.close();
+  session = undefined;
+  expect(readdirSync(join(cwd, "cuvette")).filter((n) => n.startsWith(".new-"))).toEqual([]);
+  expect(readIndex()).toEqual([]);
+});
+
+test("a session with a request keeps its folder and index row after it closes", async () => {
+  const cwd = project();
+  const s = await analysed(cwd);
+  const id = s.id;
+  await s.close();
+  session = undefined;
+  expect(readIndex().map((r) => r.id)).toEqual([id]);
+  expect(findPlace(id, { cwd })?.id).toBe(id);
+});
+
+test("a close holds the session lock while it removes the empty folder", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  lockAtDiscard.length = 0;
+  await session.close();
+  session = undefined;
+  expect(lockAtDiscard).toEqual([true]);
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("the index row stays when the empty folder cannot be removed", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const place = findPlace(session.id, { cwd })!;
+  const parent = join(place.outDir, "..");
+  chmodSync(parent, 0o500);
+  try {
+    expect(() => discardPlace(place)).not.toThrow();
+    expect(existsSync(place.outDir)).toBe(true);
+    expect(readIndex().map((r) => r.id)).toEqual([session.id]);
+  } finally {
+    chmodSync(parent, 0o700);
+  }
+});
+
+async function interruptDuringStart(extra: string) {
+  const cwd = project();
+  const held: import("node:http").ServerResponse[] = [];
+  const server = createServer((_, res) => void held.push(res));
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const host = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const code = `import { Session } from ${JSON.stringify(join(__dirname, "../src/core/session.ts"))}; ${extra} Session.create({ adapters: [], model: "ollama:slow", cwd: ${JSON.stringify(cwd)}, settings: { guidance: false, referee: "none" } });`;
+  const child = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, CUVETTE_HOME: home, OLLAMA_HOST: host }, stdio: "ignore" });
+  const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  const root = join(cwd, "cuvette");
+  const started = () => existsSync(root) && readdirSync(root).some((n) => n.startsWith(".new-")) && held.length > 0;
+  for (let i = 0; i < 600 && !started(); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(started()).toBe(true);
+  child.kill("SIGINT");
+  const code2 = await exit;
+  server.closeAllConnections();
+  await new Promise((r) => server.close(r));
+  return { code: code2, left: readdirSync(root).filter((n) => n.startsWith(".new-")) };
+}
+
+test.skipIf(process.platform === "win32")("Ctrl+C with another SIGINT handler lets that handler end the process", async () => {
+  const r = await interruptDuringStart(`process.on("SIGINT", () => setTimeout(() => process.exit(0), 500));`);
+  expect(r.code).toBe(0);
+  expect(r.left).toEqual([]);
+  expect(readIndex()).toEqual([]);
+}, 60_000);
+
+test.skipIf(process.platform === "win32")("Ctrl+C while a session starts removes the provisional folder and the index row", async () => {
+  const cwd = project();
+  const held: import("node:http").ServerResponse[] = [];
+  const server = createServer((_, res) => void held.push(res));
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const host = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const code = `import { Session } from ${JSON.stringify(join(__dirname, "../src/core/session.ts"))}; Session.create({ adapters: [], model: "ollama:slow", cwd: ${JSON.stringify(cwd)}, settings: { guidance: false, referee: "none" } });`;
+  const child = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, CUVETTE_HOME: home, OLLAMA_HOST: host }, stdio: "ignore" });
+  const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  const root = join(cwd, "cuvette");
+  const started = () => existsSync(root) && readdirSync(root).some((n) => n.startsWith(".new-")) && held.length > 0;
+  for (let i = 0; i < 600 && !started(); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(started()).toBe(true);
+  child.kill("SIGINT");
+  expect(await exit).toBe(130);
+  server.closeAllConnections();
+  await new Promise((r) => server.close(r));
+  expect(readdirSync(root).filter((n) => n.startsWith(".new-"))).toEqual([]);
+  expect(readIndex()).toEqual([]);
+}, 60_000);
+
+test("a missing provisional folder keeps its index row, so the list shows it as moved", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const place = findPlace(session.id, { cwd })!;
+  const id = session.id;
+  rmSync(place.outDir, { recursive: true, force: true });
+  discardPlace(place);
+  expect(readIndex().map((r) => r.id)).toEqual([id]);
 });

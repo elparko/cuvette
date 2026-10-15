@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
@@ -40,6 +40,29 @@ beforeAll(() => {
 });
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+test("cuvette key saves the key and warns when ANTHROPIC_API_KEY is set", () => {
+  const key = "sk-ant-api03-abcdefghijklmnop-WXYZ";
+  const run = (envKey: string) => {
+    const h = home();
+    const r = spawnSync("node", [CUVETTE, "key"], { cwd: project, env: { ...process.env, CUVETTE_HOME: h, ANTHROPIC_API_KEY: envKey, ANTHROPIC_BASE_URL: "http://127.0.0.1:1", TMPDIR: root }, input: `${key}\n`, encoding: "utf8", timeout: 60_000 });
+    return { out: r.stdout, saved: readFileSync(join(h, "credentials.json"), "utf8") };
+  };
+  const set = run("sk-ant-other");
+  expect(set.saved).toContain(key);
+  expect(set.out).toContain("This shell also has ANTHROPIC_API_KEY. Cuvette uses that one first.");
+  expect(run("").out).not.toContain("ANTHROPIC_API_KEY");
+}, 90_000);
+
+test("an unknown --mode stops with the list of modes and starts no session", () => {
+  const h = home();
+  for (const args of [["-p", "Give the mean of x", "--mode", "foo", "--model", "fake:"], ["--mode", "foo"]]) {
+    const r = cli(h, args);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('Unknown mode "foo". Use one of: watch, follow, teach, plan.');
+  }
+  expect(existsSync(join(h, "sessions-index.json"))).toBe(false);
+});
 
 test("a run with an answer exits 0, and its script, flow and replay give the same numbers", () => {
   const h = home();
@@ -282,6 +305,28 @@ describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-termin
     expect(r.out).not.toContain("ollama:9");
   }, 60_000);
 
+  test("empty input at the first start gives a message, and q quits with nothing saved", async () => {
+    const h = ptyHome();
+    const r = await drive([["Type 1 or 2", "\r"], ["You typed nothing(.|\\n)*Type 1 or 2", "x\r"], ["is not a choice(.|\\n)*Type 1 or 2", "q\r"]], cleanEnv(h), join(h, "proj"));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("You typed nothing. Type 1 for Claude, 2 for a local model, or q to quit.");
+    expect(r.out).toContain('"x" is not a choice.');
+    expect(r.out).toContain("Cuvette saved nothing.");
+    expect(existsSync(join(h, "cv", "credentials.json"))).toBe(false);
+    const h2 = ptyHome();
+    const k = await drive([["Type 1 or 2", "1\r"], ["Paste", "\r"], ["You typed nothing. Paste the key(.|\\n)*Paste", "q\r"]], cleanEnv(h2), join(h2, "proj"));
+    expect(k.code).toBe(0);
+    expect(k.out).toContain("You typed nothing. Paste the key, type ? for help, or type q to quit.");
+    expect(k.out).toContain("ant auth login");
+  }, 60_000);
+
+  test("input that ends at the first start stops with a message and does not loop", async () => {
+    const h = ptyHome();
+    const r = await drive([["Type 1 or 2", "\x04"]], cleanEnv(h), join(h, "proj"));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("You typed nothing three times.");
+  }, 60_000);
+
   test("NO_COLOR gives a terminal app with no color codes", async () => {
     const h = ptyHome();
     const r = await drive([["Ask for an analysis step", "\x03\x03"]], cleanEnv(h, { NO_COLOR: "1" }), join(h, "proj"), ["--model", "fake:"]);
@@ -315,4 +360,9 @@ test("headless text output keeps the rest of an answer after a stray control int
   const r = cli(h, ["-p", "Give the mean of x", "--adapter", "drivefix", "--model", model, "--trust-folder"]);
   expect(r.out).toContain("middle text");
   expect(r.out).toContain("End");
+});
+
+test("the help line for cuvette status names the --adapter option", () => {
+  const r = cli(home(), ["--help"]);
+  expect(r.out).toMatch(/cuvette status \[session\] \[--adapter <folder>\]/);
 });

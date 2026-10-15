@@ -1,4 +1,6 @@
 import itertools
+import functools
+import inspect
 import os
 import warnings
 
@@ -24,14 +26,26 @@ def _fail(message):
     return {"ok": False, "error": message}
 
 
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
+
+
+def _typed(path, enc):
+    frame = pd.read_csv(path, encoding=enc)
+    raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+    for column in frame.columns:
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+    return frame
+
+
 def _read(path):
     path = os.path.expanduser(path)
     for enc in ("utf-8-sig", "cp1252"):
         try:
-            return pd.read_csv(path, encoding=enc)
+            return _typed(path, enc)
         except UnicodeDecodeError:
             pass
-    return pd.read_csv(path, encoding="latin-1")
+    return _typed(path, "latin-1")
 
 
 def _need(frame, columns):
@@ -122,6 +136,31 @@ def _cell_comparisons(d, outcome, factors, mse, df_resid, compare_within, method
     return out
 
 
+def _note_missing_group(*arguments):
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            if not isinstance(result, dict) or not result.get("ok"):
+                return result
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            bound.apply_defaults()
+            columns = []
+            for name in arguments:
+                value = bound.arguments.get(name)
+                columns += [value] if isinstance(value, str) else list(value or [])
+            frame = _read(bound.arguments["path"])
+            columns = [c for c in columns if c in frame.columns]
+            dropped = int(frame[columns].isna().any(axis=1).sum()) if columns else 0
+            result.setdefault("metrics", {})["n_dropped_missing_group"] = dropped
+            if dropped:
+                result["summary"] = result.get("summary", "") + " %d %s no group and %s left out." % (dropped, "row has" if dropped == 1 else "rows have", "is" if dropped == 1 else "are")
+            return result
+        return run
+    return wrap
+
+
+@_note_missing_group("factors")
 def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compare_within=None, alpha=0.05):
     factors = _list(factors)
     if len(factors) < 2:
@@ -171,17 +210,19 @@ def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compar
     full = int(np.prod([d[f].nunique() for f in factors]))
     balanced = bool(counts.nunique() == 1 and len(counts) == full)
     metrics = {"n": len(d), "n_dropped": dropped, "df_residual": df_res, "mse": mse, "n_cells": int(len(counts)), "balanced": int(balanced)}
+    term_keys = []
     for r in out.itertuples():
         if r.term == "Residual":
             continue
         k = _key(r.term.replace(" x ", "_x_"))
         metrics["F_" + k] = float(r.F)
         metrics["p_" + k] = float(r.p)
+        term_keys.append("p_" + k)
         metrics["df_" + k] = float(r.df)
     levene = stats.levene(*[g[outcome].values for _, g in d.groupby(factors, observed=True)], center="mean")
     metrics["levene_p"] = float(levene.pvalue)
     result = {"ok": True, "metrics": metrics,
-              "data": {"ss_type": ss_type, "factors": factors, "balanced": balanced, "alpha": alpha, "posthoc": posthoc},
+              "data": {"ss_type": ss_type, "factors": factors, "balanced": balanced, "alpha": alpha, "posthoc": posthoc, "p_terms": term_keys},
               "table": _table(out, "anova_factorial")}
     summary = "%d-way ANOVA of %s (type %s sums of squares, n = %d%s, %s design): %s. Residual df %g. Levene p = %s." % (
         len(factors), outcome, {1: "I", 2: "II", 3: "III"}[ss_type], len(d), ", %d rows dropped for a missing value" % dropped if dropped else "",
@@ -219,6 +260,7 @@ def anova_factorial(path, outcome, factors, ss_type=None, posthoc="none", compar
     return result
 
 
+@_note_missing_group("between")
 def anova_repeated(path, outcome, within, subject, between=None, correction=None, alpha=0.05):
     if correction not in ("greenhouse-geisser", "none", "auto"):
         return _fail("correction is missing or not known. Use greenhouse-geisser, none or auto. The sphericity correction is a decision.")
@@ -270,12 +312,14 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
     n_subj = int(d[subject].nunique())
     metrics = {"F": F, "df_effect": df1, "df_error": df2, "p_uncorrected": p_unc, "epsilon_gg": eps, "p_gg": p_gg, "p_reported": p_rep,
                "mauchly_W": W, "mauchly_p": p_spher, "n_subjects": n_subj, "n_levels": levels, "n_subjects_removed": incomplete}
+    p_terms = ["p_reported"]
     summary = "Repeated-measures ANOVA of %s over %s (%d levels, %d subjects): F(%g, %g) = %.4g, p = %s uncorrected; Greenhouse-Geisser epsilon %.4f, corrected df %.3g and %.4g, p = %s. Mauchly W = %.4g, p = %s. Reported (%s): p = %s." % (
         outcome, within, levels, n_subj, df1, df2, F, _fmt_p(p_unc), eps, df1 * eps, df2 * eps, _fmt_p(p_gg), W, _fmt_p(p_spher),
         "Greenhouse-Geisser" if use_gg else "no correction", _fmt_p(p_rep))
     if between:
         metrics.update({"F_between": float(brow["F"]), "p_between": float(brow["p_unc"]), "df_between": float(brow["DF1"]),
-                        "F_interaction": Fi, "p_interaction": pi, "p_interaction_gg": pi_gg})
+                        "F_interaction": Fi, "p_interaction": pi, "p_interaction_gg": pi_gg, "p_interaction_reported": pi_gg if use_gg else pi})
+        p_terms += ["p_between", "p_interaction_reported"]
         summary += " Between-subject factor %s: F(%g, %g) = %.4g, p = %s. Interaction: F = %.4g, p = %s (GG %s)." % (
             between, float(brow["DF1"]), float(brow["DF2"]), float(brow["F"]), _fmt_p(float(brow["p_unc"])), Fi, _fmt_p(pi), _fmt_p(pi_gg))
     summary += note
@@ -294,10 +338,11 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
     ax.set_ylabel(outcome)
     ax.set_title("Each line is one subject", fontsize=8)
     return {"ok": True, "summary": summary, "metrics": metrics,
-            "data": {"correction": correction, "used_greenhouse_geisser": bool(use_gg), "alpha": alpha},
+            "data": {"correction": correction, "used_greenhouse_geisser": bool(use_gg), "alpha": alpha, "p_terms": p_terms},
             "table": _table(table.round(10), "anova_repeated"), "outputs": _save(fig, "repeated_measures")}
 
 
+@_note_missing_group("group")
 def kruskal_dunn(path, outcome, group, p_adjust=None, alpha=0.05):
     if p_adjust not in ADJUST:
         return _fail("p_adjust is missing or not known. Use bonferroni, holm, sidak, fdr_bh or none. The correction is a decision.")
@@ -395,6 +440,7 @@ def friedman_test(path, outcome, within, subject, p_adjust=None, alpha=0.05):
             "table": _table(post, "friedman_pairs"), "outputs": _save(fig, "friedman")}
 
 
+@_note_missing_group("group")
 def rank_test(path, outcome, group, paired=False, id_column=None, alternative="two-sided", method=None):
     if method not in ("exact", "asymptotic"):
         return _fail("method is missing or not exact or asymptotic. The p value method is a decision.")
@@ -407,6 +453,7 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         return _fail("The group column must have exactly 2 levels. It has %d: %s." % (len(levels), levels))
     first, second = levels
     note = ""
+    approximated = method != "exact"
     if paired:
         if not id_column:
             return _fail("A paired rank test needs id_column, the column that names the same subject in both groups.")
@@ -420,6 +467,7 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         ties = len(diff) - len(np.unique(np.abs(diff[diff != 0])))
         if method == "exact" and (zeros or ties > 0):
             note += " The differences have %d zeros and %d tied absolute values, so scipy cannot give an exact p; it used the normal approximation." % (zeros, max(ties, 0))
+            approximated = True
             res = stats.wilcoxon(diff, alternative=alternative, method="approx", correction=True)
         else:
             res = stats.wilcoxon(diff, alternative=alternative, method="exact" if method == "exact" else "approx", correction=method != "exact")
@@ -435,13 +483,14 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         if method == "exact" and tied:
             note = " The data have %d tied values, so scipy cannot give an exact p; it used the normal approximation." % tied
             m = "asymptotic"
+            approximated = True
         res = stats.mannwhitneyu(x, y, alternative=alternative, method=m, use_continuity=True)
         name, n1, n2 = "Mann-Whitney U test", len(y), len(x)
         stat_name = "U of the second group (R calls it W)"
         statistic = float(res.statistic)
         estimate = float(np.median(np.subtract.outer(x, y)))
     p = float(res.pvalue)
-    used = "exact" if method == "exact" and not note else "normal approximation with continuity correction"
+    used = "exact" if not approximated else "normal approximation with continuity correction"
     summary = "%s of %s, %s against %s, %s, %s p: %s = %.4g, p = %s. Estimate (%s): %.4g.%s" % (
         name, outcome, second, first, alternative, used, stat_name, statistic, _fmt_p(p),
         "median of the paired differences" if paired else "Hodges-Lehmann shift, second minus first", estimate, note)

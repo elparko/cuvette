@@ -90,11 +90,22 @@ def _figure_outputs(png, svg):
     return [{"path": png, "kind": "image", "name": os.path.basename(png)}, {"path": svg, "kind": "file", "name": os.path.basename(svg)}]
 
 
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
+
+
+def _keep_labels(frame, raw):
+    for column in frame.columns:
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+    return frame
+
+
 def load(path, sheet=None):
     path = os.path.expanduser(path)
     if path.lower().endswith((".xlsx", ".xlsm")):
-        return pd.read_excel(path, sheet_name=sheet or 0)
-    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",")
+        return _keep_labels(pd.read_excel(path, sheet_name=sheet or 0), pd.read_excel(path, sheet_name=sheet or 0, keep_default_na=False))
+    sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
+    return _keep_labels(pd.read_csv(path, sep=sep), pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False))
 
 
 def _need(frame, cols):

@@ -69,7 +69,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   };
 
   const saveKey = async () => {
-    if (checking || !key.trim()) return;
+    if (checking) return;
+    if (!key.trim()) return say("You typed no key. Paste the key, or choose the local model.", true);
     setChecking(true);
     say("Checking the key…");
     try {
@@ -141,7 +142,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                   className="pl-9 font-mono"
                 />
               </div>
-              <Button onClick={saveKey} disabled={checking || !key.trim()}>
+              <Button onClick={saveKey} disabled={checking}>
                 Save the key
               </Button>
             </div>
@@ -199,6 +200,11 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
           <p className={cn("mt-3 text-sm", bad && "text-bad")} role={bad ? "alert" : "status"}>
             {msg}
           </p>
+        )}
+        {!done && (
+          <Button variant="ghost" size="sm" className="mt-3" onClick={() => ctx.go("start")}>
+            Leave setup
+          </Button>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
           Model now: <span className="font-mono break-all text-foreground">{model}</span>

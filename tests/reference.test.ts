@@ -68,7 +68,15 @@ test("referenceValues takes the exact sample name before a longer name that cont
   writeFileSync(p, "sample,count\nmouse10,99\nmouse11,7\n");
   expect(referenceValues({ path: p, mode: "compare" }, "mouse1")).toBeUndefined();
   writeFileSync(p, "sample,count\nctrl,1\nctrl1,2\n");
-  expect(referenceValues({ path: p, mode: "compare" }, "ctrl1_rep2")).toEqual({ count: 2 });
+  expect(referenceValues({ path: p, mode: "compare" }, "ctrl1_rep2")).toBeUndefined();
+});
+
+test("referenceValues does not match a sample to a longer name that contains it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-ref-substring-"));
+  const p = join(dir, "ref.csv");
+  writeFileSync(p, "sample,count\nS10,99\n");
+  expect(referenceValues({ path: p, mode: "compare" }, "S1")).toBeUndefined();
+  expect(referenceValues({ path: p, mode: "compare" }, " s 10.TIF")).toEqual({ count: 99 });
 });
 
 test("readTable reads a semicolon file with decimal commas and a quoted comma", () => {
@@ -127,4 +135,9 @@ test("a file added in the same step of the modification time is found: a folder 
   writeFileSync(join(root, "b_counts.csv"), "sample,count\nwell_b,4\n");
   utimesSync(root, was, was);
   expect(findReferences([root], ["counts"]).map((c) => c.path).sort()).toEqual([join(root, "a_counts.csv"), join(root, "b_counts.csv")]);
+});
+
+test("the comparison line keeps the integer digits of a number", () => {
+  expect(compareLine("area", 12345.67, 20000.5, "Area")).toContain("the agent got 12346;");
+  expect(compareLine("area", 12345.67, 20000.5, "Area")).toContain('says 20001');
 });

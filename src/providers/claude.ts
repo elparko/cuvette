@@ -12,6 +12,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const NO_CREDENTIALS = "No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.";
+const NO_CREDENTIALS_HEADLESS = "No valid Claude credentials. Run cuvette key, or set ANTHROPIC_API_KEY.";
 
 export interface ClaudeOpts {
   apiKey?: string;
@@ -21,11 +22,17 @@ export interface ClaudeOpts {
   sleep?: Sleep;
   retries?: number;
   cache?: "off" | "5m" | "1h";
+  headless?: boolean;
 }
 
-function mapError(e: unknown, model: string): unknown {
+function written(text: string): string {
+  return text.replace(/[\x00-\x1f\x7f-\x9f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+}
+
+function mapError(e: unknown, model: string, headless = false): unknown {
+  const none = headless ? NO_CREDENTIALS_HEADLESS : NO_CREDENTIALS;
   if (e instanceof Anthropic.APIUserAbortError) return e;
-  if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${NO_CREDENTIALS} The API said: ${e.message}`);
+  if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${none} The API said: ${e.message}`);
   if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return new ProviderError(keyApiProblem(e.status, e.message));
   if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message} ${keyApiProblem(403)}`);
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
@@ -42,7 +49,7 @@ function mapError(e: unknown, model: string): unknown {
   if ((e as any)?.partial === true) return new ProviderError("The Claude API stopped the reply before the end.", true);
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
-  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
+  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(/^Could not resolve authentication method/.test(e.message) ? none : `${none} Detail: ${written(e.message)}`);
   return e;
 }
 
@@ -93,6 +100,7 @@ function toolResultContent(text: string, images: { media: string; data: string }
 export class ClaudeProvider implements Provider {
   info: ModelInfo;
   private fixedClient: any;
+  private headless = false;
   private apiKey?: string;
   private made?: { client: any; version: number };
   private effort: string;
@@ -107,6 +115,7 @@ export class ClaudeProvider implements Provider {
     this.effort = opts.effort && opts.effort !== "auto" ? opts.effort : model === "claude-haiku-5-5" ? "medium" : "high";
     this.display = opts.showThinking === false ? "omitted" : "summarized";
     this.fixedClient = opts.client;
+    this.headless = !!opts.headless;
     this.apiKey = opts.apiKey;
     this.sleep = opts.sleep;
     this.retries = opts.retries ?? RETRIES;
@@ -219,7 +228,7 @@ export class ClaudeProvider implements Provider {
         } else throw e;
       }
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.headless);
     }
     const out = this.fromNative(msg);
     if (!this.fixedClient) recordSpend(this.model, out.usage);
@@ -257,10 +266,10 @@ export class ClaudeProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean }): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean; maxTokens?: number }): Promise<string> {
     const params = {
       model: this.model,
-      max_tokens: 16000,
+      max_tokens: opts?.maxTokens ?? 16000,
       system: [{ type: "text", text: system }],
       messages: [{ role: "user", content: text }],
       thinking: { type: "adaptive", display: "omitted" },
@@ -275,7 +284,7 @@ export class ClaudeProvider implements Provider {
       if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.");
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.headless);
     }
   }
 
@@ -285,7 +294,7 @@ export class ClaudeProvider implements Provider {
       const r = await this.client.messages.countTokens({ model: this.model, system: p.system, messages: p.messages, tools: p.tools });
       return r.input_tokens;
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.headless);
     }
   }
 }
