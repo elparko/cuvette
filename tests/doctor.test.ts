@@ -333,8 +333,8 @@ test("a login from ant auth login counts as a Claude credential, so Cuvette can 
   const none = await runDoctor(base({ env, fetch: ollamaDown }));
   expect(byId(none, "claude-key").status).toBe("missing");
   expect(canStart(none)).toBe(false);
-  mkdirSync(join(cfg, "credentials"), { recursive: true });
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  mkdirSync(join(cfg, "configs"), { recursive: true });
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   const some = await runDoctor(base({ env, fetch: ollamaDown }));
   expect(byId(some, "claude-key")).toMatchObject({ status: "ok", detail: "a login from ant auth login" });
   expect(canStart(some)).toBe(true);

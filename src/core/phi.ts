@@ -512,7 +512,7 @@ export function isCloud(info: Pick<ModelInfo, "provider"> & { local?: boolean })
 export function localUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname;
-    return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1" || h === "[::1]" || h.endsWith(".local") || /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h);
+    return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1" || h === "[::1]" || h === "::" || h === "[::]" || h.endsWith(".local") || /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h);
   } catch {
     return false;
   }

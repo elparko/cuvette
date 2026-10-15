@@ -456,6 +456,7 @@ async function app(folder?: string) {
   await new Promise<void>((done) => {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
+    process.once("SIGHUP", done);
   });
   const slow = setTimeout(() => console.log("Stopping. Press Ctrl+C again to quit now."), 1000);
   await stopApp(() => a.close());
