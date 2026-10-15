@@ -547,6 +547,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const answer = record.entries(["assistant"]).filter((e) => e.data.final).at(-1);
   if (answer) {
     const text = answerText(answer.data);
+    for (const line of String(answer.data.assumed ?? "").split("\n").filter((l) => l.startsWith("- "))) summary.push(["Assumption", line.slice(2), "", "text of the harness, not of the model"]);
     const seen = new Set<string>();
     for (const c of checkAnswer(text, record)) {
       if (c.value === null || seen.has(`${c.text}\u0000${c.value}`)) continue;

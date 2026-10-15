@@ -165,6 +165,13 @@ describe("databook", () => {
     expect(b.html).not.toMatch(/drug 2 <sup>/);
   });
 
+  it("shows the assumptions as text of the harness after the final answer", () => {
+    const r = session();
+    r.append("assistant", { text: "The mean is 1.58.", final: true, assumed: "Assumed because no answer was given:\n- Which sigma?: used sigma 2." });
+    const b = book([r]);
+    expect(b.html).toMatch(/Text of the harness, not of the model:[\s\S]*Which sigma\?: used sigma 2\./);
+  });
+
   it("collects every session of a project folder", () => {
     const project = mkdtempSync(join(tmpdir(), "cuvette-db-proj-"));
     session({ dir: join(project, "cuvette", "2026-10-08-sleep", ".record") });
