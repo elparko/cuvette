@@ -1,0 +1,24 @@
+name = "cuvette-inference"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+routes = [
+  { pattern = "api.cuvette.ai", custom_domain = true }
+]
+
+[vars]
+MARKUP = "1.25"
+SITE_URL = "https://cuvette.ai"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cuvette-inference"
+database_id = "REPLACE_WITH_DATABASE_ID"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
