@@ -629,7 +629,7 @@ async function send(text, now) {
 
 $("composer").addEventListener("submit", (e) => {
   e.preventDefault();
-  if (sugg.length && $("msg").value.indexOf(" ") < 0 && $("msg").value.startsWith("/")) { pickSuggest(suggSel); return; }
+  if (sugg.length && $("msg").value.indexOf(" ") < 0 && $("msg").value.startsWith("/") && !commands.some((c) => c.name === $("msg").value.slice(1))) { pickSuggest(suggSel); return; }
   const v = $("msg").value;
   $("msg").value = "";
   hideSuggest();

@@ -87,6 +87,18 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`document.activeElement.blur()`);
   });
 
+  test("Enter on an exact command name runs that command, not the first suggestion", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/send", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    await setText("#msg", "/program");
+    expect(await until(page, `document.querySelector("#cmd-list")`)).toBe(true);
+    await page.eval(`document.querySelector("#msg").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/send"))`)).toBe(true);
+    expect(await page.eval(`JSON.parse(window.__calls.find((c) => c.url.includes("api/send")).body).text`)).toBe("/program");
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/send")`);
+    await setText("#msg", "");
+    await page.eval(`document.activeElement.blur()`);
+  });
+
   test("a new question card does not take the focus from a header button", async () => {
     const notes = `document.querySelector('header button[aria-label$="the status notes"]')`;
     await page.eval(`${notes}.focus()`);

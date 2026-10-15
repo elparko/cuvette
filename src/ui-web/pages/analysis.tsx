@@ -491,7 +491,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   };
 
   const submit = (now = false) => {
-    if (sugg.length && text.startsWith("/") && !text.includes(" ")) return pick(sugg[sel]);
+    if (sugg.length && text.startsWith("/") && !text.includes(" ") && !commands.some((c) => c.name === text.slice(1))) return pick(sugg[sel]);
     const v = text;
     setText("");
     setSugg([]);
