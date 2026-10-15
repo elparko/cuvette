@@ -12,6 +12,7 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   round: (x, n = 0) => {
     const digits = num(n);
     const value = num(x);
+    if (!Number.isFinite(value)) return value;
     const [mantissa, exponent = "0"] = String(Math.abs(value)).split("e");
     const shifted = Math.round(Number(`${mantissa}e${Number(exponent) + digits}`));
     const [m2, e2 = "0"] = String(shifted).split("e");

@@ -78,3 +78,8 @@ test("round moves a half away from zero, as Excel does", () => {
   expect(evaluate("round(0, 2)")).toBe(0);
   expect(calculateTool().description).toContain("away from zero");
 });
+
+test("round keeps an infinite value", () => {
+  expect(evaluate("round(1/0, 2)")).toBe(Infinity);
+  expect(evaluate("round(-1/0)")).toBe(-Infinity);
+});
