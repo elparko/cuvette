@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { killTree, withoutSecrets } from "../adapters/kinds/common.ts";
 import { oneLine } from "./trust.ts";
 import type {
   Hook, HookEvent, PostToolUseInput, PostToolUseResult, PreAnswerInput, PreAnswerResult,
@@ -14,16 +15,43 @@ export type PreResult = PreToolUseResult & { errors?: string[] };
 
 const STOPPING = new Set(["deny", "block", "ask", "instruct"]);
 const TIMEOUT_MS = 30_000;
+const OUTPUT_CAP = 64 * 1024;
 
-type Runner = (input: any, signal?: AbortSignal) => Promise<{ result?: any; error?: string }>;
+type RunnerResult = { result?: any; error?: string; block?: string };
+type Runner = (input: any, signal?: AbortSignal) => Promise<RunnerResult>;
 
-function matches(matcher: string | undefined, name: unknown): boolean {
+function matches(matcher: string | undefined, name: unknown, event: HookEvent, reported: Set<string>, report?: (message: string) => void): boolean {
   if (!matcher || matcher === "*" || typeof name !== "string") return true;
   try {
     return new RegExp(matcher).test(name);
   } catch {
-    return false;
+    const key = `${event}\n${matcher}`;
+    if (!reported.has(key)) {
+      reported.add(key);
+      const fate = event === "PreToolUse" ? "The hook runs for every tool." : "The hook does not run.";
+      report?.(`The matcher "${oneLine(matcher)}" of a ${event} hook is not a valid regular expression. ${fate}`);
+    }
+    return event === "PreToolUse";
   }
+}
+
+function capture(stream: NodeJS.ReadableStream) {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const box = { cut: false, text: () => Buffer.concat(chunks).toString("utf8") };
+  stream.on("data", (d: Buffer) => {
+    if (box.cut) return;
+    const room = OUTPUT_CAP - size;
+    if (d.length > room) {
+      chunks.push(d.subarray(0, room));
+      size = OUTPUT_CAP;
+      box.cut = true;
+      return;
+    }
+    chunks.push(d);
+    size += d.length;
+  });
+  return box;
 }
 
 function normalize(raw: any): any {
@@ -44,7 +72,7 @@ function normalize(raw: any): any {
   return out;
 }
 
-function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
+function runCommand(hook: CommandHook, event: HookEvent, cwd: string, timeoutMs: number): Runner {
   const label = oneLine(hook.command.join(" "));
   return (input, signal) =>
     new Promise((resolve) => {
@@ -56,39 +84,45 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
         tool_name: input.tool,
         tool_input: input.args,
       };
-      let stdout = "";
-      let stderr = "";
       let settled = false;
-      const finish = (v: { result?: any; error?: string }) => {
+      const finish = (v: RunnerResult) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         signal?.removeEventListener("abort", onAbort);
         resolve(v);
       };
+      const failure = (error: string) => finish({ error, ...(event === "PreToolUse" ? { block: `Blocked: ${error}` } : {}) });
       const onAbort = () => {
-        child.kill("SIGKILL");
+        killTree(child.pid);
         finish({});
       };
-      const child = spawn(hook.command[0], hook.command.slice(1), { cwd, stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn(hook.command[0], hook.command.slice(1), {
+        cwd,
+        env: withoutSecrets(process.env),
+        stdio: ["pipe", "pipe", "pipe"],
+        detached: true,
+        windowsHide: true,
+      });
       const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        finish({ error: `Command hook "${label}" timed out after 30 s.` });
-      }, TIMEOUT_MS);
+        killTree(child.pid);
+        failure(`Command hook "${label}" timed out after ${timeoutMs / 1000} s.`);
+      }, timeoutMs);
       signal?.addEventListener("abort", onAbort, { once: true });
-      child.stdout.setEncoding("utf8");
-      child.stderr.setEncoding("utf8");
-      child.stdout.on("data", (d) => (stdout += d));
-      child.stderr.on("data", (d) => (stderr += d));
-      child.on("error", (err) => finish({ error: `Command hook "${label}" failed to start: ${oneLine(err.message)}` }));
+      const out = capture(child.stdout);
+      const err = capture(child.stderr);
+      child.on("error", (e) => failure(`Command hook "${label}" failed to start: ${oneLine(e.message)}`));
       child.stdin.on("error", () => {});
       child.on("close", (code) => {
+        const stderr = err.text();
+        const cutNote = err.cut ? " [cut at 64 KB]" : "";
         if (code === 2) {
-          const reason = oneLine(stderr.trim()) || "Blocked by a command hook.";
+          const reason = (oneLine(stderr.trim()) || "Blocked by a command hook.") + cutNote;
           return finish({ result: event === "PreToolUse" ? { decision: "deny", reason } : event === "Stop" ? { decision: "block", reason } : { additionalContext: reason } });
         }
-        if (code !== 0) return finish({ error: `Command hook "${label}" exited with code ${code}: ${oneLine(stderr.trim())}` });
-        const text = stdout.trim();
+        if (code !== 0) return finish({ error: `Command hook "${label}" exited with code ${code}: ${oneLine(stderr.trim())}${cutNote}` });
+        if (out.cut) return finish({ error: `Command hook "${label}" gave more than 64 KB of output. Cuvette cut it and ignored it.` });
+        const text = out.text().trim();
         if (!text) return finish({ result: {} });
         try {
           finish({ result: normalize(JSON.parse(text)) });
@@ -107,7 +141,10 @@ export class HookRunner {
     private hooks: Hook[],
     private commandHooks: Partial<Record<HookEvent, CommandHook[]>> = {},
     private cwd: string = process.cwd(),
+    private timeoutMs: number = TIMEOUT_MS,
   ) {}
+
+  private reportedMatchers = new Set<string>();
 
   onError?: (message: string) => void;
 
@@ -127,11 +164,11 @@ export class HookRunner {
 
   private runners(event: HookEvent, name: unknown): Runner[] {
     const builtin = this.hooks
-      .filter((h) => h.event === event && matches(h.matcher, name))
+      .filter((h) => h.event === event && matches(h.matcher, name, event, this.reportedMatchers, (m) => this.onError?.(m)))
       .map((h): Runner => async (input) => ({ result: await h.run(input) }));
     const commands = (this.commandHooks[event] ?? [])
-      .filter((h) => matches(h.matcher, name))
-      .map((h) => runCommand(h, event, this.cwd));
+      .filter((h) => matches(h.matcher, name, event, this.reportedMatchers, (m) => this.onError?.(m)))
+      .map((h) => runCommand(h, event, this.cwd, this.timeoutMs));
     return [...builtin, ...commands];
   }
 
@@ -140,10 +177,15 @@ export class HookRunner {
     const errors: string[] = [];
     let current = input;
     for (const run of this.runners("PreToolUse", input.tool)) {
-      const { result: r, error } = await run(current, signal);
+      const { result: r, error, block } = await run(current, signal);
       if (error) {
         errors.push(error);
         this.onError?.(error);
+      }
+      if (block && !signal?.aborted) {
+        merged.decision = "deny";
+        merged.reason = block;
+        break;
       }
       if (signal?.aborted) {
         merged.decision = "deny";

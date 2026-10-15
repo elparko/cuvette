@@ -290,6 +290,10 @@ Command hooks follow Claude Code. The command gets the input JSON on stdin. Exit
 stdout gives the result. Exit 2 gives a deny (PreToolUse) or a block (Stop), with stderr as the
 reason. The harness logs and ignores other exit codes.
 
+A command hook does not get environment variables with KEY, TOKEN, SECRET, PASSWORD, PASSWD or CREDENTIAL in the name. A
+PreToolUse hook that fails to start or runs past the time limit blocks the call. A matcher that is
+not a valid regular expression matches every tool for a PreToolUse hook. The harness skips a hook of any other event.
+
 Decision rules: a `setup` stage decision gets a value in `applySetup` (the default if the
 scientist gives none; the setup entry lists `defaultsAccepted`). A `when_needed` decision owned
 by `human` has no value until the scientist answers; `enforce` lists it in `waiting` for each

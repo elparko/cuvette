@@ -4,7 +4,7 @@ import { basename, delimiter, dirname, join, sep } from "node:path";
 import { oldHomePath } from "../core/old-names.ts";
 import { accessOf } from "./access.ts";
 import { adapterDirs, cuvetteHome, type Manifest } from "./manifest.ts";
-import { runProcess } from "./kinds/common.ts";
+import { runProcess, withoutSecrets } from "./kinds/common.ts";
 
 export interface Located {
   path?: string;
@@ -85,7 +85,7 @@ async function versionRun(m: Manifest, path: string | undefined, adapterDir: str
   const uses = l.version_command.some((a) => a.includes("{program_path}"));
   if (uses && !path) return { timedOut: false };
   const argv = l.version_command.map((a) => a.replaceAll("{program_path}", path ?? "").replaceAll("{adapter_dir}", adapterDir));
-  const r = await runProcess(argv, { timeoutMs, cwd: tmpdir() });
+  const r = await runProcess(argv, { timeoutMs, cwd: tmpdir(), env: withoutSecrets(process.env) });
   return { text: `${r.stdout}\n${r.stderr}`, timedOut: r.timedOut };
 }
 
