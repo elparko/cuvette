@@ -62,6 +62,13 @@ test("randomization and blinding decisions give Covered for the ARRIVE items", (
   expect(item(c, "1b").status).toBe("covered");
 });
 
+test("a decision number keeps every integer digit", () => {
+  const c = buildChecklist(recordWith({ sample_size: 12345.67 }), "arrive");
+  expect(item(c, "2a").value).toBe("sample_size = 12346");
+  const small = buildChecklist(recordWith({ sample_size: 12.34567 }), "arrive");
+  expect(item(small, "2a").value).toBe("sample_size = 12.35");
+});
+
 test("a record without randomization and blinding gives Not in the record", () => {
   const r = recordWith({ replicate: "animals" });
   const c = buildChecklist(r, "arrive");

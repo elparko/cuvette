@@ -53,7 +53,7 @@ const looksLikeCode = (s: string) => /\w\(.*\)|\w\[.*\]|\s=\s\w+\(|;\s*$|^\s*(im
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function cell(v: unknown): string {
-  if (typeof v === "number") return esc(Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(6))));
+  if (typeof v === "number") return esc(Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(Math.max(6, String(Math.trunc(Math.abs(v))).length)))));
   return esc(str(v));
 }
 
