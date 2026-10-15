@@ -3209,7 +3209,7 @@ test("resume restores a pilot that a pilot card change started from the approved
 function slowPython(delayS: number): string {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-slowpy-"));
   const exe = join(dir, "python");
-  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; esac\n`);
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; : > ${join(dir, "marker")}; echo "openpyxl 9.9";; esac\n`);
   chmodSync(exe, 0o755);
   writeFileSync(
     join(dir, "adapter.yaml"),
@@ -3234,9 +3234,11 @@ test("the first request does not wait for the version command of a Python adapte
   const step = provider.step.bind(provider);
   provider.step = (req) => (sent.push(Date.now()), step(req));
   const t0 = Date.now();
-  session = await Session.create({ adapters: [slowPython(2)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  const slowDir = slowPython(2);
+  session = await Session.create({ adapters: [slowDir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
   await session.send("Say done.");
   withinMs(sent[0]! - t0, 1500);
+  expect(existsSync(join(slowDir, "marker"))).toBe(false);
   expect((session.record.entries(["session"])[0]!.data.adapters as { programVersion: string }[])[0]!.programVersion).toBe("from the manifest");
   expect(session.adapterInfo[0]!.programVersion).toBe("from the manifest");
   await session["starting"];

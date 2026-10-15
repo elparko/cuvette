@@ -355,6 +355,7 @@ test("warm: the worker starts and imports the adapter modules before the first c
   const t0 = Date.now();
   rt.warm!(true);
   withinMs(Date.now() - t0, 1000);
+  expect(existsSync(join(dir, "imported"))).toBe(false);
   await until(() => existsSync(join(dir, "imported")));
   await new Promise((r) => setTimeout(r, 3500));
   const t1 = Date.now();

@@ -21,3 +21,4 @@ catalog/calcium-imaging/data/cascade/
 catalog/calcium-imaging/data/demo/
 catalog/patch-clamp/data/allen/
 ui-dist/
+tests/fixtures/lab-bool-*/

@@ -96,6 +96,7 @@ test("a hook that hangs stops at once when the turn stops, and the call does not
   setTimeout(() => ctl.abort(), 200);
   const r = await h.pre(input, ctl.signal);
   expect(r.decision).toBe("deny");
+  expect(r.reason).not.toMatch(/timed out/);
   const ctl2 = new AbortController();
   setTimeout(() => ctl2.abort(), 200);
   expect(await h.stop({ session: "s" }, ctl2.signal)).toBeUndefined();

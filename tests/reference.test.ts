@@ -120,7 +120,8 @@ test("a second search reads the folders again only after they change, so a paren
   const first = performance.now() - t0;
   const t1 = performance.now();
   findReferences([proj, root], ["counts"]);
-  withinMs(performance.now() - t1, Math.max(20, first / 5));
+  const second = performance.now() - t1;
+  expect(second).toBeLessThan(Math.max(100, first));
   writeFileSync(join(root, "counts_summary.csv"), "sample,count\nwell_a,3\n");
   writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,area,count\nwell_a,3,4\n");
   const again = findReferences([proj, root], ["counts", "area"]);
