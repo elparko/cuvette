@@ -364,6 +364,7 @@ export interface FigureFile {
 }
 
 const CHANGED_NOTE_LOST = "The file changed after the run, and the record kept no copy. The workbook has no figure for this file.";
+const CHANGED_NOTE_TABLE_LOST = "The file changed after the run, and the record kept no copy. The workbook does not use the changed file.";
 const CHANGED_NOTE = "The file changed after the run. The workbook uses the copy that the record kept.";
 
 function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string }): { path?: string; changed: boolean } {
@@ -583,7 +584,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     const seen = new Set<string>();
     const read = (path: string, sha?: string) => {
       const found = recordedSource(record, { path, sha });
-      if (found.changed) summary.push(["Note", `${basename(path)} (step ${step})`, "changed after the run", CHANGED_NOTE]);
+      if (found.changed) summary.push(["Note", `${basename(path)} (step ${step})`, "changed after the run", found.path ? CHANGED_NOTE : CHANGED_NOTE_TABLE_LOST]);
       return found.path ? readTable(found.path) : undefined;
     };
     if (result.table?.columns?.length) {

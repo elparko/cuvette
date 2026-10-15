@@ -135,6 +135,23 @@ test("a large figure that changed after the run gives a Note row", () => {
   expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /big\.png \(step 1\)/.test(String(r[1])) && /changed after the run/.test(String(r[2])))).toBe(true);
 });
 
+test("a large table that changed after the run says that no copy exists", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s5");
+  const path = join(mkdtempSync(join(tmpdir(), "cuvette-res-big-")), "big.csv");
+  writeFileSync(path, "a,b\n" + "1,2\n".repeat(COPY_LIMIT_BYTES / 4 + 10));
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "table", sha }], result: { metrics: {} }, summary: "Big table." }));
+  const bytes = readFileSync(path);
+  bytes[6] = 57;
+  writeFileSync(path, bytes);
+  utimesSync(path, new Date(), new Date(Date.now() + 5000));
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: record.workDir, figures: [] });
+  const note = sheets[0]!.rows.find((r) => r[0] === "Note" && /big\.csv/.test(String(r[1])))!;
+  expect(String(note[3])).toMatch(/record kept no copy/);
+  expect(String(note[3])).not.toMatch(/uses the copy/);
+});
+
 test("a table that changed after the run is read from the recorded blob, with a note", () => {
   const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s3");
   const out = record.workDir;
