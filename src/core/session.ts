@@ -45,7 +45,7 @@ import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
-import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
+import { addedSteps, approvedPlan, currentPlan, matchStep, toolWords, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision, type PlanStep } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { FOLDER_LIST_MAX, FOLDER_LIST_READ_MAX, folderListNote, foldersNote, systemPrompt } from "./prompt.ts";
 import { scaleImages } from "../providers/images.ts";
@@ -1169,6 +1169,7 @@ export class Session {
     let stuckSig = "";
     let forceAnswer = false;
     let stopBlocks = 0;
+    let held: { said: string; nodes: number; open: string[] } | undefined;
     let stopHooked = false;
     const turnStart = this.record.entries().length;
     let results: Part[] = [];
@@ -1216,7 +1217,7 @@ export class Session {
         if (res.note) this.record.append("notice", { text: res.note });
         const thinking = res.message.parts.flatMap((p) => (p.type === "thinking" && p.text ? [p.text] : [])).join("\n");
         if (thinking) this.record.append("thinking", { text: thinking });
-        const said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
+        let said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
         const calls = res.message.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
         this.lastSaid = said;
         if (!calls.length && this.steered.length) {
@@ -1252,16 +1253,26 @@ export class Session {
           this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
           continue;
         }
-        if (!calls.length && nudges < 3 && !forceAnswer) {
+        let keptFirst = false;
+        if (!calls.length && held && !this.draft && said && this.record.nodes().length === held.nodes) {
+          keptFirst = true;
+          const latest = (this.record.entries(["note"]).filter((e) => Array.isArray(e.data.plan)).at(-1)?.data.plan ?? []) as PlanStep[];
+          const notDone = held.open.filter((step) => ["todo", "doing"].includes(latest.find((x) => x.step === step)?.status ?? "todo"));
+          if (notDone.length) this.record.append("notice", { text: `Not done from the plan: ${notDone.join("; ")}. The agent gave no result for ${notDone.length > 1 ? "these steps" : "this step"}. The first answer stays.`, plan: "skipped" });
+          said = held.said;
+          held = undefined;
+        }
+        if (!calls.length && nudges < 3 && !forceAnswer && !keptFirst) {
           const tail = said.slice(-400);
           const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
           const turnStart = this.lastRequest()?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
-          const plan = (this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as { step: string; status: string }[] | undefined) ??
+          const plan = (this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as PlanStep[] | undefined) ??
             (this.plan && this.approvedEntry > turnStart && !this.planning ? this.plan.steps.filter((p) => p.tool) : undefined);
-          const open = (plan ?? []).filter((p) => p.status === "todo" || p.status === "doing");
+          const ran = this.record.nodes().filter((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
+          const open = (plan ?? []).filter((p) => (p.status === "todo" || p.status === "doing") && (!!p.tool || !ran.length) && !ran.some((n) => matchStep({ steps: [p] }, n.tool, n.adapter) === 0));
           if (promise || asksLeave || noWork || open.length) {
             nudges++;
             this.record.append("assistant", { text: said, final: false });
@@ -1271,7 +1282,8 @@ export class Session {
                 ? "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer."
                 : noWork
                   ? "No program step has run in this turn, so the request is not answered yet. Run the next step now with a tool. If a tool failed, fix the input and try again."
-                  : `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, call plan and mark it skipped with the reason. Then give the answer, with every number the request asks for.`;
+                  : `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, the harness records it as not done. Then give the answer, with every number the request asks for.`;
+            if (open.length && !promise && !asksLeave && !noWork && !held && !this.draft && said) held = { said, nodes: this.record.nodes().length, open: open.map((p) => p.step) };
             this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
             continue;
           }
@@ -3857,7 +3869,7 @@ export class Session {
     if (!this.planning) {
       if (!this.plan || !this.approvedEntry) {
         const draft = { steps: [], ...readPlan(a) } as AnalysisPlan;
-        this.record.append("note", { text: `Plan:\n${planText(draft)}`, plan: draft.steps.map((x) => ({ step: x.step, status: x.status })), by: "agent" });
+        this.record.append("note", { text: `Plan:\n${planText(draft)}`, plan: draft.steps.map((x) => ({ step: x.step, status: x.status, ...(x.tool ? { tool: x.tool } : {}), ...(x.method ? { method: x.method } : {}) })), by: "agent" });
         return { ok: true, summary: `Plan with ${draft.steps.length} steps.` };
       }
       const prev = this.plan;

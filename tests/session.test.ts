@@ -320,7 +320,56 @@ test("an answer while plan steps are open gets one reminder to finish them", asy
   const answer = await session.send("Count and blur");
   const notes = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps that are not done: Blur the image/.test((p as { text: string }).text));
   expect(notes.length).toBeGreaterThan(0);
-  expect(answer).toMatch(/Done\./);
+  expect(answer).toMatch(/There are particles\./);
+  expect(answer).not.toMatch(/Done\./);
+});
+
+const SIX_STEPS = [
+  { step: "Check data quality", status: "doing" },
+  { step: "Blur the image", status: "todo" },
+  { step: "Count the particles", status: "todo" },
+  { step: "Correct the two tests", status: "todo" },
+  { step: "Make one plot", status: "todo" },
+  { step: "Write the conclusion", status: "todo" },
+];
+
+test("an answer after steps that have results gets no plan call, one answer and one referee call", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: SIX_STEPS } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { text: "There are 64 particles after the blur." },
+    { text: "The plan is updated. All six steps were already done." },
+  ]);
+  const referee = new FakeProvider({ steps: [], complete: "[]" });
+  const complete = vi.spyOn(referee, "complete");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count the particles");
+  expect(provider.requests).toHaveLength(4);
+  expect(answer).toMatch(/^There are 64 particles/);
+  expect(answer).not.toMatch(/plan is updated/i);
+  expect(session.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
+  expect(complete).toHaveBeenCalledTimes(1);
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text));
+  expect(nudges).toHaveLength(0);
+});
+
+test("a plan step with no result at all gets one reminder that names it, and the first answer stays", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", status: "todo" }] } }] },
+    { text: "The image holds particles." },
+    { text: "The plan is updated. The count did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text)).map((p) => (p as { text: string }).text);
+  expect(nudges).toHaveLength(1);
+  expect(nudges[0]).toContain("Count the particles");
+  expect(nudges[0]).not.toMatch(/call plan/);
+  expect(answer).toMatch(/^The image holds particles/);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the plan: Count the particles/.test(String(e.data.text)))).toBe(true);
 });
 
 test("a revision that loses results and fixes nothing is replaced by the first answer", async () => {
