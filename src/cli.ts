@@ -33,7 +33,9 @@ Usage
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
   card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
-  reason. With --adapter, the session has only the adapters that you name.
+  reason. With --adapter, the session has the adapters that you name and no others.
+  With --resume, the adapters that you name join the recorded adapters. A name is an
+  installed or catalog adapter. To load a folder, write ./folder or an absolute path.
 
   With --method, the harness compares the new data with the data that the method used.
   A likely unit change stops the run. Add data-change to --allow to continue.
