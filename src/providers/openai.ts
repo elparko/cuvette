@@ -4,7 +4,7 @@ import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { hideKeys } from "../core/credentials.ts";
-import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
@@ -104,7 +104,7 @@ export class OpenAIProvider implements Provider {
     idle.touch();
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
-    const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
+    const res = await longFetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
     if (res.status === 429 || res.status === 408 || res.status === 409 || res.status >= 500) {
       const txt = hideKeys(await res.text()).text;
       if (body.stream && NO_STREAM.test(txt)) return new Response(txt, { status: 400 });

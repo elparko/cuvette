@@ -3,7 +3,7 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, splitThink, wrapperText } from "./text.ts";
-import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
 
@@ -170,7 +170,7 @@ export class OllamaProvider implements Provider {
 
   private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
     idle.touch();
-    const res = await fetch(`${ollamaHost()}/api/chat`, {
+    const res = await longFetch(`${ollamaHost()}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
