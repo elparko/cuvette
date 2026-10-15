@@ -1,10 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { findAdapter } from "../src/adapters/manifest.ts";
 import { appAdapters } from "../src/server/app.ts";
-import { indexPath, readIndex } from "../src/core/places.ts";
 import { Session } from "../src/core/session.ts";
 import { trustFolder } from "../src/core/trust.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -44,7 +43,10 @@ const start = () => Session.create({ adapters: [], provider: new FakeProvider([]
 
 const unix = test.skipIf(process.platform === "win32");
 
-const dropIndexRow = (id: string) => writeFileSync(indexPath(), JSON.stringify(readIndex().filter((r) => r.id !== id)));
+const storeFile = () => join(home, "adapter-hashes.json");
+const forgetAllowed = () => rmSync(storeFile(), { force: true });
+const opts = () => ({ provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } as const });
+const notices = (s: Session) => s.record.entries(["notice"]).map((n) => String(n.data.text));
 
 unix("use_adapter refuses a path to an adapter folder outside the adapter folders", async () => {
   const dir = evilAdapter(cwd);
@@ -76,36 +78,34 @@ test("a path is an unknown name when the caller asks for names only", () => {
   expect(() => findAdapter(dir, cwd, { byName: true })).toThrow(/no adapter named/);
 });
 
-unix("resume of a record without an index row does not load an adapter from a path outside the adapter folders", async () => {
+unix("resume does not load a recorded outside path that the user never allowed on this computer", async () => {
   const dir = evilAdapter(cwd);
   session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   const id = session.id;
-  const recordDir = session.record.dir;
   expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
   await session.close();
   session = undefined;
-  dropIndexRow(id);
-  session = await Session.resume(recordDir, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  forgetAllowed();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual([]);
   expect(session.record.entries(["notice"]).some((n) => /the adapter evil from .* before.*does not load it/.test(String(n.data.text)))).toBe(true);
 });
 
-unix("resume of a record without an index row skips an outside adapter path and names the path in a notice", async () => {
+unix("resume skips an outside path that the user never allowed, names the path, and loads it after resume with the path", async () => {
   const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
   try {
     const dir = evilAdapter(away);
     session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
     const id = session.id;
-    const recordDir = session.record.dir;
     expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
     await session.close();
     session = undefined;
-    dropIndexRow(id);
-    session = await Session.resume(recordDir, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    forgetAllowed();
+    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
     expect(session.adapters.map((a) => a.name)).toEqual([]);
     const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
     expect(text).toContain(dir);
-    expect(text).toContain("--adapter");
+    expect(text).toContain(`cuvette resume --adapter ${dir}`);
     await session.close();
     session = undefined;
     session = await Session.resume(id, { addAdapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
@@ -115,7 +115,7 @@ unix("resume of a record without an index row skips an outside adapter path and 
   }
 });
 
-unix("resume of a session in the local index loads an adapter from a recorded path outside the project", async () => {
+unix("resume loads an outside adapter that the user added, and shows no notice", async () => {
   const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
   try {
     const dir = evilAdapter(away);
@@ -123,39 +123,15 @@ unix("resume of a session in the local index loads an adapter from a recorded pa
     const id = session.id;
     await session.close();
     session = undefined;
-    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    session = await Session.resume(id, opts());
     expect(session.adapters.map((a) => a.root)).toEqual([dir]);
-    expect(session.record.entries(["notice"]).some((n) => /Loaded .* from the record/.test(String(n.data.text)))).toBe(false);
+    expect(notices(session).some((t) => t.includes("evil"))).toBe(false);
   } finally {
     rmSync(away, { recursive: true, force: true });
   }
 });
 
-unix("resume of an old record without an adapter hash loads the path and shows a notice", async () => {
-  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
-  try {
-    const dir = evilAdapter(away);
-    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
-    const id = session.id;
-    const log = join(session.record.dir, "log.jsonl");
-    await session.close();
-    session = undefined;
-    const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => {
-      const e = JSON.parse(l);
-      if (e.kind === "adapter") delete e.data.hash;
-      if (e.kind === "session") for (const a of e.data.adapters ?? []) delete a.hash;
-      return JSON.stringify(e);
-    });
-    writeFileSync(log, lines.join("\n") + "\n");
-    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
-    expect(session.adapters.map((a) => a.root)).toEqual([dir]);
-    expect(session.record.entries(["notice"]).map((n) => String(n.data.text))).toContain(`Loaded ${dir} from the record. Check that you trust it.`);
-  } finally {
-    rmSync(away, { recursive: true, force: true });
-  }
-});
-
-unix("resume of a session in the local index skips an outside adapter whose files changed", async () => {
+unix("resume skips an outside adapter after a file changed since the user allowed it", async () => {
   const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
   try {
     const dir = evilAdapter(away);
@@ -164,11 +140,79 @@ unix("resume of a session in the local index skips an outside adapter whose file
     await session.close();
     session = undefined;
     writeFileSync(join(dir, "extra.txt"), "changed");
-    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    session = await Session.resume(id, opts());
     expect(session.adapters.map((a) => a.name)).toEqual([]);
-    const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
-    expect(text).toContain("changed after the session loaded it");
-    expect(text).toContain(`--adapter ${dir}`);
+    const text = notices(session).find((t) => t.includes("evil"));
+    expect(text).toContain("changed after you allowed it");
+    expect(text).toContain(`cuvette resume --adapter ${dir}`);
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
+});
+
+unix("opening a forged record by path writes no allow entry, so a second resume does not load the adapter", async () => {
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const dir = evilAdapter(away);
+    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    const recordDir = session.record.dir;
+    const log = join(recordDir, "log.jsonl");
+    await session.close();
+    session = undefined;
+    forgetAllowed();
+    const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => {
+      const e = JSON.parse(l);
+      if (e.kind === "adapter") e.data.hash = "0".repeat(64);
+      if (e.kind === "session") for (const a of e.data.adapters ?? []) a.hash = "0".repeat(64);
+      return JSON.stringify(e);
+    });
+    writeFileSync(log, lines.join("\n") + "\n");
+    for (let i = 0; i < 2; i++) {
+      session = await Session.resume(recordDir, opts());
+      expect(session.adapters.map((a) => a.name)).toEqual([]);
+      await session.close();
+      session = undefined;
+    }
+    expect(existsSync(storeFile())).toBe(false);
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
+});
+
+unix("an edited log that names another outside adapter does not load it", async () => {
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const mine = evilAdapter(away, "mine");
+    const other = evilAdapter(away, "other");
+    session = await Session.create({ adapters: [mine], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    const id = session.id;
+    const log = join(session.record.dir, "log.jsonl");
+    await session.close();
+    session = undefined;
+    const swap = (a: { name: string; path?: string }) => Object.assign(a, { name: "other", path: other });
+    const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => {
+      const e = JSON.parse(l);
+      if (e.kind === "adapter") swap(e.data);
+      if (e.kind === "session") for (const a of e.data.adapters ?? []) swap(a);
+      return JSON.stringify(e);
+    });
+    writeFileSync(log, lines.join("\n") + "\n");
+    session = await Session.resume(id, opts());
+    expect(session.adapters.map((a) => a.name)).toEqual([]);
+    expect(notices(session).some((t) => t.includes(other))).toBe(true);
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
+});
+
+unix("a model call to use_adapter with a path never writes an allow entry", async () => {
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const dir = evilAdapter(away);
+    session = await start();
+    const r = await session.useAdapter(dir, "the model chose a path");
+    expect(r.ok).toBe(false);
+    expect(existsSync(storeFile())).toBe(false);
   } finally {
     rmSync(away, { recursive: true, force: true });
   }
