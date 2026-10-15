@@ -61,14 +61,18 @@ async function needsScaling(path: string): Promise<"png" | "jpeg" | undefined> {
 }
 
 // Makes the scaled copies before the request, so that a stop from the scientist ends a slow resize.
-export async function prepareImages(messages: Message[], signal?: AbortSignal): Promise<void> {
+function candidatePaths(messages: Message[]): string[] {
   const paths: string[] = [];
   for (const m of messages)
     for (const p of m.parts) {
       if (p.type === "tool_result" && !p.isError) paths.push(...(p.images ?? []).slice(0, MAX_IMAGES_PER_RESULT));
       else if (p.type === "image") paths.push(p.path);
     }
-  await scaleImages(paths.slice(0, IMAGE_BUDGET), signal);
+  return paths;
+}
+
+export async function prepareImages(messages: Message[], signal?: AbortSignal): Promise<void> {
+  await scaleImages(candidatePaths(messages).slice(-IMAGE_BUDGET), signal);
 }
 
 export async function scaleImages(paths: string[], signal?: AbortSignal): Promise<void> {
@@ -81,14 +85,24 @@ export async function scaleImages(paths: string[], signal?: AbortSignal): Promis
 
 export class ImageBudget {
   used = 0;
+  private skip: number;
+
+  constructor(messages: Message[] = []) {
+    this.skip = Math.max(0, candidatePaths(messages).length - IMAGE_BUDGET);
+  }
 
   pick(paths: string[]): { images: LoadedImage[]; note: string } {
     const images: LoadedImage[] = [];
     const notes: string[] = [];
     let skipped = 0;
-    let overLimit = 0;
-    for (const p of paths) {
-      if (images.length >= MAX_IMAGES_PER_RESULT || this.used >= IMAGE_BUDGET) {
+    let overLimit = Math.max(0, paths.length - MAX_IMAGES_PER_RESULT);
+    for (const p of paths.slice(0, MAX_IMAGES_PER_RESULT)) {
+      if (this.used >= IMAGE_BUDGET) {
+        overLimit++;
+        continue;
+      }
+      if (this.skip > 0) {
+        this.skip--;
         overLimit++;
         continue;
       }

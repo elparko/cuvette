@@ -566,7 +566,7 @@ export class EmptyReview extends Error {
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS });
+  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
   if (!raw.trim()) throw new EmptyReview();
   return parseReferee(raw);
 }

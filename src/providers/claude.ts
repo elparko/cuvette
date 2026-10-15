@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
-import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
@@ -72,10 +72,12 @@ function makeClient(key?: string): any {
   return key ? new Anthropic({ apiKey: key, maxRetries: 0, ...headers }) : new Anthropic({ maxRetries: 0, ...headers });
 }
 
-function usageOf(u: any): Usage {
+function usageOf(u: any, longCache = false): Usage {
   const usage: Usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
   if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
   if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
+  const long = typeof u.cache_creation?.ephemeral_1h_input_tokens === "number" ? u.cache_creation.ephemeral_1h_input_tokens : longCache ? (usage.cacheWrite ?? 0) : 0;
+  if (long > 0) usage.cacheWrite1h = long;
   return usage;
 }
 
@@ -125,7 +127,7 @@ export class ClaudeProvider implements Provider {
   }
 
   toNative(messages: Message[]): unknown[] {
-    const budget = new ImageBudget();
+    const budget = new ImageBudget(messages);
     const out: unknown[] = [];
     for (const m of messages) {
       if (m.role === "assistant") {
@@ -190,18 +192,18 @@ export class ClaudeProvider implements Provider {
     await prepareImages(req.messages, req.signal);
     const base = this.params(req.system, req.messages, req.tools);
     if (req.noToolCalls && req.tools.length) base.tool_choice = { type: "none" };
-    let live: any;
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;
       const body = useFallback ? { ...base, betas: [FALLBACK_BETA], fallbacks: "default" } : base;
       const api = useFallback ? this.client.beta.messages : this.client.messages;
       const stream = api.stream(body, req.signal ? { signal: req.signal } : undefined);
-      live = stream;
       stream.on("text", (d: string) => req.onDelta?.({ type: "text", text: d }));
       stream.on("thinking", (d: string) => req.onDelta?.({ type: "thinking", text: d }));
       try {
         return await stream.finalMessage();
       } catch (e) {
+        const started = stream.currentMessage?.usage;
+        if (started && !this.fixedClient) recordSpend(this.model, usageOf(started, this.mark?.ttl === "1h"));
         if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError) && /^(stream|request) ended without/.test(e.message)) throw Object.assign(new Error(e.message), { partial: true });
         throw e;
       }
@@ -217,9 +219,6 @@ export class ClaudeProvider implements Provider {
         } else throw e;
       }
     } catch (e) {
-      // A stopped stream still costs the input tokens. The budget must count them.
-      const started = req.signal?.aborted ? live?.currentMessage?.usage : undefined;
-      if (started && !this.fixedClient) recordSpend(this.model, usageOf(started));
       throw mapError(e, this.model);
     }
     const out = this.fromNative(msg);
@@ -246,7 +245,7 @@ export class ClaudeProvider implements Provider {
       note = `The model declined this request${cat ? ` (category: ${cat})` : ""}.`;
       parts.push({ type: "text", text: note });
     } else if (stop === "max_tokens") note = "The reply hit the output limit and was cut short.";
-    const usage = usageOf(msg.usage ?? {});
+    const usage = usageOf(msg.usage ?? {}, this.mark?.ttl === "1h");
     const stopReason: StepResult["stopReason"] =
       stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" ? "max_tokens" : "end";
     const result: StepResult = {
@@ -258,7 +257,7 @@ export class ClaudeProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; maxTokens?: number }): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean; maxTokens?: number }): Promise<string> {
     const params = {
       model: this.model,
       max_tokens: opts?.maxTokens ?? 16000,
@@ -272,7 +271,8 @@ export class ClaudeProvider implements Provider {
       if (over) throw new ProviderError(over);
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
-      if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 });
+      if (!this.fixedClient) recordSpend(this.model, usageOf(u, false));
+      if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.");
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
       throw mapError(e, this.model);

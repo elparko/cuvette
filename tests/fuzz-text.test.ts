@@ -106,6 +106,19 @@ describe("fuzz: the think tags and the text tool call", () => {
     }
   });
 
+  test("the splitter treats the text before a closing tag as thinking when no opening tag came", () => {
+    const run = (chunks: string[]) => {
+      const sp = new ThinkSplitter();
+      for (const c of chunks) sp.push(c);
+      sp.end();
+      return { text: sp.text, thinking: sp.thinking };
+    };
+    expect(run(["reasoning</think>answer"])).toEqual({ text: "answer", thinking: "reasoning" });
+    expect(run(["rea", "soning</", "think", ">answer"])).toEqual({ text: "answer", thinking: "reasoning" });
+    expect(run(["<think>a</think>b</think>c"])).toEqual({ text: "b</think>c", thinking: "a" });
+    expect(run(["plain"])).toEqual({ text: "plain", thinking: "" });
+  });
+
   test("wrapperText breaks the result tags in any spacing and keeps other text", () => {
     expect(wrapperText("a <tool_result> b </ tool_call> c < / tool_response>")).not.toMatch(/<\s*\/?\s*tool_/);
     expect(wrapperText("x < y and a<b")).toBe("x < y and a<b");

@@ -282,10 +282,10 @@ describe("referee", () => {
   });
 
   test("the referee call carries the output cap and the same effort", async () => {
-    let got: { effort?: string; maxTokens?: number } | undefined;
-    const provider = { complete: async (_s: string, _t: string, _g?: AbortSignal, opts?: { effort?: string; maxTokens?: number }) => ((got = opts), "[]") } as unknown as Provider;
+    let got: { effort?: string; maxTokens?: number; failIfCut?: boolean } | undefined;
+    const provider = { complete: async (_s: string, _t: string, _g?: AbortSignal, opts?: { effort?: string; maxTokens?: number; failIfCut?: boolean }) => ((got = opts), "[]") } as unknown as Provider;
     await referee(provider, ctx(makeRecord(seed), "a"));
-    expect(got).toEqual({ effort: "low", maxTokens: REFEREE_MAX_TOKENS });
+    expect(got).toEqual({ effort: "low", maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
       });
 
   test("the referee prompt asks for five findings of one line each, most severe first", () => {

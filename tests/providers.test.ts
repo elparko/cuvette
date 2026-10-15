@@ -1,10 +1,11 @@
+import { createServer } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
-import { CONTEXT_OVERFLOW, ProviderError } from "../src/core/types.ts";
+import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { DEFAULTS } from "../src/core/config.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -12,6 +13,7 @@ import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 import { keySafe, parseArgs } from "../src/providers/openai.ts";
 import { retryReason } from "../src/providers/retry.ts";
+import { readSpend } from "../src/core/spend.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const tools: ToolSchema[] = [
@@ -70,6 +72,66 @@ describe("claude", () => {
       expect(calls[0].params.thinking).toEqual({ type: "adaptive", display });
     }
     expect(DEFAULTS.show_thinking).toBe("on");
+  });
+
+  test("usage marks the cache writes of the one-hour cache, so that they cost twice the input price", async () => {
+    const withUsage = (usage: any) => claudeMsg([{ type: "text", text: "hi" }], "end_turn", { usage });
+    const base = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 500 };
+    const run = async (cache: "5m" | "1h", usage: any) => (await new ClaudeProvider("claude-opus-5-5", { client: fakeClient([withUsage(usage)]).client, cache }).step(req([user("q")]))).usage;
+    expect((await run("5m", base)).cacheWrite1h).toBeUndefined();
+    expect((await run("1h", base)).cacheWrite1h).toBe(500);
+    expect((await run("5m", { ...base, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 300 } })).cacheWrite1h).toBe(300);
+  });
+
+  test("a stream that fails after it started counts its tokens in the spend ledger, and the retry counts its own", async () => {
+    const event = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify({ type, ...(data as object) })}\n\n`;
+    const start = event("message_start", { message: { id: "m", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: null, usage: { input_tokens: 1000, output_tokens: 1 } } });
+    let hits = 0;
+    const server = createServer((_rq, rs) => {
+      rs.writeHead(200, { "content-type": "text/event-stream" });
+      if (hits++ === 0) {
+        rs.write(start);
+        setTimeout(() => rs.destroy(), 50);
+        return;
+      }
+      rs.write(start);
+      rs.write(event("content_block_start", { index: 0, content_block: { type: "text", text: "" } }));
+      rs.write(event("content_block_delta", { index: 0, delta: { type: "text_delta", text: "ok" } }));
+      rs.write(event("content_block_stop", { index: 0 }));
+      rs.write(event("message_delta", { delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 5 } }));
+      rs.end(event("message_stop", {}));
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const spendFile = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+    vi.stubEnv("CUVETTE_SPEND_FILE", spendFile);
+    vi.stubEnv("ANTHROPIC_BASE_URL", `http://127.0.0.1:${(server.address() as { port: number }).port}`);
+    try {
+      const p = new ClaudeProvider("claude-opus-5-5", { apiKey: "sk-ant-api03-" + "x".repeat(90), sleep: async () => {} });
+      const r = await p.step(req([user("q")]));
+      expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+      expect(hits).toBe(2);
+      const rows = readSpend();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]!.usd).toBeCloseTo((1000 * 4 + 20) / 1e6, 9);
+    } finally {
+      server.close();
+    }
+  });
+
+  test("complete fails when the reply hit the output limit and the caller asks for it", async () => {
+    const cutMsg = () => claudeMsg([{ type: "text", text: "half a summ" }], "max_tokens");
+    const { client } = fakeClient([cutMsg(), cutMsg()]);
+    const p = new ClaudeProvider("claude-opus-5-5", { client });
+    await expect(p.complete("S", "T", undefined, { failIfCut: true })).rejects.toBeInstanceOf(CutReplyError);
+    expect(await p.complete("S", "T")).toBe("half a summ");
+  });
+
+  test("complete sends the output cap as max_tokens, and a cut referee reply fails", async () => {
+    const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "No findings." }]), claudeMsg([], "max_tokens")]);
+    const p = new ClaudeProvider("claude-opus-5-5", { client });
+    expect(await p.complete("S", "T", undefined, { maxTokens: 3000, failIfCut: true })).toBe("No findings.");
+    expect(calls[0]!.params.max_tokens).toBe(3000);
+    await expect(p.complete("S", "T", undefined, { maxTokens: 3000, failIfCut: true })).rejects.toBeInstanceOf(CutReplyError);
   });
 
   test("request shape: adaptive thinking, effort, cache control, no tool_choice", async () => {
@@ -201,7 +263,7 @@ describe("claude", () => {
     expect(block.content).toContain("left out of an error result");
   });
 
-  test("image limits: 4 per result, 50 per conversation", () => {
+  test("image limits: 4 per result, 50 per conversation, the newest images stay", () => {
     dirImg();
     const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
     const msgs: Message[] = [];
@@ -209,9 +271,10 @@ describe("claude", () => {
       msgs.push({ role: "user", parts: [{ type: "tool_result", callId: `c${i}`, name: "t", text: "x", images: Array(6).fill(imgPath) }] });
     const native: any[] = p.toNative(msgs);
     const counts = native.map((m) => m.content[0].content.filter((b: any) => b?.type === "image").length);
-    expect(counts.slice(0, 12)).toEqual(Array(12).fill(4));
-    expect(counts[12]).toBe(2);
+    expect(counts[0]).toBe(2);
+    expect(counts.slice(1)).toEqual(Array(12).fill(4));
     expect(native[0].content[0].content[0].text).toContain("not attached");
+    expect(native[12].content[0].content[0].text).toContain("not attached");
   });
 
   test("refusal returns a declined text part and drops tool calls from raw", async () => {
@@ -510,6 +573,31 @@ describe("ollama", () => {
     expect((await makeProvider("ollama:big", { numCtx: 100000 })).info).toMatchObject({ contextWindow: 100000, small: false });
     stubOllama(() => json({}), showBody(["tools"], "8B", 8192));
     expect((await makeProvider("ollama:m")).info.contextWindow).toBe(8192);
+  });
+
+  test("numCtx from the settings is cut to the context length of the model", async () => {
+    const seen = stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, prompt_eval_count: 7800, eval_count: 1 }]), showBody(["tools"], "8B", 8192));
+    const p = await makeProvider("ollama:m", { numCtx: 32768 });
+    expect(p.info.contextWindow).toBe(8192);
+    await expect(p.step(req([user("q")]))).rejects.toMatchObject({ overflow: true });
+    expect(seen.find((s) => s.url.endsWith("/api/chat"))!.body.options.num_ctx).toBe(8192);
+  });
+
+  test("a closing think tag without an opening tag moves the earlier text to thinking", async () => {
+    stubOllama((body) =>
+      ndjson(
+        body.stream
+          ? [{ message: { content: "reason" } }, { message: { content: "ing</thi" } }, { message: { content: "nk>The answer." } }, { done: true }]
+          : [],
+      ),
+    );
+    const p = await makeProvider("ollama:x");
+    const r = await p.step(req([user("q")]));
+    expect(r.message.parts).toEqual([
+      { type: "thinking", text: "reasoning" },
+      { type: "text", text: "The answer." },
+    ]);
+    expect(await p.complete("S", "Q")).toBe("The answer.");
   });
 
   test("retries without think when the server rejects it", async () => {
@@ -869,6 +957,16 @@ describe("agent loop fixes, round three", () => {
     stubOllama(() => json({}));
     const l: any = await makeProvider("ollama:x");
     expect(l.toNative("S", hist)[3].content).toBe("ERROR: no tool named add");
+  });
+
+  test("OpenAI: a closing think tag without an opening tag moves the earlier text to thinking", async () => {
+    vi.stubGlobal("fetch", async () => sse([delta({ role: "assistant", content: "weigh it" }), delta({ content: "</think>Done." }), delta({}, "stop")]));
+    const p = await makeProvider("openai:http://localhost:1234/v1|m");
+    const r = await p.step(req([user("q")]));
+    expect(r.message.parts).toEqual([
+      { type: "thinking", text: "weigh it" },
+      { type: "text", text: "Done." },
+    ]);
   });
 
   test("OpenAI: streams text, two parallel tool calls in pieces, and usage with cached tokens", async () => {
