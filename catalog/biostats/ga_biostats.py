@@ -12,13 +12,37 @@ warnings.filterwarnings("ignore")
 
 MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
 
+PLACEHOLDER_CELLS = {}
+
+
+def _note_placeholders(fn):
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        PLACEHOLDER_CELLS.clear()
+        result = fn(*args, **kwargs)
+        n = sum(PLACEHOLDER_CELLS.values())
+        if isinstance(result, dict) and result.get("ok") and n:
+            result.setdefault("metrics", {})["n_placeholder_cells"] = n
+            result["summary"] = result.get("summary", "") + " %d %s in numeric columns hold a placeholder (-, ? or .). The tool treats %s as missing." % (n, "cell" if n == 1 else "cells", "it" if n == 1 else "them")
+        return result
+    return run
+
 
 def _typed(path, enc):
     frame = pd.read_csv(path, encoding=enc)
     raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+    placeholders = 0
     for column in frame.columns:
         if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
-            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+            text = raw[column].astype(str).str.strip().str.lower()
+            hidden = text.isin(MISSING_TEXT)
+            cleaned = raw[column].where(~hidden, np.nan)
+            numbers = pd.to_numeric(cleaned, errors="coerce")
+            if cleaned.notna().any() and numbers.notna().sum() == cleaned.notna().sum():
+                placeholders += int((hidden & (text != "")).sum())
+                cleaned = numbers
+            frame[column] = cleaned
+    PLACEHOLDER_CELLS[path] = placeholders
     return frame
 
 
@@ -892,3 +916,7 @@ def mcnemar_test(path=None, first=None, second=None, counts=None, method=None, s
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics),
             "data": {"test": name, "alpha": alpha, "significant": bool(p < alpha), "level": rows[0]},
             "table": _table(_table_frame(table, ["%s=%s" % (first_name, v) for v in rows], ["%s=%s" % (second_name, v) for v in cols], "pairs"), "mcnemar_pairs")}
+
+
+for _name in ("inspect_table", "compare_two_groups", "anova_oneway", "fit_ols", "fit_mixed_model", "kaplan_meier", "fit_cox", "fit_logistic", "chi_square_test", "fisher_exact", "mcnemar_test"):
+    globals()[_name] = _note_placeholders(globals()[_name])

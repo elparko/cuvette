@@ -31,3 +31,26 @@ describe.skipIf(!python)("tables read_table with a file of the wrong type", () =
     await expect(tables.run("summarize_table", { path, values: ["a"] })).rejects.toThrow(/The file is not a valid csv file: empty\.csv/);
   });
 });
+
+describe.skipIf(!python)("tables summarize_table with placeholders in a numeric column", () => {
+  let tables: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-ga-tables-"));
+    tables = await openAdapter("tables");
+  });
+  afterAll(async () => {
+    await tables?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a column with - ? and . cells counts as numeric, and the summary gives the number of placeholder cells", { timeout: 120_000 }, async () => {
+    const path = join(root, "placeholders.csv");
+    writeFileSync(path, "group,y\na,1\na,-\na,3\nb,?\nb,5\nb,.\nb,7\n");
+    const r = await tables.run("summarize_table", { path, group_by: ["group"] });
+    expect(r.metrics.n_values).toBe(1);
+    expect(r.summary).toMatch(/y: mean 2/);
+    expect(r.summary).toMatch(/3 cells in numeric columns hold a placeholder \(-, \? or \.\)/);
+    expect(r.metrics.n_placeholder_cells).toBe(3);
+  });
+});
