@@ -288,4 +288,12 @@ describe("score", () => {
     expect(md).toContain("on minus off");
     expect(md).toMatch(/\+0\.\d\d/);
   });
+
+  test("the report shows the answer-ready time and the whole-turn time when the run has them", () => {
+    const sc = loadScenario("pseudorep");
+    const on = score(pseudorepLog(PSEUDO_GOOD, true), sc);
+    const md = renderReport("fake", [{ id: "pseudorep", on, onTimes: { answerReadyMs: 8200, turnMs: 13100 } }]);
+    expect(md).toContain("| pseudorep | on | 8.2 | 13.1 |");
+    expect(renderReport("fake", [{ id: "pseudorep", on }])).not.toContain("Answer ready");
+  });
 });

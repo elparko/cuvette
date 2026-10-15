@@ -179,6 +179,8 @@ The table lists the main kinds. `src/core/types.ts` has the full list.
 | sensitivity | sensitivity | the `SensitivityResult` |
 | finding / finding_resolution | review | the `Finding` / fid, action, reason |
 | claim_check | claims | answerEntry, claims, unsourced |
+| answer_ready | session | at, elapsedMs (time from the turn start to the first shown answer) |
+| review | session | answer (entry id), state (done, stopped, failed, off), findings (fids), kept |
 | mode | session | old, new |
 | follow_step | modes | step, tool, instruction, expected, observed, match, differences |
 | lab_memory | labmemory | pid, adapter, changeKind, payload, status |
@@ -399,8 +401,23 @@ class Session {
 4. No tool calls: `Stop` hooks. As in Claude Code, a `Stop` hook can return
    `{"decision": "block", "reason": "..."}` or exit with code 2. Then the agent continues, and the
    reason is its next note. The input has `stop_hook_active`. After eight blocks in one turn, the
-   harness ignores the hook. Then `PreAnswer` hooks (claims, rule review, referee); append
-   `assistant` with `final: true`.
+   harness ignores the hook. Then the answer goes out first, and the review follows:
+   1. `PreAnswer` hooks, the claim check and the rule checks run. They need no model call.
+   2. The harness appends `assistant` with `final: true` and then `answer_ready`
+      (`at`, `elapsedMs` since the turn started). Every surface shows the answer from this entry.
+   3. The referee call runs. The turn stays busy, so no queued message and no automatic
+      resume starts before the review ends. Esc aborts the call; the answer stays.
+   4. The harness appends the `finding` entries and one `review` entry (`answer`, `state`
+      done, stopped, failed or off, `findings`). The surfaces show the review notes now.
+   5. If the review has an error finding, the harness sends the problems to the model once.
+      The model writes a correction. The harness reviews it before it shows it. It appends
+      a new `assistant` entry with `corrects` (the id of the first answer). The first answer
+      stays in the record. Surfaces mark the new entry as the corrected answer.
+   `Session.answerReadyMs` and `Session.turnMs` hold the two times of the last turn.
+   `turnMs` ends after the review. Headless `--output json` and `stream-json` give both.
+   In the text mode, `-p` prints the answer at step 2. It prints the review notes to the
+   error stream at step 4. It prints a corrected answer after a line that marks it.
+   The process exits after step 4. The exit code comes from how the turn ended.
 5. `interrupt()` aborts the model call and the running tool; every open call gets an error
    result, so the history stays valid.
 

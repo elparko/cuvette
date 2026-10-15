@@ -1758,3 +1758,18 @@ for Haiku".
   and skills adds tokens and start time.
 - The scripts are not in the repository. They are a mock server, a proxy and a runner of
   about 250 lines in total.
+
+## Two times for each run: answer ready and whole turn
+
+Cuvette shows the final answer before the referee reply. The referee call runs after the
+answer is on the screen. A run has two times now:
+
+- Answer-ready time: from the start of the turn to the first shown answer. It is the time that
+  the scientist waits. Compare this number with the wall time of Claude Code.
+- Whole-turn time: from the start of the turn to the end of the review. It includes the referee.
+
+Headless `--output json` and `--output stream-json` give `answerReadyMs` and `turnMs`.
+The benchmark in `src/bench` records both numbers for each run. The scenario report has a
+time table, and a paper run has the fields `answerReadyMs` and `turnMs`.
+The tables above show wall time that includes the referee. They stay unchanged.
+For a new comparison, report both Cuvette numbers next to the wall time of Claude Code.

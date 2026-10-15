@@ -252,16 +252,25 @@ async function headless(prompt: string) {
   const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, trustFolder, method: str(o.method), settings: { headless: true, ...bypass(), ...planSetting() } });
   if (s.trustNotice) process.stderr.write(`Note: ${plainText(s.trustNotice)}\n`);
   attachHeadless(s, { answers, allow });
+  let printed = false;
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
     if (out !== "stream-json" && e.type === "entry" && (e.entry.kind === "error" || e.entry.kind === "notice")) process.stderr.write(`${e.entry.kind === "error" ? "Error" : "Note"}: ${plainText(String(e.entry.data.message ?? e.entry.data.text))}\n`);
     if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${plainText(String(e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool))}\n`);
+    if (out !== "stream-json" && e.type === "entry" && e.entry.kind === "finding") process.stderr.write(`Review ${String(e.entry.data.severity)}: ${plainText(String(e.entry.data.message))}\n`);
+    if (out === "text" && e.type === "entry" && e.entry.kind === "assistant" && e.entry.data.final) {
+      if (printed) console.log("\nCorrected answer. The review found problems in the answer above:\n");
+      console.log(plainText(String(e.entry.data.annotated ?? e.entry.data.text)));
+      printed = true;
+    }
   });
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
   if (s.endedBy !== "answer") process.exitCode = 1;
-  if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list() }, null, 1));
-  else if (out === "text") console.log(`${plainText(answer)}\n\nSession: ${s.id}\nFolder: ${plainText(s.workDir)}\nRecord: ${plainText(join(s.dir, "log.jsonl"))}`);
+  const result = { session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list(), review: s.reviewState, findingCount: s.reviewFindings, answerReadyMs: s.answerReadyMs ?? null, turnMs: s.turnMs ?? null };
+  if (out === "json") console.log(JSON.stringify(result, null, 1));
+  else if (out === "stream-json") process.stdout.write(JSON.stringify({ type: "result", ...result }) + "\n");
+  else if (out === "text") console.log(`${printed ? "" : `${plainText(answer)}\n`}\nSession: ${s.id}\nFolder: ${plainText(s.workDir)}\nRecord: ${plainText(join(s.dir, "log.jsonl"))}`);
   await s.close();
 }
 

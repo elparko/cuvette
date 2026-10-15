@@ -129,8 +129,8 @@ decisions:
     default: none
     group: Normalization
     help: >
-      pqn (probabilistic quotient normalization) divides each sample by the median ratio to a reference sample. It corrects a
-      dilution effect, such as urine concentration. total_area divides by the sample total. median divides by the sample median.
+      pqn (probabilistic quotient normalization) first divides each sample by its total. Then it divides the sample by the median ratio
+      to a reference spectrum, which is the median of the samples. It corrects a dilution effect, such as urine concentration. total_area divides by the sample total. median divides by the sample median.
       none keeps the values. Total area is wrong if a few large features change between the groups.
     owner: human
     stage: setup
@@ -144,7 +144,7 @@ decisions:
       max_runs: 3
 
   - key: pqn_reference
-    label: Reference sample of the PQN
+    label: Reference spectrum of the PQN
     kind: text
     default: all
     group: Normalization

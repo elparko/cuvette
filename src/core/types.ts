@@ -10,7 +10,7 @@ export const ENTRY_KINDS = [
   "tool_call", "tool_result", "node", "stale", "environment", "rerun",
   "decision", "owner_change", "deviation", "blocked", "permission", "permission_mode",
   "question", "answer", "sensitivity",
-  "finding", "finding_resolution", "claim_check",
+  "finding", "finding_resolution", "claim_check", "answer_ready", "review",
   "mode", "follow_step", "lab_memory", "plan", "plan_approved", "clarify",
   "pilot_run", "pilot_approved", "pilot_rejected", "reference", "validation",
   "data_check", "samples", "eln_push", "eln_link", "setting", "note", "notice", "error", "usage", "compaction", "correction", "adapter", "title", "program", "trust", "self_test",

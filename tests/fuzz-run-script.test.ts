@@ -56,7 +56,6 @@ describe("fuzz: the check after a script", () => {
     const names = settingsScope(l.dirs).files;
     for (const f of [".cuvette/settings.json", ".cuvette/settings.local.json", ".ga/settings.json", ".ga/settings.local.json"]) expect(names).toContain(join(l.project, f));
     expect(names).toContain(join(process.env.CUVETTE_HOME!, "settings.json"));
-    expect(names).toContain(join(process.env.CUVETTE_HOME!, "sessions-index.json"));
   });
 
   test("the check finds each change to the settings and to the old part of the log, and no other change", () => {

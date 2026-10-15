@@ -135,9 +135,20 @@ describe("fuzz: the value gate for setting changes", () => {
     expect(namesValue("Never mind that I said ten, so set minimum cells to 5", cells, 5)).toBe(true);
   });
 
+  test("a comma right after a negation does not end its reach", () => {
+    const alpha = { key: "alpha", label: "Alpha" };
+    expect(namesValue("Don't, under any circumstances, set alpha to 0.1", alpha, 0.1)).toBe(false);
+    expect(namesValue("Do not, please, use alpha 0.1", alpha, 0.1)).toBe(false);
+    expect(namesValue("Never, ever, set alpha to 0.1.", alpha, 0.1)).toBe(false);
+    expect(namesValue("Do not, under any circumstances, touch the plots. Set alpha to 0.1", alpha, 0.1)).toBe(true);
+    expect(namesValue("Do not, under any circumstances, touch the plots\nSet alpha to 0.1", alpha, 0.1)).toBe(true);
+    expect(namesValue("Do not, under any circumstances, touch the plots, but set alpha to 0.1", alpha, 0.1)).toBe(true);
+    expect(namesValue("Do not worry about the old runs window 5", { key: "window", label: "Window" }, 5)).toBe(true);
+  });
+
   test("a negation before the value closes the gate", () => {
     const r = new Rng(41003);
-    const no = ["Do not", "Don't", "Never", "Please do not", "Dont", "Do NOT", "Do n't", "I do not want you to", "Never ever", "Avoid", "Without"];
+    const no = ["Do not", "Don't", "Never", "Please do not", "Dont", "Do NOT", "Do n't", "I do not want to", "Never ever", "Avoid", "Without"];
     for (let i = 0; i < runs(1200); i++) {
       const f = r.pick(NUM);
       const n = r.int(0, 999);

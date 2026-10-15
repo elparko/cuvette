@@ -510,12 +510,12 @@ tools:
   - name: top_features
     title: List the ions of each segment
     description: >
-      Rank the ions of each segment of one model by the t statistic. Returns a table with the
-      segment, the m/z, the statistic and the mean intensity.
+      Rank the ions of each segment of one model by the t statistic. Keeps the ions with a positive
+      statistic, at most n for each segment. Returns a table with the segment, the m/z, the statistic and the mean intensity.
     params:
       model: { type: string, description: The model_file from segment_image. }
       s: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Sparsity of the model to read." }
-      n: { type: integer, minimum: 1, maximum: 50, default: 5, description: Number of ions for each segment. }
+      n: { type: integer, minimum: 1, maximum: 50, default: 5, description: Largest number of ions for each segment. }
     required: [model]
     read_only: true
     outputs:

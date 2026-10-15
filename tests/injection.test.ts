@@ -492,7 +492,8 @@ test("a model that is told to hide a failed step: the review still records the f
   const open = x.s.findings.list("open");
   expect(open.map((f) => f.check)).toContain("failed_result_used");
   const final = x.s.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)!;
-  expect((final.data.findings as string[]).length).toBeGreaterThan(0);
+  const review = x.s.record.entries(["review"]).filter((e) => e.data.answer === final.id).at(-1)!;
+  expect((review.data.findings as string[]).length).toBeGreaterThan(0);
   expect(x.s.record.entries(["finding_resolution"])).toEqual([]);
   expect(x.s.record.entries(["tool_result"]).some((e) => e.data.tool === "read_file" && e.data.ok === false)).toBe(true);
 });

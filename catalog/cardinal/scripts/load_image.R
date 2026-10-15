@@ -16,7 +16,12 @@ run_tool(function() {
     if (!obj %in% nm) fail(paste("object not in file. Objects:", paste(nm, collapse = ", ")))
     get(obj, envir = e)
   } else if (ext %in% c("imzml", "ibd")) {
-    readMSIData(sub("\\.ibd$", ".imzML", path, ignore.case = TRUE), attach.only = FALSE)
+    base <- sub("\\.(ibd|imzml)$", "", path, ignore.case = TRUE)
+    xml <- paste0(base, c(".imzML", ".imzml"))
+    xml <- xml[file.exists(xml)][1]
+    if (is.na(xml)) fail(paste("no .imzML file next to", path))
+    if (!file.exists(paste0(base, ".ibd"))) fail(paste("no .ibd file next to", xml))
+    readMSIData(xml, memory = TRUE)
   } else {
     fail("the file type must be .rds, .rda, .RData or .imzML")
   }
@@ -29,7 +34,7 @@ run_tool(function() {
   emit(list(
     ok = TRUE,
     summary = sprintf("%d spectra, %d m/z values, m/z %.2f to %.2f, %d run(s)", ncol(x), nrow(x), min(mz), max(mz), length(runs)),
-    metrics = list(n_spectra = ncol(x), n_features = nrow(x), mz_min = min(mz), mz_max = max(mz), n_runs = length(runs), x_min = min(co$x), x_max = max(co$x), y_min = min(co$y), y_max = max(co$y), centroided = isTRUE(centroided(x))),
+    metrics = list(n_spectra = ncol(x), n_features = nrow(x), mz_min = min(mz), mz_max = max(mz), n_runs = length(runs), x_min = min(co$x), x_max = max(co$x), y_min = min(co$y), y_max = max(co$y), centroided = as.integer(isTRUE(centroided(x)))),
     data = list(image_file = out, runs = runs, cardinal_version = cardinal_version()),
     manualRoute = sprintf("library(Cardinal); x <- readRDS(\"%s\")  # or readMSIData() for imzML", path)
   ))

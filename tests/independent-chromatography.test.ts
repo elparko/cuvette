@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -89,5 +89,22 @@ print(json.dumps({"plain": area(tt, yy), "corrected": area(tt, c), "height": flo
     expect(rows.map((r) => r[2])).toEqual([0.96, 4.96, 29.96]);
     expect(rows.map((r) => r[3])).toEqual([true, true, false]);
     expect(out.metrics.n_outside_range).toBe(1);
+  });
+
+  // Analytic integral of a Gaussian: height x sigma x sqrt(2 pi). A data system reports this value in signal times time.
+  test("the peak area in signal times time equals the analytic Gaussian integral and the summed signal is that value divided by the time step", { timeout: slow }, async () => {
+    const file = join(root, "gauss.csv");
+    const step = 0.02;
+    const rows = ["time,signal"];
+    for (let i = 0; i < 500; i++) rows.push(`${i * step},${120 * Math.exp(-0.5 * ((i * step - 5) / 0.18) ** 2)}`);
+    writeFileSync(file, rows.join("\n"));
+    const want = 120 * 0.18 * Math.sqrt(2 * Math.PI);
+    const out = await chrom.run("integrate_peaks", { path: file, baseline: "none", prominence: 0.01 });
+    expect(out.metrics.n_peaks).toBe(1);
+    expect(Math.abs(out.metrics.area_signal_time_1 / want - 1)).toBeLessThan(0.01);
+    expect(Math.abs(out.metrics.area_1 / (want / step) - 1)).toBeLessThan(0.01);
+    expect(out.table.columns).toContain("area_signal_time");
+    const window = await chrom.run("area_in_window", { path: file, start: 3, end: 7 });
+    expect(Math.abs(out.metrics.area_signal_time_1 / window.metrics.area - 1)).toBeLessThan(0.01);
   });
 });

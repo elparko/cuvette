@@ -302,7 +302,7 @@ tools:
     description: >
       Rank genes by Moran's I (or Geary's C), a measure of how similar a gene is between neighboring
       spots. A high I means that the gene follows the tissue structure. Run it on log-normalized values
-      with the spatial graph. The p values treat spots as independent. They are descriptive.
+      with the spatial graph. The p values treat spots as independent. They are descriptive. Each p value is one-sided: it tests only the direction of the statistic of the gene.
     function: "ga_squidpy:spatial_autocorr"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. The object needs the spatial graph. }

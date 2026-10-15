@@ -620,8 +620,15 @@ def make_plot(path, kind, y, y_label, x=None, x_label=None, group=None, error_ba
         if not label or not UNIT.search(label):
             return _fail("%s needs the unit in parentheses, for example 'Red dots per cell (%%)'. For a count, write '(count)'." % arg)
     error_bars = (error_bars or "SD").upper()
+    n_rows = len(frame)
+    first_values = ", ".join(map(str, frame[y].dropna().astype(str).unique()[:3]))
     frame[y] = pd.to_numeric(frame[y], errors="coerce")
     frame = frame.dropna(subset=[y])
+    if frame.empty:
+        return _fail("The column %s has no numbers (its first values are: %s). Check the column name, or read the table with read_table first." % (y, first_values or "none"))
+    left_out = []
+    if len(frame) < n_rows:
+        left_out.append("%d of %d rows have no number in %s" % (n_rows - len(frame), n_rows, y))
     _style()
     rng = np.random.default_rng(0)
     if kind in ("bar", "box"):
@@ -678,8 +685,15 @@ def make_plot(path, kind, y, y_label, x=None, x_label=None, group=None, error_ba
         metrics["bin_width"] = float(edges[1] - edges[0])
         desc = "Histogram of %s (n = %d) in %d bins of width %s; median %s" % (y, len(frame), len(edges) - 1, _fmt(edges[1] - edges[0]), _fmt(frame[y].median()))
     else:
+        n_before = len(frame)
+        first_x = ", ".join(map(str, frame[x].dropna().astype(str).unique()[:3]))
         frame[x] = pd.to_numeric(frame[x], errors="coerce")
         frame = frame.dropna(subset=[x])
+        if frame.empty:
+            plt.close(fig)
+            return _fail("The column %s has no numbers (its first values are: %s). A %s plot needs a numeric x column. Use a bar or box plot for groups." % (x, first_x or "none", kind))
+        if len(frame) < n_before:
+            left_out.append("%d of %d rows have no number in %s" % (n_before - len(frame), n_before, x))
         metrics["n"] = int(len(frame))
         sets = [(str(g), part) for g, part in frame.groupby(group, sort=False)] if group else [(None, frame)]
         parts = []
@@ -736,7 +750,7 @@ def make_plot(path, kind, y, y_label, x=None, x_label=None, group=None, error_ba
     metrics.update({"width_px": int(w), "height_px": int(h), "png_bytes": os.path.getsize(png), "svg_bytes": os.path.getsize(svg)})
     return {
         "ok": True,
-        "summary": desc + ". Saved %s and %s." % (png, os.path.basename(svg)),
+        "summary": desc + ". " + ("".join(w + ". " for w in left_out)) + "Saved %s and %s." % (png, os.path.basename(svg)),
         "metrics": metrics,
         "png": png, "svg": svg,
         "outputs": [{"path": png, "kind": "image", "name": os.path.basename(png)}, {"path": svg, "kind": "file", "name": os.path.basename(svg)}],

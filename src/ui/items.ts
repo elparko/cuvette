@@ -95,7 +95,8 @@ export class Mapper {
         return [{ key, t: "user", text: String(d.text ?? "") }];
       case "assistant":
         if (String(d.text ?? "").trim()) this.said = true;
-        return d.text ? [{ key, t: "assistant", text: String(d.text) }] : [];
+        if (!d.text) return [];
+        return d.corrects ? [...line("↻", "Corrected answer. The review found problems in the answer above.", "yellow"), { key: `${key}c`, t: "assistant", text: String(d.text) }] : [{ key, t: "assistant", text: String(d.text) }];
       case "tool_call":
         this.calls.set(String(d.callId), (d.args ?? {}) as Record<string, unknown>);
         return [];
@@ -151,6 +152,10 @@ export class Mapper {
         return line("⚠", `Review ${d.severity}: ${d.message}`, d.severity === "error" ? "red" : "yellow");
       case "finding_resolution":
         return line("✓", `Finding ${d.fid}: ${d.action}`, "green");
+      case "review":
+        if (d.state === "stopped") return line("▸", "Review stopped. The answer above has no review.", "yellow");
+        if (d.state === "done" && !((d.findings as unknown[]) ?? []).length) return line("✓", "Review finished. No problems found.", undefined, true);
+        return [];
       case "mode":
         return d.reason ? [] : line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
       case "setting":

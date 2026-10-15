@@ -12,9 +12,15 @@ export interface RunOptions {
   timeoutS?: number;
 }
 
+export interface RunTimes {
+  answerReadyMs?: number;
+  turnMs?: number;
+}
+
 export interface RunResult {
   sessionDir: string;
   scores: Scores;
+  times: RunTimes;
 }
 
 export function answerFor(sc: Scenario, q: { decisionKey?: string }): unknown {
@@ -62,7 +68,7 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
       await session.exportAs("protocol");
     } catch {}
     await session.close();
-    return { sessionDir: session.dir, scores: score(session.dir, sc) };
+    return { sessionDir: session.dir, scores: score(session.dir, sc), times: { answerReadyMs: session.answerReadyMs, turnMs: session.turnMs } };
   } finally {
     if (oldHome === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = oldHome;
@@ -75,6 +81,8 @@ interface Row {
   off?: Scores;
   onDir?: string;
   offDir?: string;
+  onTimes?: RunTimes;
+  offTimes?: RunTimes;
 }
 
 function f(x: number | undefined): string {
@@ -103,6 +111,12 @@ export function renderReport(model: string, rows: Row[]): string {
     const mean = (n: (typeof SCORE_NAMES)[number], k: "on" | "off") => both.reduce((a, r) => a + r[k]![n], 0) / both.length;
     lines.push(`| all | on minus off | ${SCORE_NAMES.map((n) => diff(mean(n, "on"), mean(n, "off"))).join(" | ")} | ${diff(both.reduce((a, r) => a + overall(r.on!), 0) / both.length, both.reduce((a, r) => a + overall(r.off!), 0) / both.length)} |`);
   }
+  const timed = rows.flatMap((r) => [["on", r.onTimes, r.id], ["off", r.offTimes, r.id]] as const).filter((x): x is readonly ["on" | "off", RunTimes, string] => !!x[1]);
+  if (timed.length) {
+    const sec = (ms?: number) => (ms === undefined ? "-" : (ms / 1000).toFixed(1));
+    lines.push("", "Answer-ready time is the time from the request to the first answer. Whole-turn time includes the review.", "", "| Scenario | Guidance | Answer ready (s) | Whole turn (s) |", "| --- | --- | --- | --- |");
+    for (const [label, t, id] of timed) lines.push(`| ${id} | ${label} | ${sec(t.answerReadyMs)} | ${sec(t.turnMs)} |`);
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -118,11 +132,13 @@ export async function runBench(
       const r = await runScenario(id, { model: opts.model, guidance: true, timeoutS: opts.timeoutS });
       row.on = r.scores;
       row.onDir = r.sessionDir;
+      row.onTimes = r.times;
     }
     if (opts.guidance !== "on") {
       const r = await runScenario(id, { model: opts.model, guidance: false, timeoutS: opts.timeoutS });
       row.off = r.scores;
       row.offDir = r.sessionDir;
+      row.offTimes = r.times;
     }
     rows.push(row);
   }
