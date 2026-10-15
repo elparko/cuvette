@@ -1056,3 +1056,33 @@ test.skipIf(!sandboxWorks)("an adapter program writes its own home adapter folde
     expect(await run(join(home, "envs", "x", "lib"))).toBe(0);
   });
 });
+
+test("settings scope locks LAB.md of the project", () => {
+  const l = layout();
+  const scope = settingsScope(l.dirs);
+  expect(scope.locked).toContain(join(l.project, "LAB.md"));
+  expect(scope.files).toContain(join(l.project, "LAB.md"));
+});
+
+test("a root glob pattern deny is followed by an allow for the work folder, for Seatbelt only", () => {
+  const l = layout();
+  writeFileSync(l.settings, JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "python3 **/*.py"] }] } }));
+  writeFileSync(join(l.project, "check.py"), "pass\n");
+  const steps = writeSteps(l.dirs);
+  const rules = writeRules(steps);
+  const deny = rules.indexOf("(deny file-write* (regex");
+  const allow = rules.indexOf(`(allow file-write* (subpath "${l.out}"))`);
+  expect(deny).toBeGreaterThanOrEqual(0);
+  expect(allow).toBeGreaterThan(deny);
+  expect(bwrapCommand(["tool"], steps).join(" ")).not.toContain(`--bind ${l.out} ${l.out}`);
+});
+
+test("a closing bracket in the project path does not stop the bwrap lock of a pattern match", () => {
+  const project = join(realpathSync(mkdtempSync(join(tmpdir(), "cuvette-br-"))), "a]b");
+  mkdirSync(project);
+  writeFileSync(join(project, "note.txt"), "x");
+  writeFileSync(join(project, "data.csv"), "x");
+  const locks = bwrapCommand(["tool"], [{ path: project, allow: false, pattern: `^${literalEre(project)}/${globEre("*.txt")}$` }]).join(" ");
+  expect(locks).toContain(`--ro-bind ${join(project, "note.txt")} `);
+  expect(locks).not.toContain(`--ro-bind ${join(project, "data.csv")} `);
+});
