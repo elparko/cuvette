@@ -1,6 +1,7 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { ensureHome } from "./atomic.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
 
 let version = 0;
@@ -129,7 +130,7 @@ export function antLogin(env: Record<string, string | undefined> = process.env):
 }
 
 function write(values: Record<string, unknown>): string {
-  mkdirSync(cuvetteHome(), { recursive: true });
+  ensureHome();
   const path = credentialsPath();
   const tmp = `${path}.${process.pid}.tmp`;
   try {

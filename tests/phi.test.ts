@@ -643,3 +643,20 @@ test("localUrl treats the IPv6 any address as local", () => {
   expect(localUrl("http://[::]:11434")).toBe(true);
   expect(localUrl("http://[::1]:11434")).toBe(true);
 });
+
+test("localUrl needs a full address, not a host name that starts with digits", () => {
+  expect(localUrl("https://10.evil.example.com/v1")).toBe(false);
+  expect(localUrl("https://192.168.evil.com/v1")).toBe(false);
+  expect(localUrl("https://172.16.example.com/v1")).toBe(false);
+  expect(localUrl("http://10.0.0.5:8000/v1")).toBe(true);
+  expect(localUrl("http://192.168.1.1/v1")).toBe(true);
+  expect(localUrl("http://172.20.1.1/v1")).toBe(true);
+  expect(localUrl("http://127.0.0.2/v1")).toBe(true);
+  expect(localUrl("http://10.0.0.300/v1")).toBe(false);
+});
+
+test("a blank row in a table does not stop the scan of a name column", () => {
+  const csv = "patient_name,visit\nJane Doe,1\n\nJohn Smith,2\n";
+  const names = scanContent(csv, "v.csv").filter((h) => h.kind === "name").map((h) => h.value);
+  expect(names).toEqual(["Jane Doe", "John Smith"]);
+});

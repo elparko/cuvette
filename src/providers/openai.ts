@@ -3,6 +3,7 @@ import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts
 import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, defang, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
+import { noticeOnce } from "../core/atomic.ts";
 import { hideKeys } from "../core/credentials.ts";
 import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
@@ -12,7 +13,8 @@ const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not suppo
 export function keySafe(base: string): boolean {
   try {
     const u = new URL(base);
-    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
+    if (u.protocol === "https:" && u.hostname === "api.openai.com") return true;
+    return (u.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname)) && localUrl(base);
   } catch {
     return false;
   }
@@ -120,7 +122,10 @@ export class OpenAIProvider implements Provider {
   private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
     idle.touch();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
+    if (process.env.OPENAI_API_KEY) {
+      if (keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
+      else noticeOnce(`Cuvette did not send OPENAI_API_KEY to ${this.base}. The key goes only to api.openai.com or to this computer.`);
+    }
     const res = await longFetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
     if (res.status === 429 || res.status === 408 || res.status === 409 || res.status >= 500) {
       const txt = hideKeys(await res.text()).text;
@@ -138,7 +143,7 @@ export class OpenAIProvider implements Provider {
       msg = j.error?.message ?? j.error ?? j.detail ?? txt;
     } catch {}
     const text = typeof msg === "string" ? msg : JSON.stringify(msg);
-    if (res.status === 401 || res.status === 403) return new ProviderError(process.env.OPENAI_API_KEY && !keySafe(this.base) ? "The model server rejected the request. Cuvette did not send OPENAI_API_KEY, because the address uses plain http and is not on this computer. Use https." : "The model server rejected the credentials. Set OPENAI_API_KEY.");
+    if (res.status === 401 || res.status === 403) return new ProviderError(process.env.OPENAI_API_KEY && !keySafe(this.base) ? "The model server rejected the request. Cuvette did not send OPENAI_API_KEY, because the server is not api.openai.com and not on this computer." : "The model server rejected the credentials. Set OPENAI_API_KEY.");
     if (res.status === 400 && body.stream_options && /stream_options|include_usage/i.test(text)) {
       this.usageOption = false;
       return "again";
