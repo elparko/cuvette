@@ -12,6 +12,7 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
+import { hookScripts } from "../core/trust.ts";
 import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
@@ -268,6 +269,9 @@ export function settingsScope(dirs: Dirs): SettingsScope {
     out.files.push(...settingsFiles);
   }
   if (!dirs.projectDir) return out;
+  const scripts = hookScripts(dirs.projectDir);
+  out.locked.push(...scripts);
+  out.files.push(...scripts);
   for (const name of [".cuvette", ".ga"]) {
     const dir = join(dirs.projectDir, name);
     if (homes.filter(inside).some((h) => within(h, realish(dir)))) {

@@ -4,14 +4,14 @@ import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { opendir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { namesValue } from "./asked.ts";
 import { refangDeep } from "../providers/text.ts";
 import { hideKeys, isCredentialsFile, isSecretFile } from "./credentials.ts";
 import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
-import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
+import { adapterDirs, findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { START_VERSION_TIMEOUT_MS } from "../adapters/locate.ts";
 import { makeProvider } from "../providers/index.ts";
@@ -57,7 +57,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectAdapterDirs, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -103,6 +103,7 @@ export interface SessionOptions {
   refereeProvider?: Provider;
   generic?: boolean;
   pick?: boolean;
+  addAdapters?: string[];
   interactive?: boolean;
   home?: boolean;
   place?: Place;
@@ -415,23 +416,36 @@ export class Session {
     const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
     const gone = new Map<string, boolean>();
-    const recorded = new Map<string, string>();
-    for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path && existsSync(a.path) ? a.path : a.name);
+    const recorded = new Map<string, string | undefined>();
+    for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
+    const replaced: string[] = [];
     try {
+      const dirs = adapterDirs(cwd);
+      const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
+      const guarded = [cwd, place.recordDir, place.outDir].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
+      const inGuarded = (path: string) => guarded.some((d) => realpathSync(path) === d || realpathSync(path).startsWith(d + sep));
+      const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : dirs[name] ?? name);
+      for (const a of opts.addAdapters ?? []) {
+        try {
+          const found = findAdapter(a, cwd);
+          const before = [recorded.get(found.name), dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
+          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) replaced.push(found.name);
+        } catch {}
+      }
       adapters =
         opts.adapters ??
-        [...recorded].filter(([name, ref]) => {
+        [...recorded].filter(([name]) => !replaced.includes(name)).map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
           try {
-            findAdapter(ref, cwd);
+            findAdapter(ref, cwd, { byName: ref === name && !dirs[name] });
             return true;
           } catch (e) {
             if (!(e as Error).message.startsWith("no adapter named")) throw e;
-            gone.set(name, existsSync(ref));
+            gone.set(name, !!path && existsSync(path) && !!cwd && projectAdapterDirs(cwd).some((d) => resolve(path).startsWith(d + sep)));
             return false;
           }
-        }).map(([, ref]) => ref);
+        }).map(([, , ref]) => ref);
     } finally {
       if (opts.trustFolder && cwd) endTrustOnce(cwd);
     }
@@ -443,7 +457,8 @@ export class Session {
       const last = record.live(["setting"]).filter((e) => e.data.name === name).at(-1)?.data;
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
-    const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    for (const name of replaced) s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. This session used another folder before.`, warn: true });
     for (const [name, untrusted] of gone) {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
@@ -457,7 +472,7 @@ export class Session {
     const resumed = this.record.entries(["session"]).length > 0;
     const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
-    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
+    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a, i, all) => all.findIndex((x) => x.name === a.name) === i).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
@@ -726,7 +741,7 @@ export class Session {
     for (const name of this.settings.defaultAdapters ?? []) {
       if (this.adapters.some((a) => a.name === name)) continue;
       try {
-        const a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
+        const a = usable(applyOverlay(findAdapter(name, this.cwd, { byName: true })), this.cwd);
         const l = a.manifest.locate;
         if (!(l.env || l.paths.length || l.which.length) || programFound(a.manifest, this.found).path) out.push(a);
         else this.notes.push(`The default adapter ${name} is not loaded: its program is not found. ${installHint(a.manifest)}`);
@@ -821,7 +836,7 @@ export class Session {
     if (this.planning) return { ok: false, error: "Plan first: name the adapter in the programs section of the plan. When the scientist approves the plan, call use_adapter. The approval covers the adapters that the plan names." };
     let a: LoadedAdapter;
     try {
-      a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
+      a = usable(applyOverlay(findAdapter(name, this.cwd, { byName: true })), this.cwd);
     } catch (e) {
       return { ok: false, error: `${(e as Error).message}. Call list_adapters to see the names.` };
     }
@@ -837,7 +852,7 @@ export class Session {
     for (const n of gate.load) {
       let b: LoadedAdapter;
       try {
-        b = n === a.name ? a : usable(applyOverlay(findAdapter(n, this.cwd)), this.cwd);
+        b = n === a.name ? a : usable(applyOverlay(findAdapter(n, this.cwd, { byName: true })), this.cwd);
       } catch (e) {
         ok = false;
         texts.push((e as Error).message);
@@ -2276,10 +2291,10 @@ export class Session {
     return this.permitted(tool, args) === "allow";
   }
 
-  // A deny rule wins over an earlier "always allow" and over the batch approval.
+  // A deny rule or an ask rule wins over an earlier "always allow" and over the batch approval.
   private permitted(tool: Tool, args: Args): "allow" | "ask" | "deny" {
     const rule = this.permissions.check(tool, args);
-    return rule !== "deny" && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
+    return rule !== "deny" && !(rule === "ask" && this.permissions.asks(tool, args)) && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
   }
 
   private outcomes = new Map<string, CallOutcome>();
@@ -2403,6 +2418,7 @@ export class Session {
       if (res.cancelled) return error("not run. The turn stopped before the scientist answered the card.");
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
+    pre.commit?.();
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
     const many = kept.length > 1;
@@ -3845,7 +3861,7 @@ export class Session {
     for (const name of new Set([...this.adapters.map((a) => a.name), ...plannedAdapters(plan)])) {
       let a: LoadedAdapter | undefined = this.adapters.find((x) => x.name === name);
       try {
-        a ??= applyOverlay(findAdapter(name, this.cwd));
+        a ??= applyOverlay(findAdapter(name, this.cwd, { byName: true }));
       } catch {
         continue;
       }

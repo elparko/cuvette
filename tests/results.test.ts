@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
+import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook, copyFigures, decodeText, typed, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
 import type { NodeIn } from "../src/core/types.ts";
@@ -100,6 +101,70 @@ test("figures are copied to figures/ with the step number and a readable name, w
   expect(names).toEqual(["figures/box.png", "figures/step02-histogram-red-intensity.png", "figures/step02-histogram-red-intensity.svg"]);
   expect(readFileSync(join(out, "figures", "step02-histogram-red-intensity.png"))).toEqual(PNG);
   expect(copyFigures(record, out).map((f) => f.path).sort()).toEqual(figs.map((f) => f.path).sort());
+});
+
+test("a figure that changed after the run is copied from the recorded blob, with a note", () => {
+  const { record, out } = sampleRecord();
+  const live = join(out, "histogram_red intensity.png");
+  const other = Buffer.concat([PNG, Buffer.from([1, 2, 3])]);
+  writeFileSync(live, other);
+  const figs = copyFigures(record, out);
+  const fig = figs.find((f) => f.path.endsWith("step02-histogram-red-intensity.png"))!;
+  expect(readFileSync(fig.path)).toEqual(PNG);
+  expect(fig.note).toMatch(/changed after the run/);
+  expect(figs.find((f) => f.path.endsWith("box.png"))!.note).toBeUndefined();
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures: figs });
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /changed after the run/.test(String(r[2])))).toBe(true);
+});
+
+test("a large figure that changed after the run gives a Note row", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s4");
+  const path = join(mkdtempSync(join(tmpdir(), "cuvette-res-big-")), "big.png");
+  writeFileSync(path, Buffer.alloc(COPY_LIMIT_BYTES + 1, 7));
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "image", sha }], result: { metrics: {} }, summary: "Plot." }));
+  const bytes = readFileSync(path);
+  bytes[5] = 9;
+  writeFileSync(path, bytes);
+  utimesSync(path, new Date(), new Date(Date.now() + 5000));
+  const out = record.workDir;
+  const figures = copyFigures(record, out);
+  expect(figures).toEqual([]);
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures });
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /big\.png \(step 1\)/.test(String(r[1])) && /changed after the run/.test(String(r[2])))).toBe(true);
+});
+
+test("a large table that changed after the run says that no copy exists", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s5");
+  const path = join(mkdtempSync(join(tmpdir(), "cuvette-res-big-")), "big.csv");
+  writeFileSync(path, "a,b\n" + "1,2\n".repeat(COPY_LIMIT_BYTES / 4 + 10));
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "table", sha }], result: { metrics: {} }, summary: "Big table." }));
+  const bytes = readFileSync(path);
+  bytes[6] = 57;
+  writeFileSync(path, bytes);
+  utimesSync(path, new Date(), new Date(Date.now() + 5000));
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: record.workDir, figures: [] });
+  const note = sheets[0]!.rows.find((r) => r[0] === "Note" && /big\.csv/.test(String(r[1])))!;
+  expect(String(note[3])).toMatch(/record kept no copy/);
+  expect(String(note[3])).not.toMatch(/uses the copy/);
+});
+
+test("a table that changed after the run is read from the recorded blob, with a note", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s3");
+  const out = record.workDir;
+  const path = join(out, "means.csv");
+  writeFileSync(path, "group,mean\n1,0.7\n2,1.9\n");
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "table", sha }], result: { metrics: {} }, summary: "Means." }));
+  writeFileSync(path, "group,mean\n1,9.9\n2,9.9\n");
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures: [] });
+  const table = sheets.find((x) => x.name.startsWith("Step 1"))!;
+  expect(table.rows).toEqual([[1, 0.7], [2, 1.9]]);
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /changed after the run/.test(String(r[2])))).toBe(true);
 });
 
 test("the Steps sheet shows no curly-brace text when a summary names a value that the result lacks", () => {

@@ -2485,6 +2485,61 @@ test("a deny rule wins over always allow", async () => {
   expect(session["permitted"](tool, { path: join(cwd, "a.txt") })).toBe("deny");
 });
 
+test("an ask rule with an argument pattern wins over always allow and over the plan approval", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false, permissions: { "run_command:rm *": "ask" } } as never });
+  const tool = { name: "run_command", source: "generic", inputSchema: { type: "object", properties: { argv: { type: "array" } } } } as never;
+  session["sessionAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["rm", "-r", "x"] })).toBe("ask");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+  session["sessionAllow"].clear();
+  session["batchAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["rm", "-r", "x"] })).toBe("ask");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+});
+
+test("an ask rule for run_script wins over the approval of a plan that names run_script", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false, permissions: { run_script: "ask" } } as never });
+  const tool = session.findTool("run_script")!;
+  session["batchAllow"].add("run_script");
+  expect(session["permitted"](tool, { code: "print(1)" })).toBe("ask");
+});
+
+test("always allow still covers a tool that asks only by its own default", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false } as never });
+  const tool = { name: "run_command", source: "generic", inputSchema: { type: "object", properties: {} } } as never;
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("ask");
+  session["sessionAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+});
+
+test("a call that the permission rules deny does not change a decision of the agent or mark steps as out of date", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const call = { calls: [{ name: "blur", args: { input: "/data/a.lab", sigma: 2 } }] };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([call, { text: "done" }]), cwd, settings: { guidance: true, phi_check: false, referee: "none", permissions: { blur: "deny" } } as never });
+  session.decisions.applySetup({ question: "Blur?" });
+  session.decisions.change("sigma", 1, { by: "agent" });
+  const before = session.record.entries(["decision"]).length;
+  await session.send("Blur the image");
+  expect(session.decisions.value("sigma")).toBe(1);
+  expect(session.record.entries(["decision"]).length).toBe(before);
+  expect(session.record.entries(["tool_result"]).some((e) => /permission rules deny/.test(String(e.data.error ?? e.data.text ?? "")))).toBe(true);
+});
+
+test("a call that runs records the change of a decision of the agent", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const call = { calls: [{ name: "blur", args: { input: "/data/a.lab", sigma: 2 } }] };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([call, { text: "done" }]), cwd, settings: { guidance: true, phi_check: false, referee: "none" } as never });
+  session.decisions.applySetup({ question: "Blur?" });
+  session.decisions.change("sigma", 1, { by: "agent" });
+  await session.send("Blur the image");
+  expect(session.decisions.value("sigma")).toBe(2);
+  expect(session.record.entries(["decision"]).at(-1)!.data).toMatchObject({ key: "sigma", old: 1, new: 2, by: "agent" });
+  expect(session.record.nodes().find((n) => n.tool === "blur")!.decisions.sigma).toBe(2);
+});
+
 test("an Esc on a permission card records a cancel by the harness, not a denial by the scientist", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
   writeFileSync(join(cwd, "a.txt"), "text");

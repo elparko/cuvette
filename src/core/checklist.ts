@@ -103,7 +103,7 @@ const clip = (s: string, n = 220) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 function plain(v: unknown): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v.trim();
-  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(4)));
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(Math.max(4, String(Math.trunc(Math.abs(v))).length))));
   if (typeof v === "boolean") return String(v);
   if (Array.isArray(v)) return v.map(plain).filter(Boolean).join("; ");
   if (typeof v === "object") return Object.values(v).map(plain).filter(Boolean).join(": ");

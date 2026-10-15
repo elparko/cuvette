@@ -432,12 +432,21 @@ export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   return found;
 }
 
-export function findAdapter(nameOrPath: string, cwd = process.cwd()): LoadedAdapter {
-  const inProject = [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
-  if (existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
+export function findAdapter(nameOrPath: string, cwd = process.cwd(), opts: { byName?: boolean } = {}): LoadedAdapter {
+  if (opts.byName) {
+    const dirs = adapterDirs(cwd);
+    if (!Object.hasOwn(dirs, nameOrPath)) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
+    return loadAdapter(dirs[nameOrPath]);
+  }
+  const pathForm = isAbsolute(nameOrPath) || /[\\/]/.test(nameOrPath) || nameOrPath.startsWith(".");
+  const inProject = pathForm && [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
+  if (pathForm && existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
   if (inProject) nameOrPath = basename(resolve(nameOrPath));
   const dirs = adapterDirs(cwd);
   const dir = dirs[nameOrPath];
-  if (!dir) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
+  if (!dir) {
+    const hint = !pathForm && existsSync(join(process.cwd(), nameOrPath, "adapter.yaml")) ? ` Use --adapter ./${nameOrPath} to load the folder.` : "";
+    throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}${hint ? `.${hint}` : ""}`);
+  }
   return loadAdapter(dir);
 }

@@ -325,6 +325,15 @@ test("write steps lock the records and the settings folders, and keep the work f
   expect(recordFolders(l.dirs)).toContain(join(l.other, ".record"));
 });
 
+test("write steps lock a hook script of the project", () => {
+  const l = layout();
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "./guard.sh"] }] } }));
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  const locked = writeSteps(l.dirs).filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toContain(join(l.project, "guard.sh"));
+  expect(settingsScope(l.dirs).files).toContain(join(l.project, "guard.sh"));
+});
+
 test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
   const record = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-legacy-")));
   const work = join(record, "work");

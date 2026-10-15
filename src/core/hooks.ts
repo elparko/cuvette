@@ -157,6 +157,11 @@ export class HookRunner {
       }
       if (r.deviations?.length) merged.deviations = [...(merged.deviations ?? []), ...r.deviations];
       if (r.applied) merged.applied = { ...merged.applied, ...r.applied };
+      if (r.commit) {
+        const first = merged.commit;
+        const next = r.commit;
+        merged.commit = () => (first?.(), next());
+      }
       merged.additionalContext = join(merged.additionalContext, r.additionalContext);
       if (r.decision && STOPPING.has(r.decision)) {
         merged.decision = r.decision;

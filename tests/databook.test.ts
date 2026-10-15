@@ -74,6 +74,19 @@ describe("databook", () => {
     expect(b.html).not.toContain("held back");
   });
 
+  it("keeps every integer digit of a large number in a cell", () => {
+    const r = session();
+    r.addNode({
+      entry: 0, adapter: "biostats", adapterVersion: "0.1.1", programVersion: "0.30.3", tool: "count_cells",
+      args: {}, decisions: {}, codeHash: "c", inputHashes: [], outputs: [],
+      result: { ok: true, metrics: { n_cells: 12345678.5, n_small: 12.3456789 } }, parents: [], summary: "Counted cells.", model: "m", manualRoute: "", fidelity: "close",
+    });
+    const html = book([r]).html;
+    expect(html).toContain("12345679");
+    expect(html).not.toContain("12345700");
+    expect(html).toContain("12.3457");
+  });
+
   it("puts the sections in the fixed order", () => {
     const r = session();
     addPilot(r);

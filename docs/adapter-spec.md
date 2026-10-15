@@ -455,7 +455,7 @@ The choice of program is a decision with the key `adapter`. The scientist owns i
 <reason>." The other options are the adapters that share a file type with it. The scientist
 accepts or picks another. If the scientist gives the decision to the agent, the load goes ahead
 and the record shows an agent choice. In a headless run, the answers file can set it, such as
-`"adapter": "biostats"`. `--adapter` still names the adapters before the start, with no card.
+`"adapter": "biostats"`. `--adapter` names the adapters before the start, with no card. With `--resume`, it adds them to the recorded adapters. A name is an installed or catalog adapter. To load a folder, write `./folder` or an absolute path.
 
 After a load, the record has an `adapter` entry with the name, the adapter version, the program
 version, the reason and who chose it. Setup-stage decisions of the new adapter get their defaults,

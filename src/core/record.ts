@@ -6,6 +6,7 @@ import { extractNumbers } from "./claims.ts";
 import type { EnvLock } from "./envlock.ts";
 import { ENTRY_KINDS, type Entry, type EntryKind, type Message, type Node, type NodeIn } from "./types.ts";
 
+const SHA_TEXT = /^[0-9a-f]{1,64}$/i;
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
 // A table or text file that a script wrote holds its results. A code file holds typed numbers, not results.
@@ -17,7 +18,20 @@ export interface RecordPlaces {
   project?: string;
 }
 
-function sha256File(path: string): string {
+const HASHES = new Map<string, string>();
+
+export function sha256File(path: string): string {
+  const st = statSync(path);
+  const key = `${path}\0${st.size}\0${st.mtimeMs}`;
+  const known = HASHES.get(key);
+  if (known) return known;
+  const digest = hashOfFile(path);
+  if (HASHES.size >= 200) HASHES.delete(HASHES.keys().next().value!);
+  HASHES.set(key, digest);
+  return digest;
+}
+
+function hashOfFile(path: string): string {
   const h = createHash("sha256");
   const fd = openSync(path, "r");
   const buf = Buffer.alloc(1 << 20);
@@ -271,6 +285,7 @@ export class AnalysisRecord {
   }
 
   blobRef(sha: string): { path: string; size: number; mtime: string; sha256: string } | undefined {
+    if (!SHA_TEXT.test(sha)) return undefined;
     const ref = join(this.blobDir, `${sha}.ref.json`);
     return existsSync(ref) ? (local(JSON.parse(readFileSync(ref, "utf8")), this.project) as { path: string; size: number; mtime: string; sha256: string }) : undefined;
   }
@@ -291,12 +306,16 @@ export class AnalysisRecord {
   }
 
   blobPath(sha: string): string | undefined {
+    if (!SHA_TEXT.test(sha)) return undefined;
     const bare = join(this.blobDir, sha);
     if (existsSync(bare)) return bare;
     const hit = this.blobName(sha);
     if (hit && existsSync(join(this.blobDir, hit))) return join(this.blobDir, hit);
     const ref = this.blobRef(sha);
-    return ref && existsSync(ref.path) ? ref.path : undefined;
+    if (!ref || !existsSync(ref.path)) return undefined;
+    const st = statSync(ref.path);
+    if (st.size === ref.size && st.mtime.toISOString() === ref.mtime) return ref.path;
+    return sha256File(ref.path) === ref.sha256 ? ref.path : undefined;
   }
 
   addNode(n: NodeIn): Node {

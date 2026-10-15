@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { harnessWrite } from "./harness-writes.ts";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
 
@@ -240,6 +240,72 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
   return out;
 }
 
+const PATH_LIKE = /[\\/]|^\.|\.\w+$/;
+const INTERPRETER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell)(\.exe)?$/i;
+
+function moduleFiles(name: string): string[] {
+  const parts = name.split(".");
+  const base = parts.join("/");
+  const parents = parts.slice(0, -1).map((_, i) => `${parts.slice(0, i + 1).join("/")}/__init__.py`);
+  return [...parents, `${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
+}
+
+function segmentWords(words: string[]): string[] {
+  const out = words.length ? [words[0]!] : [];
+  let script = false;
+  for (let i = 0; i < words.length; i++) {
+    const bare = words[i]!.replace(/^["']|["']$/g, "");
+    for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push(w);
+    if (INTERPRETER.test(basename(bare))) {
+      script = true;
+      continue;
+    }
+    if (!script || bare.startsWith("-") && bare !== "-m") continue;
+    if (bare === "-m" && words[i + 1]) {
+      out.push(...moduleFiles(words[i + 1]!.replace(/^["']|["']$/g, "")));
+      script = false;
+      continue;
+    }
+    out.push(bare);
+    script = false;
+  }
+  return out;
+}
+
+function scriptWords(argv: string[]): string[] {
+  const out = segmentWords(argv);
+  for (const arg of argv) {
+    if (!/\s/.test(arg)) continue;
+    for (const part of arg.split(/&&|\|\||[;|\n]/)) out.push(...segmentWords(part.split(/\s+/).filter(Boolean)));
+  }
+  return out;
+}
+
+export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
+  const key = folderKey(folder);
+  const found = new Set<string>();
+  try {
+    layers ??= projectSettings(key);
+  } catch {
+    return [];
+  }
+  for (const l of layers) {
+    const hooks = l.hooks;
+    if (!hooks || typeof hooks !== "object") continue;
+    for (const list of Object.values(hooks as Record<string, unknown>))
+      for (const h of Array.isArray(list) ? list : [])
+        for (const word of Array.isArray(h?.command) ? scriptWords(h.command.map(String)) : []) {
+          const path = resolve(key, word);
+          const rel = relative(key, path);
+          if (!word || rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+          try {
+            if (statSync(path).isFile()) found.add(path);
+          } catch {}
+        }
+  }
+  return [...found];
+}
+
 function shadows(name: string): string | undefined {
   if (existsSync(join(CATALOG_DIR, name, "adapter.yaml"))) return `the catalog adapter ${name}`;
   if (existsSync(join(cuvetteHome(), "adapters", name, "adapter.yaml"))) return `your adapter ${name}`;
@@ -334,6 +400,7 @@ export function scanFolder(folder: string): FolderScan {
   for (const p of paths) files[relative(key, p)] = readHash(p);
   for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
+  for (const p of hookScripts(key, layers)) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = readHash(p);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
   const keys = Object.keys(values).filter((k) => !SAFE_KEYS.has(k));

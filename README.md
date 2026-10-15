@@ -111,7 +111,7 @@ adapter that fits with `use_adapter`. The choice of program is your decision: a 
 adapter, the reason, and the other adapters that read the same file types. When the request
 names files, the harness adds a one-line hint with the adapters for those file types. The
 record keeps each load and its reason. In a run without the terminal UI, `"adapter": "biostats"`
-in the answers file answers the card. `--adapter <name>` still loads adapters before the start.
+in the answers file answers the card. `--adapter <name>` loads adapters before the start. With `--resume`, it adds them to the recorded adapters. To load a folder, write `./folder` or an absolute path.
 
 Each session also loads the `tables` adapter. It reads CSV and Excel lab sheets, and it
 summarizes and reshapes tables. It writes xlsx files and makes bar, box, scatter, line and

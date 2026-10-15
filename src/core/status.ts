@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, realpathSync, statSync } from "node:fs";
 import { basename } from "node:path";
-import { findAdapter } from "../adapters/manifest.ts";
+import { adapterDirs, findAdapter } from "../adapters/manifest.ts";
 import { locate } from "../adapters/locate.ts";
 import { expand, placeholders } from "../adapters/kinds/common.ts";
 import { scriptPython } from "../tools/run_script.ts";
@@ -24,6 +24,7 @@ export interface StepState {
   title: string;
   current: boolean;
   reasons: Reason[];
+  unchecked?: string;
 }
 
 export interface CurrentAdapter {
@@ -125,7 +126,9 @@ export function recordReasons(record: AnalysisRecord, labels: Record<string, str
   return out;
 }
 
-export function stepStatus(record: AnalysisRecord, opts: { live?: Map<string, Reason[]>; labels?: Record<string, string> } = {}): StepState[] {
+export const UNCHECKED = "not checked: adapter outside the trusted folders";
+
+export function stepStatus(record: AnalysisRecord, opts: { live?: Map<string, Reason[]>; labels?: Record<string, string>; unchecked?: Set<string> } = {}): StepState[] {
   const steps = stepNumbers(record.nodes());
   const recorded = recordReasons(record, opts.labels);
   const stale = record.stale();
@@ -139,7 +142,7 @@ export function stepStatus(record: AnalysisRecord, opts: { live?: Map<string, Re
       else if (states.get(p)?.current === false) reasons.push({ kind: "parent", text: `It uses the result of step ${steps.get(p)}, which is out of date.` });
     }
     if (!reasons.length && stale.has(n.id)) reasons.push({ kind: "parent", text: "It uses a result that changed after this step ran." });
-    states.set(n.id, { node: n.id, step: steps.get(n.id) ?? 0, tool: n.tool, title: n.summary || n.tool, current: reasons.length === 0, reasons });
+    states.set(n.id, { node: n.id, step: steps.get(n.id) ?? 0, tool: n.tool, title: n.summary || n.tool, current: reasons.length === 0, reasons, ...(opts.unchecked?.has(n.adapter) ? { unchecked: UNCHECKED } : {}) });
   }
   return [...states.values()];
 }
@@ -161,6 +164,7 @@ export function statusText(states: StepState[], next = "Type /rerun to run the o
   const lines = states.flatMap((s) => [
     `${`Step ${s.step}`.padEnd(width)}  ${s.current ? "Up to date " : "Out of date"}  ${clip(s.title, 70)}`,
     ...s.reasons.map((r) => `${" ".repeat(width + 2)}${r.text}`),
+    ...(s.unchecked ? [`${" ".repeat(width + 2)}${s.unchecked}`] : []),
   ]);
   const head = out.length ? `${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date. ${next}` : states.length === 1 ? "The step is up to date." : `All ${states.length} steps are up to date.`;
   return [...lines, "", head].join("\n");
@@ -171,15 +175,28 @@ function clip(s: string, n: number): string {
   return one.length > n ? one.slice(0, n - 1) + "…" : one;
 }
 
-export async function currentFromDisk(record: AnalysisRecord, cwd: string): Promise<{ current: Current; labels: Record<string, string> }> {
+export async function currentFromDisk(record: AnalysisRecord, cwd: string, given: string[] = []): Promise<{ current: Current; labels: Record<string, string>; unchecked: Set<string> }> {
   const current: Current = new Map();
+  const unchecked = new Set<string>();
+  const byUser = new Map<string, string>();
+  for (const g of given) {
+    try {
+      byUser.set(findAdapter(g, cwd).name, g);
+    } catch {}
+  }
   const labels: Record<string, string> = {};
   const paths = new Map<string, string>();
   const first = record.entries(["session"])[0]?.data.adapters as { name: string; path?: string }[] | undefined;
   for (const a of [...(first ?? []), ...record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string })]) if (a.path && existsSync(a.path)) paths.set(a.name, a.path);
   for (const name of new Set(record.nodes().map((n) => n.adapter).filter(Boolean))) {
     try {
-      const a = findAdapter(paths.get(name) ?? name, cwd);
+      const path = byUser.get(name) ?? paths.get(name);
+      const known = !path || byUser.has(name) || Object.values(adapterDirs(cwd)).some((d) => realpathSync(d) === realpathSync(path));
+      if (!known) {
+        unchecked.add(name);
+        continue;
+      }
+      const a = findAdapter(path ?? name, cwd);
       for (const d of a.manifest.decisions) labels[d.key] = d.label;
       const found = await locate(a.manifest, a.root);
       const ph = placeholders(a, { workDir: record.workDir, sessionDir: record.dir }, found.path);
@@ -197,7 +214,7 @@ export async function currentFromDisk(record: AnalysisRecord, cwd: string): Prom
     const env = await captureEnv(envTarget({ kind: "python", interpreter: [scriptPython()], program: "", programVersion: "" })).catch(() => undefined);
     current.set("run_script", { env });
   }
-  return { current, labels };
+  return { current, labels, unchecked };
 }
 
 // ---------------------------------------------------------------- reruns

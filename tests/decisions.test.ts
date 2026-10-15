@@ -136,6 +136,14 @@ describe("enforce", () => {
     expect(dr.enforce("x", "run", {}).args.groups).toBe("ctrl vs trt");
   });
 
+  test("a text value that differs only by leading zeros is a change", () => {
+    dr.change("groups", "123");
+    expect(dr.change("groups", "123")).toEqual([]);
+    expect(dr.change("groups", "0123")).toEqual(["n1"]);
+    expect(dr.value("groups")).toBe("0123");
+    expect(dr.change("groups", "1e2")).toEqual(["n1"]);
+  });
+
   test("does not mutate input", () => {
     const args = { params: {} };
     dr.enforce("x", "run", args);

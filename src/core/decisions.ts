@@ -131,6 +131,7 @@ function toNumber(v: unknown): number | undefined {
 function same(a: unknown, b: unknown): boolean {
   const x = toNumber(a);
   const y = toNumber(b);
+  if (typeof a === "string" && typeof b === "string") return a === b;
   if (x !== undefined && y !== undefined) return Math.abs(x - y) <= 1e-9 + 1e-9 * Math.max(Math.abs(x), Math.abs(y));
   if (typeof a === "object" || typeof b === "object") return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
   return String(a) === String(b);
@@ -438,12 +439,14 @@ export class DecisionRecord {
     s.owner = owner;
   }
 
-  enforce(adapter: string, tool: string, args: Args, opts: { readOnly?: boolean } = {}): Enforcement {
+  enforce(adapter: string, tool: string, args: Args, opts: { readOnly?: boolean; defer?: boolean } = {}): Enforcement {
     const out: Args = structuredClone(args ?? {});
     const deviations: Deviation[] = [];
     const waiting: string[] = [];
     const applied: Record<string, unknown> = {};
     const links = this.adapters.find((a) => a.name === adapter)?.linksFor(tool) ?? {};
+    const pending: (() => void)[] = [];
+    const agentChange = (key: string, value: unknown, reason: string) => (opts.defer ? pending.push(() => void this.change(key, value, { by: "agent", reason })) : void this.change(key, value, { by: "agent", reason }));
 
     for (const [arg, key] of Object.entries(links)) {
       const s = this.states.get(key);
@@ -460,7 +463,7 @@ export class DecisionRecord {
         else if (s.owner === "human" && s.def.stage === "when_needed" && !waiting.includes(key)) waiting.push(key);
       } else if (s.set) {
         if (!same(s.value, given)) {
-          if (s.owner === "agent" && !opts.readOnly) this.change(key, given, { by: "agent", reason: "the agent changed its own choice" });
+          if (s.owner === "agent" && !opts.readOnly) agentChange(key, given, "the agent changed its own choice");
           else if (s.owner === "agent") deviations.push({ arg, key, setup: s.value, used: given });
           else {
             setPath(out, arg, s.value);
@@ -470,13 +473,13 @@ export class DecisionRecord {
       } else if (s.owner === "human" && s.def.stage === "when_needed") {
         if (!waiting.includes(key)) waiting.push(key);
       } else if (s.owner === "agent" && !opts.readOnly) {
-        this.change(key, given, { by: "agent", reason: "chosen by the agent at first use" });
+        agentChange(key, given, "chosen by the agent at first use");
       }
 
       const effective = getPath(out, arg);
       if (effective !== undefined && effective !== null && effective !== "") applied[key] = effective;
     }
-    return { args: out, applied, deviations, waiting };
+    return { args: out, applied, deviations, waiting, ...(pending.length ? { commit: () => pending.forEach((f) => f()) } : {}) };
   }
 
   brief(keys?: string[]): string {
@@ -531,8 +534,8 @@ export function decisionHook(dr: DecisionRecord): Hook {
     event: "PreToolUse",
     run(input: PreToolUseInput): PreToolUseResult {
       if (!input.adapter) return {};
-      const e = dr.enforce(input.adapter, input.tool, input.args);
-      const result: PreToolUseResult = { updatedArgs: e.args, deviations: e.deviations, applied: e.applied };
+      const e = dr.enforce(input.adapter, input.tool, input.args, { defer: true });
+      const result: PreToolUseResult = { updatedArgs: e.args, deviations: e.deviations, applied: e.applied, commit: e.commit };
       if (e.waiting.length) {
         const labels = e.waiting.map((k) => dr.fields().find((f) => f.key === k)?.label ?? k);
         return {

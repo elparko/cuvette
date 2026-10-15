@@ -178,12 +178,22 @@ export class Permissions {
       .map(([k]) => globToRegex(programName(k.slice(k.indexOf(":") + 1).split(" ")[0]!.replace(/\*$/, "*"))));
   }
 
-  check(tool: Tool, args: Args): Rule {
+  private ruleFor(tool: Tool, args: Args): Rule | undefined {
     const argv = joinedArgv(args, this.programs);
     for (const rule of ["deny", "ask", "allow"] as Rule[]) {
       const hit = this.rules.find((r) => r.rule === rule && r.tool.test(tool.name) && (!r.argv || (rule === "allow" ? r.argv.test(argv[0]!) : argv.some((a) => r.folded!.test(foldProgram(a))))));
       if (hit) return rule;
     }
+    return undefined;
+  }
+
+  asks(tool: Tool, args: Args): boolean {
+    return this.ruleFor(tool, args) === "ask";
+  }
+
+  check(tool: Tool, args: Args): Rule {
+    const rule = this.ruleFor(tool, args);
+    if (rule) return rule;
     if (tool.permission) return tool.permission;
     if (tool.readOnly) return "allow";
     return tool.source === "generic" ? "ask" : "allow";

@@ -349,7 +349,9 @@ export function checkAnswer(text: string, record: AnalysisRecord, opts: { log?: 
 
 export function logClaimCheck(record: AnalysisRecord, claims: Claim[], answerEntry: number | undefined): void {
   const unsourced = claims.filter((c) => c.label === "unsourced").length;
-  record.append("claim_check", { answerEntry, claims, unsourced });
+  const lastCheck = record.entries?.(["claim_check"]).at(-1)?.data;
+  const same = lastCheck && lastCheck.answerEntry === answerEntry && lastCheck.unsourced === unsourced && JSON.stringify(lastCheck.claims) === JSON.stringify(claims);
+  if (!same) record.append("claim_check", { answerEntry, claims, unsourced });
 }
 
 export function annotate(text: string, claims: Claim[]): string {

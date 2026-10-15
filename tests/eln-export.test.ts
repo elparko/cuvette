@@ -36,6 +36,16 @@ test("answer.md holds the assumptions as text of the harness", async () => {
   expect(text).toMatch(/Text of the harness, not of the model:\n\nAssumed because no answer was given:\n- Which sigma\?: used sigma 2\./);
 });
 
+test("answer.md holds the last final answer that a rewind did not set aside", async () => {
+  const upTo = s.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)!.id;
+  s.record.append("assistant", { text: "A wrong answer from an undone turn.", final: true });
+  s.record.append("rewind", { upTo });
+  const { files, top } = await exported();
+  const text = files.get(`${top}analysis/answer.md`)!.toString();
+  expect(text).toContain("There are 41 particles");
+  expect(text).not.toContain("wrong answer");
+});
+
 test("the metadata has the descriptor, the root dataset, hasPart and a person", async () => {
   const { meta, graph } = await exported();
   expect(meta["@context"]).toBe("https://w3id.org/ro/crate/1.2/context");

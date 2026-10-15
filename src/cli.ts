@@ -33,7 +33,9 @@ Usage
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
   card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
-  reason. With --adapter, the session has only the adapters that you name.
+  reason. With --adapter, the session has the adapters that you name and no others.
+  With --resume, the adapters that you name join the recorded adapters. A name is an
+  installed or catalog adapter. To load a folder, write ./folder or an absolute path.
 
   With --method, the harness compares the new data with the data that the method used.
   A likely unit change stops the run. Add data-change to --allow to continue.
@@ -377,7 +379,7 @@ async function interactive(resumeId?: string, folder?: string) {
     if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
   }
   const s = resumeId
-    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
+    ? await Session.resume(resumeId, { addAdapters: adapters, model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
@@ -869,10 +871,10 @@ async function main() {
       const place = findPlace(ref, { cwd }) ?? fail(`No session ${ref}. See cuvette sessions.`);
       if (!existsSync(join(place.recordDir, "log.jsonl"))) fail(`No session ${ref}. See cuvette sessions.`);
       const record = new AnalysisRecord(place.recordDir, place.id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
-      const { current, labels } = await st.currentFromDisk(record, place.legacy ? cwd : place.project);
+      const { current, labels, unchecked } = await st.currentFromDisk(record, place.legacy ? cwd : place.project, (o.adapter as string[]) ?? []);
       const live = await st.liveReasons(record, current);
       console.log(`Session ${place.id}\n`);
-      console.log(st.statusText(st.stepStatus(record, { live, labels }), `To run the out-of-date steps again, type cuvette resume ${place.id}, then type /rerun.`));
+      console.log(st.statusText(st.stepStatus(record, { live, labels, unchecked }), `To run the out-of-date steps again, type cuvette resume ${place.id}, then type /rerun.`));
       return;
     }
     case "questions": {
