@@ -25,6 +25,10 @@ export interface ClaudeOpts {
   headless?: boolean;
 }
 
+function written(text: string): string {
+  return text.replace(/[\x00-\x1f\x7f-\x9f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+}
+
 function mapError(e: unknown, model: string, headless = false): unknown {
   const none = headless ? NO_CREDENTIALS_HEADLESS : NO_CREDENTIALS;
   if (e instanceof Anthropic.APIUserAbortError) return e;
@@ -45,7 +49,7 @@ function mapError(e: unknown, model: string, headless = false): unknown {
   if ((e as any)?.partial === true) return new ProviderError("The Claude API stopped the reply before the end.", true);
   if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
-  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(none);
+  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(/^Could not resolve authentication method/.test(e.message) ? none : `${none} Detail: ${written(e.message)}`);
   return e;
 }
 
