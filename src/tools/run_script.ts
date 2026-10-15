@@ -265,7 +265,7 @@ export function settingsScope(dirs: Dirs): SettingsScope {
       index = readdirSync(home).filter((f) => INDEX_NAME.test(f)).map((f) => join(home, f));
     } catch {}
     const settingsFiles = SETTINGS_NAMES.map((f) => join(home, f));
-    out.locked.push(...settingsFiles, join(home, "sessions-index.json"), ...index, ...(inside(home) ? [join(home, "sessions")] : []));
+    out.locked.push(...settingsFiles, join(home, "sessions-index.json"), join(home, "sessions-index"), ...index, ...(inside(home) ? [join(home, "sessions")] : []));
     out.files.push(...settingsFiles);
   }
   if (!dirs.projectDir) return out;

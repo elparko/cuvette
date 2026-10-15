@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { COPY_LIMIT_BYTES, discardPlace, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
+import { COPY_LIMIT_BYTES, discardPlace, findPlace, listPlaces, readIndex, removeIndexRow, renameIndexRow, saveIndexRow, slug, type Place } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -350,3 +350,96 @@ test("a missing provisional folder keeps its index row, so the list shows it as 
   discardPlace(place);
   expect(readIndex().map((r) => r.id)).toEqual([id]);
 });
+
+const rowId = (tag: string, n: number) => `20261001-0000${String(n).padStart(2, "0")}-${tag}`;
+const rowPlace = (id: string): Place => ({ id, recordDir: `/p/cuvette/${id}/.record`, outDir: `/p/cuvette/${id}`, project: "/p", title: id, created: "2026-10-01T00:00:00Z", legacy: false, fallback: false });
+const oldRow = (id: string) => ({ id, project: "/p", folder: `/p/cuvette/${id}`, title: id, date: "2026-10-01T00:00:00Z" });
+const rowDir = () => join(home, "sessions-index");
+
+async function twoProcesses(bodyA: string, bodyB: string) {
+  const go = join(home, "go");
+  const places = JSON.stringify(join(__dirname, "../src/core/places.ts"));
+  const prefix = `import { existsSync } from "node:fs"; import { saveIndexRow, renameIndexRow, removeIndexRow } from ${places}; const place = (id) => ({ id, recordDir: "/p/" + id + "/.record", outDir: "/p/" + id, project: "/p", title: id, created: "2026-10-01T00:00:00Z", legacy: false, fallback: false }); while (!existsSync(${JSON.stringify(go)})) {}`;
+  const start = (body: string) => {
+    const child = spawn(process.execPath, [TSX_CLI, "--eval", `${prefix} ${body}`], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
+    return new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  };
+  const exits = [start(bodyA), start(bodyB)];
+  await new Promise((r) => setTimeout(r, 1500));
+  writeFileSync(go, "");
+  return Promise.all(exits);
+}
+
+test("an index file of the old single-file format is still listed", () => {
+  writeFileSync(join(home, "sessions-index.json"), JSON.stringify([oldRow(rowId("aaaa", 1)), oldRow(rowId("aaaa", 2))]));
+  expect(readIndex().map((r) => r.id)).toEqual([rowId("aaaa", 1), rowId("aaaa", 2)]);
+  saveIndexRow(rowPlace(rowId("bbbb", 3)));
+  expect(readIndex().map((r) => r.id).sort()).toEqual([rowId("aaaa", 1), rowId("aaaa", 2), rowId("bbbb", 3)]);
+});
+
+test("a row in a row file wins over the row of the old file with the same id", () => {
+  const id = rowId("aaaa", 1);
+  writeFileSync(join(home, "sessions-index.json"), JSON.stringify([oldRow(id)]));
+  saveIndexRow({ ...rowPlace(id), title: "new title" });
+  expect(readIndex()).toHaveLength(1);
+  expect(readIndex()[0]!.title).toBe("new title");
+});
+
+test("rename and remove work for an id that is only in the old file, and the result stays", () => {
+  const keep = rowId("aaaa", 1);
+  const gone = rowId("aaaa", 2);
+  const old = JSON.stringify([oldRow(keep), oldRow(gone)]);
+  writeFileSync(join(home, "sessions-index.json"), old);
+  expect(renameIndexRow(keep, "  My   run ")).toBe(true);
+  expect(removeIndexRow(gone)).toBe(true);
+  expect(removeIndexRow(gone)).toBe(false);
+  expect(renameIndexRow(gone, "x")).toBe(false);
+  const rows = readIndex();
+  expect(rows.map((r) => r.id)).toEqual([keep]);
+  expect(rows[0]!.custom).toBe("My run");
+  expect(readFileSync(join(home, "sessions-index.json"), "utf8")).toBe(old);
+  saveIndexRow(rowPlace(rowId("bbbb", 3)));
+  expect(readIndex().map((r) => r.id).sort()).toEqual([keep, rowId("bbbb", 3)]);
+});
+
+test("a row that was removed from a row file only leaves no file", () => {
+  const id = rowId("aaaa", 1);
+  saveIndexRow(rowPlace(id));
+  expect(removeIndexRow(id)).toBe(true);
+  expect(readdirSync(rowDir())).toEqual([]);
+});
+
+test("a damaged row file is skipped and not deleted, and an id that is not a safe file name is refused", () => {
+  const good = rowId("aaaa", 1);
+  const bad = rowId("aaaa", 2);
+  saveIndexRow(rowPlace(good));
+  const damaged = '{"id":"' + bad + '","folder":"/p"';
+  writeFileSync(join(rowDir(), `${bad}.json`), damaged);
+  writeFileSync(join(rowDir(), "other.json"), JSON.stringify(oldRow(good)));
+  expect(readIndex().map((r) => r.id)).toEqual([good]);
+  expect(renameIndexRow(bad, "x")).toBe(false);
+  expect(removeIndexRow(bad)).toBe(false);
+  expect(readFileSync(join(rowDir(), `${bad}.json`), "utf8")).toBe(damaged);
+  saveIndexRow(rowPlace("../escape"));
+  expect(existsSync(join(home, "escape.json"))).toBe(false);
+  expect(readIndex().map((r) => r.id)).toEqual([good]);
+});
+
+test.skipIf(process.platform === "win32")("two processes that save 50 rows each at the same time lose no row", async () => {
+  const save = (tag: string) => `for (let i = 0; i < 50; i++) saveIndexRow(place("20261001-0000" + String(i).padStart(2, "0") + "-${tag}"));`;
+  expect(await twoProcesses(save("aaaa"), save("bbbb"))).toEqual([0, 0]);
+  const ids = readIndex().map((r) => r.id);
+  expect(ids).toHaveLength(100);
+  expect(new Set(ids).size).toBe(100);
+  expect(readdirSync(rowDir()).filter((f) => !f.endsWith(".json"))).toEqual([]);
+}, 120_000);
+
+test.skipIf(process.platform === "win32")("two processes that rename and remove different rows at the same time lose no change", async () => {
+  for (let i = 0; i < 100; i++) saveIndexRow(rowPlace(rowId("cccc", i)));
+  const rename = `for (let i = 0; i < 50; i++) renameIndexRow("20261001-0000" + String(i).padStart(2, "0") + "-cccc", "named " + i);`;
+  const remove = `for (let i = 50; i < 100; i++) removeIndexRow("20261001-0000" + String(i).padStart(2, "0") + "-cccc");`;
+  expect(await twoProcesses(rename, remove)).toEqual([0, 0]);
+  const rows = readIndex();
+  expect(rows).toHaveLength(50);
+  expect(rows.every((r) => r.custom?.startsWith("named "))).toBe(true);
+}, 120_000);
