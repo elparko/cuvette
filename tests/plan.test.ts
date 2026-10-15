@@ -183,3 +183,15 @@ test("a number setting reads the exponent, a leading point and a thousands comma
   expect(coerceSetting(d, "1,000 cells")).toEqual({ ok: true, value: 1000 });
   expect(coerceSetting(d, "-2.5")).toEqual({ ok: true, value: -2.5 });
 });
+
+test("coerceSetting reads un-paired, non-paired and non paired as not paired", () => {
+  const d = { key: "paired", label: "Paired test", kind: "bool", tools: [] };
+  for (const text of ["unpaired", "un-paired", "non-paired", "non paired", "nonpaired"]) expect(coerceSetting(d, text)).toEqual({ ok: true, value: false });
+  expect(coerceSetting(d, "paired")).toEqual({ ok: true, value: true });
+});
+
+test("coerceSetting reads a negated exclude phrase as false", () => {
+  const d = { key: "exclude_outliers", label: "Exclude outliers", kind: "bool", tools: [] };
+  for (const text of ["don't exclude", "never exclude", "do not exclude", "doesn't exclude them", "without exclude"]) expect(coerceSetting(d, text)).toEqual({ ok: true, value: false });
+  expect(coerceSetting(d, "exclude")).toEqual({ ok: true, value: true });
+});

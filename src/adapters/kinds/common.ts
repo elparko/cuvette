@@ -379,7 +379,10 @@ export interface Fields {
 
 export function numberOrString(s: string): number | string {
   const t = s.trim();
-  return t !== "" && /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t) ? Number(t) : s;
+  if (t === "" || !/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return s;
+  if (/^[-+]?0\d/.test(t)) return s;
+  const digits = t.split(/e/i)[0]!.replace(/\D/g, "").replace(/^0+/, "");
+  return digits.length > 15 ? s : Number(t);
 }
 
 export function parseCsv(text: string, delim = ","): string[][] {
