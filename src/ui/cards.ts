@@ -1,6 +1,6 @@
 import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
 import type { PhiAction } from "../core/phi.ts";
-import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
+import { claudeKey, ENV_KEY_WARNING, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { codeOf, plainOf } from "./items.ts";
 import { commandText, visibleText } from "../core/plain.ts";
@@ -485,7 +485,7 @@ export async function saveKey(session: SessionLike, key: string, env: Record<str
   const path = saveClaudeKey(key);
   recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
   say.ok(`${r.text} Saved to ${path}.`);
-  if (env.ANTHROPIC_API_KEY) say.warn("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
+  if (env.ANTHROPIC_API_KEY) say.warn(ENV_KEY_WARNING);
   return r;
 }
 

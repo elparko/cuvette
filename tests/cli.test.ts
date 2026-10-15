@@ -41,6 +41,19 @@ beforeAll(() => {
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
+test("cuvette key saves the key and warns when ANTHROPIC_API_KEY is set", () => {
+  const key = "sk-ant-api03-abcdefghijklmnop-WXYZ";
+  const run = (envKey: string) => {
+    const h = home();
+    const r = spawnSync("node", [CUVETTE, "key"], { cwd: project, env: { ...process.env, CUVETTE_HOME: h, ANTHROPIC_API_KEY: envKey, ANTHROPIC_BASE_URL: "http://127.0.0.1:1", TMPDIR: root }, input: `${key}\n`, encoding: "utf8", timeout: 60_000 });
+    return { out: r.stdout, saved: readFileSync(join(h, "credentials.json"), "utf8") };
+  };
+  const set = run("sk-ant-other");
+  expect(set.saved).toContain(key);
+  expect(set.out).toContain("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
+  expect(run("").out).not.toContain("ANTHROPIC_API_KEY");
+}, 90_000);
+
 test("a run with an answer exits 0, and its script, flow and replay give the same numbers", () => {
   const h = home();
   const model = fake("answer", [{ calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { calls: [{ name: "count_rows", args: { path: data } }] }, { text: "The mean of x is 2.5 over 4 rows." }]);

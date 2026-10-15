@@ -107,3 +107,11 @@ test("a login from ant auth login counts as a credential, so the first start is 
   expect(antLogin({ ...env, ANTHROPIC_PROFILE: "../x" })).toBe(false);
   expect(needsFirstStart({ cwd, env: { ...env, ANTHROPIC_PROFILE: "other" } })).toBe(true);
 });
+
+test("choose Claude warns when ANTHROPIC_API_KEY is set, because that key wins", async () => {
+  const check = async () => ({ ok: true, text: "The key works." });
+  const shadowed = await chooseClaude(KEY, { cwd, env: { ANTHROPIC_API_KEY: "sk-ant-other" }, check });
+  expect(shadowed.text).toContain("This shell also has ANTHROPIC_API_KEY. The harness uses that one first.");
+  const plain = await chooseClaude(KEY, { cwd, env: {}, check });
+  expect(plain.text).not.toContain("ANTHROPIC_API_KEY");
+});

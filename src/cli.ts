@@ -562,6 +562,7 @@ async function main() {
       const r = await checkClaudeKey(key);
       if (!r.ok) return fail(r.text);
       console.log(`${r.text} Saved to ${cred.saveClaudeKey(key)}.`);
+      if (process.env.ANTHROPIC_API_KEY) console.log(cred.ENV_KEY_WARNING);
       return;
     }
     case "eln": {
