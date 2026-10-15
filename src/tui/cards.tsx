@@ -590,20 +590,25 @@ export function ElnCard(props: { path: string; onSubmit: (url: string, key: stri
   );
 }
 
-export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string; onSubmit: (key: string) => void; onCancel: () => void }) {
+export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string; onSubmit: (key: string) => void; onCancel: () => void; onCheck: () => boolean }) {
   const [v, setV] = useState("");
+  const [none, setNone] = useState(false);
+  useInput((_, key) => {
+    if (key.tab) setNone(!props.onCheck());
+  });
   return (
     <Frame title="Claude API key" color="cyan">
       {props.card.reason ? <Text>{props.card.reason}</Text> : null}
       <Text>Paste your key from {KEYS_URL}. The screen shows it masked.</Text>
-      <Text dimColor>{KEY_ANT_LOGIN}</Text>
+      <Text dimColor>{KEY_ANT_LOGIN} Press Tab to check the login again.</Text>
+      {none ? <Text color="yellow">Cuvette found no ant login. Sign in, then press Tab.</Text> : null}
       <Text dimColor>No key yet? Type /key help to see the steps. Type /key open to open the keys page.</Text>
       <Text dimColor>The harness checks it with the API, then saves it to {props.path}. Only your user can read that file.</Text>
       <Box marginTop={1}>
         <Text>Key: </Text>
         <Field value={v} onChange={setV} onSubmit={(k) => props.onSubmit(k.trim())} onCancel={props.onCancel} mask="*" indent={5} />
       </Box>
-      <Text dimColor>Enter saves · Esc cancels</Text>
+      <Text dimColor>Enter saves · Tab checks the login again · Esc cancels</Text>
     </Frame>
   );
 }

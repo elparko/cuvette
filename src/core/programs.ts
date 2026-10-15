@@ -696,7 +696,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
       const root = manifests(opts)[plan.name]?.root;
       if (!root) return done(false, `No adapter ${plan.name}.`);
       confirmCode(root);
-      return done(true, `${plan.name}: the code may run. The permission ends when the files change.`);
+      return done(true, `${plan.name}: the code can run. The permission ends when the files change.`);
     }
     case "approve": {
       const root = manifests(opts)[plan.name]?.root;

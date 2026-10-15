@@ -79,7 +79,7 @@ export function tilde(p: string): string {
 }
 
 export function sourceBadge(r: SettingRow, cwd: string): { text: string; file?: string } {
-  const text = BADGE[r.source] ?? "";
+  const text = r.source === "ant" ? "" : (BADGE[r.source] ?? "");
   if (!r.file) return { text };
   return { text, file: r.source === "project" ? relative(cwd, r.file) : tilde(r.file) };
 }

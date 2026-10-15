@@ -265,9 +265,9 @@ test("the key state text for an ant auth login is not 'not set'", () => {
   expect(secretState(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never)).toBe("signed in with ant auth login");
 });
 
-test("the key row for an ant auth login has a source tag", () => {
+test("the key row for an ant auth login has no source tag, because the value says it", () => {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
   mkdirSync(join(cfg, "credentials"));
   writeFileSync(join(cfg, "credentials", "default.json"), "{}");
-  expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("ant login");
+  expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("");
 });

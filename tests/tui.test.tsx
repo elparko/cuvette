@@ -560,6 +560,33 @@ describe("API key", () => {
     }
   });
 
+  test("Tab on the key card reads the ant login again and closes the card when it finds one", async () => {
+    const { mkdirSync, mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const old = process.env.CUVETTE_HOME;
+    process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-tui-key-"));
+    const cfg = mkdtempSync(join(tmpdir(), "cuvette-tui-ant-"));
+    try {
+      const h = makeHarness();
+      const s = new FakeSession({ delayMs: 0 });
+      s.model = { ...s.model, provider: "claude", model: "claude-opus-5-5" };
+      const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: { ANTHROPIC_CONFIG_DIR: cfg } });
+      live = { h, s, done };
+      await until(() => h.all().includes("Claude API key"));
+      await type(h, "\t");
+      await until(() => h.all().includes("Cuvette found no ant login"));
+      mkdirSync(join(cfg, "credentials"));
+      writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+      await type(h, "\t");
+      await until(() => h.all().includes("Cuvette found your ant auth login"));
+      await until(() => h.last().includes("Ask for an analysis step"));
+    } finally {
+      if (old === undefined) delete process.env.CUVETTE_HOME;
+      else process.env.CUVETTE_HOME = old;
+    }
+  });
+
   test("/key opens the card and /key status reports no key", async () => {
     const { h } = start();
     await submit(h, "/key status");

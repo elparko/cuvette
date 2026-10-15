@@ -37,6 +37,7 @@ export interface IndexRow {
   name?: string;
   custom?: string;
   description?: string;
+  legacy?: boolean;
 }
 
 const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"cuvette open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
@@ -55,7 +56,7 @@ const text = (v: unknown) => (typeof v === "string" ? v : undefined);
 
 function toRow(r: any): IndexRow | undefined {
   if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id || typeof r.folder !== "string" || !r.folder) return undefined;
-  return { ...r, id: r.id, project: text(r.project) ?? "", folder: r.folder, title: text(r.title) ?? "", date: text(r.date) ?? "", name: text(r.name), custom: text(r.custom), description: text(r.description) };
+  return { ...r, id: r.id, project: text(r.project) ?? "", folder: r.folder, title: text(r.title) ?? "", date: text(r.date) ?? "", name: text(r.name), custom: text(r.custom), description: text(r.description), legacy: r.legacy === true ? true : undefined };
 }
 
 function parseIndex(json: string): { rows: IndexRow[]; dropped: number } {
@@ -121,8 +122,10 @@ function readRowFolder(dir: string): Map<string, IndexRow | null> {
 export function readIndex(path = indexPath()): IndexRow[] {
   const mine = readRowFolder(rowDir(path));
   const old = readOldIndex(path).filter((r) => !mine.has(r.id));
-  return [...old, ...[...mine.values()].filter((r): r is IndexRow => !!r)];
+  return [...old, ...[...mine.values()].filter((r): r is IndexRow => !!r && !r.legacy)];
 }
+
+export const readRowMarks = (path = indexPath()) => readRowFolder(rowDir(path));
 
 function findRow(id: string): { row?: IndexRow; inOld: boolean } {
   const mine = readRowFile(join(rowDir(), `${id}.json`), id);
@@ -167,9 +170,16 @@ export function cutText(s: string, n: number): string {
   return /[\ud800-\udbff]$/.test(t) ? t.slice(0, -1) : t;
 }
 
+const oldFolder = (id: string) => join(cuvetteHome(), "sessions", id);
+
+function legacyRow(id: string): IndexRow | undefined {
+  if (!existsSync(join(oldFolder(id), "log.jsonl"))) return undefined;
+  return { id, project: "", folder: oldFolder(id), title: "", date: "", legacy: true };
+}
+
 export function renameIndexRow(id: string, custom: string): boolean {
   if (!SAFE_ID.test(id)) return false;
-  const row = findRow(id).row;
+  const row = findRow(id).row ?? (readRowFile(join(rowDir(), `${id}.json`), id) === null ? undefined : legacyRow(id));
   if (!row) return false;
   writeRow(id, { ...row, custom: cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined });
   return true;
@@ -177,9 +187,10 @@ export function renameIndexRow(id: string, custom: string): boolean {
 
 export function removeIndexRow(id: string): boolean {
   if (!SAFE_ID.test(id)) return false;
-  const { row, inOld } = findRow(id);
+  const { row: found, inOld } = findRow(id);
+  const row = found ?? (readRowFile(join(rowDir(), `${id}.json`), id) === null ? undefined : legacyRow(id));
   if (!row) return false;
-  if (inOld) writeRow(id, { id, removed: true });
+  if (inOld || row.legacy) writeRow(id, { id, removed: true });
   else {
     const file = join(rowDir(), `${id}.json`);
     harnessWrite(file, () => rmSync(file, { force: true }));

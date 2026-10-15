@@ -4,7 +4,7 @@ import { Text } from "./text.tsx";
 import { guardCardOpened, guardNoteKey } from "./key-guard.ts";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
-import { credentialsPath } from "../core/credentials.ts";
+import { credentialsPath, noClaudeCredentials } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openPanels, openSetup, openWithOs, failureText, parseCommand, suggestions, table, unknownCommand, type CommandCtx } from "../ui/commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
@@ -687,7 +687,7 @@ function cardViews(d: CardDeps): CardViews {
         onClose={() => (popCard(), d.refresh())}
       />
     ),
-    key: (card) => <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void d.submitKey(k)} onCancel={popCard} />,
+    key: (card) => <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void d.submitKey(k)} onCancel={popCard} onCheck={() => (noClaudeCredentials(d.env) ? false : (popCard(), d.say.ok("Cuvette found your ant auth login. It uses that login now."), true))} />,
   };
 }
 

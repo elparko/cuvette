@@ -254,7 +254,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   };
 
   const attach = (session: SessionLike, owned: boolean) => {
-    const view = new WebView(session, { token, env, url: (p) => `${base()}${p}?t=${token}`, quit: () => quit() });
+    const view = new WebView(session, { token, env, url: (p) => `${base()}${p}?t=${token}`, open: openWithOs, quit: () => quit() });
     current = { session, view, graph: windowRoutes(session as unknown as WindowSession, token), owned };
     session.markOpen?.({ app: `${base()}?t=${token}` });
     broadcastIdle({ t: "switch" });
