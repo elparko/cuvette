@@ -14,15 +14,13 @@ Release 0.1.1 includes all changes since 12 October.
 - The command in the notice quotes the path for a shell and removes control characters from it.
 - `eln push` and `eln link` take `--adapter`.
 - Resume says so if an installed adapter replaces a recorded folder of the same name.
-- The default session is a session with work, also if it has no request. Only user work counts as work.
+- The default session is a session with work, also if it has no request. Work is a message, a tool call, a result, a step, a decision or an answer. A notice is not work.
 
-### Hook scripts and the session index
+### Hook scripts
 
 - The hook hash covers each script that a hook command names, and the code folder of the script. It does not cover files that a hook writes.
 - The hash finds a script behind any launcher. It expands globs, and it does not follow links out of the project.
 - Project settings can no longer hide a hook script from the hash.
-- The session index is locked while a row is saved, renamed or removed.
-- The lock is a file with an owner token. Cuvette recovers the lock of a process that has stopped, waits a short time, and never takes a lock from a live process.
 
 ### Referee and key status
 
@@ -32,13 +30,13 @@ Release 0.1.1 includes all changes since 12 October.
 - The key status and the key card show the `ant auth login` line.
 - The status row of an unchecked step shows "Not checked".
 - A large output that someone deleted shows "missing", not "changed".
-- The table route hint no longer shows if the table adapter is already loaded.
-- Setup does not open again after you leave it, also while the session opens.
+- The table route hint no longer shows if the table adapter is a default adapter.
+- The browser app does not show first setup again after you leave it.
 
 ### Record guard and tests
 
 - `write_file` refuses a path in a `.Record` folder if a `.record` folder with a record is beside it. `run_script` compares `.record` without letter case.
-- The pty helper in the tests waits up to 30 seconds for the exit status.
+- The pty helper in the tests waits up to 10 seconds for the exit status.
 
 ## 14 October 2026
 
