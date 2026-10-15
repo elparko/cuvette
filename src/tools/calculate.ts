@@ -11,6 +11,7 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   exp: (x) => Math.exp(num(x)),
   round: (x, n = 0) => {
     const digits = num(n);
+    if (!Number.isInteger(digits)) throw new Error("round needs a whole number of digits, for example round(2.345, 2)");
     const value = num(x);
     if (!Number.isFinite(value)) return value;
     const [mantissa, exponent = "0"] = String(Math.abs(value)).split("e");
@@ -60,6 +61,7 @@ const ARITY: Record<string, [number, number]> = {
   abs: [1, 1], sqrt: [1, 1], log: [1, 1], log10: [1, 1], log2: [1, 1], exp: [1, 1], round: [1, 2],
   ratio: [2, 2], pct_change: [2, 2], mae: [2, 2], rmse: [2, 2], r2: [2, 2],
 };
+const LIST_SEPARATOR = /(?<![\d.])\d{1,2}(?:,\d{3})+(?!\d)/;
 const SEPARATOR = /(?<![\d.])\d{1,3}(?:,\d{3})+(?!\d)/;
 
 function argumentsOnly(text: string): string {
@@ -153,7 +155,10 @@ export function evaluate(src: string): Val {
       return v;
     }
     if (t === "[") {
+      const open = at[i - 1]! + 1;
       const items = list("]");
+      const grouped = LIST_SEPARATOR.exec(src.slice(open, at[i] ?? src.length));
+      if (grouped) throw new Error(`"${grouped[0]}" has a comma between digits. Write a number without a thousands separator, for example ${grouped[0].replace(/,/g, "")}. To give separate items, write a space after each comma, for example ${grouped[0].replace(/,/g, ", ")}`);
       take("]");
       return items.map(num);
     }

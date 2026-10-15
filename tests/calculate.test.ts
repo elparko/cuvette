@@ -83,3 +83,15 @@ test("round keeps an infinite value", () => {
   expect(evaluate("round(1/0, 2)")).toBe(Infinity);
   expect(evaluate("round(-1/0)")).toBe(-Infinity);
 });
+
+test("a thousands separator inside a list is an error", () => {
+  expect(() => evaluate("mean([1,234])")).toThrow(/thousands separator/);
+  expect(() => evaluate("sum([12,345], 5)")).toThrow(/12,345/);
+  expect(evaluate("mean([1, 234])")).toBe(117.5);
+  expect(evaluate("mean([100,200,300])")).toBe(200);
+});
+
+test("round refuses a digits argument that is not a whole number", () => {
+  expect(() => evaluate("round(2.345, 1.5)")).toThrow(/whole number of digits/);
+  expect(evaluate("round(2.345, 2)")).toBe(2.35);
+});
