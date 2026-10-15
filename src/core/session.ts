@@ -66,7 +66,7 @@ import { Findings, logText, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
-import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
+import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, REVIEW_PURPOSE, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import {
   ProviderError,
@@ -2057,7 +2057,7 @@ export class Session {
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
     let state: "done" | "stopped" | "failed" | "off" = "off";
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
-      this.bus.emit({ type: "status", state: "thinking", purpose: "Reviewing the answer" });
+      this.bus.emit({ type: "status", state: "thinking", purpose: REVIEW_PURPOSE });
       try {
         for (const f of await referee(this.refereeProvider, refereeCtx, signal)) found.push({ f, source: "referee" });
         state = "done";
