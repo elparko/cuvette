@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renam
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { labDisplayText, needsTrust, scanFolder, trustEvidence, trustFolder, trustStatus, untrustFolder } from "../src/core/trust.ts";
+import { labDisplayText, needsTrust, oneLine, scanFolder, trustEvidence, trustFolder, trustStatus, untrustFolder } from "../src/core/trust.ts";
 import { linear as once, Rng, runs } from "./fuzz-rng.ts";
 
 function linear(make: (n: number) => string, run: (s: string) => void, n: number) {
@@ -221,6 +221,14 @@ function mutate(r: Rng, b: Built): string | undefined {
 }
 
 describe("fuzz: the trust card", () => {
+  test("the one-line form of a text shows a real new line, a typed backslash-n and a quote differently", () => {
+    const texts = ["a\nb", "a\\nb", '"a"', 'a"b', "a b", "\\", "\\\\", '"', "a\n", "\x1b", "\\x1b", "plain text", "", '"a\nb"'];
+    const shown = texts.map(oneLine);
+    expect(new Set(shown).size).toBe(texts.length);
+    for (const s of shown) expect(s.includes("\n")).toBe(false);
+    expect(oneLine("plain text")).toBe("plain text");
+  });
+
   test("a hook, a setting value, a method or an adapter with hidden text shows that text, written out", () => {
     const r = new Rng(45001);
     for (let i = 0; i < runs(80); i++) {

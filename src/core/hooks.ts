@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { oneLine } from "./trust.ts";
 import type {
   Hook, HookEvent, PostToolUseInput, PostToolUseResult, PreAnswerInput, PreAnswerResult,
   PreToolUseInput, PreToolUseResult,
@@ -44,7 +45,7 @@ function normalize(raw: any): any {
 }
 
 function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
-  const label = hook.command.join(" ");
+  const label = oneLine(hook.command.join(" "));
   return (input, signal) =>
     new Promise((resolve) => {
       if (signal?.aborted) return resolve({});
@@ -79,20 +80,20 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
       child.stderr.setEncoding("utf8");
       child.stdout.on("data", (d) => (stdout += d));
       child.stderr.on("data", (d) => (stderr += d));
-      child.on("error", (err) => finish({ error: `Command hook "${label}" failed to start: ${err.message}` }));
+      child.on("error", (err) => finish({ error: `Command hook "${label}" failed to start: ${oneLine(err.message)}` }));
       child.stdin.on("error", () => {});
       child.on("close", (code) => {
         if (code === 2) {
-          const reason = stderr.trim() || "Blocked by a command hook.";
+          const reason = oneLine(stderr.trim()) || "Blocked by a command hook.";
           return finish({ result: event === "PreToolUse" ? { decision: "deny", reason } : event === "Stop" ? { decision: "block", reason } : { additionalContext: reason } });
         }
-        if (code !== 0) return finish({ error: `Command hook "${label}" exited with code ${code}: ${stderr.trim()}` });
+        if (code !== 0) return finish({ error: `Command hook "${label}" exited with code ${code}: ${oneLine(stderr.trim())}` });
         const text = stdout.trim();
         if (!text) return finish({ result: {} });
         try {
           finish({ result: normalize(JSON.parse(text)) });
         } catch {
-          finish({ error: `Command hook "${label}" gave output that is not JSON: ${text.slice(0, 200)}` });
+          finish({ error: `Command hook "${label}" gave output that is not JSON: ${oneLine(text.slice(0, 200))}` });
         }
       });
       child.stdin.end(JSON.stringify(payload));

@@ -270,7 +270,7 @@ export function labDisplayText(text: string): string {
 
 export function oneLine(text: string): string {
   const t = labDisplayText(text);
-  return t.includes("\n") ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
+  return t.includes("\n") || t.includes("\\") || t.startsWith('"') ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
 }
 
 export const LAB_MAX_BYTES = 64 * 1024;
@@ -477,7 +477,7 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   const labPath = oneLine(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
   if (s.labProblem) out.push(`LAB.md could not be read: ${oneLine(s.labProblem)}. Cuvette ignores it.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${oneLine(shellQuote(s.folder))}`}`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${labDisplayText(shellQuote(s.folder))}`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
@@ -495,7 +495,7 @@ export function trustEvidence(t: TrustStatus): string {
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${oneLine(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
+  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${labDisplayText(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {

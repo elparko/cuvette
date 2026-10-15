@@ -137,18 +137,13 @@ describe.skipIf(process.platform === "win32")("fuzz: the cache of an environment
   });
 });
 
-let python: ReturnType<typeof spawnSync> | undefined;
-let rscript: ReturnType<typeof spawnSync> | undefined;
-beforeAll(() => {
-  if (process.platform === "win32") return;
-  python = spawnSync("python3", ["-c", "import site;print(site.getusersitepackages())"], { encoding: "utf8" });
-  rscript = spawnSync("Rscript", ["--vanilla", "-e", 'cat(Sys.getenv("R_LIBS_USER"))'], { encoding: "utf8" });
-});
+const probe = (cmd: string, args: string[]) => (process.platform === "win32" ? undefined : spawnSync(cmd, args, { encoding: "utf8" }));
 
 describe("the folders that a real interpreter reports", () => {
   const stamps = (key: string): string[] => Object.keys(JSON.parse(readFileSync(join(process.env.CUVETTE_HOME!, "cache", "env-locks.json"), "utf8"))[key].stamps);
 
   test("Python reports the folder of the user packages, also if it does not exist", async (ctx) => {
+    const python = probe("python3", ["-c", "import site;print(site.getusersitepackages())"]);
     if (python?.status !== 0) return ctx.skip();
     clearEnvCache();
     const path = spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
@@ -157,6 +152,7 @@ describe("the folders that a real interpreter reports", () => {
   });
 
   test("R reports the folder of the user packages, also if it does not exist", async (ctx) => {
+    const rscript = probe("Rscript", ["--vanilla", "-e", 'cat(Sys.getenv("R_LIBS_USER"))']);
     if (rscript?.status !== 0 || !String(rscript.stdout).trim()) return ctx.skip();
     clearEnvCache();
     const path = spawnSync("sh", ["-c", "command -v Rscript"], { encoding: "utf8" }).stdout.trim();
