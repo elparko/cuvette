@@ -6,6 +6,7 @@ import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
 import { CLAUDE_MODELS, CUVETTE_MODEL } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
 import { claudeKey, cuvetteToken, elabftwConfig } from "./credentials.ts";
+import { hostedMode } from "./hosted.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
 import { usesAnthropicSpec } from "./types.ts";
 import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
@@ -68,7 +69,7 @@ export interface SettingRow {
 }
 
 const ALL: Scope[] = ["session", "user", "project"];
-const MODELS = () => [...CLAUDE_MODELS, CUVETTE_MODEL].map((m) => m.spec);
+const MODELS = () => [...CLAUDE_MODELS, ...(hostedMode() ? [CUVETTE_MODEL] : [])].map((m) => m.spec);
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 export type Paper = "a4" | "letter";
@@ -424,13 +425,24 @@ export const SETTINGS: SettingDef[] = [
     },
   },
   {
+    name: "hosted_mode",
+    group: "Account and spend",
+    label: "Cuvette hosted mode",
+    help: "on: the app shows the Cuvette sign-in, plans and usage. off: the own API key is the only cloud option. CUVETTE_HOSTED=1 in the shell turns it on.",
+    scopes: ["user"],
+    choices: () => ["on", "off"],
+    shown: () => false,
+    read: (ctx) => (hostedMode(ctx.env ?? process.env) ? { value: "on", source: "user" } : { value: "off", source: "default" }),
+  },
+  {
     name: "cuvette_account",
     group: "Account and spend",
     label: "Cuvette account",
-    help: "A Cuvette account holds your Cuvette credit for Cuvette hosted. The screen never shows the token. CUVETTE_TOKEN in the shell wins over the saved token. On the command line: cuvette account.",
-    brief: "A Cuvette account holds your Cuvette credit. The screen never shows the token.",
+    help: "Sign in to use Cuvette hosted. A plan or a top-up pays for the requests. The screen never shows the token. CUVETTE_TOKEN in the shell wins over the saved token. On the command line: cuvette account.",
+    brief: "Sign in to use Cuvette hosted. The screen never shows the token.",
     scopes: [],
     secret: true,
+    shown: (ctx) => hostedMode(ctx.env ?? process.env),
     read: (ctx) => {
       const t = cuvetteToken(ctx.env ?? process.env);
       return t.from === "env" ? { value: "set by environment", source: "env" } : t.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };

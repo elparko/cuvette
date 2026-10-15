@@ -1,4 +1,5 @@
 import type { Provider } from "../core/types.ts";
+import { hostedMode } from "../core/hosted.ts";
 import { ProviderError } from "../core/types.ts";
 import { ClaudeProvider, DEFAULT_CLAUDE_MODEL } from "./claude.ts";
 import { FakeProvider } from "./fake.ts";
@@ -18,6 +19,7 @@ export interface ProviderOpts {
   cache?: "off" | "5m" | "1h";
   sleep?: Sleep;
   retries?: number;
+  session?: string;
 }
 
 export interface ModelListing {
@@ -57,12 +59,12 @@ export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promi
     case "fake":
       return rest ? FakeProvider.fromFile(rest) : new FakeProvider();
     default:
-      throw new ProviderError(`Unknown model spec "${spec}". Use claude, claude:<id>, cuvette, cuvette:<id>, ollama:<model>, openai:<url>|<model>, or fake:<file>.`);
+      throw new ProviderError(`Unknown model spec "${spec}". Use claude, claude:<id>, ${hostedMode() ? "cuvette, cuvette:<id>, " : ""}ollama:<model>, openai:<url>|<model>, or fake:<file>.`);
   }
 }
 
 export async function listModels(): Promise<ModelListing[]> {
-  const list = [...CLAUDE_MODELS, CUVETTE_MODEL];
+  const list = hostedMode() ? [...CLAUDE_MODELS, CUVETTE_MODEL] : [...CLAUDE_MODELS];
   try {
     const res = await fetch(`${ollamaHost()}/api/tags`, { signal: AbortSignal.timeout(1500) });
     if (!res.ok) return list;

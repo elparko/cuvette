@@ -12,27 +12,22 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number;
 };
 const FALLBACK = PRICES["claude-fable-5-1"]!;
 
-export const CUVETTE_MARKUP = 1.25;
-
-const markupFor = (provider?: string) => (provider === "cuvette" ? CUVETTE_MARKUP : 1);
-
 export function modelPrice(model: string): { input: number; output: number } | undefined {
   const p = PRICES[model.replace(/^(claude|cuvette):/, "")];
-  const k = markupFor(model.startsWith("cuvette:") ? "cuvette" : undefined);
-  return p && { input: p.input * k, output: p.output * k };
+  return p && { input: p.input, output: p.output };
 }
 
 export function spendFile(): string {
   return process.env.CUVETTE_SPEND_FILE || join(homeFolder(), "spend.jsonl");
 }
 
-export function costUsd(model: string, u: Usage, provider?: string): number {
+export function costUsd(model: string, u: Usage): number {
   const p = PRICES[model] ?? FALLBACK;
-  return ((u.inputTokens * p.input + u.outputTokens * p.output + (u.cacheRead ?? 0) * p.cacheRead + (u.cacheWrite ?? 0) * p.cacheWrite) / 1e6) * markupFor(provider);
+  return ((u.inputTokens * p.input + u.outputTokens * p.output + (u.cacheRead ?? 0) * p.cacheRead + (u.cacheWrite ?? 0) * p.cacheWrite) / 1e6);
 }
 
 export function recordSpend(model: string, u: Usage, session?: string, provider?: string): number {
-  const usd = costUsd(model, u, provider);
+  const usd = costUsd(model, u);
   const path = spendFile();
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, JSON.stringify({ t: new Date().toISOString(), model, provider, session, usd, ...u }) + "\n");
@@ -107,7 +102,7 @@ export function entryCost(d: Record<string, unknown>): number | undefined {
   const model = String(d.model ?? "");
   const claude = d.provider ? usesAnthropicApi(String(d.provider)) : model.startsWith("claude");
   if (!claude) return undefined;
-  return costUsd(model, { inputTokens: Number(d.inputTokens) || 0, outputTokens: Number(d.outputTokens) || 0, cacheRead: Number(d.cacheRead) || 0, cacheWrite: Number(d.cacheWrite) || 0 }, String(d.provider ?? ""));
+  return costUsd(model, { inputTokens: Number(d.inputTokens) || 0, outputTokens: Number(d.outputTokens) || 0, cacheRead: Number(d.cacheRead) || 0, cacheWrite: Number(d.cacheWrite) || 0 });
 }
 
 export interface TurnUsage {

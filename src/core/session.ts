@@ -379,10 +379,10 @@ export class Session {
     const resumed = this.record.entries(["session"]).length > 0;
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache }));
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, session: this.id }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
-    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
+    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort, session: this.id });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
@@ -1146,7 +1146,7 @@ export class Session {
     if (!changedAnalysis(all.slice(turnStart)) && (had || !all.some((e) => e.kind === "assistant" && e.data.final))) return;
     try {
       const kind = this.provider.info.provider;
-      const p = usesAnthropicApi(kind) ? await makeProvider(`${kind}:claude-haiku-5-5`, { effort: "low" }) : this.provider;
+      const p = usesAnthropicApi(kind) ? await makeProvider(`${kind}:claude-haiku-5-5`, { effort: "low", session: this.id }) : this.provider;
       const t = await describeSession(p, this.record, AbortSignal.timeout(60_000));
       if (!t || (had && had.title === t.title && had.description === t.description)) return;
       this.record.append("title", { ...t });
@@ -2358,12 +2358,12 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = name === "model" || name === "effort" || name === "promptCache" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache }) : this.provider;
+    const provider = name === "model" || name === "effort" || name === "promptCache" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, session: this.id }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name)
       ? next.referee === "same"
         ? provider
         : next.referee && next.referee !== "none"
-          ? await makeProvider(next.referee, { effort: next.effort })
+          ? await makeProvider(next.referee, { effort: next.effort, session: this.id })
           : undefined
       : this.refereeProvider;
     this.settings = next;

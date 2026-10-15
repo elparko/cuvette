@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { cuvetteToken, saveCuvetteToken } from "../src/core/credentials.ts";
 import { isCloud } from "../src/core/phi.ts";
-import { CUVETTE_MARKUP, costUsd, entryCost, modelPrice, readSpend, spendFile } from "../src/core/spend.ts";
+import { costUsd, entryCost, modelPrice, readSpend, spendFile } from "../src/core/spend.ts";
 import type { Message, StepRequest } from "../src/core/types.ts";
 import { ProviderError, usesAnthropicApi, usesAnthropicSpec } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
@@ -69,7 +69,10 @@ describe("the cuvette model spec", () => {
     expect(b.info).toMatchObject({ provider: "cuvette", model: "claude-haiku-5-5" });
   });
 
-  test("the model list has the hosted entry", async () => {
+  test("the model list has the hosted entry only in hosted mode", async () => {
+    vi.stubEnv("CUVETTE_HOSTED", "");
+    expect((await listModels()).find((m) => m.spec === "cuvette")).toBeUndefined();
+    vi.stubEnv("CUVETTE_HOSTED", "1");
     expect((await listModels()).find((m) => m.spec === "cuvette")).toEqual(CUVETTE_MODEL);
     expect(CUVETTE_MODEL.label).toBe("Cuvette hosted (pay as you go)");
   });
@@ -129,7 +132,8 @@ describe("the hosted request", () => {
     const p = await makeProvider("cuvette");
     const err = await p.step(req()).catch((e) => e);
     expect(err).toBeInstanceOf(ProviderError);
-    expect(err.message).toContain("cuvette account create");
+    expect(err.message).toContain("cuvette account login");
+    expect(err.message).not.toContain("account create");
     expect(calls).toHaveLength(0);
   });
 
@@ -142,6 +146,24 @@ describe("the hosted request", () => {
     await p.step(req());
     expect(calls.map((c) => c.headers.get("authorization"))).toEqual(["Bearer cuv_first", "Bearer cuv_second"]);
     expect(cuvetteToken({}).token).toBe("cuv_second");
+  });
+
+  test("each request carries the session id, and the id stays the same", async () => {
+    saveCuvetteToken(TOKEN);
+    mockFetch(sse("claude-opus-5-5", 1, 1), sse("claude-opus-5-5", 1, 1), sse("claude-opus-5-5", 1, 1));
+    const p = await makeProvider("cuvette", { session: "20261014-sess" });
+    await p.step(req());
+    await p.step(req());
+    expect(calls.map((c) => c.headers.get("x-cuvette-session"))).toEqual(["20261014-sess", "20261014-sess"]);
+    await (await makeProvider("cuvette")).step(req());
+    expect(calls[2]!.headers.get("x-cuvette-session")).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test("the own-key provider sends no session header", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-own-key");
+    mockFetch(sse("claude-opus-5-5", 1, 1));
+    await (await makeProvider("claude", { session: "s1" })).step(req());
+    expect(calls[0]!.headers.get("x-cuvette-session")).toBeNull();
   });
 
   test("the own-key provider is unchanged", async () => {
@@ -163,15 +185,48 @@ describe("error messages", () => {
     return (await p.step(req()).catch((e) => e)) as ProviderError;
   };
 
-  test("402 tells the user to buy credit", async () => {
-    const e = await fail(402, "insufficient_credit", "No credit.");
+  const typed = async (status: number, type: string, extra: object, spec = "cuvette") => {
+    saveCuvetteToken(TOKEN);
+    mockFetch(new Response(JSON.stringify({ type: "error", error: { type, message: "x", ...extra } }), { status, headers: { "content-type": "application/json" } }));
+    const p = await makeProvider(spec, { retries: 0 });
+    return (await p.step(req()).catch((e) => e)) as ProviderError;
+  };
+
+  test("402 shows the reset time", async () => {
+    const e = await typed(402, "allowance_used_up", { resets_at: "2026-11-01T00:00:00Z" });
     expect(e).toBeInstanceOf(ProviderError);
-    expect(e.message).toBe("Your Cuvette credit is used up. Run `cuvette account buy`, or open Settings and buy credit.");
+    expect(e.message).toMatch(/^Your allowance is used up\. It resets on .*2026.*\. Buy a top-up, or choose a larger plan\.$/);
+    expect(e.transient).toBe(false);
   });
 
-  test("401 tells the user to check the account", async () => {
+  test("403 model_not_in_plan, no_plan and account_suspended", async () => {
+    expect((await typed(403, "model_not_in_plan", {})).message).toBe("Your plan does not include this model. Choose another model, or choose a larger plan.");
+    expect((await typed(403, "no_plan", {})).message).toContain("Your account has no plan.");
+    expect((await typed(403, "account_suspended", {})).message).toContain("suspended");
+  });
+
+  test("429 rate_limited shows the wait time", async () => {
+    const e = await typed(429, "rate_limited", { retry_after: 5400 });
+    expect(e.message).toBe("You reached the limit for five hours. Wait 2 hours and retry.");
+    expect(e.transient).toBe(false);
+  });
+
+  test("a rate_limited error is not retried", async () => {
+    saveCuvetteToken(TOKEN);
+    mockFetch(
+      new Response(JSON.stringify({ type: "error", error: { type: "rate_limited", message: "x", retry_after: 600 } }), { status: 429, headers: { "content-type": "application/json" } }),
+      sse("claude-opus-5-5", 1, 1),
+    );
+    const sleeps: number[] = [];
+    const p = await makeProvider("cuvette", { sleep: async (ms) => void sleeps.push(ms) });
+    await expect(p.step(req())).rejects.toThrow(/Wait 10 minutes/);
+    expect(calls).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  test("401 tells the user to sign in again", async () => {
     const e = await fail(401, "authentication_error", "invalid x-api-key");
-    expect(e.message).toBe("Your Cuvette account token is not valid. Run `cuvette account status`.");
+    expect(e.message).toBe("Cuvette does not accept your sign-in. Sign in again. Run `cuvette account login`, or open Settings.");
     expect(e.message).not.toContain("ANTHROPIC_API_KEY");
   });
 
@@ -193,34 +248,31 @@ describe("error messages", () => {
 
   test("complete() maps 402 too", async () => {
     saveCuvetteToken(TOKEN);
-    mockFetch(errorResponse(402, "insufficient_credit", "No credit."));
+    mockFetch(errorResponse(402, "allowance_used_up", "No allowance."));
     const p = await makeProvider("cuvette", { retries: 0 });
-    await expect(p.complete!("SYS", "text")).rejects.toThrow(/credit is used up/);
+    await expect(p.complete!("SYS", "text")).rejects.toThrow(/allowance is used up/);
   });
 });
 
 describe("spend", () => {
-  test("the markup is 1.25 and applies to cuvette only", () => {
-    expect(CUVETTE_MARKUP).toBe(1.25);
+  test("a hosted call costs the list price", () => {
     const u = { inputTokens: 1e6, outputTokens: 1e6, cacheRead: 0, cacheWrite: 0 };
     expect(costUsd("claude-opus-5-5", u)).toBeCloseTo(24, 6);
-    expect(costUsd("claude-opus-5-5", u, "claude")).toBeCloseTo(24, 6);
-    expect(costUsd("claude-opus-5-5", u, "cuvette")).toBeCloseTo(30, 6);
   });
 
-  test("entry cost reads the provider tag", () => {
+  test("entry cost is the list price for claude and cuvette, and unknown for others", () => {
     const d = { model: "claude-opus-5-5", inputTokens: 1e6, outputTokens: 0, cacheRead: 0, cacheWrite: 0 };
     expect(entryCost({ ...d, provider: "claude" })).toBeCloseTo(4, 6);
-    expect(entryCost({ ...d, provider: "cuvette" })).toBeCloseTo(5, 6);
+    expect(entryCost({ ...d, provider: "cuvette" })).toBeCloseTo(4, 6);
     expect(entryCost({ ...d, provider: "ollama" })).toBeUndefined();
   });
 
-  test("the price shown for a hosted model includes the markup", () => {
+  test("the price shown for a hosted model is the list price", () => {
     expect(modelPrice("claude:claude-opus-5-5")).toEqual({ input: 4, output: 20 });
-    expect(modelPrice("cuvette:claude-opus-5-5")).toEqual({ input: 5, output: 25 });
+    expect(modelPrice("cuvette:claude-opus-5-5")).toEqual({ input: 4, output: 20 });
   });
 
-  test("a hosted step records the marked-up cost with the provider tag", async () => {
+  test("a hosted step records the list price with the provider tag", async () => {
     saveCuvetteToken(TOKEN);
     writeFileSync(spendFile(), "");
     mockFetch(sse("claude-opus-5-5", 100_000, 10_000));
@@ -228,7 +280,7 @@ describe("spend", () => {
     const rows = readSpend() as unknown as { provider: string; model: string; usd: number }[];
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ provider: "cuvette", model: "claude-opus-5-5" });
-    expect(rows[0]!.usd).toBeCloseTo(((100_000 * 4 + 10_000 * 20) / 1e6) * 1.25, 6);
+    expect(rows[0]!.usd).toBeCloseTo((100_000 * 4 + 10_000 * 20) / 1e6, 6);
     expect(readFileSync(spendFile(), "utf8")).toContain('"provider":"cuvette"');
   });
 });

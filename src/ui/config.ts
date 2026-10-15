@@ -99,7 +99,7 @@ export function modelNote(spec: string): string {
   if (spec.startsWith("ollama:") || /^openai:https?:\/\/(localhost|127\.0\.0\.1)/.test(spec)) return "free, on this Mac";
   if (!usesAnthropicSpec(spec)) return "";
   const p = modelPrice(/^(claude|cuvette)$/.test(spec) ? `${spec}:${DEFAULT_CLAUDE_MODEL}` : spec);
-  return p && !spec.startsWith("cuvette") ? `$${p.input} in, $${p.output} out per million tokens` : "";
+  return p ? `$${p.input} in, $${p.output} out per million tokens` : "";
 }
 
 export function briefHelp(d: SettingDef): string {

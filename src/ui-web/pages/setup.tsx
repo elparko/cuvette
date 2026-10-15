@@ -134,7 +134,13 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
         )}
         {choice === "cuvette" && (
           <div className="mt-4">
-            <CuvetteAccount createLabel="Make my Cuvette account" onCreated={after} />
+            <CuvetteAccount
+              use
+              onSignedIn={async () => {
+                await call("api/firststart/cuvette", {});
+                await after();
+              }}
+            />
           </div>
         )}
         {choice === "claude" && fs && (

@@ -2,8 +2,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { savedClaudeKey } from "../src/core/credentials.ts";
-import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
+import { saveCuvetteToken, savedClaudeKey } from "../src/core/credentials.ts";
+import { APP_CHOICES, CHOICES, choicesFor, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
 import { settingsPath } from "../src/core/settings.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
@@ -85,4 +85,29 @@ test("the sample copies only the CSV, and the data are the Student 1908 values",
   expect(s.request).toContain("sleep.csv");
   expect(readFileSync(join(SAMPLE_DIR, "README.md"), "utf8")).toContain("public domain");
   expect(existsSync(join(dest, "README.md"))).toBe(false);
+});
+
+test("a signed-in Cuvette user with no Claude key does not need the first start, in hosted mode", () => {
+  saveCuvetteToken("cuv_abc");
+  expect(needsFirstStart({ cwd, env: {} })).toBe(true);
+  expect(needsFirstStart({ cwd, env: { CUVETTE_HOSTED: "1" } })).toBe(false);
+});
+
+test("a user with no sign-in still needs the first start in hosted mode", () => {
+  expect(needsFirstStart({ cwd, env: { CUVETTE_HOSTED: "1" } })).toBe(true);
+});
+
+test("a token from the shell counts as a sign-in", () => {
+  expect(needsFirstStart({ cwd, env: { CUVETTE_HOSTED: "1", CUVETTE_TOKEN: "cuv_env" } })).toBe(false);
+});
+
+test("the choices include Cuvette only in hosted mode", () => {
+  expect(choicesFor({})).toBe(CHOICES);
+  expect(choicesFor({ CUVETTE_HOSTED: "1" })).toBe(APP_CHOICES);
+  expect(APP_CHOICES.map((c) => c.id)).toEqual(["claude", "cuvette", "local"]);
+});
+
+test("the Cuvette choice names no removed command", () => {
+  const text = APP_CHOICES.map((c) => `${c.label} ${c.help}`).join(" ");
+  expect(text).not.toMatch(/credit|account create|account buy/i);
 });

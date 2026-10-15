@@ -304,23 +304,10 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
     case "secret":
       control = r.name === "cuvette_account" ? (
         <div className="flex w-full flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={r.secret === "not set" ? "default" : "ok"}>{r.secret}</Badge>
-            {r.secret === "saved" && (
-              <Button
-                variant={sure ? "destructive" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  if (!sure) return setSure(true);
-                  setSure(false);
-                  void finish("api/setting/remove", { name: r.name });
-                }}
-              >
-                {sure ? "Click again to remove" : "Remove"}
-              </Button>
-            )}
-          </div>
-          <CuvetteAccount key={r.secret} createLabel="Pay Cuvette for inference" onCreated={reload} />
+          <Badge tone={r.secret === "not set" ? "default" : "ok"} className="self-start">
+            {r.secret}
+          </Badge>
+          <CuvetteAccount key={r.secret} onSignedIn={reload} />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">

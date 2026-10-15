@@ -107,7 +107,6 @@ Usage
   cuvette config set <name> <value> [--user|--project]   save a setting (default: user settings)
   cuvette spend                        Claude spend by day and model (set CUVETTE_BUDGET_USD to stop at a limit)
   cuvette key [status|remove|workspace <id>] save, show or remove your Claude API key
-  cuvette account create|status|buy [10|25|50]  make a Cuvette account, show its Cuvette credit, or open the page to buy Cuvette credit
   cuvette eln setup [--url <address>]  save your eLabFTW address and API key
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
@@ -150,7 +149,20 @@ Proposed analysis: in an interactive session the agent goes through four stages 
   A step that processes many files waits for a confirmed demonstration. /pilot off skips that.
   CUVETTE_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
 
-Models: "claude" (claude-opus-5-5), "claude:<model id>", "cuvette" or "cuvette:<model id>" (Cuvette hosted, paid with Cuvette credit), "ollama:<model>", "openai:<base url>|<model>".`;
+Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
+
+const HOSTED_HELP = {
+  account: `  cuvette account login [--provider google|microsoft|orcid|github] [--no-browser]   sign in to Cuvette
+  cuvette account status|billing|topup|logout   show the plan and allowance, open the billing page, buy a top-up, or sign out
+  cuvette account plan <id> [--yearly]  choose or change the plan: basic, standard, lab or lab_plus
+`,
+  models: `Models: "claude" (claude-opus-5-5), "claude:<model id>", "cuvette" or "cuvette:<model id>" (Cuvette hosted, paid with a Cuvette plan or top-up), "ollama:<model>", "openai:<base url>|<model>".`,
+};
+
+async function helpText(): Promise<string> {
+  if (!(await import("./core/hosted.ts")).hostedMode()) return HELP;
+  return HELP.replace("  cuvette eln setup", `${HOSTED_HELP.account}  cuvette eln setup`).replace(/^Models: .*$/m, HOSTED_HELP.models);
+}
 
 const argv = process.argv.slice(2).map((a, i, all) => ((a === "--resume" || a === "-r") && (all[i + 1] === undefined || all[i + 1]!.startsWith("-")) ? "--resume=" : a));
 const { values: o, positionals: pos } = parseArgs({
@@ -206,6 +218,9 @@ const { values: o, positionals: pos } = parseArgs({
     fix: { type: "boolean" },
     "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
+    "no-browser": { type: "boolean" },
+    yearly: { type: "boolean" },
+    provider: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -270,10 +285,25 @@ async function chooseSession(always: boolean): Promise<string> {
 async function firstStart(): Promise<{ cwd: string; message: string } | undefined> {
   const fs = await import("./core/firststart.ts");
   console.log("Welcome to Cuvette. First, choose the model that does the analysis.\n");
-  fs.CHOICES.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
+  const choices = fs.choicesFor();
+  choices.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
+  const numbers = choices.map((_, i) => String(i + 1));
   let pick = "";
-  while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
-  if (pick === "1") {
+  while (!numbers.includes(pick)) pick = (await ask(`Type ${numbers.slice(0, -1).join(", ")} or ${numbers.at(-1)}: `)).trim();
+  const choice = choices[Number(pick) - 1]!.id;
+  if (choice === "cuvette") {
+    const si = await import("./core/signin.ts");
+    const acc = await import("./core/account.ts");
+    si.PROVIDERS.forEach((p, i) => console.log(`  ${i + 1}  ${p.label}`));
+    const which = Number((await ask("Sign in with (type a number): ")).trim());
+    try {
+      const info = await si.signInFromTerminal({ provider: si.PROVIDERS[which - 1]?.id ?? "google", browser: true, open: (await import("./ui/commands.ts")).openWithOs, say: console.log, ask });
+      console.log(`${acc.accountLines(info).join("\n")}\n${(await fs.chooseCuvette({}, {})).text}`);
+    } catch (e) {
+      if (e instanceof acc.AccountError) fail(`${e.message} Run cuvette again to retry.`);
+      throw e;
+    }
+  } else if (choice === "claude") {
     for (let i = 1; ; i++) {
       const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key: ");
       if (pasted.trim() === "?") {
@@ -395,7 +425,7 @@ async function app(folder?: string) {
 }
 
 async function main() {
-  if (o.help) return console.log(HELP);
+  if (o.help) return console.log(await helpText());
   if (typeof o.print === "string") return headless(o.print);
   const [cmd, a1, a2, a3] = pos;
   if (typeof o.method === "string" && (cmd === undefined || existsSync(cmd))) {
@@ -408,7 +438,7 @@ async function main() {
     case "resume":
       return interactive(a1 || (await chooseSession(true)));
     case "help":
-      return console.log(HELP);
+      return console.log(await helpText());
     case "app":
       return app(a1);
     case "adapters": {
@@ -496,32 +526,54 @@ async function main() {
       return;
     }
     case "account": {
+      if (!(await import("./core/hosted.ts")).hostedMode()) return fail("Cuvette hosted mode is off. Set CUVETTE_HOSTED=1, or set hosted_mode to on in the user settings.");
       const acc = await import("./core/account.ts");
       const cred = await import("./core/credentials.ts");
+      const { openWithOs } = await import("./ui/commands.ts");
+      const open = (url: string) => {
+        openWithOs(url);
+        console.log(url);
+      };
       try {
-        if (a1 === "create") {
-          if (cred.cuvetteToken().from !== "none") return fail("A Cuvette account token is already set. Run cuvette account status.");
-          const r = await acc.createAccount();
-          console.log(`Made the Cuvette account ${r.accountId}. Saved the token to ${r.path}.\n${acc.CUVETTE_NOTICE}\nRun cuvette account buy to add Cuvette credit. Use the model "cuvette" for Cuvette hosted.`);
+        if (a1 === "login") {
+          const si = await import("./core/signin.ts");
+          const provider = si.providerId(str(o.provider) ?? "google");
+          const info = await si.signInFromTerminal({ provider, browser: !o["no-browser"], open: openWithOs, say: console.log, ask });
+          const fs = await import("./core/firststart.ts");
+          const r = await fs.chooseCuvette({}, { onlyIfNoKey: true });
+          console.log(`${acc.accountLines(info).join("\n")}\n${r.text}\n${acc.CUVETTE_NOTICE}\nUse the model "cuvette" for Cuvette hosted.`);
           return;
         }
         if (a1 === "status") {
           const t = cred.cuvetteToken();
-          if (t.from === "none") return console.log(acc.NO_TOKEN);
-          const s = await acc.accountStatus();
-          return console.log(`Account ${s.accountId}. Credit ${acc.balanceText(s.balanceUsd)}. Token ${cred.maskKey(t.token!)} from ${t.from === "env" ? "CUVETTE_TOKEN" : cred.credentialsPath()}.`);
+          if (t.from === "none") return console.log(acc.NOT_SIGNED_IN);
+          return console.log(`${acc.accountLines(await acc.getAccount()).join("\n")}\nToken ${cred.maskKey(t.token!)} from ${t.from === "env" ? "CUVETTE_TOKEN" : cred.credentialsPath()}.`);
         }
-        if (a1 === "buy") {
-          const amount = a2 === undefined ? 10 : Number(a2);
-          const url = await acc.checkoutUrl(amount);
-          (await import("./ui/commands.ts")).openWithOs(url);
-          return console.log(`Opening the payment page for ${amount} US dollars:\n${url}`);
+        if (a1 === "plan") {
+          if (!a2) return fail("usage: cuvette account plan <basic|standard|lab|lab_plus> [--yearly]");
+          const interval = o.yearly ? "year" : "month";
+          const info = await acc.getAccount();
+          if (info.plan === "none" || info.sub_status === "canceled" || info.sub_status === "none") return (open(await acc.checkoutUrl({ plan: a2, interval })), console.log("Opening the payment page."));
+          const r = await acc.changePlan(a2, interval);
+          return console.log(r.status === "scheduled" ? `The plan changes on ${acc.resetText(r.effective_at)}.` : "The plan changed.");
+        }
+        if (a1 === "topup") {
+          open(await acc.checkoutUrl({ topup: true }));
+          return console.log("Opening the payment page for a top-up.");
+        }
+        if (a1 === "billing") {
+          open(await acc.billingUrl());
+          return console.log("Opening the billing page.");
+        }
+        if (a1 === "logout") {
+          const r = await acc.logout();
+          return console.log(r.revoked ? "Signed out. Cuvette revoked this device." : "Signed out on this computer. Cuvette could not revoke the device. Revoke it in Settings on another device.");
         }
       } catch (e) {
         if (e instanceof acc.AccountError) return fail(e.message);
         throw e;
       }
-      return fail("usage: cuvette account create|status|buy [10|25|50]");
+      return fail("usage: cuvette account login|status|plan <id>|topup|billing|logout");
     }
     case "eln": {
       const cred = await import("./core/credentials.ts");
@@ -887,7 +939,7 @@ async function main() {
       return runMcpServer({ adapters: (o.adapter as string[]) ?? [], trustFolder });
     }
     default:
-      fail(`unknown command ${cmd}\n\n${HELP}`);
+      fail(`unknown command ${cmd}\n\n${await helpText()}`);
   }
 }
 

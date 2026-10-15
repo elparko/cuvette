@@ -2,7 +2,8 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import { accountStatus, createAccount, CUVETTE_NOTICE } from "./account.ts";
+import { CUVETTE_NOTICE, NOT_SIGNED_IN } from "./account.ts";
+import { hostedMode } from "./hosted.ts";
 import { KEY_GUIDE } from "./keyhelp.ts";
 import { claudeKey, cuvetteToken, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
@@ -16,9 +17,13 @@ export const CHOICES: { id: ModelChoice; label: string; help: string }[] = [
 
 export const APP_CHOICES: { id: ModelChoice; label: string; help: string }[] = [
   CHOICES[0]!,
-  { id: "cuvette", label: "Pay Cuvette for inference", help: `You pay Cuvette with Cuvette credit. You need no API key. ${CUVETTE_NOTICE}` },
+  { id: "cuvette", label: "Pay Cuvette for inference", help: `You sign in, and you pay Cuvette with a plan or a top-up. You need no API key. ${CUVETTE_NOTICE}` },
   CHOICES[1]!,
 ];
+
+export const choicesFor = (env: Record<string, string | undefined> = process.env) => (hostedMode(env) ? APP_CHOICES : CHOICES);
+
+export const hostedSignedIn = (env: Record<string, string | undefined> = process.env): boolean => hostedMode(env) && cuvetteToken(env).from !== "none";
 
 export const RECOMMENDED_LOCAL = "qwen3:8b";
 export const SAMPLE_DIR = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../samples/sleep");
@@ -64,7 +69,8 @@ export function savedModel(ctx: Ctx = {}): string {
 }
 
 export function needsFirstStart(ctx: Ctx = {}): boolean {
-  return claudeKey(ctx.env ?? process.env).from === "none" && savedModel(ctx).startsWith("claude");
+  const env = ctx.env ?? process.env;
+  return claudeKey(env).from === "none" && savedModel(ctx).startsWith("claude") && !hostedSignedIn(env);
 }
 
 export async function firstStartState(ctx: Ctx = {}): Promise<FirstStartState> {
@@ -83,12 +89,12 @@ export async function chooseClaude(key: string, ctx: Ctx & { check?: (key: strin
   return { ok: true, text: `${r.text} Saved the key to ${path}. The model is Claude.` };
 }
 
-export async function chooseCuvette(ctx: Ctx = {}): Promise<{ ok: boolean; text: string; balanceUsd: number }> {
+export async function chooseCuvette(ctx: Ctx = {}, opts: { onlyIfNoKey?: boolean } = {}): Promise<{ ok: boolean; text: string }> {
   const env = ctx.env ?? process.env;
-  if (cuvetteToken(env).from === "none") await createAccount({ env, fetch: ctx.fetch });
-  const s = await accountStatus({ env, fetch: ctx.fetch });
+  if (cuvetteToken(env).from === "none") return { ok: false, text: NOT_SIGNED_IN };
+  if (opts.onlyIfNoKey && claudeKey(env).from !== "none") return { ok: true, text: "You are signed in to Cuvette. The model stays the same." };
   await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", "cuvette", "user");
-  return { ok: true, text: "The Cuvette account is ready. The model is Claude, paid through Cuvette.", balanceUsd: s.balanceUsd };
+  return { ok: true, text: "You are signed in to Cuvette. The model is Claude, paid through Cuvette." };
 }
 
 export async function chooseLocal(model: string | undefined, ctx: Ctx = {}): Promise<{ ok: boolean; text: string; model: string }> {

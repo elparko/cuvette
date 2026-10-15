@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { randomUUID } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
-import { CREDIT_USED_UP, NO_TOKEN, TOKEN_REFUSED, TOO_MANY } from "../core/account.ts";
+import { hostedError, NOT_SIGNED_IN, type HostedError } from "../core/account.ts";
 import { claudeKey, claudeWorkspace, cuvetteToken, cuvetteUrl, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
@@ -23,15 +24,20 @@ export interface ClaudeOpts {
   hosted?: boolean;
   baseURL?: string;
   authToken?: string;
+  session?: string;
+}
+
+function hostedFailure(e: unknown): HostedError | undefined {
+  if (!(e instanceof Anthropic.APIError)) return undefined;
+  return hostedError(e.status ?? 0, (e as any).error, (e as any).headers?.get?.("retry-after"));
 }
 
 function mapError(e: unknown, model: string, hosted = false): unknown {
   if (e instanceof ProviderError) return e;
   if (e instanceof Anthropic.APIUserAbortError) return e;
-  if (hosted && e instanceof Anthropic.APIError) {
-    if (e.status === 402) return new ProviderError(CREDIT_USED_UP);
-    if (e.status === 401) return new ProviderError(TOKEN_REFUSED);
-    if (e.status === 429 && (e as any).error?.error?.type === "too_many_requests") return new ProviderError(TOO_MANY, true);
+  if (hosted) {
+    const known = hostedFailure(e);
+    if (known) return new ProviderError(known.text, known.transient);
   }
   if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${NO_CREDENTIALS} The API said: ${e.message}`);
   if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return new ProviderError(keyApiProblem(e.status, e.message));
@@ -60,8 +66,8 @@ function cacheLast(messages: any[], mark?: Record<string, unknown>): any[] {
   return [...messages.slice(0, -1), { ...last, content }];
 }
 
-function makeHostedClient(baseURL: string, authToken: string): any {
-  return new Anthropic({ apiKey: null, authToken, baseURL, maxRetries: 0 });
+function makeHostedClient(baseURL: string, authToken: string, session: string): any {
+  return new Anthropic({ apiKey: null, authToken, baseURL, maxRetries: 0, defaultHeaders: { "x-cuvette-session": session } });
 }
 
 function makeClient(key?: string): any {
@@ -86,6 +92,7 @@ export class ClaudeProvider implements Provider {
   private hosted: boolean;
   private baseURL?: string;
   private authToken?: string;
+  private sessionId: string;
   private made?: { client: any; version: number };
   private effort: string;
   private fallbacks = true;
@@ -97,6 +104,7 @@ export class ClaudeProvider implements Provider {
     this.hosted = !!opts.hosted;
     this.baseURL = opts.baseURL;
     this.authToken = opts.authToken;
+    this.sessionId = opts.session ?? randomUUID();
     this.info = { provider: this.hosted ? "cuvette" : "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
     this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
     this.fixedClient = opts.client;
@@ -107,7 +115,17 @@ export class ClaudeProvider implements Provider {
   }
 
   private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
-    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+    const run = this.hosted
+      ? async () => {
+          try {
+            return await fn();
+          } catch (e) {
+            const known = hostedFailure(e);
+            throw known && !known.transient ? new ProviderError(known.text) : e;
+          }
+        }
+      : fn;
+    return withRetry(run, { retries: this.retries, sleep: this.sleep, signal, onRetry });
   }
 
   private get client(): any {
@@ -115,8 +133,8 @@ export class ClaudeProvider implements Provider {
     if (!this.made || this.made.version !== keyVersion()) {
       if (this.hosted) {
         const token = this.authToken ?? cuvetteToken().token;
-        if (!token) throw new ProviderError(NO_TOKEN);
-        this.made = { client: makeHostedClient(this.baseURL ?? cuvetteUrl(), token), version: keyVersion() };
+        if (!token) throw new ProviderError(NOT_SIGNED_IN);
+        this.made = { client: makeHostedClient(this.baseURL ?? cuvetteUrl(), token, this.sessionId), version: keyVersion() };
       } else {
         const key = this.apiKey ?? claudeKey().key;
         this.made = { client: makeClient(key), version: keyVersion() };

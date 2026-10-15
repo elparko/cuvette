@@ -9,11 +9,12 @@ import { fileURLToPath } from "node:url";
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
-import { claudeKey, cuvetteToken } from "../core/credentials.ts";
+import { claudeKey } from "../core/credentials.ts";
+import { hostedMode } from "../core/hosted.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
-import { accountStatus, AccountError, AMOUNTS, checkoutUrl, CUVETTE_NOTICE } from "../core/account.ts";
-import { APP_CHOICES, chooseClaude, chooseCuvette, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
+import { CUVETTE_NOTICE } from "../core/account.ts";
+import { choicesFor, chooseClaude, chooseLocal, copySample, firstStartState, hostedSignedIn, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
 import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
@@ -32,6 +33,7 @@ import { dropInstall } from "../ui/programs.ts";
 import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/programs.ts";
 import { appPageHtml } from "./app-page.ts";
 import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json.ts";
+import { cuvetteApi, type ApiReply } from "./app-cuvette.ts";
 import { WebView } from "./app-view.ts";
 import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
 
@@ -158,7 +160,7 @@ export function chooseFolder(start: string): Promise<string> {
 }
 
 export function needsFirstSetup(model: string, env: Record<string, string | undefined>): boolean {
-  return model.startsWith("claude") && claudeKey(env).from === "none";
+  return model.startsWith("claude") && claudeKey(env).from === "none" && !hostedSignedIn(env);
 }
 
 const HIDE_WHEN_READY = new Set(["claude-key", "ollama"]);
@@ -281,6 +283,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   };
 
   const fsCtx = () => ({ cwd: current?.session.cwd ?? opts.folder ?? process.cwd(), env, fetch: opts.fetch });
+  const cuvette = cuvetteApi({ env, fetch: opts.fetch, port: () => port, cwd: () => fsCtx().cwd });
+  const reply = (res: ServerResponse, r: ApiReply) => {
+    if (!r.headers) return send(res, r.status, r.body, r.type);
+    res.writeHead(r.status, { "content-type": r.type ?? "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...r.headers });
+    res.end(r.body as string);
+  };
 
   const route = async (req: IncomingMessage, res: ServerResponse, url: URL) => {
     const p = url.pathname;
@@ -378,6 +386,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       if (!c) return send(res, 409, { error: "no session" });
       return send(res, 200, await tab(url.searchParams.get("name") ?? ""), "text/html; charset=utf-8");
     }
+    if (get && p === "/api/cuvette/usage.csv" && hostedMode(env)) return reply(res, (await cuvette.api(p, {}, url.searchParams))!);
     if (!post) return send(res, 404, { error: "not found" });
     const body = await readBody(req);
     const text = typeof body.text === "string" ? body.text : "";
@@ -404,23 +413,15 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       lastOpen = { key, at: Date.now() };
       return send(res, 200, { ok: true });
     }
-    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: APP_CHOICES, notice: CUVETTE_NOTICE, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
+    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: choicesFor(env), ...(hostedMode(env) ? { notice: CUVETTE_NOTICE } : {}), keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
     if (p === "/api/firststart/claude") {
       const r = await chooseClaude(String(body.key ?? ""), { ...fsCtx(), check: opts.checkKey });
       if (r.ok) recordSetting(c?.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
       return send(res, r.ok ? 200 : 400, r.ok ? r : { error: r.text });
     }
-    if (p === "/api/firststart/cuvette" || p === "/api/cuvette" || p === "/api/cuvette/buy") {
-      try {
-        if (p === "/api/firststart/cuvette") return send(res, 200, await chooseCuvette(fsCtx()));
-        const ctx = { env, fetch: opts.fetch };
-        if (p === "/api/cuvette/buy") return send(res, 200, { url: await checkoutUrl(Number(body.amount), ctx) });
-        if (cuvetteToken(env).from === "none") return send(res, 200, { hasToken: false, notice: CUVETTE_NOTICE, amounts: AMOUNTS });
-        return send(res, 200, { hasToken: true, ...(await accountStatus(ctx)), notice: CUVETTE_NOTICE, amounts: AMOUNTS });
-      } catch (e) {
-        if (e instanceof AccountError) return send(res, 400, { error: e.message });
-        throw e;
-      }
+    if ((p === "/api/firststart/cuvette" || p.startsWith("/api/cuvette")) && hostedMode(env)) {
+      const r = await cuvette.api(p, body, url.searchParams);
+      if (r) return reply(res, r);
     }
     if (p === "/api/firststart/local") return send(res, 200, await chooseLocal(String(body.model ?? ""), fsCtx()));
     if (p === "/api/doctor") {
@@ -541,6 +542,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const url = new URL(req.url ?? "/", `http://${host}`);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
     if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
+    if (req.method === "GET" && url.pathname === "/auth/cuvette" && hostedMode(env)) return reply(res, await cuvette.callback(url.searchParams));
     const given = url.searchParams.get("t") ?? req.headers["x-token"];
     if (given !== token) return send(res, 401, { error: "missing or wrong token" });
     try {
