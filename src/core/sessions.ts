@@ -79,8 +79,20 @@ function readLock(path: string): OpenLock | undefined {
   }
 }
 
+const LOCK_GRACE_MS = 2000;
+
+function unfinished(path: string): boolean {
+  try {
+    return Date.now() - statSync(path).mtimeMs < LOCK_GRACE_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function openLock(recordDir: string, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
-  const lock = readLock(join(recordDir, LOCK));
+  const path = join(recordDir, LOCK);
+  const lock = readLock(path);
+  if (!lock && unfinished(path)) return { pid: 0 };
   return lockAlive(lock, startOf) ? lock : undefined;
 }
 
@@ -92,10 +104,13 @@ export function claimLock(recordDir: string, extra: Record<string, unknown> = {}
     try {
       writeFileSync(tmp, body(), { mode: 0o600 });
       linkSync(tmp, path);
-      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "EEXIST") throw e;
+      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
     } finally {
       rmSync(tmp, { force: true });
     }
+    return true;
   };
   for (let i = 0; i < 5; i++) {
     try {
@@ -104,6 +119,7 @@ export function claimLock(recordDir: string, extra: Record<string, unknown> = {}
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
     }
     const held = readLock(path);
+    if (!held && unfinished(path)) return { pid: 0 };
     if (held && lockAlive(held, startOf)) {
       if (held.pid === process.pid) return undefined;
       return held;
@@ -115,6 +131,13 @@ export function claimLock(recordDir: string, extra: Record<string, unknown> = {}
       continue;
     }
     const moved = readLock(aside);
+    if (!moved && unfinished(aside)) {
+      try {
+        linkSync(aside, path);
+      } catch {}
+      rmSync(aside, { force: true });
+      return { pid: 0 };
+    }
     if (moved && lockAlive(moved, startOf) && moved.pid !== process.pid) {
       try {
         linkSync(aside, path);

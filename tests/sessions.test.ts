@@ -2,7 +2,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+
+const linkFails = vi.hoisted(() => ({ code: undefined as string | undefined }));
+vi.mock("node:fs", async (original) => {
+  const real = await original<typeof import("node:fs")>();
+  return { ...real, linkSync: (a: string, b: string) => { if (linkFails.code) throw Object.assign(new Error(linkFails.code), { code: linkFails.code }); return real.linkSync(a, b); } };
+});
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
 import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
@@ -395,4 +401,59 @@ test("a session in the old sessions folder can be renamed and removed from the l
     if (old === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = old;
   }
+});
+
+test("claimLock takes the lock with a plain write if the file system cannot link, and leaves no temporary file", () => {
+  for (const code of ["EPERM", "ENOTSUP", "EXDEV"]) {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-nolink-"));
+    linkFails.code = code;
+    try {
+      expect(claimLock(dir)).toBeUndefined();
+    } finally {
+      linkFails.code = undefined;
+    }
+    expect(JSON.parse(readFileSync(join(dir, "open.json"), "utf8"))).toMatchObject({ pid: process.pid });
+    expect(readdirSync(dir)).toEqual(["open.json"]);
+  }
+});
+
+test("a lock that cannot link still refuses a live lock of another process", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-nolink-"));
+  writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.ppid, procStart: 1000 }));
+  linkFails.code = "EPERM";
+  try {
+    expect(claimLock(dir, {}, () => 1000)).toMatchObject({ pid: process.ppid });
+  } finally {
+    linkFails.code = undefined;
+  }
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("an empty lock file that is younger than two seconds is held, and an old one is not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-empty-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  expect(claimLock(dir)).toMatchObject({ pid: 0 });
+  expect(openLock(dir)).toMatchObject({ pid: 0 });
+  expect(readFileSync(lock, "utf8")).toBe("");
+  const old = new Date(Date.now() - 10_000);
+  utimesSync(lock, old, old);
+  expect(openLock(dir)).toBeUndefined();
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid });
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("a claim leaves no temporary file after a success or after an error", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-tmp-"));
+  expect(claimLock(dir)).toBeUndefined();
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+  const missing = join(dir, "no", "such");
+  linkFails.code = "EPERM";
+  try {
+    expect(claimLock(missing)).toBeUndefined();
+  } finally {
+    linkFails.code = undefined;
+  }
+  expect(existsSync(missing)).toBe(false);
 });
