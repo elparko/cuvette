@@ -120,7 +120,7 @@ Usage
   cuvette eln setup [--url <address>]  save your eLabFTW address and API key
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
-  cuvette eln link <session> <id>      read an eLabFTW experiment and propose setup values
+  cuvette eln link <session> <id>      read an eLabFTW experiment and propose setup values. --adapter <folder> adds an outside adapter
   cuvette sessions [--clean]           list the sessions, newest first: folder, age, first request ("moved" if a folder is gone);
                                        --clean removes the empty sessions that never started and are older than one day
   cuvette export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
@@ -589,7 +589,7 @@ async function main() {
       if (!a2) return fail(`usage: cuvette eln ${a1} <session>${a1 === "link" ? " <id>" : ""}`);
       if (a1 === "link" && !/^\d+$/.test(a3 ?? "")) return fail("usage: cuvette eln link <session> <experiment id>");
       const { Session } = await import("./core/session.ts");
-      const s = await Session.resume(a2, { model: "fake:" });
+      const s = await Session.resume(a2, { model: "fake:", addAdapters: (o.adapter as string[]) ?? [] });
       try {
         if (a1 === "push") {
           s.bus.on((e) => {

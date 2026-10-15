@@ -151,7 +151,7 @@ describe("resume", () => {
     await asked;
     await first.close();
 
-    const again = await Session.resume(first.id, { cwd, provider: new FakeProvider([{ text: "Counted with the answer." }]) });
+    const again = await Session.resume(first.id, { cwd, addAdapters: adapters, provider: new FakeProvider([{ text: "Counted with the answer." }]) });
     const qid = again.questions.open()[0]!.qid;
     const { h } = start(100, 40, again as unknown as SessionLike);
     await until(() => h.term.view().includes("Your decision:"));
