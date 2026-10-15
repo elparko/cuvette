@@ -108,6 +108,17 @@ describe("Findings", () => {
     expect(again.list("open")).toHaveLength(1);
     expect(again.add({ check: "e", severity: "info", message: "z" }, "hook").fid).toBe("f3");
   });
+
+  test("a finding from a rewound answer is not listed, before or after a reload", () => {
+    const record = makeRecord();
+    const f = new Findings(record);
+    f.add({ check: "c", severity: "warning", message: "kept" }, "rule");
+    f.add({ check: "d", severity: "warning", message: "rewound" }, "rule");
+    record.setAside = (id: number) => id === 2;
+    expect(f.list("open").map((x) => x.message)).toEqual(["kept"]);
+    expect(f.list().map((x) => x.message)).toEqual(["kept"]);
+    expect(new Findings(record).list("open").map((x) => x.message)).toEqual(["kept"]);
+  });
 });
 
 describe("runChecks", () => {
@@ -257,6 +268,11 @@ describe("referee", () => {
     expect(text).not.toContain("term20,");
     expect(text).toContain("output files mixed_model.csv");
     expect(system).toMatch(/"measured n5"\) means that the claim check found\nthe number in the logged result of that node/);
+  });
+
+  test("a severity in capitals or mixed case keeps its level", () => {
+    const raw = JSON.stringify([{ severity: "ERROR", message: "a" }, { severity: "Warning", message: "b" }, { severity: "loud", message: "c" }]);
+    expect(parseReferee(raw).map((f) => f.severity)).toEqual(["error", "warning", "info"]);
   });
 
   test("a plain no-findings reply gives no finding", () => {

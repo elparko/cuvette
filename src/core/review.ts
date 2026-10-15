@@ -23,10 +23,15 @@ const STATUS = { accept: "accepted", reject: "rejected", fix: "fixed" } as const
 
 export class Findings {
   private items: Finding[] = [];
+  private entryOf = new Map<string, number>();
 
   constructor(private record: AnalysisRecord) {
     for (const e of record.entries(["finding", "finding_resolution"])) {
-      if (e.kind === "finding") this.items.push({ ...(e.data as unknown as Finding) });
+      if (e.kind === "finding") {
+        const f = { ...(e.data as unknown as Finding) };
+        this.items.push(f);
+        this.entryOf.set(f.fid, e.id);
+      }
       else {
         const f = this.items.find((x) => x.fid === e.data.fid);
         const status = STATUS[e.data.action as keyof typeof STATUS];
@@ -38,7 +43,8 @@ export class Findings {
   add(f: FindingIn, source: Finding["source"]): Finding {
     const finding: Finding = { ...f, fid: `f${this.items.length + 1}`, source, status: "open" };
     this.items.push(finding);
-    this.record.append("finding", { ...finding }, { refs: f.entries, node: f.nodes?.[0] });
+    const entry = this.record.append("finding", { ...finding }, { refs: f.entries, node: f.nodes?.[0] });
+    this.entryOf.set(finding.fid, entry.id);
     return finding;
   }
 
@@ -50,7 +56,7 @@ export class Findings {
   }
 
   list(status?: Finding["status"]): Finding[] {
-    return this.items.filter((f) => !status || f.status === status);
+    return this.items.filter((f) => (!status || f.status === status) && !this.record.setAside(this.entryOf.get(f.fid) ?? 0));
   }
 }
 
@@ -504,7 +510,7 @@ function toFinding(x: unknown): FindingIn | undefined {
   const entries = Array.isArray(o.entries) ? o.entries.map((n) => Number(String(n).replace(/^#/, ""))).filter(Number.isFinite) : [];
   return {
     check: "referee",
-    severity: SEVERITIES.has(String(o.severity)) ? (o.severity as FindingIn["severity"]) : "info",
+    severity: SEVERITIES.has(String(o.severity).toLowerCase()) ? (String(o.severity).toLowerCase() as FindingIn["severity"]) : "info",
     message: o.message.trim(),
     entries: entries.length ? entries : undefined,
   };
