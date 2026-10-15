@@ -34,6 +34,14 @@ import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json
 import { WebView } from "./app-view.ts";
 import { FILE_HEADERS, hostAllowed, pipeFile, push, tokenOk, windowRoutes, type WindowSession } from "./window.ts";
 import { ROOT } from "../root.ts";
+import { adapterDirs } from "../adapters/manifest.ts";
+
+export function appAdapters(name: string | undefined, flags: string[] | undefined, cwd: string): string[] {
+  if (!name) return flags ?? [];
+  const dirs = adapterDirs(cwd);
+  if (!Object.hasOwn(dirs, name)) throw new Error(`no adapter named "${name}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
+  return [dirs[name]!];
+}
 
 export interface AppOptions {
   folder?: string;
@@ -208,8 +216,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     (async (o: { folder?: string; resume?: string; model?: string; adapter?: string }) => {
       const { Session } = await import("../core/session.ts");
       const trustFolder = !!opts.trustFolder && resolve(o.folder ?? process.cwd()) === resolve(opts.folder ?? process.cwd());
-      if (o.resume) return (await Session.resume(o.resume, { model: o.model, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
-      return (await Session.create({ adapters: o.adapter ? [o.adapter] : opts.adapters ?? [], model: o.model, cwd: o.folder, defaults: true, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
+      if (o.resume) return (await Session.resume(o.resume, { addAdapters: opts.adapters ?? [], model: o.model, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
+      return (await Session.create({ adapters: appAdapters(o.adapter, opts.adapters, o.folder ?? process.cwd()), model: o.model, cwd: o.folder, defaults: true, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
     });
 
   const broadcastIdle = (msg: unknown) => {

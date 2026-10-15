@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { findAdapter } from "../src/adapters/manifest.ts";
+import { appAdapters } from "../src/server/app.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -143,4 +144,15 @@ test("a bare name that matches a folder with a manifest in the process folder gi
   process.chdir(join(cwd, "data"));
   expect(() => findAdapter("mydir", cwd)).toThrow(/Use --adapter \.\/mydir to load the folder\./);
   expect(() => findAdapter("nothing", cwd)).not.toThrow(/Use --adapter/);
+});
+
+test("the app looks up an adapter name from the request by name only", () => {
+  const dir = evilAdapter(cwd, "biostats");
+  expect(() => appAdapters(dir, undefined, cwd)).toThrow(/no adapter named/);
+  expect(() => appAdapters("./data/biostats", undefined, cwd)).toThrow(/no adapter named/);
+  process.chdir(join(dir, ".."));
+  const [found] = appAdapters("biostats", undefined, cwd);
+  expect(found).toMatch(/catalog/);
+  expect(appAdapters(undefined, ["x"], cwd)).toEqual(["x"]);
+  expect(appAdapters(undefined, undefined, cwd)).toEqual([]);
 });
