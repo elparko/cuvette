@@ -304,7 +304,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   const fs = await import("./core/firststart.ts");
   console.log("Welcome to Cuvette. First, choose the model that does the analysis.\n");
   fs.CHOICES.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
-  console.log("  q  Quit. Nothing is saved.\n     If you use `ant auth login`, run it, then start Cuvette again.\n");
+  console.log("  q  Quit. Cuvette saves nothing.\n     If you use `ant auth login`, run it, then start Cuvette again.\n");
   let empty = 0;
   const quit = (text: string): never => {
     console.log(text);
@@ -313,14 +313,14 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   const typed = (answer: string, message: string): string => {
     const v = answer.trim();
     if (v) return (empty = 0), v;
-    if (++empty >= 3) quit("Nothing was typed three times. Nothing was saved. Start Cuvette again when you are ready.");
+    if (++empty >= 3) quit("You typed nothing three times. Cuvette saved nothing. Start Cuvette again when you are ready.");
     console.log(message);
     return "";
   };
   let pick = "";
   while (pick !== "1" && pick !== "2") {
-    pick = typed(await ask("Type 1 or 2: "), "Nothing was typed. Type 1 for Claude, 2 for a local model, or q to quit.");
-    if (/^q/i.test(pick)) quit("Nothing was saved.");
+    pick = typed(await ask("Type 1 or 2: "), "You typed nothing. Type 1 for Claude, 2 for a local model, or q to quit.");
+    if (/^q/i.test(pick)) quit("Cuvette saved nothing.");
     if (pick && pick !== "1" && pick !== "2") console.log(`"${pick}" is not a choice. Type 1 for Claude, 2 for a local model, or q to quit.`);
   }
   if (pick === "1") {
@@ -333,8 +333,8 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
         i--;
         continue;
       }
-      if (/^q$/i.test(pasted.trim())) quit("Nothing was saved. If you use `ant auth login`, run it, then start Cuvette again.");
-      if (!typed(pasted, "Nothing was typed. Paste the key, type ? for help, or type q to quit.")) {
+      if (/^q$/i.test(pasted.trim())) quit("Cuvette saved nothing. If you use `ant auth login`, run it, then start Cuvette again.");
+      if (!typed(pasted, "You typed nothing. Paste the key, type ? for help, or type q to quit.")) {
         i--;
         continue;
       }

@@ -258,6 +258,7 @@ describe("outputs", () => {
     expect(both.indexOf("  missing  fiji: Not found.")).toBeLessThan(both.indexOf("How to cite"));
     expect(doctorText([check])).not.toContain("Love");
     expect(doctorText([check])).toContain("cuvette doctor --cite");
+    expect(doctorText([missing], { only: ["missing"] })).not.toContain("--cite");
   });
 
   test("the Programs page shows How to cite for each program", async () => {

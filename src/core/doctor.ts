@@ -365,7 +365,7 @@ export function doctorText(checks: Check[], opts: { only?: Status[]; brief?: boo
   if (fixes.length) lines.push(`cuvette doctor --fix installs ${fixes.length} missing Python environment${fixes.length === 1 ? "" : "s"} or R package set${fixes.length === 1 ? "" : "s"}. It asks before it starts.`);
   const cited = checks.filter((c) => c.cite);
   if (cited.length && opts.cite) lines.push("", "How to cite", ...cited.map((c) => `  ${c.name}: ${c.cite}`));
-  else if (cited.length && !opts.brief) lines.push("The citation of each program: cuvette doctor --cite");
+  else if (cited.length && !opts.brief && !opts.only) lines.push("The citation of each program: cuvette doctor --cite");
   return lines.join("\n");
 }
 

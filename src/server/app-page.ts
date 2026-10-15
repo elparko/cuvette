@@ -367,6 +367,7 @@ ul.dirs li button .dim { margin-left: 6px; }
     </div>
     <div id="localbox" class="hidden"><div id="models"></div></div>
     <p class="cardmsg" id="setuperr" role="alert"></p>
+    <div class="row"><button type="button" class="btn quiet" data-page-go="start">Leave setup</button></div>
     <p class="dim small">Model now: <span id="setupmodel"></span></p>
   </div>
   <div class="panel hidden" id="checkpanel">
@@ -974,6 +975,7 @@ async function useLocal(m) {
   } catch (e) { $("setuperr").textContent = e.message; }
 }
 $("savekey").addEventListener("click", async () => {
+  if (!$("setupkey").value.trim()) { $("setuperr").textContent = "You typed no key. Paste the key, or choose the local model."; return; }
   $("setuperr").textContent = "Checking the key...";
   try {
     const r = await call("api/firststart/claude", { key: $("setupkey").value });
