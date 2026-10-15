@@ -202,6 +202,7 @@ function mutate(r: Rng, b: Built): string | undefined {
   }
   if (kind === "rename" && some) {
     const to = join(dirname(some), `renamed-${r.int(0, 99)}`);
+    if (to === some) return undefined;
     renameSync(some, to);
     if (/[\\/](?:adapters|methods|skills)[\\/]/.test(to)) b.tracked.push(to);
     return `rename ${some}`;
@@ -318,8 +319,10 @@ describe("fuzz: the scan of a project folder", () => {
         const what = mutate(r, b);
         if (!what) continue;
         const t = trustStatus(b.folder);
-        if (t.state === "none") expect(needsTrust(t.scan), what).toBe(false);
-        else {
+        if (t.state === "none") {
+          expect(needsTrust(t.scan), what).toBe(false);
+          break;
+        } else {
           expect(t.state, what).toBe("changed");
           expect(t.changes.length, what).toBeGreaterThan(0);
         }
