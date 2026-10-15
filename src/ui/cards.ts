@@ -3,6 +3,8 @@ import type { PhiAction } from "../core/phi.ts";
 import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { codeOf, plainOf } from "./items.ts";
+import { commandText, visibleText } from "../core/plain.ts";
+import { cutText } from "../core/places.ts";
 import { rewindText, type RewindPoint } from "../core/rewind.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
@@ -110,15 +112,20 @@ export function applyRewind(session: SessionLike, n: number): { ok: boolean; tex
 
 // ---------------------------------------------------------------- permission
 
+const ARG_LIMIT = 1000;
+
 export function permissionView(card: Extract<Card, { t: "permission" }>) {
   const always = card.tool !== "eln_push" && !card.search;
   const { purpose, does } = plainOf(card.args);
-  const code = card.code ?? codeOf(card.args);
-  const hidden = new Set(["purpose", "does", "code", ...(code && purpose ? ["argv"] : [])]);
+  const argv = Array.isArray(card.args.argv) ? card.args.argv : undefined;
+  const given = card.code ?? (argv ? undefined : codeOf(card.args));
+  const code = given === undefined ? undefined : visibleText(given);
+  const hidden = new Set(["purpose", "does", "code", ...(argv ? ["argv"] : [])]);
   const args = Object.entries(card.args)
     .filter(([k, v]) => !hidden.has(k) && !(code && typeof v === "string" && v.trim() === code.trim()))
-    .map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`)
-    .map((a) => (a.length > 160 ? a.slice(0, 157) + "..." : a));
+    .map(([k, v]) => [k, visibleText(`${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`)] as const)
+    .map(([k, a]) => (a.length > ARG_LIMIT && !(argv && k === "cwd") ? `${cutText(a, ARG_LIMIT)}... (${a.length - ARG_LIMIT} more characters)` : a));
+  if (argv) args.unshift(`Command: ${commandText(argv)}`);
   return {
     title: card.search ? "Search outside the project" : `Permission needed: ${card.tool}`,
     purpose,

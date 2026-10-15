@@ -18,7 +18,8 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { COPY_LIMIT_BYTES, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { pathRefusalReason } from "./refusals.ts";
+import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -56,7 +57,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { endTrustOnce, folderTrusted, labLong, oneLine, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -566,20 +567,23 @@ export class Session {
             this.method = loadMethod(file);
           } catch {}
         else {
-          const text = `Cuvette did not load the saved method ${String(used.data.name)}, because its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
-          if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+          const text = `Cuvette did not load the saved method ${String(used.data.name)}. Its file is not in your methods folder or in the methods folder of a trusted project: ${file}. To use it, type /method ${file}.`;
+          const first = `Cuvette did not load the saved method ${String(used.data.name)}`;
+          if (!this.record.entries(["notice"]).some((n) => String(n.data.text).startsWith(first) && String(n.data.text).includes(file))) this.record.append("notice", { text, warn: true });
         }
       }
       this.history = this.record.messages();
       const unknown = this.record.unknownKinds();
-      const said = (text: string) => this.record.entries(["notice"]).some((n) => n.data.text === text);
-      const kindsText = unknown.length ? `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}. This version does not know them. Cuvette keeps them in the file as they are.` : "";
-      if (kindsText && !said(kindsText)) this.record.append("notice", { text: kindsText, warn: true });
-      const cutText = "The last line of the record was cut when the app stopped. Cuvette keeps the line in the file as it is.";
-      const earlierCuts = this.record.entries(["notice"]).filter((n) => n.data.text === cutText).length;
-      if (cutLine) this.record.append("notice", { text: cutText, warn: true });
-      const linesText = "Some lines of the record are in a form that this version of Cuvette cannot read. Cuvette keeps them in the file as they are.";
-      if (this.record.skipped > earlierCuts && !said(linesText)) this.record.append("notice", { text: linesText, warn: true });
+      const said = (first: string) => this.record.entries(["notice"]).some((n) => String(n.data.text).startsWith(first));
+      const kindsFirst = `A newer version of Cuvette wrote entries of these kinds: ${unknown.join(", ")}.`;
+      if (unknown.length && !said(kindsFirst)) this.record.append("notice", { text: `${kindsFirst} This version does not know them. Cuvette keeps them in the file as they are. Update Cuvette to see them.`, warn: true });
+      const cutFirst = "The last line of the record was cut when the app stopped.";
+      const cutNotice = `${cutFirst} Cuvette keeps the line in the file as it is. Cuvette does not read it, so the last action can be missing. Check the last step.`;
+      const earlierCuts = this.record.entries(["notice"]).filter((n) => String(n.data.text).startsWith(cutFirst)).length;
+      if (cutLine) this.record.append("notice", { text: cutNotice, warn: true });
+      const linesFirst = "Some lines of the record are in a form that this version of Cuvette cannot read.";
+      const linesText = `${linesFirst} Cuvette keeps them in the file as they are. If a result is missing, update Cuvette and open the session again.`;
+      if (this.record.skipped > earlierCuts && !said(linesFirst)) this.record.append("notice", { text: linesText, warn: true });
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
@@ -2341,14 +2345,17 @@ export class Session {
       return error(`${basename(held)} is held back for the blind test. The harness compares it with your results after the batch. Do not read it.`);
     }
     if (tool.source === "generic" || tool.name === "inspect_data") {
-      const place = this.pathPlace(args, tool.source !== "generic");
+      const { place, path: refused } = this.pathPlace(args, tool.source !== "generic");
       if (place === "outside") return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
+      if (place === "private" || place === "link") {
+        this.record.append("blocked", { callId, tool: tool.name, path: refused, reason: pathRefusalReason(place, refused), by: "path rule" });
+      }
       if (place === "private") return error("This path is in the Cuvette home folder or in the record of another session. The agent cannot read it. Ask the scientist to name the folder in the request.");
       if (place === "link") return error("This path is a link that leads outside the folders of this analysis. Ask the scientist to name the real folder in the request. A folder that the request names is allowed.");
     }
     const gate = this.pilotGate(tool, args);
     if (gate) {
-      this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true });
+      this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true, ...(pilotState(this.record).stale ? { stale: String(pilotState(this.record).stale) } : {}) });
       return error(gate);
     }
     if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && tool.name !== "clarify" && ++this.planLooks === 4) this.notes.push(this.clarified ? "You have looked at the data enough. Call plan now." : "You have looked at the data enough. Call clarify now.");
@@ -2455,6 +2462,7 @@ export class Session {
       }), signal, () => {
         abandoned = true;
         this.abandonedIds.add(callId);
+        this.record.append("notice", { text: `The tool ${tool.name} did not stop ${this.abandonMs / 1000} s after you pressed Esc. Cuvette stopped waiting for it. It can still run in the background. Cuvette ignores its late result. If the next step of this program fails or waits, stop the program or start Cuvette again.`, warn: true });
         this.notes.push(`The tool ${tool.name} did not stop after the scientist pressed Esc. It can still run in the background and keep its program busy. Its late result is ignored. If the next call of this program fails or waits, tell the scientist.`);
       });
     } catch (e) {
@@ -2640,9 +2648,10 @@ export class Session {
 
   // ------------------------------------------------------------- decisions owned by the scientist
 
-  private pathPlace(args: Args, onlyPrivate = false): "ok" | "outside" | "link" | "private" {
+  private pathPlace(args: Args, onlyPrivate = false): { place: "ok" | "outside" | "link" | "private"; path: string } {
     const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v.replace(/^~(?=[\\/]|$)/, homedir())));
-    if (!paths.length || paths.every(isCredentialsFile)) return "ok";
+    const ok = { place: "ok" as const, path: "" };
+    if (!paths.length || paths.every(isCredentialsFile)) return ok;
     const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
     const mine = [this.dir, this.workDir, this.place.outDir, ...this.adapters.map((a) => a.root)];
     const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
@@ -2667,13 +2676,16 @@ export class Session {
       if (hard(p)) return !free(open);
       return soft(p) && !free([...open, this.cwd]);
     };
-    if (paths.some(shut)) return "private";
-    if (onlyPrivate) return "ok";
+    const shutPath = paths.find(shut);
+    if (shutPath !== undefined) return { place: "private", path: shutPath };
+    if (onlyPrivate) return ok;
     const roots = [this.cwd, ...mine, ...named, ...named.map((n) => join(n, ".."))];
     roots.push(...nodeFiles);
-    if (!paths.every((p) => within(roots, p))) return "outside";
+    const outsidePath = paths.find((p) => !within(roots, p));
+    if (outsidePath !== undefined) return { place: "outside", path: outsidePath };
     const real = roots.map(realPath);
-    return paths.every((p) => within(real, realPath(p))) ? "ok" : "link";
+    const linkPath = paths.find((p) => !within(real, realPath(p)));
+    return linkPath === undefined ? ok : { place: "link", path: linkPath };
   }
 
   private decisionOf(key: string) {
@@ -2841,15 +2853,22 @@ export class Session {
       if (t) Object.assign(t, { value: this.decisions.value(f.key), by: "you" });
       return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. The scientist asked for this change, so no card asks again.` };
     }
-    const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+    const full = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+    const show = (v: unknown) => {
+      const t = full(v);
+      return t.length > 2000 ? `${cutText(t, 1000)} [${t.length - 1500} characters omitted of ${t.length}] ${t.slice(-500)}` : t;
+    };
+    const evidence = [value, current].some((v) => v !== undefined && full(v).length > 2000)
+      ? [`Full new value (${full(value).length} characters):`, full(value), ...(current === undefined ? [] : [`Full current value (${full(current).length} characters):`, full(current)])].join("\n")
+      : "";
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
     if (!q) {
       q = await this.questions.ask({
         decisionKey: f.key,
         title: `Change ${f.label}?`,
-        text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Reason: ${spec.reason}`,
+        text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Your message did not name this value. Reason: ${spec.reason.trim().replace(/[.\s]+$/, "") || "the agent gave none"}.${current === undefined ? " To keep the setting as it is, answer later." : ""}`,
         options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
-        evidence: "",
+        evidence,
         ...(current === undefined ? {} : { default: current }),
       });
       this.bus.emit({ type: "question", question: q });
@@ -3042,7 +3061,10 @@ export class Session {
 
   private async checkTrust(interactive: boolean): Promise<void> {
     const t = trustStatus(this.cwd);
-    if (t.scan.labProblem) this.record.append("notice", { text: `Cuvette could not read LAB.md in ${oneLine(t.scan.folder)}: ${oneLine(t.scan.labProblem)}. It ignores the file.`, warn: true });
+    if (t.scan.labProblem) {
+      const text = `Cuvette could not read LAB.md in ${oneLine(t.scan.folder)}: ${oneLine(t.scan.labProblem)}. Cuvette ignores the file. Fix the file, then start the session again.`;
+      if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
+    }
     for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");
     if (t.state !== "new" && t.state !== "changed") return;
     this.untrusted = t;
@@ -3059,7 +3081,7 @@ export class Session {
     if (open?.status === "open") return open;
     const t = trustStatus(this.cwd);
     if (t.state === "none") return undefined;
-    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
+    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: labLong(t.scan) || cannotTrust(t.scan) ? TRUST_OPTIONS.filter((o) => o.value === "no") : TRUST_OPTIONS, evidence: trustEvidence(t) });
     this.trustQid = q.qid;
     this.bus.emit({ type: "question", question: q });
     return q;
@@ -3067,7 +3089,7 @@ export class Session {
 
   async setTrust(choice: TrustChoice): Promise<string> {
     const t = trustStatus(this.cwd);
-    const refused = choice === "no" ? undefined : untrustable(t.scan);
+    const refused = choice === "no" ? undefined : untrustable(t.scan) ?? (labLong(t.scan) ? longLabRefusal(t.scan) : undefined);
     if (refused) {
       this.record.append("notice", { text: refused, warn: true });
       return refused;

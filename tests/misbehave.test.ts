@@ -11,6 +11,7 @@ import { Session, cleanText } from "../src/core/session.ts";
 import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
 import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
+import { checkText } from "../src/core/ste.ts";
 
 type Bad = FakeStep & { stopReason?: StepResult["stopReason"]; parseError?: string; note?: string };
 
@@ -873,6 +874,7 @@ test("a tool that returns after Esc and the abandon time adds no record entry an
   await until(() => started);
   s.interrupt();
   await run;
+  expect(s.record.entries(["notice"]).filter((e) => e.data.warn && /^The tool slow did not stop [\d.]+ s after you pressed Esc\. Cuvette stopped waiting for it\./.test(String(e.data.text)))).toHaveLength(1);
   const before = s.record.entries().length;
   release();
   await until(() => lateCall !== undefined);
@@ -1079,4 +1081,75 @@ test("write_file on a folder gives the error of a folder and writes nothing", as
   expect(await write.execute({ name: "new.txt", text: "first long text" }, ctx)).toMatchObject({ ok: true });
   expect(await write.execute({ name: "new.txt", text: "short" }, ctx)).toMatchObject({ ok: true });
   expect(readFileSync(join(workDir, "new.txt"), "utf8")).toBe("short");
+});
+
+
+const blockedBy = (s: Session, by: string) => s.record.entries(["blocked"]).filter((e) => e.data.by === by).map((e) => String(e.data.reason));
+
+test("a read of a private path tells the scientist what Cuvette blocked and how to allow it", async () => {
+  const { session: s } = await start([call("read_file", { path: join(home, "settings.json") }), { text: "ok" }]);
+  writeFileSync(join(home, "settings.json"), "{}");
+  await s.send("go");
+  const reasons = blockedBy(s, "path rule");
+  expect(reasons).toHaveLength(1);
+  expect(reasons[0]).toBe(`The agent tried to use ${join(home, "settings.json")}. This path is in the Cuvette home folder or in the record of another session. Cuvette blocked it. To allow it, write the folder in your next message.`);
+  expect(checkText(reasons[0]!.replace(/\S*[\\/]\S*/g, "X"))).toEqual([]);
+});
+
+test.skipIf(windows)("a read through a link that leads outside tells the scientist to write the real folder", async () => {
+  const outside = mkdtempSync(join(work, "outside-"));
+  writeFileSync(join(outside, "secret.txt"), "TOP SECRET");
+  const cwd = mkdtempSync(join(work, "proj-"));
+  symlinkSync(outside, join(cwd, "link"));
+  const { session: s } = await start([call("list_dir", { path: "link" }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  const reasons = blockedBy(s, "path rule");
+  expect(reasons).toHaveLength(1);
+  expect(reasons[0]).toContain("This path is a link that leads outside the folders of this analysis. Cuvette blocked it. To allow it, write the real folder in your next message.");
+});
+
+test("a refused path in a very long name stays short in the notice", async () => {
+  const long = join(home, "sessions", `${"é😀".repeat(400)}.txt`);
+  const { session: s } = await start([call("read_file", { path: long }), { text: "ok" }]);
+  await s.send("go");
+  const [reason] = blockedBy(s, "path rule");
+  expect(reason!.length).toBeLessThan(500);
+  expect(reason).toContain("Cuvette blocked it.");
+  expect(reason).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);
+});
+
+test("a write to the record, the settings or LAB.md tells the scientist which file Cuvette protects", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const { session: s } = await start([
+    call("write_file", { name: join(cwd, ".cuvette", "settings.json"), text: "{}" }),
+    call("write_file", { name: join(cwd, "LAB.md"), text: "Use a t test." }),
+    { text: "ok" },
+  ], {}, cwd);
+  await s.send("go");
+  const reasons = blockedBy(s, "write rule");
+  expect(reasons).toEqual([
+    `The agent tried to write ${join(cwd, ".cuvette", "settings.json")}. This path belongs to the record or to the settings of Cuvette. Cuvette blocked it. Nothing changed.`,
+    `The agent tried to write ${join(cwd, "LAB.md")}. This file holds the lab rules. Cuvette blocked it. To change a rule, edit the file yourself.`,
+  ]);
+  expect(existsSync(join(cwd, "LAB.md"))).toBe(false);
+});
+
+test("the notice names the path that Cuvette refused, also when the allowed path comes first", async () => {
+  const cwd = mkdtempSync(join(work, "proj-"));
+  const secret = join(home, "sessions");
+  mkdirSync(secret, { recursive: true });
+  const { session: s } = await start([call("run_command", { purpose: "p", does: "d", argv: ["ls"], path: cwd, cwd: secret }), call("list_dir", { path: cwd }), { text: "ok" }], {}, cwd);
+  await s.send("go");
+  const entries = s.record.entries(["blocked"]).filter((e) => e.data.by === "path rule");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.data.path).toBe(secret);
+  expect(String(entries[0]!.data.reason)).toContain(`The agent tried to use ${secret}.`);
+  expect(String(entries[0]!.data.reason)).not.toContain(cwd);
+});
+
+test("the refusal text writes out a control code and a line break in a path", async () => {
+  const { pathRefusalReason, writeRefusalReason } = await import("../src/core/refusals.ts");
+  const hidden = /[\u0000-\u001f\u007f-\u009f\u2028\u202a-\u202e]/;
+  for (const text of [pathRefusalReason("private", "/a/\u001b[2J\u202e/b\nc"), pathRefusalReason("link", "/a/\u0007/b"), writeRefusalReason("/a/\u2028b", false)]) expect(text).not.toMatch(hidden);
+  expect(pathRefusalReason("private", "/a/\u202e/b\nc")).toContain(String.raw`"/a/\\u202e/b\nc"`);
 });

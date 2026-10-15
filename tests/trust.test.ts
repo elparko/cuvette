@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -10,7 +10,8 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, scanFolder, trustedFolders, trustFolder, trustStatus, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -461,6 +462,56 @@ test.skipIf(process.platform === "win32")("the scientist cannot trust a folder t
   expect(() => trustFolder(cwd)).toThrow(/cannot trust/);
 });
 
+test.skipIf(process.platform === "win32")("the trust card for a linked folder gives the reason and one choice, and says what to do next", async () => {
+  project(".cuvette", { ...hook("ran") });
+  symlinkSync(mkdtempSync(join(tmpdir(), "cuvette-evil-")), join(cwd, ".cuvette", "adapters"));
+  session = await start(true);
+  const card = await session.askTrust();
+  expect(card?.options.map((o) => o.value)).toEqual(["no"]);
+  expect(card?.text).toMatch(/^Cuvette cannot trust the folder .*: it has a linked folder \(\.cuvette\/adapters\)\. Cuvette ignores the Cuvette files in this folder\. Replace each link with a copy of the folder\. Then start the session again\.$/);
+  expect(card?.text).not.toContain("changed after you trusted");
+  expect(card?.evidence).not.toContain("Changes since you trusted the folder");
+  const notice = session.trustNotice ?? "";
+  expect(notice).toContain("so Cuvette cannot trust it. Replace each link with a copy of the folder. Then start the session again.");
+  expect(notice).not.toContain("cuvette trust add");
+  const status = trustStatus(cwd);
+  expect(stateLabel(status)).toBe("cannot be trusted");
+  expect(checkText(trustText(status).replace(/\S*[\\/]\S*/g, "X"))).toEqual([]);
+  expect(checkText(notice.replace(/\S*[\\/]\S*/g, "X"))).toEqual([]);
+});
+
+test.skipIf(process.platform === "win32")("the trust command for a folder with a linked folder does not call it changed", async () => {
+  project(".cuvette", { model: "claude:x" });
+  symlinkSync(mkdtempSync(join(tmpdir(), "cuvette-evil-")), join(cwd, ".cuvette", "adapters"));
+  session = await start(true);
+  let printed = "";
+  const trust = commands.find((c) => c.name === "trust")!;
+  await trust.run([], { session: session as never, print: (t: string) => (printed += t), notice() {}, error() {}, openCard() {}, hasQuestionCard: () => true, refresh() {} } as never);
+  expect(printed).toContain("Trust: cannot be trusted");
+  expect(printed).toContain("Why Cuvette cannot trust the folder:");
+  expect(printed).not.toContain("Changes since you trusted the folder");
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a LAB.md that Cuvette cannot read gives the cause, says that Cuvette ignores it, and says what to do", async () => {
+  writeFileSync(join(cwd, "LAB.md"), "Use Welch.");
+  chmodSync(join(cwd, "LAB.md"), 0o000);
+  const lines = folderLines(scanFolder(cwd)).join("\n");
+  expect(lines).toMatch(/Cuvette cannot read LAB\.md: .+\. Cuvette ignores it\. Fix the file, then start the session again\./);
+  session = await start(true);
+  const notice = session.record.entries(["notice"]).map((e) => String(e.data.text)).find((t) => t.startsWith("Cuvette could not read LAB.md in"));
+  expect(notice).toMatch(/\. Cuvette ignores the file\. Fix the file, then start the session again\.$/);
+  const dir = session.record.dir;
+  await session.close();
+  session = await Session.resume(dir, { provider: new FakeProvider([{ text: "ok" }]), interactive: true });
+  expect(session.record.entries(["notice"]).filter((e) => String(e.data.text).startsWith("Cuvette could not read LAB.md in"))).toHaveLength(1);
+});
+
+test("a LAB.md that is too long for the card says how to trust the folder in the terminal and in the app", () => {
+  writeFileSync(join(cwd, "LAB.md"), Array.from({ length: 200 }, (_, i) => `Rule ${i + 1}: use a Welch test.`).join("\n"));
+  const lines = folderLines(scanFolder(cwd)).join("\n");
+  expect(lines).toMatch(/Lab rules in LAB\.md: 200 lines, \d+ characters\. This is too long to show here\. Read the file at .*LAB\.md\. Then run in a terminal: cuvette trust add .*\. Then start the session again\./);
+});
+
 test("trusting a folder without a linked folder still runs the SessionStart hook", async () => {
   project(".cuvette", { ...hook("ran") });
   session = await start(true);
@@ -550,3 +601,42 @@ test("a hook command inside an escape sequence shows its text, written out, in e
   expect(card!.evidence).not.toMatch(raw);
   expect(card!.text).not.toMatch(raw);
 });
+
+const CONTROL = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u202a-\u202e]/;
+
+test.skipIf(process.platform === "win32")("the text for a folder that cannot be trusted writes out a control code in a link name", async () => {
+  project(".cuvette", { ...hook("ran") });
+  mkdirSync(join(cwd, ".cuvette", "adapters"), { recursive: true });
+  symlinkSync(mkdtempSync(join(tmpdir(), "cuvette-evil-")), join(cwd, ".cuvette", "adapters", "ev\u202e\nil"));
+  session = await start(true);
+  const card = await session.askTrust();
+  expect(card?.options.map((o) => o.value)).toEqual(["no"]);
+  const status = trustStatus(cwd);
+  expect(status.scan.linked.some((l) => l.includes("\u202e"))).toBe(true);
+  for (const text of [card?.text ?? "", card?.evidence ?? "", session.trustNotice ?? "", trustText(status)]) expect(text).not.toMatch(CONTROL);
+  expect(card?.text).toContain(String.raw`ev\\u202e\nil`);
+  expect(session.trustNotice).toContain(String.raw`ev\\u202e\nil`);
+});
+
+test("the refusal for a long LAB.md writes out a control code in the folder name", () => {
+  const scan = { ...scanFolder(cwd), folder: `${cwd}/a\u202eb\nc` };
+  const text = longLabRefusal(scan);
+  expect(text).not.toMatch(CONTROL);
+  expect(text).toContain(String.raw`a\\u202eb\nc`);
+});
+
+test("a method file under the hooks folder of a nested .git folder is not a method", () => {
+  project(".cuvette", {});
+  const hooks = join(cwd, ".cuvette", "methods", "x", ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  writeFileSync(join(hooks, "fake.json"), "{}");
+  mkdirSync(join(cwd, ".cuvette", "methods"), { recursive: true });
+  writeFileSync(join(cwd, ".cuvette", "methods", "real.json"), "{}");
+  expect(scanFolder(cwd).methods).toEqual(["real"]);
+});
+
+test.skipIf(process.platform === "win32")("trust remove writes out a control code in the folder name", async () => {
+  const out = await cli(["trust", "remove", join(cwd, "a\u202eb\nc")]);
+  expect(out.stdout).not.toMatch(CONTROL);
+  expect(out.stdout).toContain(String.raw`a\\u202eb\nc" was not in the list.`);
+}, 120000);

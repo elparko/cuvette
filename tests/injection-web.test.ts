@@ -144,10 +144,10 @@ test("the web app shows hostile decision labels and values as escaped data", () 
   same(make(EVIL), make(BENIGN));
 });
 
-test("the web app removes text direction controls that reorder the code in a card", () => {
+test("the web app writes out text direction controls that reorder the code in a card", () => {
   const code = "print('safe')\u202e ; import os; os.remove('x')\u2066";
   const html = cardHtml(ctxFor(BENIGN), slot({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "p", does: "d", code }, code, touches: "t" }));
-  expect(html).toContain("print(&#39;safe&#39;) ; import os; os.remove(&#39;x&#39;)");
+  expect(html).toContain("print(&#39;safe&#39;)\\u202e ; import os; os.remove(&#39;x&#39;)\\u2066");
   expect(html).not.toMatch(/[\u202a-\u202e\u2066-\u2069]/);
 });
 

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import type { Tool, ToolContext } from "../src/core/types.ts";
 import { genericTools, insideWorkDir } from "../src/tools/generic.ts";
-import { withoutSecrets } from "../src/adapters/kinds/common.ts";
+import { integrityError, integrityReason, withoutSecrets } from "../src/adapters/kinds/common.ts";
+import { checkText } from "../src/core/ste.ts";
 import { credentialsPath, isCredentialsFile } from "../src/core/credentials.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-generic-"));
@@ -158,4 +159,14 @@ test("run_command does not pass API keys to the program", async () => {
   } finally {
     delete process.env.ANTHROPIC_API_KEY_TEST_ONLY;
   }
+});
+
+
+test("the text after a change of the record or the settings says what changed, that Cuvette did not undo it, and what to do", () => {
+  const one = integrityError("script", ["/home/.cuvette/settings.json"]);
+  expect(one).toBe("The script changed the record or the settings of Cuvette: /home/.cuvette/settings.json. A script must not write there. Cuvette did not undo the change. Do not run it again. Tell the scientist to check this file.");
+  expect(integrityError("command", ["/a/log.jsonl", "/b/settings.json"])).toContain("Tell the scientist to check these files.");
+  const reason = integrityReason("program", "/home/.cuvette/settings.json");
+  expect(reason).toBe("The program changed /home/.cuvette/settings.json. This file belongs to the record or the settings of Cuvette. Cuvette did not undo the change. Check the file. If it is wrong, restore it from a backup.");
+  for (const text of [one, reason]) expect(checkText(text.replace(/\S*[\\/]\S*/g, "X"))).toEqual([]);
 });

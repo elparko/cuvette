@@ -64,7 +64,6 @@ function items(text: string): Item[] {
       if (out.length > size && CLAUSE_END.test(raw)) out.at(-1)!.ce = /[;.!?][)"'\]]*$/.test(raw) ? "x" : ",";
       first = false;
     }
-    if (out.length && !out.at(-1)!.nl && first) continue;
   }
   return out;
 }

@@ -4,6 +4,8 @@ import { answerLine, optionLabel } from "./cards.ts";
 import { scopeLabel, type Scope } from "../core/settings.ts";
 import { pilotText } from "../core/pilot.ts";
 import { rerunBody, rerunTitle, type RerunData } from "../core/status.ts";
+import { commandText } from "../core/plain.ts";
+import { REFUSERS } from "../core/refusals.ts";
 import type { SessionLike } from "./types.ts";
 
 export interface OutputRef {
@@ -46,7 +48,7 @@ const NOT_SETTINGS = new Set(["purpose", "does", "code", "argv", "script", "macr
 
 export function codeOf(args: Record<string, unknown>): string | undefined {
   if (typeof args.code === "string") return args.code;
-  if (Array.isArray(args.argv)) return args.argv.map(String).join(" ");
+  if (Array.isArray(args.argv)) return commandText(args.argv);
   return undefined;
 }
 
@@ -81,6 +83,7 @@ export class Mapper {
   private options = new Map<string, Question["options"]>();
   private calls = new Map<string, Record<string, unknown>>();
   private said = false;
+  private refused = new Set<string>();
   constructor(private session: SessionLike) {}
 
   map(e: Entry): Item[] {
@@ -101,6 +104,7 @@ export class Mapper {
         this.calls.set(String(d.callId), (d.args ?? {}) as Record<string, unknown>);
         return [];
       case "tool_result": {
+        if (this.refused.has(String(d.callId))) return [];
         const analysis = role(e) === "analysis";
         const it = this.stepItem(key, d, analysis);
         if (analysis && it.t === "step") {
@@ -125,7 +129,10 @@ export class Mapper {
         }));
       }
       case "blocked":
-        return line("⏸", `Waiting for your decision: ${String(d.reason ?? "")}`, "yellow");
+        if (d.pilot || REFUSERS.has(String(d.by))) this.refused.add(String(d.callId));
+        if (d.pilot) return line("⏸", `Held back ${String(d.tool ?? "a call").replace(/_/g, " ")}: it processes many files. The agent runs the method on one sample first.${d.stale ? ` The earlier demonstration is out of date: ${String(d.stale).replace(/[.\s]+$/, "")}.` : ""} You confirm that demonstration before the batch runs.`, "yellow");
+        if (!d.qid) return line("⚠", `Blocked ${String(d.tool ?? "a call").replace(/_/g, " ")}: ${String(d.reason ?? "")}`, "yellow");
+        return line("⏸", `Waiting for your decision: ${String(d.reason ?? "").replace(/^waiting for the scientist:\s*/, "")}`, "yellow");
       case "decision":
         if (/^(data_check|design):/.test(String(d.key))) return [];
         return line("✎", `Decision: ${d.key} ${show(d.old)} → ${show(d.new)} (${d.by ?? "human"})`, "cyan");
@@ -340,6 +347,7 @@ export interface Logged {
 }
 
 const HELD = new Set(["question", "blocked"]);
+const holds = (e: Entry) => HELD.has(e.kind) && !(e.kind === "blocked" && !e.data.qid);
 
 export class Collapser {
   private held: Logged[] = [];
@@ -364,8 +372,8 @@ export class Collapser {
     if (e.kind === "answer") {
       this.answered.add(String(e.data.qid));
       const open = (h: Logged) => String(h.e!.data.qid ?? "").split(",").some((q) => !this.answered.has(q));
-      const waiting = this.held.filter((h) => h.e && HELD.has(h.e.kind) && open(h));
-      this.held = this.held.filter((h) => !(h.e && HELD.has(h.e.kind)));
+      const waiting = this.held.filter((h) => h.e && holds(h.e) && open(h));
+      this.held = this.held.filter((h) => !(h.e && holds(h.e)));
       const out = [...this.flush(e), ...l.items];
       this.held = waiting;
       return out;
@@ -373,7 +381,7 @@ export class Collapser {
     const r = role(e);
     if (r === "housekeeping" && !l.items.length && e.kind !== "tool_result") return [];
     const waitText = e.kind === "assistant" && !e.data.final && !e.data.stopped && this.held.some((h) => h.e && role(h.e) === "failed");
-    if (r === "housekeeping" || r === "failed" || HELD.has(e.kind) || waitText) {
+    if (r === "housekeeping" || r === "failed" || holds(e) || waitText) {
       this.held.push(l);
       return [];
     }

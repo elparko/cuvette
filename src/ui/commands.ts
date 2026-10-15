@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { pilotText } from "../core/pilot.ts";
+import { cutText } from "../core/places.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { KEYS_URL, keyGuideText } from "../core/keyhelp.ts";
@@ -67,7 +68,8 @@ export const unknownCommand = (head: string) => (head ? `Unknown command /${clip
 
 export function failureText(name: string, e: unknown, session?: SessionLike): string {
   if (e instanceof TypeError || e instanceof RangeError || e instanceof ReferenceError || e instanceof SyntaxError) {
-    const short = `${e.name}: ${e.message.slice(0, 200)}`;
+    const one = e.message.replace(/\s+/g, " ").trim();
+    const short = `${e.name}: ${(one.length > 200 ? `${cutText(one, 200)}…` : one).replace(/[.\s]+$/, "")}`;
     try {
       session?.record.append("error", { command: name, name: e.name, message: e.message, stack: e.stack ?? "" });
     } catch {}
@@ -78,7 +80,7 @@ export function failureText(name: string, e: unknown, session?: SessionLike): st
 
 export function problemOf(e: unknown): string {
   const err = e as NodeJS.ErrnoException;
-  if (err?.code === "EACCES" || err?.code === "EPERM" || err?.code === "EROFS") return `Cuvette cannot write in ${err.path ?? "that folder"}. The folder has read-only access, or you have no permission. Choose another folder, or fix the permission, then type the command again.`;
+  if (err?.code === "EACCES" || err?.code === "EPERM" || err?.code === "EROFS") return `Cuvette cannot write to ${err.path ?? "that folder"}. The folder has read-only access, or you have no permission to write in it. Fix the permission, then type the command again.`;
   if (err?.code === "ENOSPC") return "The disk is full. Free some space, then type the command again.";
   return err?.message ?? String(e);
 }
@@ -91,7 +93,7 @@ export function table(headers: string[], rows: string[][]): string {
 
 function clip(s: string, n = 48): string {
   const one = s.replace(/\s+/g, " ");
-  return one.length > n ? one.slice(0, n - 1) + "…" : one;
+  return one.length > n ? cutText(one, n - 1) + "…" : one;
 }
 
 export function parseDecision(f: { kind: string; choices?: any[] }, raw: string): unknown {
@@ -432,7 +434,7 @@ const base: Command[] = [
         return;
       }
       const t = tr.trustStatus(cwd);
-      const lines = [`Folder: ${tr.oneLine(t.scan.folder)}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? ["Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
+      const lines = [`Folder: ${tr.oneLine(t.scan.folder)}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? [tr.cannotTrust(t.scan) ? "Why Cuvette cannot trust the folder:" : "Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
       ctx.print(lines.join("\n"), "Folder trust");
       if ((t.state === "new" || t.state === "changed") && ctx.session.askTrust) {
         const q = await ctx.session.askTrust();
