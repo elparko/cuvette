@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,7 @@ import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 import { keySafe, parseArgs } from "../src/providers/openai.ts";
 import { retryReason } from "../src/providers/retry.ts";
+import { readSpend } from "../src/core/spend.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const tools: ToolSchema[] = [
@@ -79,6 +81,41 @@ describe("claude", () => {
     expect((await run("5m", base)).cacheWrite1h).toBeUndefined();
     expect((await run("1h", base)).cacheWrite1h).toBe(500);
     expect((await run("5m", { ...base, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 300 } })).cacheWrite1h).toBe(300);
+  });
+
+  test("a stream that fails after it started counts its tokens in the spend ledger, and the retry counts its own", async () => {
+    const event = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify({ type, ...(data as object) })}\n\n`;
+    const start = event("message_start", { message: { id: "m", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: null, usage: { input_tokens: 1000, output_tokens: 1 } } });
+    let hits = 0;
+    const server = createServer((_rq, rs) => {
+      rs.writeHead(200, { "content-type": "text/event-stream" });
+      if (hits++ === 0) {
+        rs.write(start);
+        setTimeout(() => rs.destroy(), 50);
+        return;
+      }
+      rs.write(start);
+      rs.write(event("content_block_start", { index: 0, content_block: { type: "text", text: "" } }));
+      rs.write(event("content_block_delta", { index: 0, delta: { type: "text_delta", text: "ok" } }));
+      rs.write(event("content_block_stop", { index: 0 }));
+      rs.write(event("message_delta", { delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 5 } }));
+      rs.end(event("message_stop", {}));
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const spendFile = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+    vi.stubEnv("CUVETTE_SPEND_FILE", spendFile);
+    vi.stubEnv("ANTHROPIC_BASE_URL", `http://127.0.0.1:${(server.address() as { port: number }).port}`);
+    try {
+      const p = new ClaudeProvider("claude-opus-5-5", { apiKey: "sk-ant-api03-" + "x".repeat(90), sleep: async () => {} });
+      const r = await p.step(req([user("q")]));
+      expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+      expect(hits).toBe(2);
+      const rows = readSpend();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]!.usd).toBeCloseTo((1000 * 4 + 20) / 1e6, 9);
+    } finally {
+      server.close();
+    }
   });
 
   test("request shape: adaptive thinking, effort, cache control, no tool_choice", async () => {

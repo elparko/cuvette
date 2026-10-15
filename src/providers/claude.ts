@@ -192,18 +192,18 @@ export class ClaudeProvider implements Provider {
     await prepareImages(req.messages, req.signal);
     const base = this.params(req.system, req.messages, req.tools);
     if (req.noToolCalls && req.tools.length) base.tool_choice = { type: "none" };
-    let live: any;
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;
       const body = useFallback ? { ...base, betas: [FALLBACK_BETA], fallbacks: "default" } : base;
       const api = useFallback ? this.client.beta.messages : this.client.messages;
       const stream = api.stream(body, req.signal ? { signal: req.signal } : undefined);
-      live = stream;
       stream.on("text", (d: string) => req.onDelta?.({ type: "text", text: d }));
       stream.on("thinking", (d: string) => req.onDelta?.({ type: "thinking", text: d }));
       try {
         return await stream.finalMessage();
       } catch (e) {
+        const started = stream.currentMessage?.usage;
+        if (started && !this.fixedClient) recordSpend(this.model, usageOf(started, this.mark?.ttl === "1h"));
         if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError) && /^(stream|request) ended without/.test(e.message)) throw Object.assign(new Error(e.message), { partial: true });
         throw e;
       }
@@ -219,9 +219,6 @@ export class ClaudeProvider implements Provider {
         } else throw e;
       }
     } catch (e) {
-      // A stopped stream still costs the input tokens. The budget must count them.
-      const started = req.signal?.aborted ? live?.currentMessage?.usage : undefined;
-      if (started && !this.fixedClient) recordSpend(this.model, usageOf(started, this.mark?.ttl === "1h"));
       throw mapError(e, this.model);
     }
     const out = this.fromNative(msg);
