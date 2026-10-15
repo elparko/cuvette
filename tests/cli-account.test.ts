@@ -104,12 +104,12 @@ test("status without a sign-in", async () => {
 
 test("status shows the plan, the allowance in dollars and the analyses left", async () => {
   const url = await api();
-  saveCuvetteToken("cuv_abcdefghijkl");
+  saveCuvetteToken("cuv_test");
   const r = await cli(["account", "status"], { CUVETTE_HOSTED: "1", CUVETTE_INFERENCE_URL: url });
   expect(r.stdout).toContain("Plan: Lab, billed each year. Status: active.");
   expect(r.stdout).toContain("Allowance: $40.50 of $46.00 left.");
   expect(r.stdout).toContain("about 65 analyses left");
-  expect(calls[0]).toMatchObject({ url: "/v1/account", auth: "Bearer cuv_abcdefghijkl" });
+  expect(calls[0]).toMatchObject({ url: "/v1/account", auth: "Bearer cuv_test" });
 });
 
 test("logout revokes the device and removes the token", async () => {
