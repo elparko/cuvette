@@ -1032,11 +1032,14 @@ const MOST_WORDS: Record<string, number> = { mode: 1, permissions: 1, trust: 1, 
 
 const mostWords = (name: string, args: string[]) => (name === "key" ? (args[0] === "workspace" ? 2 : 1) : MOST_WORDS[name]);
 
+const NEEDS_FINAL_ANSWER = new Set(["export", "cite", "databook", "review"]);
+
 export const commands: Command[] = base.map((c) => ({
   ...c,
   run(args, ctx) {
     const most = mostWords(c.name, args);
     if (most !== undefined && args.length > most) return ctx.error(`Too many words. Use: /${c.name}${c.args ? ` ${c.args}` : ""}`);
+    if (NEEDS_FINAL_ANSWER.has(c.name) && ctx.session.busy) return ctx.error("The review of the answer is still running. Type the command again when it ends.");
     return c.run(args, ctx);
   },
 }));

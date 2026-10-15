@@ -9,7 +9,7 @@ export interface FakeStep {
 }
 
 export type FakeStepFn = (messages: Message[], tools: ToolSchema[]) => FakeStep;
-export type FakeScript = FakeStep[] | FakeStepFn | { steps: FakeStep[] | FakeStepFn; complete?: string; completeDelayMs?: number };
+export type FakeScript = FakeStep[] | FakeStepFn | { steps: FakeStep[] | FakeStepFn; complete?: string; completeDelayMs?: number; completeError?: string };
 
 export interface RecordedRequest {
   system: string;
@@ -23,6 +23,8 @@ export class FakeProvider implements Provider {
   private steps: FakeStep[] | FakeStepFn;
   private completeText: string;
   private completeDelayMs: number;
+  completeGate?: Promise<void>;
+  private completeError?: string;
   private index = 0;
   private callNo = 0;
 
@@ -30,6 +32,7 @@ export class FakeProvider implements Provider {
     const obj = Array.isArray(script) || typeof script === "function" ? { steps: script, complete: undefined } : script;
     this.steps = obj.steps;
     this.completeText = obj.complete ?? "No findings.";
+    this.completeError = "completeError" in obj ? obj.completeError : undefined;
     this.completeDelayMs = "completeDelayMs" in obj ? (obj.completeDelayMs ?? 0) : 0;
   }
 
@@ -60,11 +63,20 @@ export class FakeProvider implements Provider {
   }
 
   async complete(_system?: string, _text?: string, signal?: AbortSignal): Promise<string> {
+    if (this.completeError) throw new Error(this.completeError);
     if (this.completeDelayMs) {
       await new Promise<void>((resolve, reject) => {
         if (signal?.aborted) return reject(new Error("aborted"));
         const timer = setTimeout(resolve, this.completeDelayMs);
         signal?.addEventListener("abort", () => (clearTimeout(timer), reject(new Error("aborted"))), { once: true });
+      });
+    }
+    if (this.completeGate) {
+      const gate = this.completeGate;
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(new Error("aborted"));
+        signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        void gate.then(resolve);
       });
     }
     return this.completeText;

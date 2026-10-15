@@ -28,10 +28,10 @@ function script(name: string, value: unknown): string {
   return `fake:${p}`;
 }
 
-function setup(name: string, steps: unknown[], reply: string) {
+function setup(name: string, steps: unknown[], reply: string, referee: Record<string, unknown> = { complete: reply, completeDelayMs: REFEREE_MS }) {
   const home = mkdtempSync(join(root, "home-"));
   cpSync(join(__dirname, "fixtures", "drive"), join(home, "adapters", "drivefix"), { recursive: true });
-  return { home, model: script(`${name}-model`, steps), referee: script(`${name}-referee`, { steps: [], complete: reply, completeDelayMs: REFEREE_MS }) };
+  return { home, model: script(`${name}-model`, steps), referee: script(`${name}-referee`, { steps: [], ...referee }) };
 }
 
 interface Run {
@@ -110,4 +110,25 @@ test("headless stream-json sends answer_ready before the review notes and ends w
   expect(result.turnMs - result.answerReadyMs).toBeGreaterThanOrEqual(1000);
   const ready = lines.find((l) => l.type === "entry" && l.entry.kind === "answer_ready");
   expect(ready.entry.data.elapsedMs).toBe(result.answerReadyMs);
+});
+
+test("headless json gives the review state and the finding count", async () => {
+  const done = JSON.parse((await run(setup("state", [...CALLS(data), { text: ANSWER }], WARNING), "json")).out);
+  expect(done.review).toBe("done");
+  expect(done.findingCount).toBe(1);
+  const none = JSON.parse((await run(setup("none", [{ text: "Hello." }], WARNING), "json")).out);
+  expect(none.review).toBe("none");
+  expect(none.findingCount).toBe(0);
+});
+
+test("a referee that fails gives review failed, keeps the answer and exits 0", async () => {
+  const r = await run(setup("failed", [...CALLS(data), { text: ANSWER }], "", { completeError: "referee down" }), "json");
+  expect(r.code, r.err).toBe(0);
+  const out = JSON.parse(r.out);
+  expect(out.review).toBe("failed");
+  expect(out.stop).toBe("answer");
+  expect(out.answer).toBe(ANSWER);
+  expect(r.err).toContain("referee down");
+  const stream = await run(setup("failed2", [...CALLS(data), { text: ANSWER }], "", { completeError: "referee down" }), "stream-json");
+  expect(JSON.parse(stream.out.trim().split("\n").at(-1)!)).toMatchObject({ type: "result", review: "failed", answer: ANSWER });
 });

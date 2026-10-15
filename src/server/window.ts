@@ -32,7 +32,7 @@ export interface WindowSession {
 const MODES = new Set(["watch", "follow", "teach", "plan"]);
 const FEED_KINDS = new Set(["user", "assistant", "tool_result", "question", "answer", "notice", "error", "follow_step", "permission"]);
 
-function feedEntry(e: { id: number; kind: string; data: Record<string, unknown> }) {
+export function feedEntry(e: { id: number; kind: string; data: Record<string, unknown> }) {
   const d = e.data;
   const base = { id: e.id, kind: e.kind };
   switch (e.kind) {
@@ -41,7 +41,7 @@ function feedEntry(e: { id: number; kind: string; data: Record<string, unknown> 
     case "error":
       return { ...base, text: String(d.text ?? d.message ?? "") };
     case "assistant":
-      return d.final ? { ...base, text: String(d.text ?? "") } : undefined;
+      return d.final ? { ...base, text: `${d.corrects ? "Corrected answer: " : ""}${String(d.text ?? "")}` } : undefined;
     case "tool_result":
       return { ...base, tool: String(d.tool ?? ""), ok: d.ok !== false, text: String(d.summary ?? d.tool ?? ""), route: d.manualRoute ? String(d.manualRoute) : undefined };
     case "question":
