@@ -51,6 +51,12 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   },
 };
 
+const ARITY: Record<string, [number, number]> = {
+  abs: [1, 1], sqrt: [1, 1], log: [1, 1], log10: [1, 1], log2: [1, 1], exp: [1, 1], round: [1, 2],
+  ratio: [2, 2], pct_change: [2, 2], mae: [2, 2], rmse: [2, 2], r2: [2, 2],
+};
+const SEPARATOR = /(?<![\d.])\d{1,3}(?:,\d{3})+(?!\d)/;
+
 function num(v: Val): number {
   if (Array.isArray(v)) throw new Error("a list was given where one number is needed");
   return v;
@@ -67,6 +73,8 @@ function pairs(a: Val, b: Val): [number, number][] {
 }
 
 export function evaluate(src: string): Val {
+  const grouped = SEPARATOR.exec(src);
+  if (grouped) throw new Error(`"${grouped[0]}" has a comma between digits. Write a number without a thousands separator, for example ${grouped[0].replace(/,/g, "")}. To give separate arguments, write a space after each comma, for example ${grouped[0].replace(/,/g, ", ")}`);
   const toks = src.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|\*\*|[-+*/^(),[\]]|\S/gi) ?? [];
   let i = 0;
   const peek = () => toks[i];
@@ -143,6 +151,8 @@ export function evaluate(src: string): Val {
       take("(");
       const args = list(")");
       take(")");
+      const [min, max] = ARITY[t.toLowerCase()] ?? [1, Infinity];
+      if (args.length < min || args.length > max) throw new Error(`${t} takes ${min === max ? min : max === Infinity ? `${min} or more` : `${min} to ${max}`} argument(s), not ${args.length}`);
       return f(...args);
     }
     throw new Error(`unexpected "${t}"`);

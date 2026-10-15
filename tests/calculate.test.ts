@@ -43,3 +43,17 @@ test("a minus sign binds less tightly than a power, and a number can start with 
   expect(evaluate(".5*2")).toBe(1);
   expect(evaluate("2^3^2")).toBe(512);
 });
+
+test("a thousands separator in an argument list is an error, not two arguments", () => {
+  expect(() => evaluate("sum(1,234)")).toThrow(/thousands separator/);
+  expect(() => evaluate("mean(1,234,5)")).toThrow(/1,234/);
+  expect(evaluate("sum(1, 234)")).toBe(235);
+  expect(evaluate("sum([1,2,3])")).toBe(6);
+});
+
+test("a function with the wrong number of arguments is an error", () => {
+  expect(() => evaluate("abs(1, 2)")).toThrow(/takes 1 argument/);
+  expect(() => evaluate("ratio(4)")).toThrow(/takes 2 argument/);
+  expect(() => evaluate("round(1, 2, 3)")).toThrow(/takes 1 to 2/);
+  expect(() => evaluate("mean()")).toThrow(/takes 1 or more/);
+});
