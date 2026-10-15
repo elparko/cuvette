@@ -267,7 +267,10 @@ export function discardPlace(p: Place): void {
     if (readdirSync(p.outDir).some((n) => n !== ".record")) return;
     rmSync(p.outDir, { recursive: true, force: true });
   } catch {}
-  if (!existsSync(p.outDir)) removeIndexRow(p.id);
+  if (existsSync(p.outDir)) return;
+  try {
+    removeIndexRow(p.id);
+  } catch {}
 }
 
 const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

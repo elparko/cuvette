@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { globEre, literalEre } from "../src/core/trust.ts";
 import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
@@ -383,6 +384,35 @@ test("a hook glob in the project root denies new files that match the glob, and 
   expect(bwrap).not.toContain(`--ro-bind ${l.project} ${l.project} `);
   expect(bwrap).toContain(`--ro-bind ${join(l.project, "guard.sh")} ${join(l.project, "guard.sh")}`);
   expect(bwrap).not.toContain(join(l.project, "notes.txt"));
+});
+
+test("bwrap ro-binds only regular files for a root glob, never a folder that the glob matches", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "results"));
+  writeFileSync(join(l.project, "res.sh"), "x");
+  const step = (g: string) => [{ path: l.project, allow: false, pattern: `^${literalEre(l.project)}/${globEre(g)}$` }];
+  const bwrap = bwrapCommand(["tool"], step("res*")).join(" ");
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "res.sh")} ${join(l.project, "res.sh")}`);
+  expect(bwrap).not.toContain(`--ro-bind ${join(l.project, "results")} `);
+  const all = bwrapCommand(["tool"], step("*")).join(" ");
+  expect(all).not.toContain(`--ro-bind ${join(l.project, "cuvette")} `);
+  expect(all).not.toContain(`--ro-bind ${l.out} `);
+});
+
+test("bwrap knows xdigit, blank, cntrl, graph and print, and locks every file for an unknown class", () => {
+  const l = layout();
+  for (const n of ["hookA.sh", "hookZ.sh", "other.txt"]) writeFileSync(join(l.project, n), "x");
+  const bind = (g: string) => bwrapCommand(["tool"], [{ path: l.project, allow: false, pattern: `^${literalEre(l.project)}/${globEre(g)}$` }]).join(" ");
+  const has = (b: string, n: string) => b.includes(`--ro-bind ${join(l.project, n)} `);
+  const hex = bind("hook[[:xdigit:]].sh");
+  expect(has(hex, "hookA.sh")).toBe(true);
+  expect(has(hex, "hookZ.sh")).toBe(false);
+  const print = bind("hook[[:print:]].sh");
+  expect(has(print, "hookZ.sh")).toBe(true);
+  expect(has(print, "other.txt")).toBe(false);
+  const unknown = bind("hook[[:nosuch:]].sh");
+  for (const n of ["hookA.sh", "hookZ.sh", "other.txt"]) expect(has(unknown, n)).toBe(true);
+  expect(has(unknown, "cuvette")).toBe(false);
 });
 
 test("Linux wrap: a hook glob in the project root locks only the existing matches, so the work folder and new files stay writable", () => {

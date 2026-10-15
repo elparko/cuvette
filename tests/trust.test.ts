@@ -1122,8 +1122,15 @@ describe("Seatbelt patterns for glob and path text", () => {
 
   test("a POSIX class in a bracket keeps the whole bracket", () => {
     expect(globEre("a[[:space:]]b")).toBe("a[[:space:]]b");
-    expect(globEre("a[![:digit:]]b")).toBe("a[^[:digit:]]b");
+    expect(globEre("a[![:digit:]]b")).toBe("a[^/]+b");
     expect(() => new RegExp(globEre("a[[:space:]]b").replace(/\[:space:\]/g, "\\s"))).not.toThrow();
+  });
+
+  test("a question mark and a negated bracket match a whole name part, so the deny only gets wider", () => {
+    expect(globEre("hook?.sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[!a].sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[^a].sh")).toBe("hook[^/]+[.]sh");
+    expect(globEre("hook[ab].sh")).toBe("hook[ab][.]sh");
   });
 
   const sandboxOk = process.platform === "darwin" && spawnSync("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"]).status === 0;
@@ -1138,6 +1145,10 @@ describe("Seatbelt patterns for glob and path text", () => {
     expect(touch("a[[:space:]]b", "a b")).toBe(false);
     expect(touch("a[[:space:]]b", "axb")).toBe(true);
     expect(touch("*.sh", "other.txt")).toBe(true);
+    expect(touch("hook?.sh", "hook\u00e9.sh")).toBe(false);
+    expect(touch("hook[!a].sh", "hook\u00e9.sh")).toBe(false);
+    expect(touch("hook?.sh", "hookx.sh")).toBe(false);
+    expect(touch("hook?.sh", "hook.sh")).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
 });
