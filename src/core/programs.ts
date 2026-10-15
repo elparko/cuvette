@@ -201,12 +201,12 @@ function installFor(name: string, m: Manifest, home: string, lib: string, find: 
   const env = envNameIn(m);
   if (env && ENVS[env]) {
     const py = envPython(home, env);
-    return { kind: "uv", dir: join(home, "envs", env), command: uvCommand(home, env), update: `uv pip install --python ${q(py)} --upgrade ${ENVS[env]!.packages.map(q).join(" ")}`, needs: find("uv") ? undefined : "uv" };
+    return { kind: "uv", dir: join(home, "envs", env), command: uvCommand(home, env), update: `uv pip install --python ${q(py)} --upgrade ${ENVS[env]!.packages.map(q).join(" ")}`, link: m.program.homepage || undefined, needs: find("uv") ? undefined : "uv" };
   }
   const r = R_PACKAGES[name];
   if (r) {
     const cmd = rInstallCommand(lib, r);
-    return { kind: "r", dir: lib, command: cmd, update: cmd, needs: find("Rscript") ? undefined : "R" };
+    return { kind: "r", dir: lib, command: cmd, update: cmd, link: m.program.homepage || undefined, needs: find("Rscript") ? undefined : "R" };
   }
   const fix = PROGRAM_INSTALL[name];
   if (fix?.command?.startsWith("brew ")) return { kind: "brew", command: fix.command, update: fix.command.replace(/^brew install/, "brew upgrade"), link: fix.link, needs: find("brew") ? undefined : "Homebrew" };
@@ -418,7 +418,7 @@ function installLines(r: ProgramRow, i: Install, update: boolean): Partial<Plan>
   if (i.kind === "uv" || i.kind === "r") {
     if (i.needs) return { refused: `${i.needs} is not installed. Install ${i.needs} first: ${i.needs === "uv" ? "brew install uv" : "brew install r"}.`, command: i.needs === "uv" ? "brew install uv" : "brew install r", runs: false };
     const where = i.kind === "uv" ? `the Python environment ${tilde(i.dir!)}` : `the R library ${tilde(i.dir!)}`;
-    return { command: cmd, runs: true, confirm: verb, lines: [`Cuvette runs the command below. It ${update ? "updates the packages in" : "installs the packages into"} ${where}. Nothing else on this computer changes.`, tested].filter(Boolean) };
+    return { command: cmd, link: i.link, runs: true, confirm: verb, lines: [`Cuvette runs the command below. It ${update ? "updates the packages in" : "installs the packages into"} ${where}. Nothing else on this computer changes.`, tested].filter(Boolean) };
   }
   if (i.kind === "brew") {
     if (i.needs) return { refused: "Homebrew is not installed. Install the program from the link, or install Homebrew from https://brew.sh first.", command: cmd, link: i.link, runs: false };
@@ -637,6 +637,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
   switch (plan.action) {
     case "install":
     case "update": {
+      if (process.platform === "win32" && !opts.exec) return { ok: false, text: `Cuvette cannot run an install command on Windows. Nothing changed. ${plan.link ? `Download ${plan.name} from this link, then choose Check again: ${plan.link}` : `Install the program yourself, then choose Check again. The command is: ${plan.command}`}` };
       const claim = claimRun(home, plan);
       if ("busy" in claim) return { ok: false, text: claim.busy };
       try {

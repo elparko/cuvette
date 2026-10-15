@@ -157,7 +157,7 @@ describe("the actions", () => {
     expect(record.append).toHaveBeenCalledWith("program", expect.objectContaining({ action: "install", adapter: "zeta", ok: true }));
   });
 
-  test("an install command does not get the API keys and tokens of the shell", async () => {
+  test.skipIf(process.platform === "win32")("an install command does not get the API keys and tokens of the shell", async () => {
     const old = { key: process.env.ANTHROPIC_API_KEY, gh: process.env.GITHUB_TOKEN };
     process.env.ANTHROPIC_API_KEY = "sk-ant-secret";
     process.env.GITHUB_TOKEN = "ghp-secret";
@@ -461,7 +461,22 @@ describe("a long install: stop, password, and a second action at the same time",
     expect(stream).toMatch(/"ok":false,"text":"The command asks for your password, and Cuvette cannot type it\. Run the command in Terminal/);
   });
 
-  test("a stop ends the real command and its child processes at once", async () => {
+  test("on Windows the install command does not run, and the text gives the link", async () => {
+    const real = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const plan: Plan = { action: "install", name: "zeta", title: "", lines: [], runs: true, confirm: "Install", command: "brew install zeta", link: "https://example.org/zeta" };
+      const r = await runAction(plan, { home, via: "terminal", confirmed: true });
+      expect(r.ok).toBe(false);
+      expect(r.text).toBe("Cuvette cannot run an install command on Windows. Nothing changed. Download zeta from this link, then choose Check again: https://example.org/zeta");
+      const bare = await runAction({ ...plan, link: undefined }, { home, via: "terminal", confirmed: true });
+      expect(bare.text).toContain("Install the program yourself");
+    } finally {
+      Object.defineProperty(process, "platform", { value: real });
+    }
+  });
+
+  test.skipIf(process.platform === "win32")("a stop ends the real command and its child processes at once", async () => {
     const plan: Plan = { action: "install", name: "zeta", title: "", lines: [], runs: true, confirm: "Install", command: "sh -c 'sleep 30'; echo after" };
     const abort = new AbortController();
     const lines: string[] = [];
