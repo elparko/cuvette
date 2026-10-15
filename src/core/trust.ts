@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { harnessWrite } from "./harness-writes.ts";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
 
@@ -240,6 +240,49 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
   return out;
 }
 
+const INTERPRETER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell)(\.exe)?$/i;
+
+function scriptWords(argv: string[]): string[] {
+  const out = argv.length ? [argv[0]!] : [];
+  if (!INTERPRETER.test(basename(argv[0] ?? ""))) return out;
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (/^-\w*c$/.test(a)) {
+      for (const part of String(argv[i + 1] ?? "").split(/&&|\|\||[;|\n]/)) out.push(...scriptWords(part.split(/\s+/).filter(Boolean).map((w) => w.replace(/^["']|["']$/g, ""))));
+      break;
+    }
+    if (a.startsWith("-")) continue;
+    out.push(a);
+    break;
+  }
+  return out;
+}
+
+export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
+  const key = folderKey(folder);
+  const found = new Set<string>();
+  try {
+    layers ??= projectSettings(key);
+  } catch {
+    return [];
+  }
+  for (const l of layers) {
+    const hooks = l.hooks;
+    if (!hooks || typeof hooks !== "object") continue;
+    for (const list of Object.values(hooks as Record<string, unknown>))
+      for (const h of Array.isArray(list) ? list : [])
+        for (const word of Array.isArray(h?.command) ? scriptWords(h.command.map(String)) : []) {
+          const path = resolve(key, word);
+          const rel = relative(key, path);
+          if (!word || rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+          try {
+            if (statSync(path).isFile()) found.add(path);
+          } catch {}
+        }
+  }
+  return [...found];
+}
+
 function shadows(name: string): string | undefined {
   if (existsSync(join(CATALOG_DIR, name, "adapter.yaml"))) return `the catalog adapter ${name}`;
   if (existsSync(join(cuvetteHome(), "adapters", name, "adapter.yaml"))) return `your adapter ${name}`;
@@ -334,6 +377,7 @@ export function scanFolder(folder: string): FolderScan {
   for (const p of paths) files[relative(key, p)] = readHash(p);
   for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
+  for (const p of hookScripts(key, layers)) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = readHash(p);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
   const keys = Object.keys(values).filter((k) => !SAFE_KEYS.has(k));

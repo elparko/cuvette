@@ -98,6 +98,28 @@ test("only display settings: no card, and they apply", async () => {
   expect(session.questions.open()).toEqual([]);
 });
 
+test("a hook script in the project root is part of the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./hook.sh"] }, { command: ["sh", "-c", "bash tools/check.sh --quick"] }] } });
+  mkdirSync(join(cwd, "tools"));
+  writeFileSync(join(cwd, "hook.sh"), "echo one\n");
+  writeFileSync(join(cwd, "tools", "check.sh"), "echo two\n");
+  const before = scanFolder(cwd);
+  expect(Object.keys(before.files)).toEqual(expect.arrayContaining(["(hook script) hook.sh", "(hook script) tools/check.sh"]));
+  trustFolder(cwd);
+  expect(trustStatus(cwd).state).toBe("trusted");
+  writeFileSync(join(cwd, "hook.sh"), "echo evil\n");
+  const after = scanFolder(cwd);
+  expect(after.hash).not.toBe(before.hash);
+  const t = trustStatus(cwd);
+  expect(t.state).toBe("changed");
+  expect(t.changes).toEqual(["changed file: (hook script) hook.sh"]);
+});
+
+test("a hook command that names a file outside the project adds no file to the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "/etc/hosts"] }, { command: ["sh", "../outside.sh"] }] } });
+  expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)"))).toEqual([]);
+});
+
 test("the trust card shows the folder, the keys, each hook in full, the adapters and bypass; trust once applies for this session only", async () => {
   project(".ga", { ...hook("ran"), permissions: "bypass", model: "claude:x" });
   shadowAdapter();
