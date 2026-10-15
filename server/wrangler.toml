@@ -8,8 +8,19 @@ routes = [
 ]
 
 [vars]
-MARKUP = "1.25"
+HOSTED_ENABLED = "false"
 SITE_URL = "https://cuvette.ai"
+# Replace each price_REPLACE_* value with the price id from the Stripe Dashboard.
+PLANS = '''{
+  "plans": {
+    "basic": {"price_usd_month": 10, "price_usd_year": 100, "allowance_usd": 7, "models": ["claude-sonnet-5-5", "claude-haiku-5-5"], "stripe_price_month": "price_REPLACE_basic_month", "stripe_price_year": "price_REPLACE_basic_year"},
+    "standard": {"price_usd_month": 20, "price_usd_year": 200, "allowance_usd": 15, "models": "all", "stripe_price_month": "price_REPLACE_standard_month", "stripe_price_year": "price_REPLACE_standard_year"},
+    "lab": {"price_usd_month": 60, "price_usd_year": 600, "allowance_usd": 46, "models": "all", "stripe_price_month": "price_REPLACE_lab_month", "stripe_price_year": "price_REPLACE_lab_year"},
+    "lab_plus": {"price_usd_month": 150, "price_usd_year": 1500, "allowance_usd": 118, "models": "all", "stripe_price_month": "price_REPLACE_lab_plus_month", "stripe_price_year": "price_REPLACE_lab_plus_year"}
+  },
+  "topup": {"price_usd": 10, "allowance_usd": 8, "stripe_price": "price_REPLACE_topup"},
+  "trial": {"plan": "standard", "days": 7, "allowance_usd": 2}
+}'''
 # Optional. Adds models to the default Anthropic table, or replaces a default model.
 # See "Add a host" in README.md.
 # UPSTREAMS = '{"my-model": {"kind": "openai", "base_url": "https://host.example/v1", "key_secret_name": "HOST_API_KEY", "upstream_model": "vendor/model", "price": {"input": 1, "output": 4, "cache_read": 0.1}, "max_output_tokens": 8000}}'

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SONNET, addAccount, balanceOf, call, chatBody, inFlightOf, makeEnv, messageDelta, messageStart, mockFetch, post, sse, sseResponse } from "./helpers.ts";
+import { SONNET, addAccount, balanceOf, call, chatBody, holdsOf, makeEnv, messageDelta, messageStart, mockFetch, post, sse, sseResponse } from "./helpers.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,7 +40,7 @@ describe("body allowlist", () => {
       expect(((await res.json()) as any).error.type).toBe("invalid_request_error");
       expect(calls).toHaveLength(0);
       expect(balanceOf(env, acct.id)).toBe(5);
-      expect(inFlightOf(env, acct.id)).toBe(0);
+      expect(holdsOf(env, acct.id)).toBe(0);
     });
   }
 

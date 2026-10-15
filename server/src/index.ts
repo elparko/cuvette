@@ -1,135 +1,25 @@
+import { accountInfo, adminCosts, pricing, usageReport } from "./account.ts";
+import { authCallback, authLink, authStart, authToken, authenticate, listDevices, logout, revokeDevice, type Session } from "./auth.ts";
+import { billingPortal, changePlan, checkout, webhook } from "./billing.ts";
+import type { Env } from "./env.ts";
+import { NO_TOKENS, allowedModels, planOf, prepareAccount, refusal, reserve, settle, topupBalance, type Account } from "./money.ts";
+import { loadPlans, type PlansConfig } from "./plans.ts";
 import { OpenAiUsage, openAiTokens } from "./openai.ts";
-import { listCost, reservationCost, type Price, type Tokens } from "./pricing.ts";
+import { listCost, reservationCost, type Tokens } from "./pricing.ts";
 import { SseUsage, mergeUsage } from "./sse.ts";
-import { AMOUNTS_USD, createCheckout, hex, verifySignature } from "./stripe.ts";
 import { answerPrice, loadUpstreams, type Kind, type Upstream, type UpstreamTable } from "./upstreams.ts";
+import { fail, logError, reply, secretOf } from "./util.ts";
 
-export interface Env {
-  DB: D1Database;
-  ANTHROPIC_API_KEY?: string;
-  STRIPE_SECRET_KEY: string;
-  STRIPE_WEBHOOK_SECRET: string;
-  MARKUP?: string;
-  SITE_URL: string;
-  UPSTREAMS?: unknown;
-}
+export type { Env } from "./env.ts";
+export { MAX_LIVE_HOLDS, LIVE_HOLD_MS } from "./money.ts";
 
-export const MAX_IN_FLIGHT = 4;
-export const IN_FLIGHT_TTL_MS = 15 * 60_000;
 export const COUNT_TOKENS_PER_MINUTE = 60;
-export const SIGNUPS_PER_HOUR = 5;
 export const ALLOWED_BETAS = ["server-side-fallback-2026-07-01"];
 export const ALLOWED_FIELDS = ["model", "messages", "system", "max_tokens", "tools", "tool_choice", "stream", "thinking", "metadata", "output_config", "fallbacks"];
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
-const DEFAULT_MARKUP = 1.25;
-const NO_ZERO = { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
-
-const encoder = new TextEncoder();
-
-function reply(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
-}
-
-function fail(status: number, type: string, message: string, headers: Record<string, string> = {}): Response {
-  return reply(status, { type: "error", error: { type, message } }, headers);
-}
-
-async function sha256Hex(text: string): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", encoder.encode(text)));
-}
-
-function base64url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function markupOf(env: Env): number {
-  const m = Number(env.MARKUP);
-  return Number.isFinite(m) && m > 0 ? m : DEFAULT_MARKUP;
-}
-
-function logError(where: string, e: unknown): void {
-  console.error(where, e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
-}
-
-interface Account {
-  id: string;
-  balance_usd: number;
-}
-
-async function authenticate(req: Request, env: Env): Promise<Account | undefined> {
-  const m = /^Bearer (cuv_[A-Za-z0-9_-]{43})$/.exec(req.headers.get("authorization") ?? "");
-  if (!m) return undefined;
-  const row = await env.DB.prepare("SELECT id, balance_usd FROM accounts WHERE token_hash = ?1").bind(await sha256Hex(m[1]!)).first<Account>();
-  return row ?? undefined;
-}
+const SESSION_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 
 const unauthorized = () => fail(401, "authentication_error", "The account token is missing or not valid.");
-
-async function createAccount(req: Request, env: Env): Promise<Response> {
-  const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
-  const hour = Math.floor(Date.now() / 3_600_000);
-  const [limit] = await env.DB.batch([
-    env.DB.prepare("INSERT INTO signups (ip_hash, hour, count) VALUES (?1, ?2, 1) ON CONFLICT (ip_hash, hour) DO UPDATE SET count = count + 1 WHERE count < ?3").bind(await sha256Hex(ip), hour, SIGNUPS_PER_HOUR),
-    env.DB.prepare("DELETE FROM signups WHERE hour < ?1").bind(hour),
-  ]);
-  if (!limit!.meta.changes) return fail(429, "too_many_requests", "Too many accounts were created from this address. Try again later.", { "retry-after": "3600" });
-  const id = crypto.randomUUID();
-  const token = `cuv_${base64url(crypto.getRandomValues(new Uint8Array(32)))}`;
-  await env.DB.prepare("INSERT INTO accounts (id, token_hash, balance_usd, created_at) VALUES (?1, ?2, 0, ?3)").bind(id, await sha256Hex(token), new Date().toISOString()).run();
-  return reply(201, { account_id: id, token });
-}
-
-async function checkout(req: Request, env: Env, account: Account): Promise<Response> {
-  let amount: unknown;
-  try {
-    amount = ((await req.json()) as any)?.amount_usd;
-  } catch {
-    amount = undefined;
-  }
-  if (typeof amount !== "number" || !AMOUNTS_USD.includes(amount)) return fail(400, "invalid_request_error", `amount_usd must be one of ${AMOUNTS_USD.join(", ")}.`);
-  try {
-    return reply(200, { url: await createCheckout(env.STRIPE_SECRET_KEY, account.id, amount, env.SITE_URL) });
-  } catch (e) {
-    logError("checkout", e);
-    return fail(502, "api_error", "The payment service did not answer. Try again later.");
-  }
-}
-
-async function webhook(req: Request, env: Env): Promise<Response> {
-  const raw = new Uint8Array(await req.arrayBuffer());
-  if (!(await verifySignature(env.STRIPE_WEBHOOK_SECRET, req.headers.get("stripe-signature"), raw))) return fail(400, "invalid_request_error", "The signature is not valid.");
-  let event: any;
-  try {
-    event = JSON.parse(new TextDecoder().decode(raw));
-  } catch {
-    return fail(400, "invalid_request_error", "The body is not JSON.");
-  }
-  if (event?.type !== "checkout.session.completed") return reply(200, { received: true });
-  const s = event.data?.object;
-  const cents = Number(s?.amount_total);
-  const valid = typeof s?.id === "string" && typeof s?.client_reference_id === "string" && s.payment_status === "paid" && s.currency === "usd" && AMOUNTS_USD.some((a) => a * 100 === cents);
-  if (!valid) {
-    console.error("webhook ignored", typeof s?.id === "string" ? s.id : "no session id");
-    return reply(200, { received: true, ignored: true });
-  }
-  const exists = await env.DB.prepare("SELECT id FROM accounts WHERE id = ?1").bind(s.client_reference_id).first();
-  if (!exists) {
-    console.error("webhook account not found", s.id);
-    return reply(200, { received: true, ignored: true });
-  }
-  const usd = cents / 100;
-  try {
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO payments (session_id, account_id, amount_usd, created_at) VALUES (?1, ?2, ?3, ?4)").bind(s.id, s.client_reference_id, usd, new Date().toISOString()),
-      env.DB.prepare("UPDATE accounts SET balance_usd = balance_usd + ?1 WHERE id = ?2").bind(usd, s.client_reference_id),
-    ]);
-  } catch (e) {
-    const done = await env.DB.prepare("SELECT session_id FROM payments WHERE session_id = ?1").bind(s.id).first();
-    if (!done) throw e;
-    return reply(200, { received: true, duplicate: true });
-  }
-  return reply(200, { received: true });
-}
 
 const OPENAI_FIELDS = ["model", "messages", "tools", "tool_choice", "stream", "max_tokens", "max_completion_tokens", "temperature", "top_p", "stop", "response_format", "stream_options"];
 const WRONG_ROUTE: Record<Kind, string> = {
@@ -228,17 +118,11 @@ function passHeaders(up: Response, extra: Record<string, string> = {}): Headers 
   return h;
 }
 
-function secretOf(env: Env, name: string): string | undefined {
-  const v = (env as unknown as Record<string, unknown>)[name];
-  return typeof v === "string" && v ? v : undefined;
-}
-
 interface Hold {
   requestId: string;
-  accountId: string;
+  sessionId: string | null;
   reserve: number;
   outputReserve: number;
-  markup: number;
   requestedModel: string;
 }
 
@@ -258,45 +142,17 @@ interface Flavor {
   isOurs(status: number, text: string): boolean;
 }
 
-async function reserve(env: Env, hold: Hold): Promise<"ok" | "busy" | "poor"> {
-  const now = Date.now();
-  const cutoff = now - IN_FLIGHT_TTL_MS;
-  const [, taken] = await env.DB.batch([
-    env.DB.prepare("DELETE FROM in_flight WHERE account_id = ?1 AND started_at <= ?2").bind(hold.accountId, cutoff),
-    env.DB.prepare(
-      "INSERT INTO in_flight (request_id, account_id, started_at) SELECT ?1, ?2, ?3 WHERE (SELECT COUNT(*) FROM in_flight WHERE account_id = ?2 AND started_at > ?4) < ?5 AND (SELECT balance_usd FROM accounts WHERE id = ?2) >= ?6",
-    ).bind(hold.requestId, hold.accountId, now, cutoff, MAX_IN_FLIGHT, hold.reserve),
-    env.DB.prepare("UPDATE accounts SET balance_usd = balance_usd - ?1 WHERE id = ?2 AND EXISTS (SELECT 1 FROM in_flight WHERE request_id = ?3)").bind(hold.reserve, hold.accountId, hold.requestId),
-  ]);
-  if (taken!.meta.changes) return "ok";
-  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM in_flight WHERE account_id = ?1 AND started_at > ?2").bind(hold.accountId, cutoff).first<{ n: number }>();
-  return row && row.n >= MAX_IN_FLIGHT ? "busy" : "poor";
-}
-
-async function settle(env: Env, hold: Hold, charge: number, model: string, status: string, t: Tokens): Promise<void> {
-  const cutoff = Date.now() - IN_FLIGHT_TTL_MS;
-  const live = "EXISTS (SELECT 1 FROM in_flight WHERE request_id = ?12 AND started_at > ?13)";
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO usage (account_id, model, status, input_tokens, output_tokens, cache_read_tokens, cache_write_5m_tokens, cache_write_1h_tokens, cost_usd, at) SELECT ?1, ?2, CASE WHEN ${live} THEN ?3 ELSE 'expired' END, ?4, ?5, ?6, ?7, ?8, CASE WHEN ${live} THEN ?9 ELSE ?11 END, ?10`,
-    ).bind(hold.accountId, model, status, t.input, t.output, t.cacheRead, t.cacheWrite5m, t.cacheWrite1h, charge, new Date().toISOString(), hold.reserve, hold.requestId, cutoff),
-    env.DB.prepare("UPDATE accounts SET balance_usd = balance_usd + ?1 WHERE id = ?2 AND EXISTS (SELECT 1 FROM in_flight WHERE request_id = ?3 AND started_at > ?4)").bind(hold.reserve - charge, hold.accountId, hold.requestId, cutoff),
-    env.DB.prepare("DELETE FROM in_flight WHERE request_id = ?1").bind(hold.requestId),
-  ]);
-}
-
 function settleSafe(env: Env, hold: Hold, charge: number, model: string, status: string, t: Tokens): Promise<void> {
-  return settle(env, hold, charge, model, status, t).catch((e) => logError("settle", e));
+  return settle(env, hold.requestId, charge, model, status, t).catch((e) => logError("settle", e));
 }
 
-function newHold(account: Account, checked: Checked, bytes: number, env: Env): Hold {
-  const markup = markupOf(env);
+function newHold(req: Request, checked: Checked, bytes: number): Hold {
+  const session = req.headers.get("x-cuvette-session");
   return {
     requestId: crypto.randomUUID(),
-    accountId: account.id,
-    reserve: reservationCost(checked.up.price, bytes, checked.maxTokens, markup),
-    outputReserve: listCost(checked.up.price, { ...NO_ZERO, output: checked.maxTokens }) * markup,
-    markup,
+    sessionId: session && SESSION_ID.test(session) ? session : null,
+    reserve: reservationCost(checked.up.price, bytes, checked.maxTokens),
+    outputReserve: listCost(checked.up.price, { ...NO_TOKENS, output: checked.maxTokens }),
     requestedModel: checked.name,
   };
 }
@@ -323,7 +179,7 @@ function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked
   const beta = betaHeader(req.headers.get("anthropic-beta"));
   if (beta) headers["anthropic-beta"] = beta;
   const query = new URL(req.url).searchParams.get("beta") === "true" ? "?beta=true" : "";
-  const finalCharge = (model: string, t: Tokens) => listCost(answerPrice(table, model), t) * hold.markup;
+  const finalCharge = (model: string, t: Tokens) => listCost(answerPrice(table, model), t);
   return {
     url: checked.up.baseUrl + path + query,
     headers,
@@ -338,7 +194,7 @@ function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked
             const model = seen.model ?? hold.requestedModel;
             return { charge: finalCharge(model, seen.total), model, tokens: seen.total, status: "ok" };
           }
-          if (!seen.started || !seen.start) return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_ZERO, status: "cut" };
+          if (!seen.started || !seen.start) return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_TOKENS, status: "cut" };
           const model = seen.model ?? hold.requestedModel;
           return { charge: finalCharge(model, { ...seen.start, output: 0 }) + hold.outputReserve, model, tokens: seen.start, status: "cut" };
         },
@@ -355,7 +211,7 @@ function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked
 }
 
 function openAiFlavor(hold: Hold, checked: Checked, key: string): Flavor {
-  const cost = (t: Tokens) => listCost(checked.up.price, t) * hold.markup;
+  const cost = (t: Tokens) => listCost(checked.up.price, t);
   return {
     url: `${checked.up.baseUrl}/chat/completions`,
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
@@ -366,7 +222,7 @@ function openAiFlavor(hold: Hold, checked: Checked, key: string): Flavor {
         push: (chunk) => usage.push(chunk),
         outcome(completed) {
           if (usage.tokens && (usage.done || completed)) return { charge: cost(usage.tokens), model: hold.requestedModel, tokens: usage.tokens, status: "ok" };
-          return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_ZERO, status: "cut" };
+          return { charge: hold.reserve, model: hold.requestedModel, tokens: NO_TOKENS, status: "cut" };
         },
       };
     },
@@ -379,7 +235,7 @@ function openAiFlavor(hold: Hold, checked: Checked, key: string): Flavor {
 }
 
 async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flavor): Promise<Response> {
-  const refundAll = (status: string) => settleSafe(env, hold, 0, hold.requestedModel, status, NO_ZERO);
+  const refundAll = (status: string) => settleSafe(env, hold, 0, hold.requestedModel, status, NO_TOKENS);
   let up: Response;
   try {
     up = await fetch(flavor.url, { method: "POST", headers: flavor.headers, body: flavor.body });
@@ -444,15 +300,25 @@ async function forward(env: Env, ctx: ExecutionContext, hold: Hold, flavor: Flav
   }
   const o = flavor.fromJson(json);
   if (o) ctx.waitUntil(settleSafe(env, hold, o.charge, o.model, o.status, o.tokens));
-  else ctx.waitUntil(settleSafe(env, hold, hold.reserve, hold.requestedModel, "cut", NO_ZERO));
+  else ctx.waitUntil(settleSafe(env, hold, hold.reserve, hold.requestedModel, "cut", NO_TOKENS));
   return new Response(text, { status: up.status, headers: passHeaders(up) });
 }
 
-async function takeCredit(env: Env, hold: Hold): Promise<Response | undefined> {
-  const result = await reserve(env, hold);
-  if (result === "busy") return fail(429, "too_many_requests", "Too many requests are running for this account. Wait for one to finish.");
-  if (result === "poor") return fail(402, "insufficient_credit", "The Cuvette credit is used up. Buy more credit to continue.");
+async function entitlement(env: Env, cfg: PlansConfig, account: Account, model: string, now: number): Promise<Response | undefined> {
+  if (account.suspended) return fail(403, "account_suspended", "A payment dispute suspended this account. Contact support.");
+  if (!planOf(cfg, account) && (await topupBalance(env, account.id, now)) <= 0) return fail(403, "no_plan", "This account has no plan. Choose a plan or buy a top-up.");
+  if (!(await allowedModels(env, cfg, account, now)).includes(model)) return fail(403, "model_not_in_plan", `The plan of this account does not include the model "${model}".`);
   return undefined;
+}
+
+async function admit(env: Env, base: Account, checked: Checked, hold: Hold): Promise<Response | undefined> {
+  const cfg = loadPlans(env.PLANS);
+  const now = Date.now();
+  const account = await prepareAccount(env, cfg, base, now);
+  const denied = await entitlement(env, cfg, account, checked.name, now);
+  if (denied) return denied;
+  if (await reserve(env, cfg, account, { requestId: hold.requestId, amount: hold.reserve, model: checked.name, sessionId: hold.sessionId }, now)) return undefined;
+  return refusal(env, cfg, account, hold.reserve, now);
 }
 
 async function messages(req: Request, env: Env, ctx: ExecutionContext, account: Account): Promise<Response> {
@@ -466,8 +332,8 @@ async function messages(req: Request, env: Env, ctx: ExecutionContext, account: 
     console.error("upstream key missing", checked.up.keySecretName);
     return unavailable();
   }
-  const hold = newHold(account, checked, read.raw.byteLength, env);
-  const refused = await takeCredit(env, hold);
+  const hold = newHold(req, checked, read.raw.byteLength);
+  const refused = await admit(env, account, checked, hold);
   if (refused) return refused;
   return forward(env, ctx, hold, anthropicFlavor(req, table, hold, checked, key, "/messages"));
 }
@@ -483,8 +349,8 @@ async function chatCompletions(req: Request, env: Env, ctx: ExecutionContext, ac
     console.error("upstream key missing", checked.up.keySecretName);
     return unavailable();
   }
-  const hold = newHold(account, checked, read.raw.byteLength, env);
-  const refused = await takeCredit(env, hold);
+  const hold = newHold(req, checked, read.raw.byteLength);
+  const refused = await admit(env, account, checked, hold);
   if (refused) return refused;
   return forward(env, ctx, hold, openAiFlavor(hold, checked, key));
 }
@@ -501,12 +367,14 @@ async function countTokens(req: Request, env: Env, account: Account): Promise<Re
   const table = loadUpstreams(env.UPSTREAMS);
   const checked = checkAnthropic(read.body, table, true);
   if (typeof checked === "string") return fail(400, "invalid_request_error", checked);
+  const denied = await entitlement(env, loadPlans(env.PLANS), account, checked.name, Date.now());
+  if (denied) return denied;
   const key = secretOf(env, checked.up.keySecretName);
   if (!key) {
     console.error("upstream key missing", checked.up.keySecretName);
     return unavailable();
   }
-  const hold = newHold(account, checked, read.raw.byteLength, env);
+  const hold = newHold(req, checked, read.raw.byteLength);
   const flavor = anthropicFlavor(req, table, hold, checked, key, "/messages/count_tokens");
   let up: Response;
   try {
@@ -525,32 +393,87 @@ function models(env: Env): Response {
   return reply(200, { object: "list", data: [...table.keys()].map((id) => ({ id, object: "model", owned_by: "cuvette" })) });
 }
 
+type Name = "pricing" | "webhook" | "start" | "callback" | "token" | "link" | "logout" | "account" | "usage" | "devices" | "revoke" | "checkout" | "plan" | "portal" | "messages" | "count_tokens" | "chat" | "models" | "admin";
+
+const ROUTES: { method: string; pattern: RegExp; name: Name }[] = [
+  { method: "GET", pattern: /^\/v1\/pricing$/, name: "pricing" },
+  { method: "POST", pattern: /^\/v1\/stripe\/webhook$/, name: "webhook" },
+  { method: "GET", pattern: /^\/v1\/auth\/start$/, name: "start" },
+  { method: "GET", pattern: /^\/v1\/auth\/callback\/([a-z]{1,20})$/, name: "callback" },
+  { method: "POST", pattern: /^\/v1\/auth\/token$/, name: "token" },
+  { method: "POST", pattern: /^\/v1\/auth\/link$/, name: "link" },
+  { method: "POST", pattern: /^\/v1\/auth\/logout$/, name: "logout" },
+  { method: "GET", pattern: /^\/v1\/account$/, name: "account" },
+  { method: "GET", pattern: /^\/v1\/usage$/, name: "usage" },
+  { method: "GET", pattern: /^\/v1\/devices$/, name: "devices" },
+  { method: "DELETE", pattern: /^\/v1\/devices\/([A-Za-z0-9_-]{1,64})$/, name: "revoke" },
+  { method: "POST", pattern: /^\/v1\/checkout$/, name: "checkout" },
+  { method: "POST", pattern: /^\/v1\/plan$/, name: "plan" },
+  { method: "POST", pattern: /^\/v1\/billing\/portal$/, name: "portal" },
+  { method: "POST", pattern: /^\/v1\/messages$/, name: "messages" },
+  { method: "POST", pattern: /^\/v1\/messages\/count_tokens$/, name: "count_tokens" },
+  { method: "POST", pattern: /^\/v1\/chat\/completions$/, name: "chat" },
+  { method: "GET", pattern: /^\/v1\/models$/, name: "models" },
+  { method: "GET", pattern: /^\/v1\/admin\/costs$/, name: "admin" },
+];
+
 export async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const path = new URL(req.url).pathname;
-  const routes: Record<string, string> = {
-    "/v1/accounts": "POST",
-    "/v1/account": "GET",
-    "/v1/checkout": "POST",
-    "/v1/stripe/webhook": "POST",
-    "/v1/messages": "POST",
-    "/v1/messages/count_tokens": "POST",
-    "/v1/chat/completions": "POST",
-    "/v1/models": "GET",
-  };
-  const method = routes[path];
-  if (!method) return fail(404, "not_found_error", "The route does not exist.");
-  if (req.method !== method) return fail(405, "invalid_request_error", `Use ${method} for this route.`, { allow: method });
+  const matches = ROUTES.filter((r) => r.pattern.test(path));
+  if (!matches.length) return fail(404, "not_found_error", "The route does not exist.");
+  if (env.HOSTED_ENABLED !== "true" && !(req.method === "GET" && path === "/v1/pricing")) return fail(503, "hosted_off", "Cuvette hosted is not open yet.");
+  const route = matches.find((r) => r.method === req.method);
+  if (!route) {
+    const allow = matches.map((r) => r.method).join(", ");
+    return fail(405, "invalid_request_error", `Use ${allow} for this route.`, { allow });
+  }
+  const param = route.pattern.exec(path)?.[1] ?? "";
   try {
-    if (path === "/v1/accounts") return await createAccount(req, env);
-    if (path === "/v1/stripe/webhook") return await webhook(req, env);
-    const account = await authenticate(req, env);
-    if (!account) return unauthorized();
-    if (path === "/v1/account") return reply(200, { account_id: account.id, balance_usd: Math.round(account.balance_usd * 1e6) / 1e6 });
-    if (path === "/v1/checkout") return await checkout(req, env, account);
-    if (path === "/v1/models") return models(env);
-    if (path === "/v1/messages/count_tokens") return await countTokens(req, env, account);
-    if (path === "/v1/chat/completions") return await chatCompletions(req, env, ctx, account);
-    return await messages(req, env, ctx, account);
+    switch (route.name) {
+      case "pricing":
+        return pricing(env);
+      case "webhook":
+        return await webhook(req, env);
+      case "start":
+        return await authStart(req, env);
+      case "callback":
+        return await authCallback(req, env, param);
+      case "token":
+        return await authToken(req, env);
+      case "admin":
+        return await adminCosts(req, env);
+    }
+    const session: Session | undefined = await authenticate(req, env, ctx);
+    if (!session) return unauthorized();
+    const account = session.account;
+    switch (route.name) {
+      case "link":
+        return await authLink(req, env, session);
+      case "logout":
+        return await logout(env, session);
+      case "account":
+        return await accountInfo(env, await prepareAccount(env, loadPlans(env.PLANS), account));
+      case "usage":
+        return await usageReport(req, env, account);
+      case "devices":
+        return await listDevices(env, session);
+      case "revoke":
+        return await revokeDevice(env, session, param);
+      case "checkout":
+        return await checkout(req, env, account);
+      case "plan":
+        return await changePlan(req, env, account);
+      case "portal":
+        return await billingPortal(env, account);
+      case "models":
+        return models(env);
+      case "count_tokens":
+        return await countTokens(req, env, account);
+      case "chat":
+        return await chatCompletions(req, env, ctx, account);
+      default:
+        return await messages(req, env, ctx, account);
+    }
   } catch (e) {
     logError(path, e);
     return fail(500, "api_error", "The server had an internal error.");

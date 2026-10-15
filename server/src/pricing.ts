@@ -36,7 +36,7 @@ export function listCost(price: Price | undefined, t: Tokens): number {
   return (t.input * p.input + t.output * p.output + t.cacheRead * p.cacheRead + t.cacheWrite5m * p.cacheWrite5m + t.cacheWrite1h * p.cacheWrite1h) / 1e6;
 }
 
-export function reservationCost(price: Price, bodyBytes: number, maxTokens: number, markup: number): number {
+export function reservationCost(price: Price, bodyBytes: number, maxTokens: number): number {
   const input = Math.ceil(bodyBytes / 2);
-  return listCost(price, { input, output: maxTokens, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 }) * markup;
+  return listCost(price, { input, output: maxTokens, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
 }

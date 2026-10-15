@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  HOST_KEY, OPENAI_MODEL, SONNET, addAccount, balanceOf, call, chatBody, chunk, heldStream, inFlightOf, makeEnv, makeOpenAiEnv, mockFetch, openAiBody, post, sseResponse,
+  HOST_KEY, OPENAI_MODEL, SONNET, addAccount, balanceOf, call, chatBody, chunk, heldStream, heldTotal, holdsOf, makeEnv, makeOpenAiEnv, mockFetch, openAiBody, post, sseResponse,
 } from "./helpers.ts";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -13,7 +13,7 @@ function streamText(usage: object | null = USAGE): string {
 }
 
 function reserveFor(body: Record<string, unknown>, max: number): number {
-  return ((Math.ceil(new TextEncoder().encode(JSON.stringify(body)).length / 2) * 1 + max * 4) / 1e6) * 1.25;
+  return ((Math.ceil(new TextEncoder().encode(JSON.stringify(body)).length / 2) * 1 + max * 4) / 1e6);
 }
 
 describe("chat completions routing", () => {
@@ -86,7 +86,7 @@ describe("wrong route for the kind", () => {
     expect(((await res.json()) as any).error.message).toContain("/v1/messages");
     expect(calls).toHaveLength(0);
     expect(balanceOf(env, acct.id)).toBe(5);
-    expect(inFlightOf(env, acct.id)).toBe(0);
+    expect(holdsOf(env, acct.id)).toBe(0);
   });
 
   it("answers 400 for an openai model on /v1/messages and on count_tokens", async () => {
@@ -111,18 +111,19 @@ describe("chat completions usage", () => {
     const held = heldStream();
     mockFetch(() => held.response);
     const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, body));
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 1000), 9);
-    expect(inFlightOf(env, acct.id)).toBe(1);
+    expect(balanceOf(env, acct.id)).toBe(5);
+    expect(heldTotal(env, acct.id)).toBeCloseTo(reserveFor(body, 1000), 9);
+    expect(holdsOf(env, acct.id)).toBe(1);
     held.push(streamText());
     held.end();
     const text = await res.text();
     await settled();
     expect(text).toBe(streamText());
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST * 1.25, 9);
-    expect(inFlightOf(env, acct.id)).toBe(0);
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST, 9);
+    expect(holdsOf(env, acct.id)).toBe(0);
     const row = env.fake.row("SELECT * FROM usage");
     expect(row).toMatchObject({ account_id: acct.id, model: OPENAI_MODEL, status: "ok", input_tokens: 1000, output_tokens: 50, cache_read_tokens: 200 });
-    expect(row.cost_usd).toBeCloseTo(COST * 1.25, 9);
+    expect(row.cost_usd).toBeCloseTo(COST, 9);
   });
 
   it("reads usage across chunk edges", async () => {
@@ -134,7 +135,7 @@ describe("chat completions usage", () => {
       const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
       await res.text();
       await settled();
-      expect(before - balanceOf(env, acct.id)).toBeCloseTo(COST * 1.25, 9);
+      expect(before - balanceOf(env, acct.id)).toBeCloseTo(COST, 9);
     }
   });
 
@@ -149,20 +150,20 @@ describe("chat completions usage", () => {
     await reader.read();
     await reader.cancel();
     await settled();
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST * 1.25, 9);
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST, 9);
     expect(env.fake.row("SELECT status FROM usage").status).toBe("ok");
   });
 
-  it("charges a non-stream response from the usage object", async () => {
-    const env = makeOpenAiEnv({ MARKUP: "2" });
+  it("charges a non-stream response from the usage object at the list price", async () => {
+    const env = makeOpenAiEnv();
     const acct = await addAccount(env, 5);
     const json = JSON.stringify({ id: "c1", model: "vendor/real-model", choices: [{ message: { role: "assistant", content: "ok" } }], usage: USAGE });
     mockFetch(() => new Response(json, { headers: { "content-type": "application/json" } }));
     const { res, settled } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody({ stream: false })));
     expect(await res.text()).toBe(json);
     await settled();
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST * 2, 9);
-    expect(inFlightOf(env, acct.id)).toBe(0);
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - COST, 9);
+    expect(holdsOf(env, acct.id)).toBe(0);
     expect(env.fake.row("SELECT model, status FROM usage")).toEqual({ model: OPENAI_MODEL, status: "ok" });
   });
 
@@ -175,7 +176,7 @@ describe("chat completions usage", () => {
     await res.text();
     await settled();
     expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 1000), 9);
-    expect(inFlightOf(env, acct.id)).toBe(0);
+    expect(holdsOf(env, acct.id)).toBe(0);
     expect(env.fake.row("SELECT status, cost_usd FROM usage").status).toBe("cut");
   });
 
@@ -205,7 +206,7 @@ describe("chat completions usage", () => {
     await settled();
     expect(held.state.cancelled).toBe(true);
     expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 1000), 9);
-    expect(inFlightOf(env, acct.id)).toBe(0);
+    expect(holdsOf(env, acct.id)).toBe(0);
   });
 
   it("refunds in full when the host returns an HTTP error and hides a host key problem", async () => {
@@ -217,7 +218,7 @@ describe("chat completions usage", () => {
       expect(res.status).toBe(expected);
       if (expected === 503) expect(await res.text()).not.toContain("sk-host");
       expect(balanceOf(env, acct.id)).toBe(5);
-      expect(inFlightOf(env, acct.id)).toBe(0);
+      expect(holdsOf(env, acct.id)).toBe(0);
       expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "rejected", cost_usd: 0 });
     }
   });
@@ -286,7 +287,7 @@ describe("chat completions body", () => {
     const calls = mockFetch(() => held.response);
     const { res } = await call(env, "/v1/chat/completions", post(acct.token, body));
     expect(JSON.parse(calls[0]!.body)).toMatchObject({ max_tokens: 8000, max_completion_tokens: 100 });
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 8000), 9);
+    expect(heldTotal(env, acct.id)).toBeCloseTo(reserveFor(body, 8000), 9);
     await res.body!.cancel();
   });
 
@@ -298,7 +299,7 @@ describe("chat completions body", () => {
     const calls = mockFetch(() => held.response);
     const { res } = await call(env, "/v1/chat/completions", post(acct.token, body));
     expect(JSON.parse(calls[0]!.body).max_tokens).toBe(8000);
-    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 8000), 9);
+    expect(heldTotal(env, acct.id)).toBeCloseTo(reserveFor(body, 8000), 9);
     await res.body!.cancel();
   });
 
@@ -333,7 +334,7 @@ describe("chat completions body", () => {
       expect(((await res.json()) as any).error.type).toBe("invalid_request_error");
       expect(calls).toHaveLength(0);
       expect(balanceOf(env, acct.id)).toBe(5);
-      expect(inFlightOf(env, acct.id)).toBe(0);
+      expect(holdsOf(env, acct.id)).toBe(0);
     });
   }
 
@@ -353,7 +354,7 @@ describe("chat completions credit and limits", () => {
     expect((await call(env, "/v1/chat/completions", post(undefined, openAiBody()))).res.status).toBe(401);
     const { res } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
     expect(res.status).toBe(402);
-    expect(((await res.json()) as any).error.type).toBe("insufficient_credit");
+    expect(((await res.json()) as any).error.type).toBe("allowance_used_up");
     expect(calls).toHaveLength(0);
   });
 
@@ -368,7 +369,7 @@ describe("chat completions credit and limits", () => {
       first.push(await call(env, path, post(acct.token, path === "/v1/messages" ? chatBody() : openAiBody())));
     }
     expect(first.map((f) => f.res.status)).toEqual([200, 200, 200, 200]);
-    expect(inFlightOf(env, acct.id)).toBe(4);
+    expect(holdsOf(env, acct.id)).toBe(4);
     expect((await call(env, "/v1/chat/completions", post(acct.token, openAiBody()))).res.status).toBe(429);
     expect((await call(env, "/v1/messages", post(acct.token, chatBody()))).res.status).toBe(429);
     for (const f of first) await f.res.body!.cancel();
