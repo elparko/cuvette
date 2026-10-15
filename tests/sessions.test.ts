@@ -175,14 +175,14 @@ test("the list reads a log again only after it changes, and the running status s
   writeFileSync(log, body);
   const t = new Date(Date.now() - 60000);
   utimesSync(log, t, t);
-  expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", status: "waiting for you" });
+  expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", status: "in progress" });
   writeFileSync(log, body.replace("Count the cells", "Xxxxx xxx xxxxx"));
   utimesSync(log, t, t);
   expect(listSessions(h)[0]!.ask).toBe("Count the cells");
   writeFileSync(log, body + JSON.stringify({ id: 3, kind: "assistant", data: { text: "12 cells.", final: true } }) + "\n");
   expect(listSessions(h)[0]).toMatchObject({ ask: "Count the cells", status: "answered" });
   writeFileSync(log, body + JSON.stringify({ id: 3, kind: "tool", data: {} }) + "\n");
-  expect(listSessions(h)[0]!.status).toBe("waiting for you");
+  expect(listSessions(h)[0]!.status).toBe("in progress");
   writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.pid }));
   expect(listSessions(h)[0]!.status).toBe("running");
 });
@@ -345,5 +345,54 @@ test("cuvette sessions --clean prints what it removes", () => {
   } finally {
     if (prev === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = prev;
+  }
+});
+
+test("the default and the picker skip a moved session, and the line marks it", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-moved-"));
+  const folder = mkdtempSync(join(tmpdir(), "cuvette-sessions-moved-ok-"));
+  mkdirSync(join(folder, ".record"));
+  writeFileSync(join(folder, ".record", "log.jsonl"), [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
+  const past = new Date(Date.now() - 3 * 3600_000);
+  utimesSync(join(folder, ".record", "log.jsonl"), past, past);
+  const rows = [
+    { id: "20261008-100000-aaaa", project: "/lab", folder, title: "Count the cells", date: new Date(Date.now() - 3600_000).toISOString() },
+    { id: "20261009-100000-bbbb", project: "/lab", folder: "/gone/cuvette/x", title: "Newer but moved", date: new Date().toISOString() },
+  ];
+  writeFileSync(join(h, "sessions-index.json"), JSON.stringify(rows));
+  const list = listSessions(h);
+  expect(list[0]).toMatchObject({ id: "20261009-100000-bbbb", moved: true });
+  expect(defaultSession(list, "/elsewhere")).toMatchObject({ info: { id: "20261008-100000-aaaa" } });
+  expect(defaultSession(list.filter((s) => s.moved), "/lab")).toBeUndefined();
+});
+
+test("a session with a request and no answer is in progress, also after the first turn stopped", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-progress-"));
+  const dir = join(h, "sessions", "20261013-100000-aaaa");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "log.jsonl"), [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
+  expect(listSessions(h)[0]!.status).toBe("in progress");
+});
+
+test("a session in the old sessions folder can be renamed and removed from the list", () => {
+  const h = home();
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    const id = "20261008-100000-bbbb";
+    expect(renameIndexRow(id, "  Cell   counts ")).toBe(true);
+    expect(listSessions(h).find((s) => s.id === id)).toMatchObject({ name: "Cell counts", ask: "Count the cells" });
+    expect(readIndex().map((r) => r.id)).toEqual([]);
+    expect(renameIndexRow(id, "")).toBe(true);
+    expect(listSessions(h).find((s) => s.id === id)!.name).toBeUndefined();
+    expect(removeIndexRow(id)).toBe(true);
+    expect(listSessions(h).map((s) => s.id)).not.toContain(id);
+    expect(existsSync(join(h, "sessions", id, "log.jsonl"))).toBe(true);
+    expect(renameIndexRow(id, "again")).toBe(false);
+    expect(removeIndexRow(id)).toBe(false);
+    expect(removeIndexRow("20261001-090000-zzzz")).toBe(false);
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
   }
 });

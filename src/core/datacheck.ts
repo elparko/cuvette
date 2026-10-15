@@ -560,18 +560,21 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
     }
   }
 
-  const bits = new Map<number, string[]>();
+  const bitsByType = new Map<string, Map<number, string[]>>();
   for (const p of parsed) {
     if (!p.f.bits) continue;
+    const bits = bitsByType.get(p.ext) ?? new Map<number, string[]>();
+    bitsByType.set(p.ext, bits);
     const list = bits.get(p.f.bits);
     if (list) list.push(p.f.rel);
     else bits.set(p.f.bits, [p.f.rel]);
   }
-  if (bits.size > 1) {
+  for (const [ext, bits] of bitsByType) {
+    if (bits.size < 2) continue;
     const sorted = [...bits.entries()].sort((a, b) => b[1].length - a[1].length);
     const few = sorted.slice(1).flatMap(([, f]) => f);
-    const lead = `The images have different bit depths: ${sorted.map(([b, f]) => `${plural(f.length, "image")} ${b}-bit`).join(", ")}`;
-    items.push({ id: "bit_depth", check: "bit_depth", level: "ask", files: few, text: `${lead} (${listOf(few, 3)}). Intensities of different bit depths are not on one scale.`, question: `${lead}. Intensities of different bit depths are not on one scale. Leave out the ${plural(few.length, "image")} with the less common depth, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(few.length, "image")} (${listOf(few, 2)})` }, { value: "continue", label: "Continue. Do not compare intensities between bit depths" }, { value: "stop", label: "Stop. I check the images" }], recommendation: "leave_out" });
+    const lead = `The ${ext} images have different bit depths: ${sorted.map(([b, f]) => `${plural(f.length, "image")} ${b}-bit`).join(", ")}`;
+    items.push({ id: items.some((i) => i.id === "bit_depth") ? `bit_depth:${ext}` : "bit_depth", check: "bit_depth", level: "ask", files: few, text: `${lead} (${listOf(few, 3)}). Intensities of different bit depths are not on one scale.`, question: `${lead}. Intensities of different bit depths are not on one scale. Leave out the ${plural(few.length, "image")} with the less common depth, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(few.length, "image")} (${listOf(few, 2)})` }, { value: "continue", label: "Continue. Do not compare intensities between bit depths" }, { value: "stop", label: "Stop. I check the images" }], recommendation: "leave_out" });
   }
   const size = `${plural(files.length, "file")} in ${plural(folders.size, "folder")}${channels.size >= 2 ? `, ${plural(channels.size, "channel")} (${[...channels.keys()].join(", ")})` : ""}`;
   return { source, kind: "files", size, items };

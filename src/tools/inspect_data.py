@@ -13,6 +13,14 @@ TABLE = {".csv", ".tsv", ".xlsx", ".xls"}
 TOKEN = re.compile(r"(?:^|[_\-. ])(ch\d+|c\d|channel\d+|overlay|merge|merged|composite|dapi|hoechst|gfp|rfp|fitc|tritc|cy5|bf|brightfield|phase|red|green|blue)$", re.I)
 COLOR_WORDS = {"dapi": "blue", "hoechst": "blue", "blue": "blue", "gfp": "green", "fitc": "green", "green": "green", "rfp": "red", "tritc": "red", "red": "red", "cy5": "far red"}
 OVERLAY = ("overlay", "merge", "merged", "composite")
+MAX_CHANNELS = 64
+
+
+def valid(p):
+    if p.dtype.kind != "f":
+        return p
+    v = p[~np.isnan(p)]
+    return v if v.size else np.zeros(1, dtype=p.dtype)
 
 
 def plane_list(path):
@@ -55,7 +63,9 @@ def plane_list(path):
             rgb = arr.shape[-1] in (3, 4) and axes[-1] == "S"
             return [arr[..., i] for i in range(3 if rgb else arr.shape[-1])], rgb, labels, str(arr.dtype), warnings, notes
         arr = np.moveaxis(arr, p, 0)
-        return [arr[i] for i in range(arr.shape[0])], False, labels, str(arr.dtype), warnings, notes
+        if arr.shape[0] > MAX_CHANNELS:
+            warnings.append("The file has %d planes on the axis %s. Cuvette showed the first %d." % (arr.shape[0], axes[p], MAX_CHANNELS))
+        return [arr[i] for i in range(min(arr.shape[0], MAX_CHANNELS))], False, labels, str(arr.dtype), warnings, notes
     from PIL import Image
 
     im = Image.open(path)
@@ -67,7 +77,7 @@ def plane_list(path):
 
 
 def full_range(planes, dtype):
-    top = max(float(p.max()) for p in planes)
+    top = max(float(valid(p).max()) for p in planes)
     if dtype == "uint8":
         return 255.0
     if dtype.startswith("float"):
@@ -79,6 +89,7 @@ def full_range(planes, dtype):
 
 
 def stats(p, full):
+    p = valid(p)
     q = np.percentile(p, [1, 50, 99])
     return {"min": float(p.min()), "max": float(p.max()), "mean": round(float(p.mean()), 2), "p1": float(q[0]), "median": float(q[1]), "p99": float(q[2]), "full": full}
 
@@ -113,8 +124,8 @@ def preview(planes, rgb, out_dir, name):
     from PIL import Image
 
     def stretch(p):
-        lo, hi = np.percentile(p, [1, 99.5])
-        return np.clip((p.astype(np.float32) - lo) / max(hi - lo, 1e-6) * 255, 0, 255).astype(np.uint8)
+        lo, hi = np.percentile(valid(p), [1, 99.5])
+        return np.clip(np.nan_to_num((p.astype(np.float32) - lo) / max(hi - lo, 1e-6) * 255), 0, 255).astype(np.uint8)
 
     img = np.stack([stretch(p) for p in planes[:3]], axis=-1) if rgb else stretch(planes[0])
     im = Image.fromarray(img)
@@ -130,6 +141,10 @@ def describe_image(path, out_dir):
         raise RuntimeError("numpy is not installed")
     planes, rgb, labels, dtype, warnings, notes = plane_list(path)
     full = full_range(planes, dtype)
+    for i, p in enumerate(planes):
+        n_nan = int(np.isnan(p).sum()) if p.dtype.kind == "f" else 0
+        if n_nan:
+            warnings.append("Channel %d has %d NaN values (%.1f percent of the pixels). Cuvette left them out of the statistics." % (i + 1, n_nan, 100.0 * n_nan / p.size))
     stem = os.path.splitext(os.path.basename(path))[0]
     m = TOKEN.search(stem)
     token = m.group(1) if m else None

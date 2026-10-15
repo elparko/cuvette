@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
-import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
+import { antLogin, claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
@@ -102,7 +102,7 @@ export class ClaudeProvider implements Provider {
   private fixedClient: any;
   private headless = false;
   private apiKey?: string;
-  private made?: { client: any; version: number };
+  private made?: { client: any; version: number; login: boolean };
   private effort: string;
   private display: "summarized" | "omitted";
   private fallbacks = true;
@@ -128,10 +128,9 @@ export class ClaudeProvider implements Provider {
 
   private get client(): any {
     if (this.fixedClient) return this.fixedClient;
-    if (!this.made || this.made.version !== keyVersion()) {
-      const key = this.apiKey ?? claudeKey().key;
-      this.made = { client: makeClient(key), version: keyVersion() };
-    }
+    const key = this.apiKey ?? claudeKey().key;
+    const login = !key && antLogin();
+    if (!this.made || this.made.version !== keyVersion() || this.made.login !== login) this.made = { client: makeClient(key), version: keyVersion(), login };
     return this.made.client;
   }
 

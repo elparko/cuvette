@@ -622,8 +622,27 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent.startsWith("Show the moved sessions")).click()`);
     expect(await until(page, `document.querySelector('main button[aria-label="Remove Old analysis from the list"]')`)).toBe(true);
     await page.eval(`document.querySelector('main button[aria-label="Remove Old analysis from the list"]').click()`);
+    expect(await until(page, `!!document.querySelector('[role="dialog"]')`)).toBe(true);
+    expect(await page.eval(`window.__calls.some((c) => c.url.includes("api/session-remove"))`)).toBe(false);
+    await page.eval(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent.trim() === "Remove").click()`);
     expect(await until(page, `window.__calls.some((c) => c.url.includes("api/session-remove") && JSON.parse(c.body).id === "gone-1")`)).toBe(true);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json" && m.part !== "api/session-remove")`);
+  });
+
+  test("the sessions page renames and removes any session, also on a phone", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/sessions.json", reply: () => ({ body: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => ({ id: "p" + i, title: "Run " + i, text: "", folder: "/lab/f" + i, folderName: "f" + i, age: "1 h ago", status: "", moved: false, thumb: "" })) }) }); window.__mocks.push({ part: "api/session-rename", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    await page.size(390, 800);
+    await goPage("Programs");
+    await goPage("Sessions");
+    const mine = (label: string) => `document.querySelector('main button[aria-label=${JSON.stringify(label)}]')`;
+    expect(await until(page, `!!${mine("Rename Run 8")} && !!${mine("Remove Run 8 from the list")}`)).toBe(true);
+    await page.eval(`${mine("Rename Run 8")}.scrollIntoView(); ${mine("Rename Run 8")}.click()`);
+    expect(await until(page, `!!document.querySelector('[role="dialog"] input[aria-label="Session name"]')`)).toBe(true);
+    await setText('[role="dialog"] input[aria-label="Session name"]', "Late run");
+    await page.eval(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent.trim() === "Save").click()`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/session-rename") && JSON.parse(c.body).id === "p8" && JSON.parse(c.body).name === "Late run")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json" && m.part !== "api/session-rename")`);
+    await page.size(1280, 900);
   });
 
   test("a folder with no files asks before it opens", async () => {
@@ -652,6 +671,25 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await until(page, `(document.querySelector("main [role=alert]") || {}).textContent === "You typed no key. Paste the key, or choose the local model."`)).toBe(true);
     await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Leave setup").click()`);
     expect(await until(page, `!document.querySelector("main").textContent.includes("Welcome to Cuvette")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart"))`);
+    await goPage("Analysis");
+  });
+
+  test("first start: Check again reads the ant login again and goes on if it finds one", async () => {
+    await page.eval(`(() => {
+      window.__ant = false;
+      window.__calls = [];
+      window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { needed: !window.__ant, hasKey: false, model: "claude", ollama: { reachable: false, models: [] }, choices: [{ id: "claude", label: "Use Claude", help: "" }, { id: "local", label: "Use a local model", help: "" }], recommended: "qwen3:8b", sample: "/tmp/Cuvette sample", keyGuide: { title: "", intro: "", steps: [], notes: [] }, keyAntLogin: "If you use ant auth login, sign in there." } }) });
+      window.cuvetteApp.show("setup");
+    })()`);
+    const check = `[...document.querySelectorAll("main button")].find((b) => b.textContent === "Check again")`;
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Use Claude")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Use Claude").click()`);
+    expect(await until(page, `!!${check}`)).toBe(true);
+    await page.eval(`${check}.click()`);
+    expect(await until(page, `(document.querySelector("main [role=alert]") || {}).textContent === "Cuvette found no ant login. Sign in, then choose Check again."`)).toBe(true);
+    await page.eval(`window.__ant = true; ${check}.click()`);
+    expect(await until(page, `window.__calls.filter((c) => c.url.includes("api/firststart")).length >= 3 && window.__calls.some((c) => c.url.includes("api/state"))`)).toBe(true);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart"))`);
     await goPage("Analysis");
   });

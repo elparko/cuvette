@@ -3700,3 +3700,109 @@ test("a headless run gives the headless flag to the referee model", async () => 
   expect((t as any).refereeProvider.headless).toBe(false);
   await t.close();
 });
+
+async function rewoundTurn() {
+  const provider = new FakeProvider([{ text: "First done." }, { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 5 } }] }, { text: "Second done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none", permissionMode: "bypass" } as never });
+  session.decisions.applySetup({ method: "Default", min_size: 5 });
+  await session.send("First request.");
+  return session;
+}
+
+test("a continue word with filler still continues, and a continue word with a new instruction does not", async () => {
+  const s = await rewoundTurn();
+  const real = () => s["realRequest"]()?.data.text;
+  for (const text of ["ok", "Yes", "go ahead", "Okay, please continue.", "yes, thanks", "next", "Okay, sounds good, go on!", "ok, go ahead with that"]) {
+    s.record.append("user", { text });
+    expect(real(), text).toBe("First request.");
+  }
+  for (const text of ["ok, use alpha 0.01 instead", "yes but drop sample 3", "next, count only the red cells"]) {
+    s.record.append("user", { text });
+    expect(real(), text).toBe(text);
+  }
+});
+
+test("the request, settings used and comparison runs ignore a step and a request that a rewind set aside", async () => {
+  const s = await rewoundTurn();
+  await s.send("Second request.");
+  expect(s.record.nodes().map((n) => n.tool)).toEqual(["count"]);
+  s.record.nodes()[0]!.decisions = { method: "Otsu" };
+  expect(s["settingsUsed"]()).toContain("Threshold method");
+  s.rewind(2);
+  expect(s["realRequest"]()?.data.text).toBe("First request.");
+  expect(s["settingsUsed"]()).toBe("");
+  const r = await s["compareOptions"]({ key: "method", values: ["Otsu"] });
+  expect(r.ok).toBe(false);
+  expect(String(r.error)).toMatch(/^No step that uses/);
+});
+
+test("the validation reminder ignores a pilot approval and a step that a rewind set aside", async () => {
+  const s = await rewoundTurn();
+  s["reference"] = { path: "/data/ref.xlsx", mode: "blind" } as never;
+  s.record.append("pilot_approved", { run: 1, sample: "Set 1" });
+  await s.send("Second request.");
+  expect(s["needsValidation"]()).toBe(true);
+  s.rewind(2);
+  s["reference"] = { path: "/data/ref.xlsx", mode: "blind" } as never;
+  expect(s["needsValidation"]()).toBe(false);
+});
+
+test("a review of a resumed session gives the referee the answer without the harness footer", async () => {
+  const s = await rewoundTurn();
+  s.record.append("assistant", { text: "The count is 41.\n\nSettings used, from the decision record: Threshold method: Default.\n\nDefinitions, from the confirmed analysis:\n- cell: a cell", final: true });
+  s["lastAnswer"] = "";
+  const seen: string[] = [];
+  const ref = new FakeProvider([]);
+  ref.complete = async (_system?: string, text?: string) => (seen.push(String(text)), "No findings.");
+  s["refereeProvider"] = ref;
+  await s.review();
+  expect(seen.join("\n")).toContain("The count is 41.");
+  expect(seen.join("\n")).not.toContain("Settings used, from the decision record");
+  expect(seen.join("\n")).not.toContain("Definitions, from the confirmed analysis");
+});
+
+test("pilot: a cancel removes the settings that the agent added during the pilot", async () => {
+  const { proj, images } = pilotProject();
+  const method = { key: "method", label: "Threshold method", value: "Otsu", by: "default" };
+  const step = (decisions: unknown[]) => ({ steps: [{ step: "Count the cells in each field", tool: "count", decisions }] });
+  const change = { name: "plan", args: step([method, { key: "sigma", label: "Blur", value: 4, by: "agent" }]) };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: { ...CELL_PLAN(images), ...step([method]) } }] }, { calls: [change] }, { calls: [PILOT_CALL] }, { text: "Stopped." }, { text: "Stopped." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  answerCards(s, (e) => (e.stage === "plan" ? { action: "pilot" } : { action: "cancel" }));
+  await s.send(`Count the red-positive cells in ${images}`);
+  expect(s.record.entries(["decision"]).some((e) => e.data.key === "sigma" && e.data.new === 4)).toBe(true);
+  expect(s.decisions.isSet("sigma")).toBe(false);
+});
+
+
+test("pilot: revealing a blind reference removes it from the deny list of the blind policy", async () => {
+  const { proj, images, ref } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
+    { calls: [{ name: "count", args: { input: join(images, "Set 1.tif"), method: "Otsu" } }] },
+    { calls: [PILOT_CALL] },
+    { calls: [{ name: "count", args: { input: images, method: "Otsu" } }] },
+    { calls: [{ name: "batch_results", args: { measure: "positive cell", values: [{ sample: "Set 1", value: 41 }, { sample: "Set 2", value: 400 }] } }] },
+    { text: "Done." },
+    { text: "Done." },
+  ]);
+  setBlindPolicy({ allow: [proj], deny: [] });
+  try {
+    session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { permissionMode: "bypass", referee: "none" } as never });
+    session.decisions.applySetup({ method: "Otsu" });
+    let denied: string[] = [];
+    session.bus.on((e) => {
+      if (e.type === "question" && e.question.title === "Earlier results") setTimeout(() => session!.answer(e.question.qid, "blind"), 0);
+      if (e.type !== "plan") return;
+      if (e.stage === "pilot") denied = [...blindPolicy()!.deny];
+      setTimeout(() => session!.respondPlan(e.stage === "pilot" ? { action: "confirm" } : { action: "pilot" }), 0);
+    });
+    await session.send(`Count the red-positive cells in ${images}`);
+    expect(session.record.entries(["validation"])).toHaveLength(1);
+    expect(denied).toContain(ref);
+    expect(blindPolicy()!.deny).not.toContain(ref);
+  } finally {
+    setBlindPolicy(undefined);
+  }
+});

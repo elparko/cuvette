@@ -78,7 +78,14 @@ export async function showModel(model: string, signal?: AbortSignal, timeoutMs =
   }
   if (res.status === 404) throw new ProviderError(`Ollama has no model ${model}. Run \`ollama pull ${model}\`.`);
   if (!res.ok) throw new ProviderError(`Ollama /api/show failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
-  const j: any = await res.json();
+  let j: any;
+  try {
+    j = await res.json();
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    if (limit.aborted) throw new ProviderError(`Ollama at ${host} did not answer in ${timeoutMs / 1000} s.`);
+    throw new ProviderError(`Ollama at ${host} sent an answer that Cuvette cannot read.`);
+  }
   let contextLength: number | null = null;
   for (const [k, v] of Object.entries(j.model_info ?? {}))
     if (k.endsWith(".context_length") && typeof v === "number") contextLength = v;

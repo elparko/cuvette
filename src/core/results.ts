@@ -39,6 +39,9 @@ export const DECKS = ["images.pptx", "images.pdf"];
 const MAX_ROWS = 1_048_575;
 const MAX_TABLE_BYTES = 50_000_000;
 const MAX_CELL = 32_767;
+const MAX_SHEET_ROWS = 1_048_576;
+const MAX_SHEET_COLUMNS = 16_384;
+const ID_COLUMN = /(^|[^a-z])(id|ids|name|barcode|sample|code|label|lot|accession|catalog)([^a-z]|$)/i;
 const RASTER = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".bmp", ".webp"]);
 const FIGURE = new Set([...RASTER, ".svg", ".pdf", ".eps"]);
 const TABLE = new Set([".csv", ".tsv"]);
@@ -110,6 +113,10 @@ function sheetXml(s: Sheet): string {
 }
 
 export function xlsx(sheets: Sheet[]): Buffer {
+  for (const s of sheets) {
+    if (s.columns.length > MAX_SHEET_COLUMNS) throw new Error(`The sheet "${s.name}" has ${s.columns.length} columns. Excel allows ${MAX_SHEET_COLUMNS} columns. Use the CSV file.`);
+    if (s.rows.length + 1 > MAX_SHEET_ROWS) throw new Error(`The sheet "${s.name}" has ${s.rows.length + 1} rows. Excel allows ${MAX_SHEET_ROWS} rows. Use the CSV file.`);
+  }
   const ns = "http://schemas.openxmlformats.org";
   const files = [
     {
@@ -296,9 +303,10 @@ export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] 
 }
 
 // An integer with more than 15 digits, such as a barcode, changes in a double. It stays text.
-// An unsigned integer with a capital E exponent, such as the ID 5E3, stays text too.
-function exact(v: string): boolean {
-  if (/^\s*\d+E\d+\s*$/.test(v)) return false;
+// An unsigned integer with a capital E exponent, such as 5E3, stays text in a column with an ID-like name.
+// In any other column, such as a qPCR standard series 1E6, 1E5, 1E4, it is a number.
+function exact(v: string, idColumn: boolean): boolean {
+  if (idColumn && /^\s*\d+E\d+\s*$/.test(v)) return false;
   return /[.eE]/.test(v) || v.replace(/\D/g, "").length <= 15;
 }
 
@@ -309,17 +317,18 @@ function staysText(v: string): boolean {
   return !Number.isFinite(n) || (n === 0 && /[1-9]/.test(v.split(/e/i)[0]!));
 }
 
-export function typed(rows: unknown[][], width: number): Cell[][] {
+export function typed(rows: unknown[][], width: number, names: string[] = []): Cell[][] {
   const kinds = Array.from({ length: width }, (_, j) => {
     let numeric = true;
     let bool = true;
     let any = false;
+    const idColumn = ID_COLUMN.test(names[j] ?? "");
     for (const r of rows) {
       const v = r[j];
       if (v === null || v === undefined || (typeof v === "string" && MISSING.has(v.trim()))) continue;
       any = true;
       const huge = typeof v === "string" && staysText(v);
-      if (!huge && !(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim()) && exact(v)))) numeric = false;
+      if (!huge && !(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim()) && exact(v, idColumn)))) numeric = false;
       if (!(typeof v === "boolean" || (typeof v === "string" && /^(true|false)$/i.test(v.trim())))) bool = false;
     }
     return !any ? "text" : numeric ? "number" : bool ? "bool" : "text";
@@ -344,12 +353,12 @@ export function readTable(path: string): { columns: string[]; rows: Cell[][]; to
   const [head, ...body] = all;
   const width = body.reduce((w, r) => Math.max(w, r.length), head!.length);
   const columns = Array.from({ length: width }, (_, j) => head![j] || `column ${j + 1}`);
-  return { columns, rows: typed(body.slice(0, MAX_ROWS), width), total: body.length };
+  return { columns, rows: typed(body.slice(0, MAX_ROWS), width, columns), total: body.length };
 }
 
 function previewTable(t: TablePreview): { columns: string[]; rows: Cell[][]; total: number } {
   const columns = t.columns.map(String);
-  return { columns, rows: typed(t.rows.slice(0, MAX_ROWS), columns.length), total: t.n_rows ?? t.rows.length };
+  return { columns, rows: typed(t.rows.slice(0, MAX_ROWS), columns.length, columns), total: t.n_rows ?? t.rows.length };
 }
 
 // ---------------------------------------------------------------- figures

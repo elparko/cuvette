@@ -152,8 +152,8 @@ test("the budget setting is read by the spend check, and CUVETTE_BUDGET_USD wins
 
 test("the Claude API key setting says that an ant auth login is signed in", () => {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
-  mkdirSync(join(cfg, "credentials"));
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  mkdirSync(join(cfg, "configs"));
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   expect(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key")).toMatchObject({ value: "signed in with ant auth login", source: "ant" });
   expect(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: join(cfg, "none") } }), "claude_key")).toMatchObject({ value: "not set" });
 });
@@ -260,14 +260,14 @@ test("a model or referee value that is not a model spec is not saved", async () 
 
 test("the key state text for an ant auth login is not 'not set'", () => {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
-  mkdirSync(join(cfg, "credentials"));
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  mkdirSync(join(cfg, "configs"));
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   expect(secretState(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never)).toBe("signed in with ant auth login");
 });
 
-test("the key row for an ant auth login has a source tag", () => {
+test("the key row for an ant auth login has no source tag, because the value says it", () => {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
-  mkdirSync(join(cfg, "credentials"));
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
-  expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("ant login");
+  mkdirSync(join(cfg, "configs"));
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
+  expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("");
 });

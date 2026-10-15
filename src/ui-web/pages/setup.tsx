@@ -85,6 +85,23 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
     setChecking(false);
   };
 
+  const checkLogin = async () => {
+    if (checking) return;
+    setChecking(true);
+    try {
+      const next = await call<FirstStart>("api/firststart", {});
+      setFs(next);
+      if (next.needed) say("Cuvette found no ant login. Sign in, then choose Check again.", true);
+      else {
+        say("Cuvette found your ant auth login.");
+        await after();
+      }
+    } catch (e) {
+      say((e as Error).message, true);
+    }
+    setChecking(false);
+  };
+
   const useLocal = async (m: string) => {
     try {
       const r = await call<{ ok: boolean; text: string }>("api/firststart/local", { model: m });
@@ -128,7 +145,14 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
         {choice === "claude" && (
           <div className="mt-4">
             <p className="mb-2 text-[13px] text-muted-foreground">Paste your key. The app checks it with Anthropic, then saves it in a file that only your user can read.</p>
-            {fs && <p className="mb-2 text-[13px] text-muted-foreground">{fs.keyAntLogin}</p>}
+            {fs && (
+              <p className="mb-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+                {fs.keyAntLogin}
+                <Button variant="ghost" size="sm" onClick={() => void checkLogin()} disabled={checking}>
+                  Check again
+                </Button>
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <div className="relative min-w-[min(220px,100%)] flex-1">
                 <KeyRoundIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
