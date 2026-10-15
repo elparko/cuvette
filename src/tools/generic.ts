@@ -6,7 +6,7 @@ import { cap, commandLine, integrityError, integrityReason, outputFile, processF
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
 import { isCredentialsFile } from "../core/credentials.ts";
 import { writeRefusalReason } from "../core/refusals.ts";
-import { guardCommand } from "./run_script.ts";
+import { guardCommand, settingsScope } from "./run_script.ts";
 
 const below = (root: string, p: string) => {
   const rel = relative(root, p);
@@ -76,6 +76,10 @@ function guarded(target: string, dirs: Dirs): boolean {
     const parts = relative(project, t).split(/[\\/]/);
     if (GUARDED_NAMES.has(parts[0]!.toLowerCase()) || (parts.length === 1 && parts[0]!.toLowerCase() === "lab.md")) return true;
   }
+  const scope = settingsScope(dirs);
+  const locked = scope.locked.filter((l) => !scope.open.includes(l)).flatMap((l) => [l, realish(l)]);
+  for (const [t, w] of [[realish(target), work], [resolve(target), resolve(dirs.workDir)]] as const)
+    if (locked.some((l) => inside(l, t) && !(inside(w, t) && !inside(w, l)))) return true;
   return false;
 }
 
