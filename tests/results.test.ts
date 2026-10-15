@@ -304,9 +304,30 @@ test("typed keeps a column of IDs with a leading zero as text", () => {
 
 test("1e400 stays a text cell in a number column, and an ID with an exponent stays text", () => {
   expect(typed([["1e400"], ["2"]], 1)).toEqual([["1e400"], [2]]);
-  expect(typed([["5E3"], ["7E10"]], 1)).toEqual([["5E3"], ["7E10"]]);
+  expect(typed([["5E3"], ["7E10"]], 1, ["sample id"])).toEqual([["5E3"], ["7E10"]]);
   expect(typed([["1.5e3"], ["2"]], 1)).toEqual([[1500], [2]]);
   expect(typed([["3e2"], ["2"]], 1)).toEqual([[300], [2]]);
+});
+
+test("a column named like an ID keeps capital-E cells as text", () => {
+  expect(typed([["1E5"], ["2E5"]], 1, ["Sample_ID"])).toEqual([["1E5"], ["2E5"]]);
+  expect(typed([["1E5"], ["2E5"]], 1, ["barcode"])).toEqual([["1E5"], ["2E5"]]);
+});
+
+test("a qPCR standard series 1E6, 1E5, 1E4 is a number column", () => {
+  expect(typed([["1E6"], ["1E5"], ["1E4"]], 1, ["copies"])).toEqual([[1e6], [1e5], [1e4]]);
+  expect(typed([["1E6"], ["1E5"]], 1)).toEqual([[1e6], [1e5]]);
+});
+
+test("xlsx refuses a sheet with more than 16384 columns", () => {
+  const columns = Array.from({ length: 16385 }, (_, i) => `c${i}`);
+  expect(() => xlsx([{ name: "Wide", columns, rows: [] }])).toThrow(/16384 columns/);
+  expect(() => xlsx([{ name: "Wide", columns: columns.slice(0, 16384), rows: [] }])).not.toThrow();
+});
+
+test("xlsx refuses a sheet with more than 1048576 rows", () => {
+  const rows = Array.from({ length: 1_048_576 }, () => [1]);
+  expect(() => xlsx([{ name: "Long", columns: ["x"], rows }])).toThrow(/1048576 rows/);
 });
 
 test("an integer with more than 15 digits stays text, so the workbook keeps each digit", () => {

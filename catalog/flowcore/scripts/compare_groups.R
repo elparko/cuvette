@@ -30,6 +30,7 @@ run_tool(function() {
   if (length(bad)) fail(sprintf("population '%s' is not in the stats table. Populations: %s", bad[1], paste(head(unique(st$population), 15), collapse = ", ")))
   d <- merge(st[st$population %in% pops, c("sample", "population", metric)], des, by = "sample")
   if (!nrow(d)) fail("no sample of the stats table is in the design file. Check the sample names in both files.")
+  not_in_design <- setdiff(unique(st$sample), des$sample)
   names(d)[names(d) == metric] <- "value"
   d$group <- as.character(d[[group_col]])
   ref <- pick(p, "reference", NULL)
@@ -83,7 +84,7 @@ run_tool(function() {
     }
   })
 
-  metrics <- list(n_populations = length(pops), n_comparisons = nrow(cmp), n_comparisons_skipped = length(skipped))
+  metrics <- list(n_populations = length(pops), n_comparisons = nrow(cmp), n_comparisons_skipped = length(skipped), n_samples_not_in_design = length(not_in_design))
   for (i in seq_len(nrow(grp))) {
     tag <- paste(pop_tag(grp$population[i]), clean_name(grp$group[i]), sep = "_")
     metrics[[paste0("mean_", tag)]] <- grp$mean[i]
@@ -100,8 +101,9 @@ run_tool(function() {
   per <- if (nrow(cmp)) paste(head(sprintf("%s, %s against %s: difference %s, p %s (%s %s)", cmp$population, cmp$group_b, cmp$group_a, fmt(cmp$difference_b_minus_a), fmt(cmp$p_value), adjust, fmt(cmp$p_adjusted)), 20), collapse = "; ") else "no comparison (a group has fewer than 2 samples)"
   emit(list(
     ok = TRUE,
-    summary = sprintf("%s of %d populations in groups of %s. Test: %s. %s.%s", metric, length(pops), group_col, test, per,
-      if (length(skipped)) sprintf(" Not tested, and not in the %s adjustment: %s.", adjust, paste(head(skipped, 10), collapse = "; ")) else ""),
+    summary = sprintf("%s of %d populations in groups of %s. Test: %s. %s.%s%s", metric, length(pops), group_col, test, per,
+      if (length(skipped)) sprintf(" Not tested, and not in the %s adjustment: %s.", adjust, paste(head(skipped, 10), collapse = "; ")) else "",
+      if (length(not_in_design)) sprintf(" %d %s in the stats table but not in the design file, so the tool left %s out: %s.", length(not_in_design), if (length(not_in_design) == 1) "sample is" else "samples are", if (length(not_in_design) == 1) "it" else "them", paste(head(not_in_design, 10), collapse = ", ")) else ""),
     metrics = metrics,
     data = list(groups_file = out_path("groups"), comparisons_file = if (nrow(cmp)) out_path("comparisons") else NULL, test = test, adjust = adjust),
     table = table_of(if (nrow(cmp)) cmp else grp, out_path("groups")),

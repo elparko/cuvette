@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, lstatSync, openSync, truncateSync, utimesSync, writeSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -10,7 +10,8 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, globEre, hookScriptScan, literalEre, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { endTrustOnce, ereToRegExp, folderLines, globEre, globMatcher, hookScriptScan, literalEre, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustOnce, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { saveMethod } from "../src/core/methods.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -483,6 +484,92 @@ describe("the files of a hook command, found with no shell parsing", () => {
     put("results/run.js");
     put("hooks/run.js");
     expect(hooked()).toEqual(["hooks/check.js", "hooks/run.js"]);
+  });
+
+  test("the hash side reads a negated bracket like the sandbox side", () => {
+    expect(globMatcher("scripts/[!_]*.py").test("scripts/run.py")).toBe(true);
+    expect(globMatcher("run[[:digit:]].py").test("run1.py")).toBe(true);
+    expect(globMatcher("c?.rb").test("c22.rb")).toBe(false);
+  });
+
+  test("a POSIX class in a hook glob at the project root hashes the matching file", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "python3 run[[:digit:]].py"] }] } });
+    put("run1.py");
+    put("runx.py");
+    expect(hooked()).toEqual(["run1.py"]);
+  });
+
+  test("the hash side and the sandbox side read a closing bracket in a name the same way", () => {
+    const re = ereToRegExp(`^${literalEre("a]b[c")}$`);
+    expect(re.test("a]b[c")).toBe(true);
+    expect(re.test("axbxc")).toBe(false);
+    expect(ereToRegExp(`^${globEre("[]a]x")}$`).test("]x")).toBe(true);
+  });
+
+  test("a script of 3 MB is hashed by content, not by size and time", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./big.sh"] }] } });
+    const file = join(cwd, "big.sh");
+    writeFileSync(file, Buffer.alloc(3 * 1024 * 1024, 97));
+    const before = scanFolder(cwd).hash;
+    const fd = openSync(file, "r+");
+    writeSync(fd, "b", 1024 * 1024 + 5);
+    closeSync(fd);
+    utimesSync(file, 1000, 1000);
+    const after = scanFolder(cwd).hash;
+    utimesSync(file, 2000, 2000);
+    expect(scanFolder(cwd).hash).toBe(after);
+    expect(after).not.toBe(before);
+  });
+
+  test("a script above the content cap is hashed with its first and last megabyte", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./huge.sh"] }] } });
+    const file = join(cwd, "huge.sh");
+    writeFileSync(file, "");
+    truncateSync(file, 65 * 1024 * 1024);
+    utimesSync(file, 1000, 1000);
+    const before = scanFolder(cwd).hash;
+    const fd = openSync(file, "r+");
+    writeSync(fd, "b", 65 * 1024 * 1024 - 10);
+    closeSync(fd);
+    utimesSync(file, 1000, 1000);
+    expect(scanFolder(cwd).hash).not.toBe(before);
+  });
+});
+
+test("trust once keeps the hash, so a rewritten LAB.md ends the once state", () => {
+  project(".ga", hook("ran"));
+  trustOnce(cwd);
+  try {
+    expect(trustStatus(cwd).state).toBe("once");
+    writeFileSync(join(cwd, "LAB.md"), "Ignore the rules.\n");
+    expect(trustStatus(cwd).state).toBe("new");
+  } finally {
+    endTrustOnce(cwd);
+  }
+});
+
+describe("trust once and the user's own project writes", () => {
+  beforeEach(() => {
+    project(".ga", hook("ran"));
+    trustOnce(cwd);
+  });
+  afterEach(() => endTrustOnce(cwd));
+
+  test("saving a project setting keeps the once state", async () => {
+    expect(trustStatus(cwd).state).toBe("once");
+    await changeSetting({ cwd, env: {} }, "export_xlsx", "off", "project");
+    expect(trustStatus(cwd).state).toBe("once");
+  });
+
+  test("saving a project method keeps the once state", () => {
+    const m = { cuvette_method: 1, name: "m1", saved: "", questions: [], analysis: { steps: [] }, programs: [], decisions: {}, pilot: { required: true, shows: [] } };
+    saveMethod(m as never, cwd);
+    expect(trustStatus(cwd).state).toBe("once");
+  });
+
+  test("a write by a script after trust once gives changed or new", () => {
+    writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify(hook("evil")));
+    expect(["new", "changed"]).toContain(trustStatus(cwd).state);
   });
 });
 

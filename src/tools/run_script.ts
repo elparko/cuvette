@@ -12,7 +12,7 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
-import { globEre, hookScriptScan, literalEre } from "../core/trust.ts";
+import { ereToRegExp, globEre, hookScriptScan, LAB_FILE, literalEre } from "../core/trust.ts";
 import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
@@ -202,6 +202,7 @@ export interface WriteStep {
   allow: boolean;
   fixed?: boolean;
   pattern?: string;
+  seatbeltOnly?: boolean;
 }
 
 const within = (p: string, root: string) => {
@@ -275,8 +276,9 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   const scripts = scan.files;
   const roots = both([dirs.projectDir]);
   const lockedFolders = [...scripts.map((f) => dirname(f)), ...scan.folders].filter((d) => !roots.includes(d));
-  out.locked.push(...scripts, ...new Set(lockedFolders));
-  out.files.push(...scripts);
+  const lab = join(dirs.projectDir, LAB_FILE);
+  out.locked.push(...scripts, ...new Set(lockedFolders), lab);
+  out.files.push(...scripts, lab);
   out.rootGlobs.push(...scan.rootGlobs);
   for (const name of [".cuvette", ".ga"]) {
     const dir = join(dirs.projectDir, name);
@@ -314,6 +316,7 @@ export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): Wri
   const keep = both(own);
   const rootGlobs = dirs.projectDir ? scope.rootGlobs : [];
   const steps: WriteStep[] = both(dirs.projectDir ? [dirs.projectDir] : []).flatMap((root) => rootGlobs.map((g) => ({ path: root, allow: false, pattern: `^${literalEre(root)}/${globEre(g)}$` })));
+  if (steps.length) steps.push(...keep.map((path) => ({ path, allow: true, seatbeltOnly: true })));
   steps.push(...locked.map((path) => ({ path, allow: false })));
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
@@ -349,12 +352,9 @@ export function writeRules(steps: WriteStep[]): string {
   return steps.map((x) => (x.pattern ? `(deny file-write* (regex #"${x.pattern}"))` : x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
 }
 
-const POSIX_CLASSES: Record<string, string> = { space: "\\s", digit: "\\d", alpha: "a-zA-Z", alnum: "a-zA-Z0-9", upper: "A-Z", lower: "a-z", punct: "!-/:-@\\[-`{-~", xdigit: "0-9a-fA-F", blank: " \\t", cntrl: "\\x00-\\x1f\\x7f", graph: "!-~", print: " -~" };
-
 function patternMatches(pattern: string, dir: string): string[] {
   try {
-    const unknown = [...pattern.matchAll(/\[:(\w+):\]/g)].some((m) => !Object.hasOwn(POSIX_CLASSES, m[1]!));
-    const re = unknown ? /./ : new RegExp(pattern.replace(/\[:(\w+):\]/g, (_m, name: string) => POSIX_CLASSES[name]!));
+    const re = ereToRegExp(pattern);
     return readdirSync(dir).slice(0, 5000).map((n) => join(dir, n)).filter((p) => re.test(p) && statSync(p, { throwIfNoEntry: false })?.isFile());
   } catch {
     return [];
@@ -363,7 +363,7 @@ function patternMatches(pattern: string, dir: string): string[] {
 
 // bwrap cannot deny a new file by pattern. It locks only the files that exist now. Seatbelt on macOS also denies new files.
 function bwrapLocks(steps: WriteStep[]): string[] {
-  return steps.filter((x) => !x.fixed).flatMap((x) => (!existsSync(x.path) ? [] : x.pattern ? patternMatches(x.pattern, x.path).flatMap((p) => ["--ro-bind", p, p]) : [x.allow ? "--bind" : "--ro-bind", x.path, x.path]));
+  return steps.filter((x) => !x.fixed && !x.seatbeltOnly).flatMap((x) => (!existsSync(x.path) ? [] : x.pattern ? patternMatches(x.pattern, x.path).flatMap((p) => ["--ro-bind", p, p]) : [x.allow ? "--bind" : "--ro-bind", x.path, x.path]));
 }
 
 function programExists(cmd: string | undefined, cwd: string, env: Record<string, string | undefined>): boolean {

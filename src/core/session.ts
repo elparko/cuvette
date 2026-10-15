@@ -148,7 +148,17 @@ const MAX_EXTRA_TOOLS = 10;
 const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
 const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
-const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
+const CONTINUE_WORD = "continue|go on|go ahead|proceed|yes|ok|okay|next|carry on";
+const CONTINUE_FILLER = `${CONTINUE_WORD}|please|thanks|thank you|sounds good|looks good|great|good|fine|sure|now|then|and|you can|with that|with this|to the next step`;
+const CONTINUE = new RegExp(`^(?:${CONTINUE_WORD})(?:[\\s,.;:!-]+(?:${CONTINUE_FILLER}))*[\\s,.;:!?-]*$`, "i");
+
+const FOOTER_START = /\n\n(?:Step results that the answer does not mention, from the record:|Settings used, from the decision record:|Definitions, from the confirmed analysis:)/;
+
+function stripFooter(text: string | undefined): string {
+  const t = text ?? "";
+  const at = t.search(FOOTER_START);
+  return at < 0 ? t : t.slice(0, at);
+}
 
 function shortTitle(text: string): string {
   const first = text.split(/(?<=[?.!])\s/)[0]!.trim();
@@ -308,6 +318,7 @@ export class Session {
   reference?: Reference;
   private hidden: string[] = [];
   private refCandidates: Candidate[] = [];
+  private pilotBefore = new Map<string, { value: unknown } | undefined>();
   private pilotPlan?: { plan: AnalysisPlan; version: number; target: Mode; answers: string[] };
   private lastSaid = "";
   private waiting = new Map<string, BusEvent>();
@@ -2235,7 +2246,7 @@ export class Session {
   private settingsUsed(): string {
     const stale = this.record.stale();
     const keys = new Set<string>();
-    for (const n of this.record.nodes()) if (!n.sensitivityOf && !stale.has(n.id)) for (const k of Object.keys(n.decisions ?? {})) keys.add(k);
+    for (const n of this.record.liveView().nodes()) if (!n.sensitivityOf && !stale.has(n.id)) for (const k of Object.keys(n.decisions ?? {})) keys.add(k);
     const fields = this.decisions.fields().filter((f) => keys.has(f.key) && f.set);
     if (!fields.length) return "";
     const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
@@ -2970,7 +2981,7 @@ export class Session {
     if (!found) return { ok: false, error: `No decision ${spec.key}.` };
     const d = found.decision;
     const tools = new Set(d.links.map((l) => l.tool));
-    const last = this.record.nodes().filter((n) => tools.has(n.tool) && !n.sensitivityOf).at(-1);
+    const last = this.record.liveView().nodes().filter((n) => tools.has(n.tool) && !n.sensitivityOf).at(-1);
     if (!last) return { ok: false, error: `No step that uses ${d.label} has run yet. Run one first, then compare.` };
     const link = d.links.find((l) => l.tool === last.tool)!;
     const target = this.findTool(last.tool);
@@ -3331,7 +3342,7 @@ export class Session {
   // ------------------------------------------------------------- analysis plan
 
   private realRequest(): Entry | undefined {
-    return this.record.entries(["user"]).filter((e) => !e.data.during && !e.data.internal && !CONTINUE.test(String(e.data.text ?? "").trim())).at(-1);
+    return this.record.live(["user"]).filter((e) => !e.data.during && !e.data.internal && !CONTINUE.test(String(e.data.text ?? "").trim())).at(-1);
   }
 
   private inHistory(text: string): boolean {
@@ -3511,7 +3522,9 @@ export class Session {
   }
 
   private needsValidation(): boolean {
-    return !!this.reference && !!this.record.entries(["pilot_approved"]).length && !this.record.entries(["validation"]).length && this.record.nodes().some((n) => n.entry > (this.record.entries(["pilot_approved"]).at(-1)?.id ?? 0));
+    const view = this.record.liveView();
+    const approved = view.entries(["pilot_approved"]).at(-1);
+    return !!this.reference && !!approved && !view.entries(["validation"]).length && view.nodes().some((n) => n.entry > approved.id);
   }
 
   private figuresDir(): string {
@@ -3695,6 +3708,7 @@ export class Session {
       const pilot = { entry, ...run } as PilotRun;
       this.record.append("pilot_approved", { run: entry, sample });
       this.pilotStage = false;
+      this.pilotBefore.clear();
       if (pending) {
         this.approvePlan(pending.plan, pending.version, pending.target, pending.answers, pilot);
         this.pilotPlan = undefined;
@@ -3708,6 +3722,7 @@ export class Session {
     if (r.action === "cancel") {
       this.record.append("pilot_rejected", { run: entry, sample, reason: "cancelled" });
       if (pending) this.record.append("plan", { action: "cancelled", version: pending.version });
+      this.rollBackPilotSettings();
       this.pilotStage = false;
       this.pilotPlan = undefined;
       this.stopTurn = true;
@@ -3724,6 +3739,7 @@ export class Session {
       const old = t.value;
       t.value = typeof old === "number" && typeof r.value === "string" && Number.isFinite(Number(r.value)) ? Number(r.value) : r.value;
       t.by = "you";
+      if (t.key) this.pilotBefore.delete(t.key);
       p.version = ++this.planVersion;
       this.record.append("plan", { action: "setting_changed", phase: "Demonstration on a sample", version: this.planVersion, label: t.label, key: t.key, old: old ?? null, new: t.value, text: planText(p.plan), plan: structuredClone(p.plan) });
       this.commitSettings(p.plan);
@@ -3855,6 +3871,8 @@ export class Session {
     this.record.append("validation", { measure, refColumn, reference: ref.path, mode: ref.mode, pairs, summary, plot });
     if (ref.mode === "blind") {
       this.hidden = this.hidden.filter((h) => h !== ref.path);
+      const bp = blindPolicy();
+      if (bp) setBlindPolicy({ allow: bp.allow, deny: bp.deny.filter((d) => d !== ref.path), hide: bp.hide });
       this.record.append("reference", { ...ref, revealed: true });
     }
     const table = pairs.map((p) => `${p.sample}: agent ${p.ours}, reference ${p.ref}${p.pilot ? " (pilot)" : ""}`).join("\n");
@@ -3976,6 +3994,11 @@ export class Session {
     return qids;
   }
 
+  private rollBackPilotSettings() {
+    for (const [key, before] of this.pilotBefore) this.decisions.revert(key, before, "the scientist cancelled the pilot, so the value from before it returns");
+    this.pilotBefore.clear();
+  }
+
   private async planTool(a: Args): Promise<ToolOutput> {
     const given = readPlan(a, false);
     const reason = typeof a.reason === "string" ? a.reason.trim() : "";
@@ -3986,6 +4009,7 @@ export class Session {
       this.fillDecisions(next);
       const open = openDecisions(next);
       if (open.length) return { ok: false, error: `Open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in every setting with a value and say who set it (default, from your answer, or agent). The pilot runs with these values.` };
+      for (const { setting: d } of settingsOf(next)) if (d.key && this.decisions.has(d.key) && !this.pilotBefore.has(d.key)) this.pilotBefore.set(d.key, this.decisions.isSet(d.key) ? { value: this.decisions.value(d.key) } : undefined);
       this.commitSettings(next);
       for (const d of given.definitions ?? []) {
         const old = p.plan.definitions?.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
@@ -4699,7 +4723,7 @@ export class Session {
   }
 
   async review(): Promise<Finding[]> {
-    const answer = this.lastAnswer || (this.record.live(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string) || "";
+    const answer = this.lastAnswer || stripFooter(this.record.live(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string);
     const claims = checkAnswer(answer, this.record.liveView());
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];

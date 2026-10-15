@@ -538,6 +538,16 @@ tests:
       - { path: error, contains: "signal_col 'OD450' is not a column" }
       - { path: error, contains: "Columns: plate, well, type" }
 
+  - id: elisa-blank-dilution
+    description: A blank dilution in a sample row stops the tool, and the error names the column and the file row. A blank dilution in a standard row does not.
+    data: [data/dnase_elisa_blank_dilution.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa_blank_dilution.csv", model: 4PL, weighting: none, blank: none }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "dilution_col 'dilution' is blank in the sample rows 20" }
+
   - id: elisa-missing-file
     description: A data file that does not exist fails, and the error names the file.
     calls:
@@ -546,6 +556,16 @@ tests:
     expect:
       - { path: ok, equals: false }
       - { path: error, contains: "no_such_plate.csv" }
+
+  - id: dose-negative-dose-counted
+    description: A row with a negative dose is left out, and the summary says how many rows and why.
+    data: [data/ryegrass_negative_dose.csv]
+    calls:
+      - tool: fit_dose_response
+        args: { data: "{adapter_dir}/data/ryegrass_negative_dose.csv", dose_col: conc, response_col: rootl, model: 4PL, ci: delta }
+    expect:
+      - { path: metrics.n_dropped, equals: 1 }
+      - { path: summary, contains: "Rows left out: 1 (1 with a negative dose, 0 with a missing dose or response)" }
 
   - id: dose-ryegrass-4pl
     description: >

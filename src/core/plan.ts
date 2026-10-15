@@ -161,6 +161,8 @@ export interface KnownDecision {
 const GENERIC = new Set(["the", "a", "an", "of", "to", "in", "on", "for", "and", "or", "with", "per", "each", "is", "are", "that", "this", "what", "which", "do", "you", "use", "value", "setting", "method", "image", "images", "channel", "cell", "cells", "object", "objects", "group", "groups", "test", "count", "number"]);
 const termsOf = (s: string) => s.toLowerCase().replace(/_/g, " ").split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !GENERIC.has(w)).map((w) => w.replace(/s$/, ""));
 
+const NEGATED = /\b(no|not|never|false|off)\b|n['’]t\b|\b(un|non)[- ]?paired\b|^\s*without\b|\bwithout\s+pair/;
+
 export function coerceSetting(d: KnownDecision, value: unknown): { ok: true; value: unknown } | { ok: false } {
   if (value === undefined || value === null) return { ok: false };
   const text = String(value).toLowerCase();
@@ -170,8 +172,8 @@ export function coerceSetting(d: KnownDecision, value: unknown): { ok: true; val
   }
   if (/bool/.test(d.kind)) {
     if (typeof value === "boolean") return { ok: true, value };
-    if (/\b(yes|true|on|paired|exclude|remove|split|assume)\b/.test(text) && !/\b(no|not|false|off|unpaired)\b/.test(text)) return { ok: true, value: true };
-    if (/\b(no|not|false|off|unpaired|keep|none|welch)\b/.test(text)) return { ok: true, value: false };
+    if (/\b(yes|true|on|paired|exclude|remove|split|assume)\b/.test(text) && !NEGATED.test(text)) return { ok: true, value: true };
+    if (NEGATED.test(text) || /\b(keep|none|welch)\b/.test(text)) return { ok: true, value: false };
     return { ok: false };
   }
   if (/int|float|num|real/.test(d.kind)) {

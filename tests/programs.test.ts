@@ -1,13 +1,15 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, uptime } from "node:os";
 import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 import { ServerResponse } from "node:http";
+import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { accessOf, codeTools, isCodeTool, saveAccess } from "../src/adapters/access.ts";
 import { adapterIndex, formatIndex } from "../src/adapters/catalog.ts";
 import { CUSTOM_HOW, type Located } from "../src/adapters/locate.ts";
 import { Manifest } from "../src/adapters/manifest.ts";
-import { lastUsedMap, listPrograms, planAction, programsTable, readLog, runAction, type Plan, type ProgramRow, type ProgramsOpts } from "../src/core/programs.ts";
+import { defaultExec, lastUsedMap, listPrograms, planAction, programsTable, readLog, runAction, type Plan, type ProgramRow, type ProgramsOpts } from "../src/core/programs.ts";
 import { Session } from "../src/core/session.ts";
 import { trustFolder } from "../src/core/trust.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -412,6 +414,25 @@ describe("a long install that throws", () => {
     expect(second.job).not.toBe(first.job);
   });
 
+  test("while the app closes, a new request is refused with 409", async () => {
+    const exec = vi.fn(async (_c: string, line: (l: string) => void, signal?: AbortSignal) => {
+      line("go");
+      await new Promise<void>((r) => signal?.addEventListener("abort", () => r()));
+      await new Promise((r) => setTimeout(r, 500));
+      return null;
+    });
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    await vi.waitFor(() => expect(exec).toHaveBeenCalled());
+    const closed = app.close();
+    const late = await post("api/programs/run", { name: "alpha", action: "install", confirmed: true });
+    expect(late.status).toBe(409);
+    expect((await late.json()).error).toContain("stopping");
+    await closed;
+  });
+
   test("an error after the job is done does not change a good result", async () => {
     let release = () => {};
     const exec = vi.fn(async (_c: string, line: (l: string) => void) => {
@@ -607,4 +628,40 @@ describe("a long install: stop, password, and a second action at the same time",
     expect(stopped).toBe(true);
     expect(readdirSync(join(home, "programs-running"))).not.toContain("zeta.json");
   });
+});
+
+describe.skipIf(process.platform === "win32")("the default command runner", () => {
+  test("it ends after the shell exits, even if a grandchild keeps the pipes open", async () => {
+    const lines: string[] = [];
+    const t0 = Date.now();
+    const code = await defaultExec("sleep 8 & echo $!", (l) => lines.push(l));
+    const spent = Date.now() - t0;
+    for (const pid of lines.map(Number).filter(Boolean)) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {}
+    }
+    expect(code).toBe(0);
+    expect(spent).toBeLessThan(4000);
+  }, 20_000);
+
+  test("a forced exit of the process sends SIGKILL to the command that ignores SIGTERM", async () => {
+    const script = `import { defaultExec } from ${JSON.stringify(join(__dirname, "../src/core/programs.ts"))}; const ac = new AbortController(); void defaultExec('trap "" TERM; echo $$; sleep 30', (l) => { console.log(l); setTimeout(() => { ac.abort(); setTimeout(() => process.exit(130), 300); }, 200); }, ac.signal);`;
+    const child = spawn(process.execPath, [TSX_CLI, "--eval", script], { stdio: ["ignore", "pipe", "ignore"] });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    const exit = new Promise<number | null>((r) => child.on("exit", (c) => r(c)));
+    const code = await exit;
+    const pid = Number(out.trim().split("\n")[0]);
+    await new Promise((r) => setTimeout(r, 300));
+    let alive = true;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    if (alive) process.kill(-pid, "SIGKILL");
+    expect(code).toBe(130);
+    expect(alive).toBe(false);
+  }, 30_000);
 });

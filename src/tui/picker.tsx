@@ -16,7 +16,9 @@ export function SessionPicker(props: { list: SessionInfo[]; initial: number; not
   useInput((ch, key) => {
     if (key.upArrow) setSel((x) => (x + props.list.length - 1) % props.list.length);
     else if (key.downArrow) setSel((x) => (x + 1) % props.list.length);
-    else if (key.return) done(props.list[sel]);
+    else if (key.return) {
+      if (!props.list[sel]?.moved) done(props.list[sel]);
+    }
     else if (key.escape || (key.ctrl && ch === "c")) done();
   });
   return (
@@ -25,12 +27,13 @@ export function SessionPicker(props: { list: SessionInfo[]; initial: number; not
       {props.note ? <Text color="yellow">{props.note}</Text> : null}
       {props.list.map((s, i) => {
         const age = ageText(now - s.used);
+        const tag = s.moved ? "moved: run cuvette open <new folder>" : s.status;
         return (
           <Box key={s.id} flexDirection="column">
             <Text color={i === sel ? "cyan" : undefined} bold={i === sel}>
               {i === sel ? "▸ " : "  "}
-              {age} · {clipStart(folderText(s.cwd), Math.max(10, width - age.length - 3 - (s.status ? s.status.length + 3 : 0)))}
-              {s.status ? <Text dimColor> · {s.status}</Text> : null}
+              {age} · {clipStart(folderText(s.cwd), Math.max(10, width - age.length - 3 - (tag ? tag.length + 3 : 0)))}
+              {tag ? <Text dimColor> · {tag}</Text> : null}
             </Text>
             {s.name ? <Text>    {clip(s.name, width - 2)}</Text> : null}
             <Text dimColor>    {s.description ? clip(s.description, width - 2) : s.ask ? clip(s.ask, width - 2) : "(no request)"}</Text>

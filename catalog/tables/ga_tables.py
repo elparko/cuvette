@@ -1,4 +1,5 @@
 import csv
+import functools
 import os
 import re
 import textwrap
@@ -109,6 +110,27 @@ def _bad_file(path):
 
 MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
 
+PLACEHOLDER_CELLS = {}
+
+
+def _note_placeholders(fn):
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        PLACEHOLDER_CELLS.clear()
+        result = fn(*args, **kwargs)
+        n = sum(PLACEHOLDER_CELLS.values())
+        if isinstance(result, dict) and result.get("ok") and n:
+            result.setdefault("metrics", {})["n_placeholder_cells"] = n
+            result["summary"] = result.get("summary", "") + " %d %s in numeric columns hold a placeholder (-, ? or .). The tool treats %s as missing." % (n, "cell" if n == 1 else "cells", "it" if n == 1 else "them")
+        return result
+    return run
+
+
+def _keeps_text(cleaned):
+    cells = cleaned.dropna().astype(str).str.strip()
+    integers = cells[cells.str.fullmatch(r"[-+]?\d+")]
+    return bool(cells.str.match(r"[-+]?0\d").any() or (integers.str.count(r"\d") > 15).any())
+
 
 def load(path, sheet=None):
     path = os.path.expanduser(path)
@@ -126,9 +148,18 @@ def load(path, sheet=None):
         if "Excel file format" in str(e):
             raise _bad_file(path) from None
         raise
+    placeholders = 0
     for column in frame.columns:
         if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
-            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+            text = raw[column].astype(str).str.strip().str.lower()
+            hidden = text.isin(MISSING_TEXT)
+            cleaned = raw[column].where(~hidden, np.nan)
+            numbers = pd.to_numeric(cleaned, errors="coerce")
+            if cleaned.notna().any() and not _keeps_text(cleaned) and numbers.notna().sum() == cleaned.notna().sum():
+                placeholders += int((hidden & (text != "")).sum())
+                cleaned = numbers
+            frame[column] = cleaned
+    PLACEHOLDER_CELLS[path] = placeholders
     return frame
 
 
@@ -1105,3 +1136,7 @@ def read_plate(path, sheet=None, plate_map=None, map_sheet=None, map_well_column
         "manualRoute": route,
         "fidelity": "close",
     }
+
+
+for _name in ("summarize_table", "reshape_table", "make_plot"):
+    globals()[_name] = _note_placeholders(globals()[_name])

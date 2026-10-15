@@ -28,13 +28,43 @@ def _fail(message):
 
 MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
 
+PLACEHOLDER_CELLS = {}
+
+
+def _note_placeholders(fn):
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        PLACEHOLDER_CELLS.clear()
+        result = fn(*args, **kwargs)
+        n = sum(PLACEHOLDER_CELLS.values())
+        if isinstance(result, dict) and result.get("ok") and n:
+            result.setdefault("metrics", {})["n_placeholder_cells"] = n
+            result["summary"] = result.get("summary", "") + " %d %s in numeric columns hold a placeholder (-, ? or .). The tool treats %s as missing." % (n, "cell" if n == 1 else "cells", "it" if n == 1 else "them")
+        return result
+    return run
+
+
+def _keeps_text(cleaned):
+    cells = cleaned.dropna().astype(str).str.strip()
+    integers = cells[cells.str.fullmatch(r"[-+]?\d+")]
+    return bool(cells.str.match(r"[-+]?0\d").any() or (integers.str.count(r"\d") > 15).any())
+
 
 def _typed(path, enc):
     frame = pd.read_csv(path, encoding=enc)
     raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+    placeholders = 0
     for column in frame.columns:
         if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
-            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+            text = raw[column].astype(str).str.strip().str.lower()
+            hidden = text.isin(MISSING_TEXT)
+            cleaned = raw[column].where(~hidden, np.nan)
+            numbers = pd.to_numeric(cleaned, errors="coerce")
+            if cleaned.notna().any() and not _keeps_text(cleaned) and numbers.notna().sum() == cleaned.notna().sum():
+                placeholders += int((hidden & (text != "")).sum())
+                cleaned = numbers
+            frame[column] = cleaned
+    PLACEHOLDER_CELLS[path] = placeholders
     return frame
 
 
@@ -497,3 +527,7 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
     return {"ok": True, "summary": summary,
             "metrics": {"statistic": statistic, "p_value": p, "n_a": n1, "n_b": n2, "estimate": estimate, "exact": int(used == "exact")},
             "data": {"test": name, "p_method": used, "alternative": alternative, "direction": "%s minus %s" % (second, first)}}
+
+
+for _name in ("anova_factorial", "anova_repeated", "kruskal_dunn", "friedman_test", "rank_test"):
+    globals()[_name] = _note_placeholders(globals()[_name])

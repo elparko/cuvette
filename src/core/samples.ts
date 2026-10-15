@@ -106,17 +106,18 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
   const batch = find(BATCH_COL, [id, unit, group]);
   if (group < 0 && unit < 0) return undefined;
   const key = id >= 0 ? id : unit;
+  const lineOf = (i: number) => t.lines?.[i] ?? i + 2;
   const by = new Map<string, number[]>();
   t.rows.forEach((r, i) => {
     const v = key >= 0 ? (r[key] ?? "").trim() : "";
-    const k = v && !isMissing(v) ? v : `row ${i + 2}`;
+    const k = v && !isMissing(v) ? v : `row ${lineOf(i)}`;
     const list = by.get(k);
     if (list) list.push(i);
     else by.set(k, [i]);
   });
   const rows: SampleRow[] = [...by.entries()].map(([k, idx]) => {
     const r = t.rows[idx[0]!]!;
-    const span = idx.length === 1 ? `row ${idx[0]! + 2}` : `rows ${idx.map((i) => i + 2).join(", ")}`;
+    const span = idx.length === 1 ? `row ${lineOf(idx[0]!)}` : `rows ${idx.map(lineOf).join(", ")}`;
     return { sample: k, group: group >= 0 ? (r[group] ?? "").trim() : "", unit: unit >= 0 ? (r[unit] ?? "").trim() : k, batch: batch >= 0 ? (r[batch] ?? "").trim() : "", path: `${basename(source)} ${span}` };
   });
   const conflicts: string[] = [];

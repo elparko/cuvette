@@ -395,6 +395,23 @@ tests:
       - { path: saved.welch.metrics.p_CD8pos_ctl_trt, approx: 0.0018486, abs: 0.0000001 }
       - { path: metrics.p_CD4pos_ctl_trt, approx: 0.1, abs: 0.000001 }
 
+  - id: groups-sample-not-in-design
+    description: A sample that is in the stats table but not in the design file is left out, and the summary names it.
+    data: [data/synthetic_design_without_trt3.csv]
+    calls:
+      - tool: population_stats
+        args:
+          data: ["{adapter_dir}/data/synthetic_ctl1.fcs", "{adapter_dir}/data/synthetic_ctl2.fcs", "{adapter_dir}/data/synthetic_ctl3.fcs", "{adapter_dir}/data/synthetic_trt1.fcs", "{adapter_dir}/data/synthetic_trt2.fcs", "{adapter_dir}/data/synthetic_trt3.fcs"]
+          markers: [CD4, CD8]
+          thresholds: ["CD4=2500", "CD8=2500"]
+          pregate: ["FSC-A:20000:max"]
+        save_as: stats
+      - tool: compare_groups
+        args: { stats: "{saved.stats.data.stats_file}", design: "{adapter_dir}/data/synthetic_design_without_trt3.csv", populations: ["CD4+"], test: welch, adjust: none }
+    expect:
+      - { path: metrics.n_samples_not_in_design, equals: 1 }
+      - { path: summary, contains: "1 sample is in the stats table but not in the design file, so the tool left it out: synthetic_trt3." }
+
   - id: population-named-like-marker
     description: A combined population with the name of a single marker (CD4+) does not make a second row. n_populations stays 2 for CD4 and CD8.
     data: [data/synthetic_ctl1.fcs]
