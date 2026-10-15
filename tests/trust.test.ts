@@ -115,6 +115,54 @@ test("a hook script in the project root is part of the trust hash", () => {
   expect(t.changes).toEqual(["changed file: (hook script) hook.sh"]);
 });
 
+test("a log or state file that a hook writes does not change the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "./run.sh >> logs/out.log"] }, { command: ["node", "run.js", "--state", "state.json", "--log=run.log", "data.csv", "cache/tmp.py"] }] } });
+  writeFileSync(join(cwd, "run.sh"), "echo one\n");
+  writeFileSync(join(cwd, "run.js"), "1;\n");
+  trustFolder(cwd);
+  expect(trustStatus(cwd).state).toBe("trusted");
+  mkdirSync(join(cwd, "logs"));
+  mkdirSync(join(cwd, "cache"));
+  for (const f of ["logs/out.log", "state.json", "run.log", "data.csv", "cache/tmp.py"]) writeFileSync(join(cwd, f), "written by the hook\n");
+  expect(trustStatus(cwd).state).toBe("trusted");
+  writeFileSync(join(cwd, "run.js"), "evil();\n");
+  expect(trustStatus(cwd).state).toBe("changed");
+});
+
+test("a script that imports a module in its own small folder has that module in the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["node", "tools/hook.js"] }] } });
+  mkdirSync(join(cwd, "tools"));
+  writeFileSync(join(cwd, "tools", "hook.js"), "import './lib.js';\n");
+  writeFileSync(join(cwd, "tools", "lib.js"), "export {};\n");
+  writeFileSync(join(cwd, "tools", "notes.txt"), "a\n");
+  expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort()).toEqual(["(hook script) tools/hook.js", "(hook script) tools/lib.js"]);
+  trustFolder(cwd);
+  writeFileSync(join(cwd, "tools", "notes.txt"), "b\n");
+  expect(trustStatus(cwd).state).toBe("trusted");
+  writeFileSync(join(cwd, "tools", "lib.js"), "evil();\n");
+  expect(trustStatus(cwd).changes).toEqual(["changed file: (hook script) tools/lib.js"]);
+});
+
+test("a hook script in a large folder or in a folder with node_modules does not add its folder to the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["node", "big/hook.js"] }, { command: ["node", "mod/hook.js"] }] } });
+  mkdirSync(join(cwd, "big"));
+  mkdirSync(join(cwd, "mod", "node_modules"), { recursive: true });
+  writeFileSync(join(cwd, "big", "hook.js"), "1;\n");
+  for (let i = 0; i < 51; i++) writeFileSync(join(cwd, "big", `m${i}.js`), "1;\n");
+  writeFileSync(join(cwd, "mod", "hook.js"), "1;\n");
+  writeFileSync(join(cwd, "mod", "lib.js"), "1;\n");
+  expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort()).toEqual(["(hook script) big/hook.js", "(hook script) mod/hook.js"]);
+});
+
+test("a folder argument of a hook command puts the code files of the folder in the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+  mkdirSync(join(cwd, "hooks"));
+  writeFileSync(join(cwd, "hooks", "index.js"), "1;\n");
+  writeFileSync(join(cwd, "hooks", "util.mjs"), "1;\n");
+  writeFileSync(join(cwd, "hooks", "run.log"), "1\n");
+  expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort()).toEqual(["(hook script) hooks/index.js", "(hook script) hooks/util.mjs"]);
+});
+
 test("a hook script is found behind env, uv run, npx tsx and options with values", () => {
   project(".ga", {
     hooks: {

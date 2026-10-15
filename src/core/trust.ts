@@ -250,35 +250,78 @@ function moduleFiles(name: string): string[] {
   return [...parents, `${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
 }
 
-function segmentWords(words: string[]): string[] {
-  const out = words.length ? [words[0]!] : [];
+const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|rb|pl|php|ps1|r)$/i;
+const FOLDER_EXT = /\.(js|mjs|ts|py|sh)$/i;
+const VOLATILE_DIR = /^(logs?|state|caches?|\.cache|tmp|temp|__pycache__)$/i;
+const FOLDER_FILE_LIMIT = 50;
+
+interface HookWord {
+  word: string;
+  explicit: boolean;
+}
+
+function segmentWords(words: string[]): HookWord[] {
+  const out: HookWord[] = words.length ? [{ word: words[0]!, explicit: true }] : [];
   let script = false;
   for (let i = 0; i < words.length; i++) {
     const bare = words[i]!.replace(/^["']|["']$/g, "");
-    for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push(w);
+    for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push({ word: w, explicit: false });
     if (INTERPRETER.test(basename(bare))) {
       script = true;
       continue;
     }
     if (!script || bare.startsWith("-") && bare !== "-m") continue;
     if (bare === "-m" && words[i + 1]) {
-      out.push(...moduleFiles(words[i + 1]!.replace(/^["']|["']$/g, "")));
+      out.push(...moduleFiles(words[i + 1]!.replace(/^["']|["']$/g, "")).map((word) => ({ word, explicit: true })));
       script = false;
       continue;
     }
-    out.push(bare);
+    out.push({ word: bare, explicit: true });
     script = false;
   }
   return out;
 }
 
-function scriptWords(argv: string[]): string[] {
+function scriptWords(argv: string[]): HookWord[] {
   const out = segmentWords(argv);
   for (const arg of argv) {
     if (!/\s/.test(arg)) continue;
     for (const part of arg.split(/&&|\|\||[;|\n]/)) out.push(...segmentWords(part.split(/\s+/).filter(Boolean)));
   }
   return out;
+}
+
+function codeFolder(dir: string): string[] | undefined {
+  const found: string[] = [];
+  let count = 0;
+  const visit = (d: string): boolean => {
+    let names: string[];
+    try {
+      names = readdirSync(d).sort();
+    } catch {
+      return true;
+    }
+    for (const name of names) {
+      if (name === "node_modules") return false;
+      if (name.startsWith(".") || VOLATILE_DIR.test(name)) continue;
+      const p = join(d, name);
+      let l;
+      try {
+        l = lstatSync(p);
+      } catch {
+        continue;
+      }
+      if (l.isSymbolicLink()) continue;
+      if (l.isDirectory()) {
+        if (!visit(p)) return false;
+        continue;
+      }
+      if (++count > FOLDER_FILE_LIMIT) return false;
+      if (FOLDER_EXT.test(name)) found.push(p);
+    }
+    return true;
+  };
+  return visit(dir) ? found : undefined;
 }
 
 export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
@@ -294,12 +337,17 @@ export function hookScripts(folder: string, layers?: Record<string, unknown>[]):
     if (!hooks || typeof hooks !== "object") continue;
     for (const list of Object.values(hooks as Record<string, unknown>))
       for (const h of Array.isArray(list) ? list : [])
-        for (const word of Array.isArray(h?.command) ? scriptWords(h.command.map(String)) : []) {
+        for (const { word, explicit } of Array.isArray(h?.command) ? scriptWords(h.command.map(String)) : []) {
           const path = resolve(key, word);
           const rel = relative(key, path);
           if (!word || rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+          if (!explicit && (!SCRIPT_EXT.test(word) || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
           try {
-            if (statSync(path).isFile()) found.add(path);
+            const st = statSync(path);
+            if (st.isFile()) {
+              found.add(path);
+              if (FOLDER_EXT.test(path)) for (const f of codeFolder(dirname(path)) ?? []) found.add(f);
+            } else if (st.isDirectory() && explicit) for (const f of codeFolder(path) ?? []) found.add(f);
           } catch {}
         }
   }
