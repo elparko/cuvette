@@ -1273,7 +1273,7 @@ export class Session {
           const planNote = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1);
           const approvedSteps = !planNote && this.plan && this.approvedEntry > turnStart && !this.planning ? this.plan.steps.filter((p) => p.tool) : undefined;
           const ran = planNote ? this.record.entries(["tool_result"]).filter((e) => e.id > planNote.id && e.data.ok === true && e.data.tool !== "plan" && e.data.tool !== "calculate") : [];
-          const covered = (p: PlanStep) => (p.tool ? ran.some((e) => matchStep({ steps: [p] }, String(e.data.tool), e.data.adapter ? String(e.data.adapter) : undefined) === 0) : ran.length > 0);
+          const covered = (p: PlanStep) => (p.tool ? ran.some((e) => matchStep({ steps: [p] }, String(e.data.tool), e.data.adapter ? String(e.data.adapter) : undefined) === 0) : ran.some((e) => { const t = this.findTool(String(e.data.tool)); return !!t && (!t.readOnly || t.source === "adapter"); }));
           const open = (approvedSteps ?? (planNote?.data.plan as PlanStep[] | undefined) ?? []).filter((p) => (p.status === "todo" || p.status === "doing") && (approvedSteps || !covered(p)));
           if (promise || asksLeave || noWork || open.length) {
             nudges++;
@@ -2799,7 +2799,9 @@ export class Session {
     this.bus.emit({ type: "status", state: "waiting" });
     try {
       const done = await this.waitFor(q.qid);
-      const note = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1)?.data.note;
+      const last = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1);
+      const note = last?.data.note;
+      if (last?.data.by === "default") return { ok: true, summary: `No answer was given; the harness used the default: ${String(done.answer)}${note ? ` (${note})` : ""}`, data: { answer: done.answer, note, by: "default" } };
       return { ok: true, summary: `The scientist answered: ${String(done.answer)}${note ? ` (${note})` : ""}`, data: { answer: done.answer, note } };
     } catch {
       return { ok: false, error: `Question ${q.qid} is still open. The scientist did not answer it yet.${this.steerText(q.qid)}` };
@@ -3146,7 +3148,7 @@ export class Session {
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by, reason: `answer to ${qid}` });
     if (waited) return;
     const quiet = isChecklistQuestion(q);
-    this.notes.push(`The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);
+    this.notes.push(by === "default" ? `No answer was given to ${qid} (${q.title}); the harness used the default: ${String(q.answer)}${note ? ` - ${note}` : ""}.` : `The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);
     if (!quiet && !this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
   }
 
@@ -3769,6 +3771,10 @@ export class Session {
     this.mode = to;
   }
 
+  private lastDecisionBy(key: string): string | undefined {
+    return this.record.entries(["decision"]).filter((e) => e.data.key === key).at(-1)?.data.by as string | undefined;
+  }
+
   private whoSet(key: string): string {
     const last = this.record.entries(["setup", "decision"]).filter((e) => (e.kind === "decision" ? e.data.key === key : key in ((e.data.values as object) ?? {}))).at(-1);
     if (!last) return "default";
@@ -3789,9 +3795,9 @@ export class Session {
         const answered = qid ? this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1) : undefined;
         if (answered) {
           d.value = f && this.decisions.hasValue(f.key) ? this.decisions.value(f.key) : answered.data.value;
-          d.by = "you";
+          d.by = answered.data.by === "default" ? "default" : "you";
         } else if (d.by === "you") continue;
-        else if (f && f.set && this.decisions.hasValue(f.key) && (d.value === undefined || this.whoSet(f.key) !== "default" || f.owner === "fixed")) {
+        else if (f && f.set && this.decisions.hasValue(f.key) && (d.value === undefined || this.whoSet(f.key) !== "default" || this.lastDecisionBy(f.key) === "default" || f.owner === "fixed")) {
           d.value = this.decisions.value(f.key);
           d.by = f.owner === "fixed" ? "fixed" : this.whoSet(f.key);
         } else if (d.value !== undefined) d.by ??= "agent";

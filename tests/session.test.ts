@@ -786,6 +786,63 @@ test("headless run: a bold line after the Waits for you list stays in the answer
   expect(session.assumptions).not.toContain("Note");
 });
 
+test("headless run: an answers-file value that fits no option is recorded as default with a notice", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { method: "banana" }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), recommendation: { value: "Otsu", reason: "It suits the file." }, evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("answered"));
+  expect(session.record.entries(["answer"]).find((e) => e.data.qid === q.qid)!.data).toMatchObject({ value: "Otsu", by: "default" });
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "method")!.data.by).toBe("default");
+  expect(session.record.entries(["notice"]).some((e) => /gave 'banana' for method, which does not fit the options/.test(String(e.data.text)))).toBe(true);
+});
+
+test("headless run: an answers-file value that fits an option stays human", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { method: "Triangle" }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), recommendation: { value: "Otsu", reason: "" }, evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("answered"));
+  expect(session.record.entries(["answer"]).find((e) => e.data.qid === q.qid)!.data).toMatchObject({ value: "Triangle", by: "human" });
+});
+
+test("the plan card keeps a harness default as default and shows the recorded value, not the proposed one", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  session.decisions.applySetup({});
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), evidence: "" });
+  await session.answer(q.qid, "Otsu", "harness", "default");
+  const asked = { key: "method", label: "Threshold method", value: "Triangle", by: "agent" };
+  (session as unknown as { planQids: Map<string, unknown> }).planQids.set(q.qid, asked);
+  const proposed = { key: "method", label: "Threshold method", value: "Triangle", by: "agent" };
+  const plan = { steps: [{ step: "Count", status: "todo", decisions: [asked, proposed] }] };
+  (session as unknown as { fillDecisions(p: unknown): void }).fillDecisions(plan);
+  expect(asked).toMatchObject({ value: "Otsu", by: "default" });
+  expect(proposed).toMatchObject({ value: "Otsu", by: "default" });
+});
+
+test("a plan step without a tool is not covered by a read-only result", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Make one plot", status: "todo" }] } }] },
+    { calls: [LOOK] },
+    { text: "The folder holds one adapter." },
+    { text: "The plot did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Plot");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text));
+  expect(nudges).toHaveLength(1);
+});
+
+test("the model reads that the harness used the default, not that the scientist answered", async () => {
+  await askRun({});
+  const result = session!.record.entries(["tool_result"]).find((e) => e.data.tool === "ask_scientist")!.data;
+  expect(String(result.summary)).toMatch(/^No answer was given; the harness used the default: sigma 2/);
+  const human = await askRun({ "Blur a.tif with which sigma?": "sigma 1" });
+  expect(human).toBeDefined();
+  expect(String(session!.record.entries(["tool_result"]).find((e) => e.data.tool === "ask_scientist")!.data.summary)).toMatch(/^The scientist answered: sigma 1/);
+});
+
 test("a decision that the harness set as default is shown as default on the plan card, not as you", async () => {
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
   session.decisions.applySetup({});
