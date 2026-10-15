@@ -35,7 +35,7 @@ import { buildChecklist, checklistText, GUIDELINE_IDS, GUIDELINE_QUESTION_TITLE,
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
-import { adapterTrust, confirmCode, hashFolder } from "../adapters/source.ts";
+import { adapterTrust, confirmCode } from "../adapters/source.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
@@ -57,7 +57,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { cannotTrust, endTrustOnce, longLabRefusal, folderKey, folderTrusted, labLong, oneLine, projectAdapterDirs, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectAdapterDirs, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -121,14 +121,6 @@ interface Pending<T> {
   resolve: (v: T) => void;
 }
 
-const realOrSelf = (p: string) => {
-  try {
-    return realpathSync(p);
-  } catch {
-    return resolve(p);
-  }
-};
-const samePlace = (a: string, b: string) => realOrSelf(a) === realOrSelf(b);
 const ownPurpose = (t: Tool) => Boolean((t.inputSchema.properties as Record<string, unknown> | undefined)?.purpose);
 
 function withPurpose(t: Tool): Record<string, unknown> {
@@ -424,7 +416,6 @@ export class Session {
   }
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
-    const rowsBefore = readIndex();
     const place = findPlace(ref, { cwd: opts.cwd, outputFolder: loadSettings(opts.cwd ?? process.cwd(), opts.settings ?? {}).output_folder });
     if (!place) {
       const row = readIndex().find((r) => r.id === ref);
@@ -435,40 +426,20 @@ export class Session {
     const id = place.id;
     const record = new AnalysisRecord(place.recordDir, id, recordPlaces(place));
     const first = record.entries(["session"])[0] as any;
-    const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string; hash?: string });
+    const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
     const gone = new Map<string, boolean>();
     const recorded = new Map<string, string | undefined>();
     const strayPath = new Map<string, string>();
     const swapped = new Map<string, string>();
-    const recordedHash = new Map<string, string | undefined>();
-    const unchecked = new Map<string, string>();
-    const changedPath = new Map<string, string>();
-    const indexed = rowsBefore.some((r) => r.id === id && samePlace(r.folder, place.outDir));
-    for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string; hash?: string }[]), ...loaded]) {
-      recorded.set(a.name, a.path);
-      recordedHash.set(a.name, a.hash);
-    }
+    for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
     const replaced: string[] = [];
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
-      const projectDirs = cwd ? [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))] : [];
-      const ownOutside = (name: string, path?: string) => {
-        if (!indexed || !path || dirs[name] || !existsSync(path) || known.has(realpathSync(path))) return false;
-        if (projectDirs.some((d) => resolve(path).startsWith(d + sep))) return false;
-        const hash = recordedHash.get(name);
-        if (!hash) {
-          unchecked.set(name, path);
-          return true;
-        }
-        if (hashFolder(path) === hash) return true;
-        changedPath.set(name, path);
-        return false;
-      };
-      const refOf = (name: string, path?: string) => (path && existsSync(path) && known.has(realpathSync(path)) ? path : ownOutside(name, path) ? path! : dirs[name] ?? name);
+      const refOf = (name: string, path?: string) => (path && existsSync(path) && known.has(realpathSync(path)) ? path : dirs[name] ?? name);
       for (const a of opts.addAdapters ?? []) {
         try {
           const found = findAdapter(a, cwd);
@@ -512,18 +483,10 @@ export class Session {
       const text = `The session used the adapter ${name} from ${path} before. This resumed session did not use that folder. It loaded the installed adapter ${name} instead.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
-    for (const [name, path] of unchecked) {
-      if (!s.adapters.some((x) => x.name === name)) continue;
-      if ((opts.addAdapters ?? []).some((g) => samePlace(resolve(cwd ?? process.cwd(), g), path))) continue;
-      const text = `Loaded ${path} from the record. Check that you trust it.`;
-      if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
-    }
     for (const [name, untrusted] of gone) {
       const stray = strayPath.get(name);
       if (stray && s.adapters.some((x) => x.name === name)) continue;
-      const text = changedPath.has(name)
-        ? `The files of the adapter ${name} in ${changedPath.get(name)} changed after the session loaded it. This resumed session does not load it. To load it, resume with --adapter ${changedPath.get(name)}.`
-        : untrusted
+      const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
         ? `The session loaded the adapter ${name} from ${stray} before. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
@@ -688,7 +651,7 @@ export class Session {
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
     } else {
       this.record.append("session", {
-        adapters: this.adapterInfo.map((a) => ({ name: a.name, version: a.version, programVersion: a.programVersion, path: this.adapters.find((x) => x.name === a.name)?.root, hash: this.adapters.some((x) => x.name === a.name) ? hashFolder(this.adapters.find((x) => x.name === a.name)!.root) : undefined })),
+        adapters: this.adapterInfo.map((a) => ({ name: a.name, version: a.version, programVersion: a.programVersion, path: this.adapters.find((x) => x.name === a.name)?.root })),
         model: this.provider.info.model,
         modelSpec: this.settings.model,
         provider: this.provider.info.provider,
@@ -1132,7 +1095,7 @@ export class Session {
     this.system = this.buildSystem();
     const info = this.adapterInfo.at(-1)!;
     const envHash = await this.envHashFor(a.name);
-    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, trust: info.trust, path: a.root, hash: hashFolder(a.root), programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
+    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, trust: info.trust, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
     const shown = names.filter((n) => this.active.has(n));
     const skills = a.skills();
     const brief = added.length ? this.decisions.brief(added) : "";
