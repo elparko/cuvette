@@ -162,7 +162,7 @@ describe.skipIf(!python || !rscript)("biostats adapter against base R", () => {
   });
 });
 
-describe.skipIf(!python)("biostats adapter group labels that look like missing values", () => {
+describe.skipIf(!python)("biostats adapter group labels and missing group marks", () => {
   let stats: OpenAdapter;
   let root: string;
   beforeAll(async () => {
@@ -184,7 +184,7 @@ describe.skipIf(!python)("biostats adapter group labels that look like missing v
     return file;
   };
 
-  for (const label of ["None", "NA", "null"]) {
+  for (const label of ["None"]) {
     test(`a group named ${label} stays a group in the one-way ANOVA`, { timeout: slow }, async () => {
       const file = write(`oneway-${label}.csv`, [label, "A", "B", "C"]);
       const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
@@ -193,8 +193,17 @@ describe.skipIf(!python)("biostats adapter group labels that look like missing v
     });
   }
 
-  test("a group named NA stays a group in the Kruskal-Wallis test and the two-group test", { timeout: slow }, async () => {
-    const kw = await stats.run("kruskal_dunn", { path: write("kw.csv", ["NA", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
+  for (const label of ["NA", "N/A", "null", "NaN"]) {
+    test(`a group written ${label} is a missing group, not a group`, { timeout: slow }, async () => {
+      const file = write(`missing-${label.replace("/", "-")}.csv`, [label, "A", "B", "C"]);
+      const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
+      expect(out.metrics.n_groups).toBe(3);
+      expect(out.metrics.n).toBe(18);
+    });
+  }
+
+  test("a group named None stays a group in the Kruskal-Wallis test and the two-group test", { timeout: slow }, async () => {
+    const kw = await stats.run("kruskal_dunn", { path: write("kw.csv", ["None", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
     expect(kw.metrics.n).toBe(18);
     const two = await stats.run("compare_two_groups", { path: write("two.csv", ["None", "A"]), outcome: "value", group: "group" });
     expect(two.metrics.n_a + two.metrics.n_b).toBe(12);

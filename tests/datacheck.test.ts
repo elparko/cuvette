@@ -65,6 +65,16 @@ describe("table checks", () => {
     expect(ids(real)).toContain("units:length");
   });
 
+  test("a group row written NA, N/A, null or empty is a missing group and not a group", () => {
+    for (const mark of ["NA", "N/A", "null", ""]) {
+      const rows = Array.from({ length: 12 }, (_, i) => [`M${i + 1}`, i === 0 ? mark : ["Drug", "Vehicle"][i % 2]!, String(10 + i)]);
+      const c = checkTable(t(["Animal", "Group", "dose"], rows), "plate.csv");
+      expect(c.groups?.sizes.map((g) => g[0]).sort()).toEqual(["Drug", "Vehicle"]);
+      expect(item(c, "missing:Group").level).toBe("ask");
+      expect(item(c, "missing:Group").rows).toEqual([2]);
+    }
+  });
+
   test("an empty column is shown, not asked", () => {
     const c = checkTable(t(["id", "value", "spare"], [["a", "1", ""], ["b", "2", ""], ["c", "3", ""]]), "x.csv");
     expect(item(c, "empty:spare")).toMatchObject({ level: "note", text: "Column 'spare' is empty. The harness does not use it." });

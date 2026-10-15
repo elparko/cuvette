@@ -8,12 +8,15 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 
+MISSING_TEXT = {"", "NA", "N/A", "n/a", "NaN", "nan", "null", "NULL", "Null"}
+
+
 def _typed(path, enc):
     frame = pd.read_csv(path, encoding=enc)
     raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
     for column in frame.columns:
         if frame[column].dtype == object:
-            frame[column] = raw[column].where(raw[column].str.strip() != "", np.nan)
+            frame[column] = raw[column].where(~raw[column].str.strip().isin(MISSING_TEXT), np.nan)
     return frame
 
 
