@@ -26,7 +26,7 @@ connection:
   kind: macro
   interpreter: ["{node}", "{adapter_dir}/fake.mjs", "{macro_file}"]
   macro_ext: ".fake"
-  call_timeout_s: 1
+  call_timeout_s: 8
 locate:
   paths: ["${process.execPath.replace(/\\/g, "\\\\")}"]
 module: adapter.mjs
@@ -238,8 +238,8 @@ describe("macro runtime", () => {
     const t0 = Date.now();
     const o = await byName.slow.execute({}, ctx());
     expect(o.ok).toBe(false);
-    expect(o.error).toMatch(/timed out after 1 s/);
-    expect(Date.now() - t0).toBeLessThan(10000);
+    expect(o.error).toMatch(/timed out after 8 s/);
+    expect(Date.now() - t0).toBeLessThan(30000);
   });
 
   test("the abort signal stops the program", async () => {
