@@ -89,24 +89,34 @@ function writeIndex(rows: IndexRow[]): void {
   });
 }
 
-const LOCK_WAIT_MS = 10_000;
-const LOCK_STALE_MS = 15_000;
+const LOCK_WAIT_MS = 1000;
+const LOCK_STALE_MS = 5000;
+
+function stealStale(dir: string): void {
+  try {
+    if (Date.now() - statSync(dir).mtimeMs <= LOCK_STALE_MS) return;
+    const aside = `${dir}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
+    renameSync(dir, aside);
+    try {
+      if (Date.now() - statSync(aside).mtimeMs <= LOCK_STALE_MS) renameSync(aside, dir);
+      else rmSync(aside, { recursive: true, force: true });
+    } catch {}
+  } catch {}
+}
 
 function withIndexLock<T>(fn: () => T): T {
   const dir = `${indexPath()}.lock`;
   mkdirSync(dirname(dir), { recursive: true });
   const start = Date.now();
   let held = false;
-  while (!held) {
+  for (let wait = 2; !held; wait = Math.min(wait * 2, 50)) {
     try {
       mkdirSync(dir);
       held = true;
     } catch {
-      try {
-        if (Date.now() - statSync(dir).mtimeMs > LOCK_STALE_MS) rmSync(dir, { recursive: true, force: true });
-      } catch {}
+      stealStale(dir);
       if (Date.now() - start > LOCK_WAIT_MS) break;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
     }
   }
   try {
