@@ -2485,6 +2485,36 @@ test("a deny rule wins over always allow", async () => {
   expect(session["permitted"](tool, { path: join(cwd, "a.txt") })).toBe("deny");
 });
 
+test("an ask rule with an argument pattern wins over always allow and over the plan approval", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false, permissions: { "run_command:rm *": "ask" } } as never });
+  const tool = { name: "run_command", source: "generic", inputSchema: { type: "object", properties: { argv: { type: "array" } } } } as never;
+  session["sessionAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["rm", "-r", "x"] })).toBe("ask");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+  session["sessionAllow"].clear();
+  session["batchAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["rm", "-r", "x"] })).toBe("ask");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+});
+
+test("an ask rule for run_script wins over the approval of a plan that names run_script", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false, permissions: { run_script: "ask" } } as never });
+  const tool = session.findTool("run_script")!;
+  session["batchAllow"].add("run_script");
+  expect(session["permitted"](tool, { code: "print(1)" })).toBe("ask");
+});
+
+test("always allow still covers a tool that asks only by its own default", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false } as never });
+  const tool = { name: "run_command", source: "generic", inputSchema: { type: "object", properties: {} } } as never;
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("ask");
+  session["sessionAllow"].add("run_command");
+  expect(session["permitted"](tool, { argv: ["ls"] })).toBe("allow");
+});
+
 test("an Esc on a permission card records a cancel by the harness, not a denial by the scientist", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
   writeFileSync(join(cwd, "a.txt"), "text");

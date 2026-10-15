@@ -2275,10 +2275,10 @@ export class Session {
     return this.permitted(tool, args) === "allow";
   }
 
-  // A deny rule wins over an earlier "always allow" and over the batch approval.
+  // A deny rule or an ask rule wins over an earlier "always allow" and over the batch approval.
   private permitted(tool: Tool, args: Args): "allow" | "ask" | "deny" {
     const rule = this.permissions.check(tool, args);
-    return rule !== "deny" && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
+    return rule !== "deny" && !(rule === "ask" && this.permissions.asks(tool, args)) && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
   }
 
   private outcomes = new Map<string, CallOutcome>();
