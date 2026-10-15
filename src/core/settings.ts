@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
-import { CLAUDE_MODELS, CUVETTE_MODEL } from "../providers/index.ts";
+import { CLAUDE_MODELS, cuvetteModels } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
 import { claudeKey, cuvetteToken, elabftwConfig } from "./credentials.ts";
 import { hostedMode } from "./hosted.ts";
@@ -69,7 +69,7 @@ export interface SettingRow {
 }
 
 const ALL: Scope[] = ["session", "user", "project"];
-const MODELS = () => [...CLAUDE_MODELS, ...(hostedMode() ? [CUVETTE_MODEL] : [])].map((m) => m.spec);
+const MODELS = () => [...CLAUDE_MODELS, ...(hostedMode() ? cuvetteModels() : [])].map((m) => m.spec);
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 export type Paper = "a4" | "letter";

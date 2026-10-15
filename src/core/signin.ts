@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { hostname } from "node:os";
-import { AccountError, BAD_CODE, getAccount, hostedError, type AccountCtx, type AccountInfo } from "./account.ts";
+import { AccountError, BAD_CODE, getAccount, hostedError, linkUrl, type AccountCtx, type AccountInfo } from "./account.ts";
 import { cuvetteToken, cuvetteUrl, saveCuvetteToken } from "./credentials.ts";
 
 export const PROVIDERS = [
@@ -13,6 +13,11 @@ export const PROVIDERS = [
 ] as const;
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
+
+export const SIGN_IN_ERRORS = { access_denied: "You stopped the sign-in.", sign_in_failed: "The sign-in did not finish. Try again." } as const;
+
+export const signInErrorText = (value: string | null | undefined): string | undefined =>
+  value ? (SIGN_IN_ERRORS as Record<string, string>)[value] ?? SIGN_IN_ERRORS.sign_in_failed : undefined;
 
 export const SIGN_IN_WAIT_MS = 5 * 60_000;
 
@@ -64,8 +69,8 @@ export async function redeemCode(ctx: AccountCtx, o: { code: string; verifier: s
 const page = (ok: boolean, text: string) =>
   `<!doctype html><meta charset="utf-8"><title>Cuvette</title><body style="font:16px system-ui;max-width:32em;margin:4em auto;padding:0 1em"><h1>${ok ? "Signed in" : "Sign-in failed"}</h1><p>${text}</p></body>`;
 
-export const signInPage = (ok: boolean) =>
-  page(ok, ok ? "You are signed in to Cuvette. Close this tab and go back to Cuvette." : "Cuvette could not finish the sign-in. Close this tab and sign in again.");
+export const signInPage = (ok: boolean, problem?: string) =>
+  page(ok, ok ? "You are signed in to Cuvette. Close this tab and go back to Cuvette." : `${problem ?? "Cuvette could not finish the sign-in."} Close this tab and sign in again.`);
 
 export interface CodeListener {
   port: number;
@@ -74,8 +79,8 @@ export interface CodeListener {
 }
 
 export async function listenForCode(state: string, ms = SIGN_IN_WAIT_MS): Promise<CodeListener> {
-  let settle!: (r: { code?: string }) => void;
-  const done = new Promise<{ code?: string }>((r) => (settle = r));
+  let settle!: (r: { code?: string; error?: string }) => void;
+  const done = new Promise<{ code?: string; error?: string }>((r) => (settle = r));
   let port = 0;
   const server = createServer((req, res) => {
     const host = req.headers.host ?? "";
@@ -85,9 +90,11 @@ export async function listenForCode(state: string, ms = SIGN_IN_WAIT_MS): Promis
       return;
     }
     const code = url.searchParams.get("code");
-    const ok = !!code && url.searchParams.get("state") === state;
-    res.writeHead(ok ? 200 : 400, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(signInPage(ok));
-    settle(ok ? { code: code! } : {});
+    const stateOk = url.searchParams.get("state") === state;
+    const error = stateOk ? signInErrorText(url.searchParams.get("error")) : undefined;
+    const ok = !!code && stateOk && !error;
+    res.writeHead(ok ? 200 : 400, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(signInPage(ok, error));
+    settle(ok ? { code: code! } : { error });
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -106,7 +113,8 @@ export async function listenForCode(state: string, ms = SIGN_IN_WAIT_MS): Promis
     async wait() {
       const r = await done;
       close();
-      if (!r.code) throw new AccountError("The sign-in did not finish. Run `cuvette account login` again.");
+      if (r.error) throw new AccountError(r.error);
+      if (!r.code) throw new AccountError(SIGN_IN_ERRORS.sign_in_failed);
       return r.code;
     },
   };
@@ -115,6 +123,7 @@ export async function listenForCode(state: string, ms = SIGN_IN_WAIT_MS): Promis
 export interface TerminalSignIn {
   provider: ProviderId;
   browser: boolean;
+  link?: boolean;
   ctx?: AccountCtx;
   open(url: string): void;
   say(text: string): void;
@@ -125,15 +134,23 @@ export async function signInFromTerminal(o: TerminalSignIn): Promise<AccountInfo
   const ctx = o.ctx ?? {};
   const env = ctx.env ?? process.env;
   const pkce = makePkce();
+  const urlFor = async (port: number | "paste") =>
+    o.link ? linkUrl({ provider: o.provider, port: String(port), challenge: pkce.challenge, state: pkce.state }, ctx) : startUrl(env, { provider: o.provider, port, pkce });
   let code: string;
   if (o.browser) {
     const listener = await listenForCode(pkce.state);
-    const url = startUrl(env, { provider: o.provider, port: listener.port, pkce });
+    let url: string;
+    try {
+      url = await urlFor(listener.port);
+    } catch (e) {
+      listener.close();
+      throw e;
+    }
     o.say(`Opening the browser. If it does not open, open this link:\n${url}\nThis command waits 5 minutes for the sign-in.`);
     o.open(url);
     code = await listener.wait();
   } else {
-    o.say(`Open this link in a browser on any computer:\n${startUrl(env, { provider: o.provider, port: "paste", pkce })}`);
+    o.say(`Open this link in a browser on any computer:\n${await urlFor("paste")}`);
     code = (await o.ask("Paste the code that the page shows: ")).trim();
     if (!code) throw new AccountError("No code given.");
   }

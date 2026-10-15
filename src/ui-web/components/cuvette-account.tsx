@@ -47,6 +47,7 @@ export function CuvetteAccount({ use, onSignedIn }: { use?: boolean; onSignedIn?
   const [usage, setUsage] = useState(false);
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [sure, setSure] = useState(false);
+  const [adding, setAdding] = useState(false);
   const was = useRef(false);
 
   const load = useCallback(async () => {
@@ -54,6 +55,7 @@ export function CuvetteAccount({ use, onSignedIn }: { use?: boolean; onSignedIn?
       const s = await call<State>("api/cuvette", {});
       setSt(s);
       setMsg(s.error);
+      if (!s.waiting) setLink("");
       return s;
     } catch (e) {
       setMsg((e as Error).message);
@@ -71,10 +73,10 @@ export function CuvetteAccount({ use, onSignedIn }: { use?: boolean; onSignedIn?
   }, [st, onSignedIn]);
 
   useEffect(() => {
-    if (!link || st?.signedIn) return;
+    if (!link || !st?.waiting) return;
     const t = window.setInterval(() => void load(), POLL_MS);
     return () => window.clearInterval(t);
-  }, [link, st?.signedIn, load]);
+  }, [link, st?.waiting, load]);
 
   const run = async <T,>(path: string, body: unknown, done?: (r: T) => void) => {
     try {
@@ -86,11 +88,18 @@ export function CuvetteAccount({ use, onSignedIn }: { use?: boolean; onSignedIn?
     }
   };
 
-  const signIn = (provider: string) =>
-    run<{ url: string }>("api/cuvette/signin", { provider, use }, (r) => {
-      setLink(r.url);
-      setMsg("The browser is open. Finish the sign-in there. This page updates by itself.");
-    });
+  const browserOpen = (r: { url: string }) => {
+    setLink(r.url);
+    setSt((s) => (s ? { ...s, waiting: true, error: "" } : s));
+    setMsg("The browser is open. Finish the sign-in there. This page updates by itself.");
+  };
+
+  const signIn = (provider: string) => run<{ url: string }>("api/cuvette/signin", { provider, use }, browserOpen);
+
+  const addMethod = (provider: string) => {
+    setAdding(false);
+    return run<{ url: string }>("api/cuvette/link", { provider }, browserOpen);
+  };
 
   const showPlans = async () => {
     setPlans(!plans);
@@ -219,10 +228,31 @@ export function CuvetteAccount({ use, onSignedIn }: { use?: boolean; onSignedIn?
             <Button variant="outline" size="sm" onClick={showDevices} aria-expanded={!!devices}>
               {devices ? "Hide devices" : "Show devices"}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setAdding(!adding)} aria-expanded={adding}>
+              Add a sign-in method
+            </Button>
             <Button variant={sure ? "destructive" : "ghost"} size="sm" onClick={signOut}>
               {sure ? "Click again to sign out" : "Sign out"}
             </Button>
           </div>
+          {adding && (
+            <div className="flex flex-wrap gap-2">
+              {st!.providers.map((p) => (
+                <Button key={p.id} variant="outline" size="sm" title={PROVIDER_TITLES[p.id]} onClick={() => addMethod(p.id)}>
+                  Add {p.label}
+                </Button>
+              ))}
+            </div>
+          )}
+          {link && st?.waiting && (
+            <p className="text-[13px] text-muted-foreground">
+              The browser did not open?{" "}
+              <a className="text-accent-brand underline" href={link} target="_blank" rel="noopener noreferrer">
+                Open the sign-in page
+              </a>
+              .
+            </p>
+          )}
           {usage && <CuvetteUsage />}
           {devices && (
             <ul className="flex flex-col gap-1 text-[13px]">

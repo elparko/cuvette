@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AccountError } from "../src/core/account.ts";
-import { cuvetteToken } from "../src/core/credentials.ts";
+import { cuvetteToken, saveCuvetteToken } from "../src/core/credentials.ts";
 import { listenForCode, makePkce, providerId, PROVIDERS, redeemCode, signInFromTerminal, startUrl } from "../src/core/signin.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
@@ -102,6 +102,33 @@ describe("the one-time listener", () => {
     expect(await done).toBeInstanceOf(AccountError);
   });
 
+  test("an access_denied redirect ends the wait with the text for it", async () => {
+    const l = await listenForCode("state-1");
+    const done = l.wait().catch((e) => e);
+    const r = await fetch(`http://127.0.0.1:${l.port}/auth/cuvette?error=access_denied&state=state-1`);
+    expect(r.status).toBe(400);
+    expect(await r.text()).toContain("You stopped the sign-in.");
+    const e = await done;
+    expect(e).toBeInstanceOf(AccountError);
+    expect(e.message).toBe("You stopped the sign-in.");
+  });
+
+  test("a sign_in_failed redirect, and an unknown error value, end the wait with the failed text", async () => {
+    for (const error of ["sign_in_failed", "something_else"]) {
+      const l = await listenForCode("state-1");
+      const done = l.wait().catch((e) => e);
+      await fetch(`http://127.0.0.1:${l.port}/auth/cuvette?error=${error}&state=state-1`);
+      expect((await done).message).toBe("The sign-in did not finish. Try again.");
+    }
+  });
+
+  test("an error with a wrong state does not name the error", async () => {
+    const l = await listenForCode("state-1");
+    const done = l.wait().catch((e) => e);
+    await fetch(`http://127.0.0.1:${l.port}/auth/cuvette?error=access_denied&state=other`);
+    expect((await done).message).toBe("The sign-in did not finish. Try again.");
+  });
+
   test("other paths get 404 and do not end the wait", async () => {
     const l = await listenForCode("state-1");
     expect((await fetch(`http://127.0.0.1:${l.port}/favicon.ico`)).status).toBe(404);
@@ -173,6 +200,60 @@ describe("sign in from a terminal", () => {
     expect(createHash("sha256").update(bodies[0].verifier).digest("base64url")).toBe(url.searchParams.get("challenge"));
     expect(bodies[0].code).toBe("pasted-code");
     expect(bodies[0].device_name).toContain("(command line)");
+  });
+
+  test("link flow: asks the server for the link with the device token, then signs in like a login", async () => {
+    saveCuvetteToken("cuv_old");
+    const said: string[] = [];
+    const calls: { url: string; auth: string | null; body: any }[] = [];
+    const fn = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, auth: new Headers(init?.headers).get("authorization"), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (url.endsWith("/v1/auth/link")) return json(200, { url: "https://api.cuvette.ai/v1/auth/start?provider=github&link=abc" });
+      if (url.endsWith("/v1/auth/token")) return json(200, { token: "cuv_new", device_id: "d", account_id: "acc_1" });
+      return json(200, ACCOUNT);
+    }) as unknown as typeof fetch;
+    let opened = "";
+    const info = await signInFromTerminal({
+      provider: "github",
+      browser: true,
+      link: true,
+      ctx: { fetch: fn },
+      say: (t) => said.push(t),
+      ask: async () => "",
+      open: (url) => {
+        opened = url;
+        void fetch(`http://127.0.0.1:${calls[0]!.body.port}/auth/cuvette?code=thecode&state=${calls[0]!.body.state}`);
+      },
+    });
+    expect(opened).toContain("link=abc");
+    expect(calls[0]).toMatchObject({ url: "https://api.cuvette.ai/v1/auth/link", auth: "Bearer cuv_old" });
+    expect(calls[0]!.body).toMatchObject({ provider: "github", challenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) });
+    expect(info.account_id).toBe("acc_1");
+    expect(cuvetteToken({}).token).toBe("cuv_new");
+    expect(said[0]).toContain("link=abc");
+  });
+
+  test("link flow with --no-browser sends the word paste", async () => {
+    saveCuvetteToken("cuv_old");
+    const bodies: any[] = [];
+    const fn = (async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/auth/link")) {
+        bodies.push(JSON.parse(String(init!.body)));
+        return json(200, { url: "https://api.cuvette.ai/v1/auth/start?link=abc" });
+      }
+      if (url.endsWith("/v1/auth/token")) return json(200, { token: "cuv_new", device_id: "d", account_id: "acc_1" });
+      return json(200, ACCOUNT);
+    }) as unknown as typeof fetch;
+    await signInFromTerminal({ provider: "orcid", browser: false, link: true, ctx: { fetch: fn }, say: () => {}, ask: async () => "code-1", open: () => {} });
+    expect(bodies[0].port).toBe("paste");
+  });
+
+  test("link flow: a server refusal stops before the browser opens", async () => {
+    saveCuvetteToken("cuv_old");
+    const fn = (async () => json(400, { type: "error", error: { type: "invalid_request_error", message: "x" } })) as unknown as typeof fetch;
+    let opened = false;
+    await expect(signInFromTerminal({ provider: "orcid", browser: true, link: true, ctx: { fetch: fn }, say: () => {}, ask: async () => "", open: () => void (opened = true) })).rejects.toThrow(AccountError);
+    expect(opened).toBe(false);
   });
 
   test("--no-browser with an empty answer stops", async () => {

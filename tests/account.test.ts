@@ -215,8 +215,23 @@ describe("error texts", () => {
     expect([1, 45, 60, 61, 3599, 3600, 7300].map(waitText)).toEqual(["1 second", "45 seconds", "1 minute", "2 minutes", "60 minutes", "1 hour", "3 hours"]);
   });
 
-  test("an unknown error type has no text of its own", () => {
-    expect(hostedError(500, body("api_error"))).toBeUndefined();
+  test("the server error types have their own text", () => {
+    expect(hostedError(503, body("hosted_off"))!.text).toBe("Cuvette hosted is not open yet.");
+    expect(hostedError(409, body("trial_in_progress"))!.text).toContain("during the trial");
+    expect(hostedError(400, body("invalid_request_error"))!.text).toContain("Update Cuvette");
+    expect(hostedError(404, body("not_found_error"))!.text).toContain("does not have this item");
+    expect(hostedError(413, body("request_too_large"))!.text).toContain("too large");
+    expect(hostedError(500, body("api_error"))).toMatchObject({ transient: true, text: expect.stringContaining("had an error") });
+  });
+
+  test("overloaded shows the retry time if the server gives one", () => {
+    expect(hostedError(503, body("overloaded"), "30")).toEqual({ type: "overloaded", text: "The model service is busy. Wait 30 seconds and retry.", transient: true });
+    expect(hostedError(503, body("overloaded"))!.text).toBe("The model service is busy. Wait a moment and retry.");
+    expect(hostedError(503, body("overloaded", { retry_after: 120 }))!.text).toContain("Wait 2 minutes");
+  });
+
+  test("any other type shows the message of the server", () => {
+    expect(hostedError(418, body("teapot_error", { message: "The pot is full." }))).toMatchObject({ type: "teapot_error", text: "The pot is full.", generic: true });
     expect(hostedError(404, undefined)).toBeUndefined();
   });
 

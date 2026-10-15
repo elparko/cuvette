@@ -2,11 +2,12 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CUVETTE_NOTICE, NOT_SIGNED_IN } from "./account.ts";
+import { AccountError, CUVETTE_NOTICE, getAccount, NOT_SIGNED_IN } from "./account.ts";
 import { hostedMode } from "./hosted.ts";
 import { KEY_GUIDE } from "./keyhelp.ts";
 import { claudeKey, cuvetteToken, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
+import { DEFAULT_CLAUDE_MODEL, listedClaudeIds } from "../providers/index.ts";
 
 export type ModelChoice = "claude" | "cuvette" | "local";
 
@@ -89,12 +90,33 @@ export async function chooseClaude(key: string, ctx: Ctx & { check?: (key: strin
   return { ok: true, text: `${r.text} Saved the key to ${path}. The model is Claude.` };
 }
 
+export const firstListedModel = (models: string[]): string | undefined => {
+  const listed = listedClaudeIds();
+  return models.find((m) => listed.includes(m));
+};
+
+export async function keepModelInPlan(ctx: Ctx, models: string[]): Promise<string | undefined> {
+  const saved = savedModel(ctx);
+  if (saved !== "cuvette" && !saved.startsWith("cuvette:")) return undefined;
+  if (!models.length || models.includes(saved.slice("cuvette:".length) || DEFAULT_CLAUDE_MODEL)) return undefined;
+  const next = firstListedModel(models);
+  if (!next) return undefined;
+  await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", `cuvette:${next}`, "user");
+  return next;
+}
+
 export async function chooseCuvette(ctx: Ctx = {}, opts: { onlyIfNoKey?: boolean } = {}): Promise<{ ok: boolean; text: string }> {
   const env = ctx.env ?? process.env;
   if (cuvetteToken(env).from === "none") return { ok: false, text: NOT_SIGNED_IN };
   if (opts.onlyIfNoKey && claudeKey(env).from !== "none") return { ok: true, text: "You are signed in to Cuvette. The model stays the same." };
-  await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", "cuvette", "user");
-  return { ok: true, text: "You are signed in to Cuvette. The model is Claude, paid through Cuvette." };
+  let id: string | undefined;
+  try {
+    id = firstListedModel((await getAccount({ env, fetch: ctx.fetch })).models);
+  } catch (e) {
+    if (!(e instanceof AccountError)) throw e;
+  }
+  await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", id ? `cuvette:${id}` : "cuvette", "user");
+  return { ok: true, text: `You are signed in to Cuvette. The model is Claude${id ? ` (${id})` : ""}, paid through Cuvette.` };
 }
 
 export async function chooseLocal(model: string | undefined, ctx: Ctx = {}): Promise<{ ok: boolean; text: string; model: string }> {

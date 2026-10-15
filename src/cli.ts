@@ -153,6 +153,7 @@ Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "open
 
 const HOSTED_HELP = {
   account: `  cuvette account login [--provider google|microsoft|orcid|github] [--no-browser]   sign in to Cuvette
+  cuvette account link --provider google|microsoft|orcid|github [--no-browser]   add a sign-in method to this account
   cuvette account status|billing|topup|logout   show the plan and allowance, open the billing page, buy a top-up, or sign out
   cuvette account plan <id> [--yearly]  choose or change the plan: basic, standard, lab or lab_plus
 `,
@@ -544,6 +545,13 @@ async function main() {
           console.log(`${acc.accountLines(info).join("\n")}\n${r.text}\n${acc.CUVETTE_NOTICE}\nUse the model "cuvette" for Cuvette hosted.`);
           return;
         }
+        if (a1 === "link") {
+          const si = await import("./core/signin.ts");
+          if (!o.provider) return fail("usage: cuvette account link --provider google|microsoft|orcid|github [--no-browser]");
+          const provider = si.providerId(str(o.provider));
+          const info = await si.signInFromTerminal({ provider, browser: !o["no-browser"], link: true, open: openWithOs, say: console.log, ask });
+          return console.log(`${acc.accountLines(info).join("\n")}\nThe account has a new sign-in method: ${provider}.`);
+        }
         if (a1 === "status") {
           const t = cred.cuvetteToken();
           if (t.from === "none") return console.log(acc.NOT_SIGNED_IN);
@@ -555,6 +563,11 @@ async function main() {
           const info = await acc.getAccount();
           if (info.plan === "none" || info.sub_status === "canceled" || info.sub_status === "none") return (open(await acc.checkoutUrl({ plan: a2, interval })), console.log("Opening the payment page."));
           const r = await acc.changePlan(a2, interval);
+          if (r.status !== "scheduled") {
+            try {
+              await (await import("./core/firststart.ts")).keepModelInPlan({}, (await acc.getAccount()).models);
+            } catch {}
+          }
           return console.log(r.status === "scheduled" ? `The plan changes on ${acc.resetText(r.effective_at)}.` : "The plan changed.");
         }
         if (a1 === "topup") {
@@ -573,7 +586,7 @@ async function main() {
         if (e instanceof acc.AccountError) return fail(e.message);
         throw e;
       }
-      return fail("usage: cuvette account login|status|plan <id>|topup|billing|logout");
+      return fail("usage: cuvette account login|link|status|plan <id>|topup|billing|logout");
     }
     case "eln": {
       const cred = await import("./core/credentials.ts");

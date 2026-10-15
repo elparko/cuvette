@@ -29,7 +29,8 @@ export interface ClaudeOpts {
 
 function hostedFailure(e: unknown): HostedError | undefined {
   if (!(e instanceof Anthropic.APIError)) return undefined;
-  return hostedError(e.status ?? 0, (e as any).error, (e as any).headers?.get?.("retry-after"));
+  const known = hostedError(e.status ?? 0, (e as any).error, (e as any).headers?.get?.("retry-after"));
+  return known?.generic ? undefined : known;
 }
 
 function mapError(e: unknown, model: string, hosted = false): unknown {

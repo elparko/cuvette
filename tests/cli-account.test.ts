@@ -51,6 +51,7 @@ async function api(): Promise<string> {
       if (req.url === "/v1/account") return send(200, ACCOUNT);
       if (req.url === "/v1/auth/logout") return send(204);
       if (req.url === "/v1/auth/token") return send(200, { token: "cuv_from_login", device_id: "dev_1", account_id: "acc_9" });
+      if (req.url === "/v1/auth/link") return send(200, { url: "https://api.cuvette.ai/v1/auth/start?link=abc" });
       if (req.url === "/v1/plan") return send(200, { status: "scheduled", effective_at: "2026-11-14T00:00:00Z" });
       if (req.url === "/v1/checkout") return send(200, { url: "https://checkout.stripe.com/x" });
       send(404, {});
@@ -92,7 +93,7 @@ test("the removed commands show the usage line", async () => {
   for (const sub of ["create", "buy"]) {
     const r = await cli(["account", sub], { CUVETTE_HOSTED: "1" });
     expect(r.code).toBe(1);
-    expect(r.stderr).toContain("usage: cuvette account login|status|plan <id>|topup|billing|logout");
+    expect(r.stderr).toContain("usage: cuvette account login|link|status|plan <id>|topup|billing|logout");
   }
 });
 
@@ -130,6 +131,50 @@ test("login --no-browser prints the start URL and takes the pasted code", async 
   expect(JSON.parse(token.body)).toMatchObject({ code: "pasted-code" });
   expect(cuvetteToken({}).token).toBe("cuv_from_login");
   expect(r.stdout).toContain("Account acc_9");
+});
+
+test("link --no-browser asks for the link with the device token and takes the pasted code", async () => {
+  const url = await api();
+  saveCuvetteToken("cuv_old");
+  const r = await cli(["account", "link", "--provider", "github", "--no-browser"], { CUVETTE_HOSTED: "1", CUVETTE_INFERENCE_URL: url }, "pasted-code\n");
+  expect(r.code).toBe(0);
+  const link = calls.find((c) => c.url === "/v1/auth/link")!;
+  expect(link).toMatchObject({ method: "POST", auth: "Bearer cuv_old" });
+  expect(JSON.parse(link.body)).toMatchObject({ provider: "github", port: "paste" });
+  expect(r.stdout).toContain("link=abc");
+  expect(r.stdout).toContain("The account has a new sign-in method: github.");
+  expect(cuvetteToken({}).token).toBe("cuv_from_login");
+});
+
+test("link needs a provider and a sign-in", async () => {
+  const none = await cli(["account", "link"], { CUVETTE_HOSTED: "1" });
+  expect(none.code).toBe(1);
+  expect(none.stderr).toContain("usage: cuvette account link --provider");
+  const out = await cli(["account", "link", "--provider", "github", "--no-browser"], { CUVETTE_HOSTED: "1" });
+  expect(out.code).toBe(1);
+  expect(out.stderr).toContain("You are not signed in to Cuvette");
+});
+
+test("login stops with a non-zero code and the text when the sign-in is denied", async () => {
+  const child = spawn("node", [cuvette, "account", "login", "--provider", "github"], { env: { ...process.env, CUVETTE_HOME: home, CUVETTE_NO_OPEN: "1", CUVETTE_TOKEN: "", CUVETTE_HOSTED: "1" } });
+  let stdout = "";
+  let stderr = "";
+  child.stderr.on("data", (d) => (stderr += d));
+  const closed = new Promise<number | null>((resolve) => child.on("close", resolve));
+  await new Promise<void>((resolve) => {
+    child.stdout.on("data", async (d) => {
+      stdout += d;
+      const line = stdout.split("\n").find((l) => l.includes("/v1/auth/start"));
+      if (!line || !stdout.includes("\n", stdout.indexOf(line) + line.length - 1)) return;
+      child.stdout.removeAllListeners("data");
+      const u = new URL(line);
+      await fetch(`http://127.0.0.1:${u.searchParams.get("port")}/auth/cuvette?error=access_denied&state=${u.searchParams.get("state")}`);
+      resolve();
+    });
+  });
+  expect(await closed).toBe(1);
+  expect(stderr).toContain("You stopped the sign-in.");
+  expect(cuvetteToken({}).from).toBe("none");
 });
 
 test("login with an unknown provider stops", async () => {

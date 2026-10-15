@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { saveCuvetteToken, savedClaudeKey } from "../src/core/credentials.ts";
-import { APP_CHOICES, CHOICES, choicesFor, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
+import { APP_CHOICES, CHOICES, choicesFor, chooseClaude, chooseCuvette, chooseLocal, copySample, firstStartState, keepModelInPlan, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
 import { settingsPath } from "../src/core/settings.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
@@ -110,4 +110,36 @@ test("the choices include Cuvette only in hosted mode", () => {
 test("the Cuvette choice names no removed command", () => {
   const text = APP_CHOICES.map((c) => `${c.label} ${c.help}`).join(" ");
   expect(text).not.toMatch(/credit|account create|account buy/i);
+});
+
+const planFetch = (models: string[]) => (async () => new Response(JSON.stringify({ account_id: "a", models }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+
+test("choose Cuvette: the model is the first plan model that the app lists", async () => {
+  saveCuvetteToken("cuv_abc");
+  const r = await chooseCuvette({ cwd, env: {}, fetch: planFetch(["claude-future-9", "claude-sonnet-5-5", "claude-haiku-5-5"]) }, {});
+  expect(r.text).toContain("claude-sonnet-5-5");
+  expect(savedModel({ cwd, env: {} })).toBe("cuvette:claude-sonnet-5-5");
+});
+
+test("choose Cuvette: the model stays cuvette if the plan lists no model or the server fails", async () => {
+  saveCuvetteToken("cuv_abc");
+  await chooseCuvette({ cwd, env: {}, fetch: planFetch([]) }, {});
+  expect(savedModel({ cwd, env: {} })).toBe("cuvette");
+  await chooseCuvette({ cwd, env: {}, fetch: down }, {});
+  expect(savedModel({ cwd, env: {} })).toBe("cuvette");
+});
+
+test("keep the model in the plan: only a Cuvette model outside the plan changes", async () => {
+  const ctx = { cwd, env: {} };
+  expect(await keepModelInPlan(ctx, ["claude-sonnet-5-5"])).toBeUndefined();
+  await chooseLocal("qwen3:8b", { cwd, env: {}, fetch: down });
+  expect(await keepModelInPlan(ctx, ["claude-sonnet-5-5"])).toBeUndefined();
+  expect(savedModel(ctx)).toBe("ollama:qwen3:8b");
+  saveCuvetteToken("cuv_abc");
+  await chooseCuvette({ ...ctx, fetch: planFetch([]) }, {});
+  expect(await keepModelInPlan(ctx, [])).toBeUndefined();
+  expect(await keepModelInPlan(ctx, ["claude-opus-5-5"])).toBeUndefined();
+  expect(await keepModelInPlan(ctx, ["claude-haiku-5-5"])).toBe("claude-haiku-5-5");
+  expect(savedModel(ctx)).toBe("cuvette:claude-haiku-5-5");
+  expect(await keepModelInPlan(ctx, ["claude-haiku-5-5"])).toBeUndefined();
 });

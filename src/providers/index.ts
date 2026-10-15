@@ -1,4 +1,6 @@
 import type { Provider } from "../core/types.ts";
+import { getAccount, knownPlanModels } from "../core/account.ts";
+import { cuvetteToken } from "../core/credentials.ts";
 import { hostedMode } from "../core/hosted.ts";
 import { ProviderError } from "../core/types.ts";
 import { ClaudeProvider, DEFAULT_CLAUDE_MODEL } from "./claude.ts";
@@ -39,6 +41,18 @@ export const CLAUDE_MODELS: ModelListing[] = [
   { spec: "claude:claude-fable-5-1", label: "Claude Fable 5.1", local: false, tools: true, contextWindow: 1_000_000 },
 ];
 
+export const listedClaudeIds = (): string[] => CLAUDE_MODELS.map((m) => m.spec.slice("claude:".length));
+
+export function cuvetteLabel(id: string): string {
+  const m = CLAUDE_MODELS.find((x) => x.spec === `claude:${id}`);
+  return `${(m?.label ?? id).replace(" (default)", "")} (Cuvette hosted)`;
+}
+
+export function cuvetteModels(planModels: string[] | undefined = knownPlanModels()): ModelListing[] {
+  if (!planModels) return [CUVETTE_MODEL];
+  return CLAUDE_MODELS.filter((m) => planModels.includes(m.spec.slice("claude:".length))).map((m) => ({ ...m, spec: `cuvette:${m.spec.slice("claude:".length)}`, label: cuvetteLabel(m.spec.slice("claude:".length)) }));
+}
+
 export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promise<Provider> {
   const i = spec.indexOf(":");
   const kind = i < 0 ? spec : spec.slice(0, i);
@@ -64,7 +78,11 @@ export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promi
 }
 
 export async function listModels(): Promise<ModelListing[]> {
-  const list = hostedMode() ? [...CLAUDE_MODELS, CUVETTE_MODEL] : [...CLAUDE_MODELS];
+  const list = [...CLAUDE_MODELS];
+  if (hostedMode()) {
+    if (cuvetteToken().from !== "none") await getAccount().catch(() => undefined);
+    list.push(...cuvetteModels());
+  }
   try {
     const res = await fetch(`${ollamaHost()}/api/tags`, { signal: AbortSignal.timeout(1500) });
     if (!res.ok) return list;
