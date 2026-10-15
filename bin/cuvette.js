@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { main as checkNode } from "./node-check.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import module from "node:module";
+
+checkNode(process.versions.node, process.stderr, process.exit);
 
 const root = new URL("../", import.meta.url);
 const bundle = new URL("dist/cli.js", root);
