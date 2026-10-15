@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { harnessWrite } from "./harness-writes.ts";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
@@ -90,47 +90,83 @@ function writeIndex(rows: IndexRow[]): void {
 }
 
 const LOCK_WAIT_MS = 6000;
-const LOCK_STALE_MS = 5000;
+const LOCK_OLD_MS = 30_000;
+export const INDEX_BUSY = "The session list is busy. Try again.";
 
-function stealStale(dir: string): void {
+function pidAlive(pid: number): boolean {
   try {
-    if (Date.now() - statSync(dir).mtimeMs <= LOCK_STALE_MS) return;
-    const aside = `${dir}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
-    renameSync(dir, aside);
-    rmSync(aside, { recursive: true, force: true });
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
+
+function lockHolder(path: string): { pid?: number; token?: string } {
+  try {
+    const j = JSON.parse(readFileSync(path, "utf8"));
+    return { pid: typeof j.pid === "number" ? j.pid : undefined, token: typeof j.token === "string" ? j.token : undefined };
+  } catch {
+    return {};
+  }
+}
+
+function stealStale(path: string): void {
+  try {
+    const holder = lockHolder(path);
+    const old = Date.now() - statSync(path).mtimeMs > LOCK_OLD_MS;
+    if (!old && (holder.pid === undefined || pidAlive(holder.pid))) return;
+    const aside = `${path}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
+    renameSync(path, aside);
+    if (lockHolder(aside).token !== holder.token) {
+      try {
+        linkSync(aside, path);
+      } catch {}
+    }
+    rmSync(aside, { force: true });
   } catch {}
 }
 
 function withIndexLock<T>(fn: () => T): T {
-  const dir = `${indexPath()}.lock`;
-  mkdirSync(dirname(dir), { recursive: true });
+  const path = `${indexPath()}.lock`;
+  mkdirSync(dirname(path), { recursive: true });
+  const token = `${process.pid}:${randomBytes(8).toString("hex")}`;
   const start = Date.now();
-  let held = false;
-  for (let wait = 20; !held; wait = Math.min(wait + 10, 50)) {
+  for (let wait = 10; ; wait = Math.min(wait + 10, 50)) {
     try {
-      mkdirSync(dir);
-      held = true;
-    } catch {
-      stealStale(dir);
-      if (Date.now() - start > LOCK_WAIT_MS) break;
+      writeFileSync(path, JSON.stringify({ pid: process.pid, token }), { flag: "wx" });
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+      stealStale(path);
+      if (Date.now() - start > LOCK_WAIT_MS) throw new Error(INDEX_BUSY);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
     }
   }
   try {
     return fn();
   } finally {
-    if (held) rmSync(dir, { recursive: true, force: true });
+    if (lockHolder(path).token === token) rmSync(path, { force: true });
+  }
+}
+
+function orBusy<T>(run: () => T, busy: T): T {
+  try {
+    return run();
+  } catch (e) {
+    if ((e as Error).message === INDEX_BUSY) return busy;
+    throw e;
   }
 }
 
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
-  withIndexLock(() => {
+  orBusy(() => withIndexLock(() => {
     const all = readIndex();
     const old = all.find((r) => r.id === p.id);
     const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
     writeIndex([...all.filter((r) => r.id !== p.id), row]);
-  });
+  }), undefined);
 }
 
 export function cutText(s: string, n: number): string {
@@ -139,23 +175,23 @@ export function cutText(s: string, n: number): string {
 }
 
 export function renameIndexRow(id: string, custom: string): boolean {
-  return withIndexLock(() => {
+  return orBusy(() => withIndexLock(() => {
     const rows = readIndex();
     const row = rows.find((r) => r.id === id);
     if (!row) return false;
     row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
     writeIndex(rows);
     return true;
-  });
+  }), false);
 }
 
 export function removeIndexRow(id: string): boolean {
-  return withIndexLock(() => {
+  return orBusy(() => withIndexLock(() => {
     const rows = readIndex();
     if (!rows.some((r) => r.id === id)) return false;
     writeIndex(rows.filter((r) => r.id !== id));
     return true;
-  });
+  }), false);
 }
 
 export function slug(text: string, max = 40): string {

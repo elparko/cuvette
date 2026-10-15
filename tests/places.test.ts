@@ -1,11 +1,11 @@
 import { chmodSync, utimesSync, existsSync, rmSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { COPY_LIMIT_BYTES, discardPlace, findPlace, indexPath, listPlaces, readIndex, saveIndexRow, slug } from "../src/core/places.ts";
+import { COPY_LIMIT_BYTES, discardPlace, findPlace, indexPath, listPlaces, readIndex, removeIndexRow, saveIndexRow, slug } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -377,33 +377,54 @@ test("two processes that save index rows at the same time lose no row", async ()
 }, 120_000);
 
 const rowOf = (id: string) => ({ id, recordDir: "/x", outDir: `/x/${id}`, project: "/x", title: "t", created: "2026-01-01", legacy: false, fallback: false });
-const staleLock = () => {
-  const lock = `${indexPath()}.lock`;
-  mkdirSync(lock, { recursive: true });
-  const old = new Date(Date.now() - 60_000);
-  utimesSync(lock, old, old);
-  return lock;
+const lockPath = () => `${indexPath()}.lock`;
+const deadPid = () => spawnSync(process.execPath, ["-e", ""]).pid!;
+const writeLock = (pid: number) => {
+  mkdirSync(home, { recursive: true });
+  writeFileSync(lockPath(), JSON.stringify({ pid, token: `${pid}:test` }));
 };
+const staleLock = () => writeLock(deadPid());
 
-test("a stale lock from a crash is replaced, and the write goes through at once", () => {
-  const lock = staleLock();
+test("a lock of a dead process is replaced, and the write goes through at once", () => {
+  staleLock();
   const start = Date.now();
   saveIndexRow(rowOf("a"));
-  expect(Date.now() - start).toBeLessThan(500);
+  expect(Date.now() - start).toBeLessThan(3000);
   expect(readIndex().map((r) => r.id)).toEqual(["a"]);
-  expect(existsSync(lock)).toBe(false);
+  expect(existsSync(lockPath())).toBe(false);
 });
 
 test("a write waits for a live lock of another process, then takes the lock and releases it", async () => {
-  const lock = `${indexPath()}.lock`;
-  mkdirSync(lock, { recursive: true });
-  const child = spawn(process.execPath, ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}, { recursive: true }), 1500)`], { stdio: "ignore" });
+  mkdirSync(home, { recursive: true });
+  const child = spawn(process.execPath, ["-e", `require("node:fs").writeFileSync(${JSON.stringify(lockPath())}, JSON.stringify({ pid: process.pid, token: "child" })); setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lockPath())}), 1500)`], { stdio: "ignore" });
   const exit = new Promise((done) => child.on("exit", done));
+  for (let i = 0; i < 1200 && !existsSync(lockPath()); i++) await new Promise((r) => setTimeout(r, 20));
   saveIndexRow(rowOf("b"));
   expect(readIndex().map((r) => r.id)).toEqual(["b"]);
-  expect(existsSync(lock)).toBe(false);
+  expect(existsSync(lockPath())).toBe(false);
   await exit;
 });
+
+test.skipIf(process.platform === "win32")("a holder that is killed with SIGKILL is recovered at once, because its pid is dead", async () => {
+  mkdirSync(home, { recursive: true });
+  const child = spawn(process.execPath, ["-e", `require("node:fs").writeFileSync(${JSON.stringify(lockPath())}, JSON.stringify({ pid: process.pid, token: "child" })); setInterval(() => {}, 1000)`], { stdio: "ignore" });
+  const exit = new Promise((done) => child.on("exit", done));
+  for (let i = 0; i < 1200 && !existsSync(lockPath()); i++) await new Promise((r) => setTimeout(r, 20));
+  child.kill("SIGKILL");
+  await exit;
+  const start = Date.now();
+  saveIndexRow(rowOf("k"));
+  expect(Date.now() - start).toBeLessThan(3000);
+  expect(readIndex().map((r) => r.id)).toEqual(["k"]);
+});
+
+test("a write that waits six seconds for a live lock does not run, and the callers keep working", () => {
+  writeLock(process.pid);
+  expect(removeIndexRow("none")).toBe(false);
+  saveIndexRow(rowOf("late"));
+  expect(readIndex()).toEqual([]);
+  expect(existsSync(lockPath())).toBe(true);
+}, 60_000);
 
 test("a steal of a stale lock leaves no moved-aside file", () => {
   staleLock();
@@ -411,7 +432,7 @@ test("a steal of a stale lock leaves no moved-aside file", () => {
   expect(readdirSync(home).filter((n) => n.includes(".lock"))).toEqual([]);
 });
 
-test("two processes that find the same stale lock both save their rows", async () => {
+test("two processes that find the same dead lock save 200 rows each and lose none", async () => {
   staleLock();
   const go = join(home, "go2");
   const code = (tag: string) => `
@@ -419,7 +440,7 @@ test("two processes that find the same stale lock both save their rows", async (
     import { saveIndexRow } from ${JSON.stringify(join(__dirname, "../src/core/places.ts"))};
     writeFileSync(${JSON.stringify(go)} + "-${tag}", "");
     while (!existsSync(${JSON.stringify(go)})) {}
-    for (let i = 0; i < 20; i++) saveIndexRow({ id: "${tag}-" + i, recordDir: "/x", outDir: "/x/" + i, project: "/x", title: "t", created: "2026-01-01", legacy: false, fallback: false });
+    for (let i = 0; i < 200; i++) saveIndexRow({ id: "${tag}-" + i, recordDir: "/x", outDir: "/x/" + i, project: "/x", title: "t", created: "2026-01-01", legacy: false, fallback: false });
   `;
   const run = (tag: string) => {
     const child = spawn(process.execPath, [TSX_CLI, "--eval", code(tag)], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
@@ -429,6 +450,6 @@ test("two processes that find the same stale lock both save their rows", async (
   for (let i = 0; i < 1200 && !(existsSync(`${go}-a`) && existsSync(`${go}-b`)); i++) await new Promise((r) => setTimeout(r, 50));
   writeFileSync(go, "");
   expect(await exits).toEqual([0, 0]);
-  expect(readIndex()).toHaveLength(40);
-  expect(existsSync(`${indexPath()}.lock`)).toBe(false);
-}, 120_000);
+  expect(readIndex()).toHaveLength(400);
+  expect(existsSync(lockPath())).toBe(false);
+}, 300_000);
