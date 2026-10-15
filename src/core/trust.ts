@@ -912,6 +912,12 @@ export function trustOnce(folder: string): void {
   once.set(k, { n: (once.get(k)?.n ?? 0) + 1, hash: scanFolder(k).hash });
 }
 
+function refreshOnce(folder: string): void {
+  const k = folderKey(folder);
+  const e = once.get(k);
+  if (e) once.set(k, { ...e, hash: scanFolder(k).hash });
+}
+
 export function endTrustOnce(folder: string): void {
   const k = folderKey(folder);
   const e = once.get(k);
@@ -986,7 +992,7 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   if (before === "trusted" || before === "none") {
     const s = scanFolder(folder);
     if (needsTrust(s)) trustFolder(folder);
-  }
+  } else if (before === "once") refreshOnce(folder);
 }
 
 export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
