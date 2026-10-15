@@ -562,7 +562,7 @@ function focusCard() {
   const card = activeCard();
   for (const c of document.querySelectorAll("#cards [data-card]")) c.classList.toggle("active", c === card);
   if (!card) return;
-  if (card !== cardEl) { cardEl = card; cardAt = Date.now(); }
+  if (card.dataset.card !== cardEl) { cardEl = card.dataset.card; cardAt = Date.now(); }
   const bs = optionButtons(card);
   markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
   const a = document.activeElement;
@@ -576,7 +576,7 @@ document.addEventListener("keydown", (e) => {
   if (document.querySelector("dialog[open]")) return;
   const card = activeCard();
   if (!card) return;
-  if (card === cardEl && Date.now() - cardAt < 400) return;
+  if (card.dataset.card === cardEl && Date.now() - cardAt < 400) return;
   const bs = optionButtons(card);
   let i = Number(card.dataset.sel || 0);
   if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }

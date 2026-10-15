@@ -175,5 +175,18 @@ unix("resume with an adapter folder of a recorded name uses the new folder and s
   session = undefined;
   session = await Session.resume(id, { addAdapters: [mine], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => realpathSync(a.root))).toEqual([realpathSync(mine)]);
-  expect(session.record.entries(["notice"]).some((n) => /adapter lab comes from the folder that you gave/.test(String(n.data.text)))).toBe(true);
+  expect(session.record.entries(["notice"]).some((n) => /adapter lab comes from the folder that you gave/.test(String(n.data.text)) && /used another folder before/.test(String(n.data.text)))).toBe(true);
+});
+
+unix("resume with an adapter folder says so when the recorded folder no longer exists", async () => {
+  const installed = installedLab();
+  const mine = evilAdapter(cwd, "lab");
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  rmSync(installed, { recursive: true, force: true });
+  session = await Session.resume(id, { addAdapters: [mine], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const texts = session.record.entries(["notice"]).map((n) => String(n.data.text));
+  expect(texts.some((t) => /adapter lab comes from the folder that you gave/.test(t) && /does not exist now/.test(t) && !/used another folder/.test(t))).toBe(true);
 });

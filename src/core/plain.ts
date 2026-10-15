@@ -32,3 +32,7 @@ export function commandText(argv: unknown[]): string {
     return /^[\w@%+=:,./-]+$/.test(s) ? s : visibleText(JSON.stringify(s));
   }).join(" ");
 }
+
+export function fmtSig(v: number, digits: number): string {
+  return String(Number(v.toPrecision(Math.max(digits, String(Math.trunc(Math.abs(v))).length))));
+}

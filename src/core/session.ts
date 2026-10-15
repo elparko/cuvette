@@ -471,7 +471,11 @@ export class Session {
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
-    for (const name of replaced) s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. This session used another folder before.`, warn: true });
+    for (const name of replaced) {
+      const before = recorded.get(name);
+      const missing = !!before && !existsSync(before);
+      s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
+    }
     for (const [name, untrusted] of gone) {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`

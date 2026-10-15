@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { EmptyReview, Findings, REFEREE_MAX_TOKENS, parseReferee, readsLikeReply, referee, refereePrompt, runChecks } from "../src/core/review.ts";
+import { EmptyReview, Findings, REFEREE_MAX_TOKENS, logText, parseReferee, readsLikeReply, referee, refereePrompt, runChecks } from "../src/core/review.ts";
 import type { Claim, Entry, EntryKind, Provider } from "../src/core/types.ts";
 
 function makeRecord(seed: { kind: EntryKind; data: Record<string, unknown>; node?: string }[] = [], nodes: any[] = [], stale: string[] = []) {
@@ -449,4 +449,32 @@ describe("a referee reply with no text", () => {
   test("the output cap is 8000 tokens", () => {
     expect(REFEREE_MAX_TOKENS).toBe(8000);
   });
+});
+
+test("a tool result that says no p value was computed is not a test in the record", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const withText = (text: string) => ({
+    record: { entries: () => [], live: (types: string[]) => (types.includes("tool_result") ? [{ data: { ok: true, tool: "run_script", text } }] : []), nodes: () => [], numbers: () => [], stale: () => new Set() },
+    decisions: { values: () => ({}) },
+    adapters: [],
+    answer: "The treated cells are significantly larger.",
+    claims: [],
+  });
+  const flagged = async (text: string) => (await run(withText(text) as never)).some((f) => f.check === "significance_without_test");
+  expect(await flagged("mean area 3.1\nno p value computed")).toBe(true);
+  expect(await flagged("The test failed to compute a p value")).toBe(true);
+  expect(await flagged("Welch t test\np value = 0.03")).toBe(false);
+  expect(await flagged("Not a large effect, p = 0.03")).toBe(false);
+  expect(await flagged("The tool could not compute a p value")).toBe(true);
+  expect(await flagged("There is no p value in the output")).toBe(true);
+  expect(await flagged("not adjusted p values: 0.01")).toBe(false);
+});
+
+test("the finding and the log text keep the integer digits of a number", async () => {
+  const held = { id: "n1", entry: 2, tool: "stats", outputs: [], parents: [], args: {}, result: { metrics: { p_value: 0.01, mean_diff: 12345.67 }, data: { test: "Welch t-test" }, table: { columns: ["a"], rows: [[1234567.89]] } } };
+  const seed = [{ kind: "tool_call" as EntryKind, data: { callId: "c1", tool: "stats", args: {} } }, { kind: "tool_result" as EntryKind, data: { callId: "c1", ok: true, summary: "Done." }, node: "n1" }];
+  const record = makeRecord(seed, [held]);
+  const out = await runChecks(ctx(record, "Drug 2 is better, p = 0.01.", { claims: [{ text: "p = 0.01", value: 0.01, label: "measured", node: "n1" } as Claim] }));
+  expect(out.find((f) => f.check === "p_without_effect")!.message).toContain("mean_diff = 12346");
+  expect(logText(record)).toContain("1234568");
 });

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
 import { decodeText, delimiterOf, parseCsv, type CsvNotes } from "./results.ts";
+import { fmtSig } from "./plain.ts";
 
 export interface CheckOption {
   value: string;
@@ -177,7 +178,7 @@ export function extremes(values: number[]): number[] {
   return values.flatMap((v, i) => (Math.abs((0.6745 * (v - med)) / mad) > 3.5 ? [i] : []));
 }
 
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.toPrecision(4))));
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : fmtSig(n, 4));
 
 export function checkTable(t: Table, source: string): DataCheck {
   const items: CheckItem[] = [];

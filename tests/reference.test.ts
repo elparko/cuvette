@@ -136,3 +136,8 @@ test("a file added in the same step of the modification time is found: a folder 
   utimesSync(root, was, was);
   expect(findReferences([root], ["counts"]).map((c) => c.path).sort()).toEqual([join(root, "a_counts.csv"), join(root, "b_counts.csv")]);
 });
+
+test("the comparison line keeps the integer digits of a number", () => {
+  expect(compareLine("area", 12345.67, 20000.5, "Area")).toContain("the agent got 12346;");
+  expect(compareLine("area", 12345.67, 20000.5, "Area")).toContain('says 20001');
+});

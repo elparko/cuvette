@@ -9,6 +9,7 @@ import { captureEnv, envTarget, packageChanges, type EnvLock } from "./envlock.t
 import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
+import { fmtSig } from "./plain.ts";
 
 export const REVIEW_PURPOSE = "Reviewing the answer";
 
@@ -168,7 +169,17 @@ export function statusText(states: StepState[], next = "Type /rerun to run the o
     ...s.reasons.map((r) => `${" ".repeat(width + 2)}${r.text}`),
     ...(s.unchecked ? [`${" ".repeat(width + 2)}${s.unchecked}`] : []),
   ]);
-  const head = out.length ? `${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date. ${next}` : states.length === 1 ? "The step is up to date." : `All ${states.length} steps are up to date.`;
+  const skipped = states.filter((s) => s.unchecked).length;
+  const allUpToDate = states.length === 1 ? "The step is up to date." : `All ${states.length} steps are up to date.`;
+  const notChecked = `${skipped} ${skipped === 1 ? "step is" : "steps are"} not checked.`;
+  const upToDate = states.length - skipped;
+  const head = out.length
+    ? `${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date.${skipped ? ` ${notChecked}` : ""} ${next}`
+    : skipped > 0 && skipped === states.length
+      ? states.length === 1 ? "The step is not checked." : `${states.length} steps are not checked.`
+      : skipped
+        ? `${upToDate} of ${states.length} steps ${upToDate === 1 ? "is" : "are"} up to date. ${notChecked}`
+        : allUpToDate;
   return [...lines, "", head].join("\n");
 }
 
@@ -285,7 +296,7 @@ export function changeRows(before: unknown, after: unknown): { rows: ChangeRow[]
 export function num(v: number | null): string {
   if (v === null) return "none";
   if (Number.isInteger(v)) return String(v);
-  return String(Number(v.toPrecision(4)));
+  return fmtSig(v, 4);
 }
 
 export function changeCell(r: ChangeRow): string {
