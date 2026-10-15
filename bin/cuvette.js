@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./node-check.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import module from "node:module";
 
