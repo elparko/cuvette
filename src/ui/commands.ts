@@ -3,7 +3,7 @@ import type { Mode, Owner, Question } from "../core/types.ts";
 import { pilotText } from "../core/pilot.ts";
 import { cutText } from "../core/places.ts";
 import { planView } from "../core/plan.ts";
-import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
+import { antLogin, claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { KEYS_URL, keyGuideText } from "../core/keyhelp.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { REVIEW_PURPOSE, statusText, stepStatus, type StepState } from "../core/status.ts";
@@ -870,6 +870,7 @@ const base: Command[] = [
         const ws = claudeWorkspace() ? ` Workspace ID: ${claudeWorkspace()}.` : "";
         if (k.from === "env") return ctx.notice(`The key ${maskKey(k.key!)} comes from ANTHROPIC_API_KEY in this shell.${ws}`);
         if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.${ws}`);
+        if (antLogin()) return ctx.notice(`Signed in with ant auth login.${ws}`);
         return ctx.notice("There is no Claude API key. Type /key to add one.");
       }
       if (sub === "remove") {
