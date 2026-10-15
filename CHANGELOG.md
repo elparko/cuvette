@@ -36,17 +36,17 @@ Release 0.1.1 includes all changes since 12 October.
 - A reply that starts with "None." and then lists findings keeps the findings.
 - A cut reply with no complete finding gives a notice that the reply is incomplete.
 - Cuvette sends `reasoning_effort` only to o3, o4 and gpt-5 models. It retries without the setting after an HTTP 400.
-- Effort `auto` sends no `reasoning_effort` to OpenAI models. The retry limit allows three refusals in a row.
+- Effort `auto` sends no `reasoning_effort` to OpenAI models. The app sends a request again up to three times after the server refuses a setting. A fourth refusal gives the error "The model server refused the request."
 - The key status and the key card show the `ant auth login` line.
-- The Claude API key setting and the setup key step tell about `ant auth login`.
+- The Claude API key setting and the setup key step show the `ant auth login` command.
 - The status row of an unchecked step shows "Not checked".
 - A large output that someone deleted shows "missing", not "changed".
 - The table route hint no longer shows if the table adapter is a default adapter.
 - The browser app does not show first setup again after you leave it.
-- Leave setup waits for the server before it goes to start. Setup comes back after a session closes with no key.
-- A job whose run throws ends as failed with the message. Later installs can start.
-- The command line waits longer than the install stop wait, so Ctrl+C during an install still closes the session.
-- The app prints a message after the first Ctrl+C. A second Ctrl+C quits at once.
+- Leave setup first sends the choice to the server. Then it shows the start page. Setup shows again after a session closes with no key.
+- An install job that throws an error ends as failed and shows the error message. A new install can start after it.
+- After Ctrl+C, the command line waits up to 20 seconds for the app to close. The app waits up to 6 seconds for an install to stop. So the session closes if an install runs.
+- The app prints "Stopping. Press Ctrl+C again to quit now." after the first Ctrl+C. A second Ctrl+C quits at once.
 
 ### Data and statistics
 
@@ -57,8 +57,9 @@ Release 0.1.1 includes all changes since 12 October.
 ### Windows
 
 - A folder path with a backslash shows with no quotes in the trust card, `trust list`, the refusal notices and the LAB.md card.
+- A command in a notice quotes a path with single quotes on Windows, so PowerShell reads `%`, `$` and a backtick as text. The notice shows each backslash of a path as it is.
 - An exported script imports the replay module with a file URL, so Node on Windows can run it.
-- An install of a program does not run on Windows. The message gives the download link of the program.
+- On Windows, the plan card of an install says that Cuvette cannot run the install command. It shows the download link and has no confirm button.
 - A session lock from a process that ended no longer blocks the session. Cuvette reads the start time of the process with PowerShell. If the lock stays, the message names the file to delete.
 - The output of a script uses one new line. Before, a Windows script gave a carriage return and a new line.
 
