@@ -1,0 +1,6 @@
+sample,group
+synthetic_ctl1,ctl
+synthetic_ctl2,ctl
+synthetic_ctl3,ctl
+synthetic_trt1,trt
+synthetic_trt2,trt
