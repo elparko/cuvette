@@ -10,8 +10,14 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   log2: (x) => Math.log2(num(x)),
   exp: (x) => Math.exp(num(x)),
   round: (x, n = 0) => {
-    const f = 10 ** num(n);
-    return Math.round(num(x) * f) / f;
+    const digits = num(n);
+    if (!Number.isInteger(digits)) throw new Error("round needs a whole number of digits, for example round(2.345, 2)");
+    const value = num(x);
+    if (!Number.isFinite(value)) return value;
+    const [mantissa, exponent = "0"] = String(Math.abs(value)).split("e");
+    const shifted = Math.round(Number(`${mantissa}e${Number(exponent) + digits}`));
+    const [m2, e2 = "0"] = String(shifted).split("e");
+    return Math.sign(value) * Number(`${m2}e${Number(e2) - digits}`);
   },
   sum: (...a) => flat(a).reduce((s, x) => s + x, 0),
   mean: (...a) => {
@@ -51,6 +57,22 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   },
 };
 
+const ARITY: Record<string, [number, number]> = {
+  abs: [1, 1], sqrt: [1, 1], log: [1, 1], log10: [1, 1], log2: [1, 1], exp: [1, 1], round: [1, 2],
+  ratio: [2, 2], pct_change: [2, 2], mae: [2, 2], rmse: [2, 2], r2: [2, 2],
+};
+const LIST_SEPARATOR = /(?<![\d.])\d{1,2}(?:,\d{3})+(?!\d)/;
+const SEPARATOR = /(?<![\d.])\d{1,3}(?:,\d{3})+(?!\d)/;
+
+function argumentsOnly(text: string): string {
+  let out = text;
+  for (let prev = ""; prev !== out; ) {
+    prev = out;
+    out = out.replace(/\[[^\][]*\]|\([^()]*\)/g, " ");
+  }
+  return out;
+}
+
 function num(v: Val): number {
   if (Array.isArray(v)) throw new Error("a list was given where one number is needed");
   return v;
@@ -67,7 +89,9 @@ function pairs(a: Val, b: Val): [number, number][] {
 }
 
 export function evaluate(src: string): Val {
-  const toks = src.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|\*\*|[-+*/^(),[\]]|\S/gi) ?? [];
+  const found = Array.from(src.matchAll(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|\*\*|[-+*/^(),[\]]|\S/gi));
+  const toks = found.map((m) => m[0]);
+  const at = found.map((m) => m.index ?? 0);
   let i = 0;
   const peek = () => toks[i];
   const take = (t?: string) => {
@@ -131,7 +155,10 @@ export function evaluate(src: string): Val {
       return v;
     }
     if (t === "[") {
+      const open = at[i - 1]! + 1;
       const items = list("]");
+      const grouped = LIST_SEPARATOR.exec(src.slice(open, at[i] ?? src.length));
+      if (grouped) throw new Error(`"${grouped[0]}" has a comma between digits. Write a number without a thousands separator, for example ${grouped[0].replace(/,/g, "")}. To give separate items, write a space after each comma, for example ${grouped[0].replace(/,/g, ", ")}`);
       take("]");
       return items.map(num);
     }
@@ -141,8 +168,15 @@ export function evaluate(src: string): Val {
       const f = FUNCS[t.toLowerCase()];
       if (!f) throw new Error(`unknown function ${t}. Functions: ${Object.keys(FUNCS).join(", ")}`);
       take("(");
+      const open = at[i - 1]! + 1;
       const args = list(")");
+      const close = at[i] ?? src.length;
       take(")");
+      const [min, max] = ARITY[t.toLowerCase()] ?? [1, Infinity];
+      const grouped = SEPARATOR.exec(argumentsOnly(src.slice(open, close)));
+      const hint = grouped ? `. "${grouped[0]}" has a comma between digits. Write a number without a thousands separator, for example ${grouped[0].replace(/,/g, "")}. To give separate arguments, write a space after each comma, for example ${grouped[0].replace(/,/g, ", ")}` : "";
+      if (args.length < min || args.length > max) throw new Error(`${t} takes ${min === max ? min : max === Infinity ? `${min} or more` : `${min} to ${max}`} argument(s), not ${args.length}${hint}`);
+      if (grouped && max === Infinity) throw new Error(`${t} has "${grouped[0]}" in its arguments${hint}`);
       return f(...args);
     }
     throw new Error(`unexpected "${t}"`);
@@ -158,7 +192,7 @@ export function calculateTool(): Tool {
     description:
       "Do arithmetic on numbers from tool results. Use it for each ratio, difference, percent change, mean or error that you report and that no tool reported; do not do arithmetic in your answer. If a tool result already has the value, report that value and do not compute it again. mae, rmse and r2 take one pair of numbers for each sample or image, not the totals. " +
       "Write one expression per item, for example \"ratio(412, 450)\", \"pct_change(46, 50)\", \"mae([48,10],[50,10])\", \"r2([1,2,3],[1,2,4])\". " +
-      "Operators: + - * / ^ and brackets. Lists: [1, 2, 3]. Functions: " + Object.keys(FUNCS).join(", ") + ".",
+      "Operators: + - * / ^ and brackets. Lists: [1, 2, 3]. Put a space after each comma between arguments, because 1,234 can read as a number with a thousands separator. round(x, n) rounds a half away from zero, as Excel does: round(0.285, 2) is 0.29 and round(-2.5) is -3. Functions: " + Object.keys(FUNCS).join(", ") + ".",
     inputSchema: {
       type: "object",
       properties: {

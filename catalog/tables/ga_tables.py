@@ -107,18 +107,29 @@ def _bad_file(path):
     return BadFile("The file is not a valid %s file: %s" % (kind, os.path.basename(path)))
 
 
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
+
+
 def load(path, sheet=None):
     path = os.path.expanduser(path)
     try:
         if _is_xlsx(path):
-            return pd.read_excel(path, sheet_name=sheet or 0)
-        return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",", encoding=text_encoding(path))
+            frame = pd.read_excel(path, sheet_name=sheet or 0)
+            raw = pd.read_excel(path, sheet_name=sheet or 0, keep_default_na=False)
+        else:
+            sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
+            frame = pd.read_csv(path, sep=sep, encoding=text_encoding(path))
+            raw = pd.read_csv(path, sep=sep, encoding=text_encoding(path), dtype=str, keep_default_na=False)
     except _FILE_ERRORS:
         raise _bad_file(path) from None
     except ValueError as e:
         if "Excel file format" in str(e):
             raise _bad_file(path) from None
         raise
+    for column in frame.columns:
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+    return frame
 
 
 def _need(frame, cols):
@@ -480,7 +491,8 @@ def summarize_table(path, values=None, group_by=None, ratios=None, sheet=None):
         values = [c for c in frame.columns if c not in group_by and pd.api.types.is_numeric_dtype(frame[c]) and c not in (ratios or {})]
     values = values + [r for r in (ratios or {}) if r not in values]
     rows = []
-    groups = frame.groupby(group_by, sort=False, dropna=False) if group_by else [((), frame)]
+    groups = frame.groupby(group_by, sort=False, dropna=True) if group_by else [((), frame)]
+    no_group = int(frame[group_by].isna().any(axis=1).sum()) if group_by else 0
     for key, part in groups:
         key = key if isinstance(key, tuple) else (key,)
         for v in values:
@@ -500,6 +512,8 @@ def summarize_table(path, values=None, group_by=None, ratios=None, sheet=None):
                                                            _fmt(r[len(group_by) + 3]), _fmt(r[len(group_by) + 4]), r[len(group_by) + 1]))
     by = " by " + ", ".join(group_by) if group_by else ""
     summary = "Summarized %s%s over %d rows. %s%s." % (", ".join(values), by, len(frame), "; ".join(parts), "; ..." if len(rows) > 8 else "")
+    if no_group:
+        summary += " %d %s no group label and %s left out." % (no_group, "row has" if no_group == 1 else "rows have", "is" if no_group == 1 else "are")
     if ratios:
         rows_path = _save(frame, "rows-with-ratios")
         summary += " Each ratio is computed per row, then summarized. The rows with the ratio columns are in %s; use it for make_plot." % rows_path

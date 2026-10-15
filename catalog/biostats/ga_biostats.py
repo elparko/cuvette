@@ -1,3 +1,5 @@
+import functools
+import inspect
 import os
 import re
 import warnings
@@ -8,14 +10,26 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
+
+
+def _typed(path, enc):
+    frame = pd.read_csv(path, encoding=enc)
+    raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+    for column in frame.columns:
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+    return frame
+
+
 def _read(path):
     path = os.path.expanduser(path)
     for enc in ("utf-8-sig", "cp1252"):
         try:
-            return pd.read_csv(path, encoding=enc)
+            return _typed(path, enc)
         except UnicodeDecodeError:
             pass
-    return pd.read_csv(path, encoding="latin-1")
+    return _typed(path, "latin-1")
 
 
 def _fail(message):
@@ -150,6 +164,31 @@ def inspect_table(path):
     }
 
 
+def _note_missing_group(*arguments):
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            if not isinstance(result, dict) or not result.get("ok"):
+                return result
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            bound.apply_defaults()
+            columns = []
+            for name in arguments:
+                value = bound.arguments.get(name)
+                columns += [value] if isinstance(value, str) else list(value or [])
+            frame = _read(bound.arguments["path"])
+            columns = [c for c in columns if c in frame.columns]
+            dropped = int(frame[columns].isna().any(axis=1).sum()) if columns else 0
+            result.setdefault("metrics", {})["n_dropped_missing_group"] = dropped
+            if dropped:
+                result["summary"] = result.get("summary", "") + " %d %s no group and %s left out." % (dropped, "row has" if dropped == 1 else "rows have", "is" if dropped == 1 else "are")
+            return result
+        return run
+    return wrap
+
+
+@_note_missing_group("group")
 def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=None, alternative="two-sided", alpha=0.05, equal_variance=False):
     from scipy import stats
     frame = _read(path)
@@ -236,6 +275,7 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
             "table": _table(pd.DataFrame([row]), "two_group_test")}
 
 
+@_note_missing_group("group")
 def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0.05):
     import pingouin as pg
     posthoc = {"bonferroni": "bonf"}.get(posthoc, posthoc)
@@ -296,12 +336,18 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
 def adjust_pvalues(pvalues, method="holm", alpha=0.05):
     from statsmodels.stats.multitest import multipletests
     p = np.asarray(pvalues, dtype=float)
-    reject, adjusted, _, _ = multipletests(p, alpha=alpha, method=method)
+    valid = ~np.isnan(p)
+    adjusted = np.full(len(p), np.nan)
+    reject = np.zeros(len(p), dtype=bool)
+    if valid.any():
+        reject[valid], adjusted[valid], _, _ = multipletests(p[valid], alpha=alpha, method=method)
     frame = pd.DataFrame({"p_raw": p, "p_adjusted": adjusted, "reject": reject})
+    skipped = int((~valid).sum())
+    note = " %d missing p-values were left out of the count." % skipped if skipped else ""
     return {
         "ok": True,
-        "summary": "%s correction of %d p-values at alpha %g: %d rejected." % (method, len(p), alpha, int(reject.sum())),
-        "metrics": _metrics({"n_tests": len(p), "n_rejected": int(reject.sum())}),
+        "summary": "%s correction of %d p-values at alpha %g: %d rejected.%s" % (method, int(valid.sum()), alpha, int(reject.sum()), note),
+        "metrics": _metrics({"n_tests": int(valid.sum()), "n_rejected": int(reject.sum())}),
         "table": _table(frame, "adjusted_p"),
     }
 
@@ -391,6 +437,7 @@ def _event_problem(series, name):
     return "The event column %s must hold 1 for an event and 0 for a censored subject. Its values are: %s. If the file uses 1 for censored and 2 for an event (as in R), recode it first." % (name, shown)
 
 
+@_note_missing_group("group")
 def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None, subset=None):
     import matplotlib
     matplotlib.use("Agg")
@@ -510,12 +557,14 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
         loglik = float(res.llf)
         ph_p = {}
     metrics = {"n": len(data), "events": int(data[event].sum()), "concordance": concordance, "log_likelihood": loglik, "n_dropped": dropped}
+    term_keys = []
     for _, r in table.iterrows():
         key = _key(r["term"])
         metrics["coef_" + key] = r["coef"]
         metrics["hr_" + key] = r["hazard_ratio"]
         metrics["se_" + key] = r["se"]
         metrics["p_" + key] = r["p"]
+        term_keys.append("p_" + key)
     if ph_p:
         metrics["ph_test_min_p"] = min(ph_p.values())
         for k, v in ph_p.items():
@@ -534,7 +583,7 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
     if low:
         summary += " Proportional hazards test p below alpha for: %s." % ", ".join("%s (p = %.3g)" % (k, ph_p[k]) for k in low)
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics),
-            "data": {"ties": ties, "alpha": alpha, "ph_test_p": ph_p, "ph_violations": low, "reference_levels": refs, "subset": subset or "all"},
+            "data": {"ties": ties, "alpha": alpha, "ph_test_p": ph_p, "ph_violations": low, "reference_levels": refs, "subset": subset or "all", "p_terms": term_keys},
             "table": _table(table, "cox")}
 
 
@@ -687,7 +736,8 @@ def chi_square_test(path=None, row=None, column=None, counts=None, correction=No
     n = int(table.sum())
     below = int((expected < 5).sum())
     cells = expected.size
-    cramers_v = float(np.sqrt(chi2 / (n * (min(table.shape) - 1))))
+    chi2_plain = stats.chi2_contingency(table, correction=False)[0] if use else chi2
+    cramers_v = float(np.sqrt(chi2_plain / (n * (min(table.shape) - 1))))
     name = "Pearson chi-square test" + (" with Yates continuity correction" if use else "")
     summary = "%s, %d x %d table, n = %d: chi-square %.4g on %d df, p = %.4g (alpha %g). Cramer's V %.3g." % (name, table.shape[0], table.shape[1], n, chi2, dof, p, alpha, cramers_v)
     warning = ""

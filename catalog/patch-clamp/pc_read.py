@@ -145,6 +145,21 @@ def _read_neo(path, channel, signal_unit=None):
     return Recording(path, "neo %s" % type(io).__name__, sweeps, rate, mode, unit, "", notes=["Neo files carry no command waveform. Give stim_window."])
 
 
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
+
+
+def read_labels_csv(path, **kw):
+    import numpy as np
+    import pandas as pd
+
+    frame = pd.read_csv(path, **kw)
+    raw = pd.read_csv(path, dtype=str, keep_default_na=False, **kw)
+    for column in frame.columns:
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
+    return frame
+
+
 def _read_text_table(path, signal_unit):
     import pandas as pd
 

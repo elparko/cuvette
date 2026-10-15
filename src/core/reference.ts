@@ -180,22 +180,17 @@ export function describeCandidate(c: Candidate): string {
   return `${basename(c.path)}${c.sheet && c.sheet !== basename(c.path) ? ` (sheet ${c.sheet}: ${cols})` : ` (columns ${cols})`}`;
 }
 
+const FILE_EXTENSION = /\.(tiff?|png|jpe?g|bmp|czi|nd2|lif|lsm|oib|oif|ims|vsi|svs|ndpi|fcs|csv|tsv|txt|xlsx?|abf|dcm|nii|h5|hdf5|zarr|fastq|bam|raw|mzml|imzml)$/i;
+const stemNorm = (v: unknown) => norm(String(v ?? "").trim().replace(FILE_EXTENSION, ""));
+
 export function referenceValues(ref: Reference, sample: string): Record<string, number> | undefined {
   const sheets = readTable(ref.path);
   const s = sheets.find((x) => !ref.sheet || x.name === ref.sheet) ?? sheets[0];
   if (!s) return undefined;
   const key = ref.sample_column ? s.columns.indexOf(ref.sample_column) : 0;
-  const want = norm(sample);
+  const want = stemNorm(sample);
   if (!want) return undefined;
-  const at = (r: unknown[]) => norm(r[Math.max(0, key)]);
-  const near = s.rows.filter((r) => {
-    const v = at(r);
-    return v && (want.includes(v) || v.includes(want));
-  });
-  const gap = (r: unknown[]) => Math.abs(at(r).length - want.length);
-  const best = Math.min(...near.map(gap));
-  const closest = near.filter((r) => gap(r) === best);
-  const row = s.rows.find((r) => at(r) === want) ?? (closest.length === 1 ? closest[0] : undefined);
+  const row = s.rows.find((r) => stemNorm(r[Math.max(0, key)]) === want);
   if (!row) return undefined;
   const cols = ref.columns?.length ? ref.columns : s.columns.filter((_, i) => i !== key);
   const out: Record<string, number> = {};
