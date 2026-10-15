@@ -46,6 +46,16 @@ describe("table checks", () => {
     expect(item(c, "missing:dose").rows).toEqual([6]);
   });
 
+  test("a row number in a message is the line of the file, after a blank line and a cell on two lines", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-datacheck-lines-"));
+    const file = join(dir, "lines.csv");
+    const rows = ["id,note,dose", "a,\"two\nlines\",1", "", "b,x,", "c,y,3", "d,z,4"];
+    writeFileSync(file, rows.join("\n") + "\n");
+    const c = checkTable(readCsvTable(file), "lines.csv");
+    expect(item(c, "missing:dose").rows).toEqual([5]);
+    expect(item(c, "missing:dose").text).toContain("row 5");
+  });
+
   test("an empty column is shown, not asked", () => {
     const c = checkTable(t(["id", "value", "spare"], [["a", "1", ""], ["b", "2", ""], ["c", "3", ""]]), "x.csv");
     expect(item(c, "empty:spare")).toMatchObject({ level: "note", text: "Column 'spare' is empty. The harness does not use it." });

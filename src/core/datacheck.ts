@@ -35,6 +35,7 @@ export interface Table {
   rows: string[][];
   encoding?: string;
   ragged?: number[];
+  lines?: number[];
   quotes?: CsvNotes;
 }
 
@@ -62,11 +63,14 @@ const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 export function readCsvTable(path: string): Table {
   const { text, encoding } = decodeText(readFileSync(path));
   const delim = delimiterOf(text, path);
-  const quotes: CsvNotes = { stray: [], multiline: [] };
-  const grid = parseCsv(/[\r\n]$/.test(text) ? text : `${text}\n`, delim, quotes).filter((r) => r.some((c) => c.trim() !== ""));
-  const [head = [], ...rows] = grid;
+  const quotes: CsvNotes = { stray: [], multiline: [], starts: [] };
+  const all = parseCsv(/[\r\n]$/.test(text) ? text : `${text}\n`, delim, quotes);
+  const kept = all.flatMap((r, i) => (r.some((c) => c.trim() !== "") ? [i] : []));
+  const [head = [], ...rows] = kept.map((i) => all[i]!);
+  const lines = kept.slice(1).map((i) => quotes.starts![i]!);
+  delete quotes.starts;
   const ragged = rows.flatMap((r, i) => (r.slice(head.length).some((c) => c.trim() !== "") ? [i] : []));
-  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}), ...(quotes.stray.length || quotes.multiline.length ? { quotes } : {}) };
+  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}), ...(lines.some((l, i) => l !== i + 2) ? { lines } : {}), ...(quotes.stray.length || quotes.multiline.length ? { quotes } : {}) };
 }
 
 type Kind = "num" | "comma" | "astext" | "text" | "missing";
@@ -157,8 +161,6 @@ export function unitOf(column: string): string | undefined {
   return m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
 }
 
-const fileRow = (i: number) => i + 2;
-
 export function median(xs: number[]): number {
   const s = Float64Array.from(xs).sort();
   const m = s.length >> 1;
@@ -186,6 +188,7 @@ export function checkTable(t: Table, source: string): DataCheck {
   for (const c of t.columns) nameCount.set(c, (nameCount.get(c) ?? 0) + 1);
   for (const c of cols) if ((nameCount.get(c.name) ?? 0) > 1) c.name = `${c.name || "(no name)"} (column ${cols.indexOf(c) + 1})`;
   const at = (c: ColInfo) => cols.indexOf(c);
+  const fileRow = (i: number) => t.lines?.[i] ?? i + 2;
 
   if (t.ragged?.length) {
     const rows = t.ragged.map(fileRow);
