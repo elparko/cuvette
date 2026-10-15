@@ -302,6 +302,13 @@ test("typed keeps a column of IDs with a leading zero as text", () => {
   expect(typed([["001", "1.5"], ["002", "2"]], 2)).toEqual([["001", 1.5], ["002", 2]]);
 });
 
+test("a value that is not finite as a number, and an ID with an exponent, stay text", () => {
+  expect(typed([["1e400"], ["2"]], 1)).toEqual([["1e400"], ["2"]]);
+  expect(typed([["5E3"], ["7E10"]], 1)).toEqual([["5E3"], ["7E10"]]);
+  expect(typed([["1.5e3"], ["2"]], 1)).toEqual([[1500], [2]]);
+  expect(typed([["3e2"], ["2"]], 1)).toEqual([[300], [2]]);
+});
+
 test("an integer with more than 15 digits stays text, so the workbook keeps each digit", () => {
   expect(typed([["12345678901234567890"], ["98765432109876543210"]], 1)).toEqual([["12345678901234567890"], ["98765432109876543210"]]);
   expect(typed([["0.30000000000000004"], ["123456789012345"]], 1)).toEqual([[0.30000000000000004], [123456789012345]]);

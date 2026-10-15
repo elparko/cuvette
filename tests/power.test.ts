@@ -90,6 +90,15 @@ describe("power notes from the record", () => {
     expect(p.minimum * sd).toBeCloseTo(1.225, 2);
   });
 
+  test("an unpaired t-test uses the two-sample design, a paired one uses the paired design", () => {
+    const m = { n_a: 10, n_b: 12, statistic: 2.5, mean_diff: 1.2, p_value: 0.02 };
+    const unpaired = powerFindings(recordWith([ttest("n1", "unpaired t-test", m)]))[0].message;
+    expect(unpaired).toMatch(/^With 10 and 12 subjects in the groups, the unpaired t-test/);
+    expect(powerFindings(recordWith([ttest("n1", "Welch unpaired t-test", m)]))[0].message).toMatch(/^With 10 and 12 subjects in the groups/);
+    expect(powerFindings(recordWith([ttest("n1", "paired t-test", { ...m, n_b: 10 })]))[0].message).toMatch(/^With 10 pairs, the paired t-test/);
+    expect(powerFindings(recordWith([ttest("n1", "(paired) t-test", { ...m, n_b: 10 })]))[0].message).toMatch(/^With 10 pairs/);
+  });
+
   test("a note, not an error, for a small sample", () => {
     const out = powerFindings(recordWith([sleepPaired]));
     expect(out).toHaveLength(1);

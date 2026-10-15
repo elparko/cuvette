@@ -155,6 +155,14 @@ test("a session shows its title, its sentence and its status", () => {
   expect(listSessions(h)[0]!.status).toBe("waiting for you");
 });
 
+test("a session with work and no question has the status in progress", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-"));
+  const dir = join(h, "sessions", "20261009-090000-eeee");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "log.jsonl"), [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "node", data: { outputs: [] } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
+  expect(listSessions(h)[0]!.status).toBe("in progress");
+});
+
 test("the list reads a log again only after it changes, and the running status stays current", () => {
   const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-cache-"));
   const dir = join(h, "sessions", "20261012-100000-dddd");

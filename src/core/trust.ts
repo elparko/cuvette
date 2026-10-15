@@ -845,7 +845,7 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   }
 }
 
-const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
+export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
 
 const show = (v: unknown) => oneLine(typeof v === "string" ? v : JSON.stringify(v));
 
