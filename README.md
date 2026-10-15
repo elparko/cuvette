@@ -38,6 +38,8 @@ node bin/cuvette.js --help
 node bin/cuvette.js adapters
 ```
 
+Run `npm run ui:build` once after `npm install`, or the app shows the older page.
+
 ### First start and check
 
 Start `cuvette` for the first time with no Claude API key and no local model. Then `cuvette` asks one
