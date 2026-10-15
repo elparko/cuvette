@@ -634,3 +634,7 @@ test("the Masker with more than 1000 values gives the same text as with few valu
   expect(few.text(text)).toBe("[NAME 1] [NAME 3], and [NAME 2].");
   expect(many.text(text)).toBe("[NAME 999] [NAME 1001], and [NAME 1000].");
 });
+
+test("localUrl treats 0.0.0.0 as local", () => {
+  expect(localUrl("http://0.0.0.0:11434")).toBe(true);
+});

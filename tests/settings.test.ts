@@ -8,7 +8,7 @@ import { budgetUsd } from "../src/core/spend.ts";
 import { loadSettings, xlsxOn } from "../src/core/config.ts";
 import { trustFolder } from "../src/core/trust.ts";
 import { folderHasNoPatientData } from "../src/core/phi.ts";
-import { saveSetting, secretState } from "../src/ui/config.ts";
+import { rowTag, saveSetting, secretState } from "../src/ui/config.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
 const old = process.env.CUVETTE_HOME;
@@ -263,4 +263,11 @@ test("the key state text for an ant auth login is not 'not set'", () => {
   mkdirSync(join(cfg, "credentials"));
   writeFileSync(join(cfg, "credentials", "default.json"), "{}");
   expect(secretState(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never)).toBe("signed in with ant auth login");
+});
+
+test("the key row for an ant auth login has a source tag", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  mkdirSync(join(cfg, "credentials"));
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(rowTag(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never, cwd)).toBe("ant login");
 });

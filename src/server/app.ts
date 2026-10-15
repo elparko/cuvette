@@ -55,6 +55,7 @@ export const APP_CLOSE_LIMIT_MS = JOB_STOP_WAIT_MS + 14_000;
 
 export async function stopApp(close: () => Promise<unknown>, limitMs = APP_CLOSE_LIMIT_MS) {
   process.once("SIGINT", () => process.exit(130));
+  process.once("SIGTERM", () => process.exit(143));
   await Promise.race([close(), new Promise((r) => setTimeout(r, limitMs).unref())]);
 }
 
@@ -250,7 +251,6 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     c.view.close();
     c.graph.close();
     if (c.owned) await c.session.close().catch(() => {});
-    if (needsSetup()) leftSetup = false;
   };
 
   const attach = (session: SessionLike, owned: boolean) => {
@@ -263,6 +263,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const quit = async (): Promise<string | void> => {
     if (current && !current.owned) return TERMINAL_QUIT;
     await detach();
+    if (needsSetup()) leftSetup = false;
     broadcastIdle({ t: "switch" });
     opts.onQuit?.();
   };
@@ -553,19 +554,17 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         if (job.lines.length > JOB_LINES) job.lines.splice(0, job.lines.length - JOB_LINES);
         jobSend(job, { line });
       };
-      job.ended = runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal }).then((d) => {
-        job.done = { ok: d.ok, text: d.text };
-        jobSend(job, { done: true, ...job.done });
+      const finish = (done: { ok: boolean; text: string }) => {
+        if (job.done) return;
+        job.done = done;
+        jobSend(job, { done: true, ...done });
         for (const x of job.subs) x.end();
         job.subs.clear();
         setTimeout(() => jobs.delete(id), 600_000).unref();
-      }).catch((e: Error) => {
-        job.done = { ok: false, text: `The ${r.plan!.action} did not finish: ${e.message}` };
-        jobSend(job, { done: true, ...job.done });
-        for (const x of job.subs) x.end();
-        job.subs.clear();
-        setTimeout(() => jobs.delete(id), 600_000).unref();
-      });
+      };
+      job.ended = runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal })
+        .then((d) => finish({ ok: d.ok, text: d.text }))
+        .catch((e: Error) => finish({ ok: false, text: `The ${r.plan!.action} did not finish: ${e.message}` }));
       return send(res, 200, { job: id });
     }
     if (p === "/api/programs/stop") {

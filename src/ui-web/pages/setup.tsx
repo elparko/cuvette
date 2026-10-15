@@ -205,8 +205,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
         )}
         {!done && (
           <Button variant="ghost" size="sm" className="mt-3" onClick={async () => {
-              await call("api/leave-setup", {}).catch(() => {});
-              ctx.go("start");
+              if (await post("api/leave-setup", {})) ctx.go("start");
             }}>
             Leave setup
           </Button>

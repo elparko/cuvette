@@ -457,8 +457,9 @@ async function app(folder?: string) {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
   });
-  console.log("Stopping. Press Ctrl+C again to quit now.");
+  const slow = setTimeout(() => console.log("Stopping. Press Ctrl+C again to quit now."), 1000);
   await stopApp(() => a.close());
+  clearTimeout(slow);
   process.exit(0);
 }
 

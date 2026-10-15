@@ -18,7 +18,7 @@ export const RESET = "Reset to default";
 
 export const SCOPE_BUTTON: Record<Scope, string> = { session: "This session", user: "Me (all projects)", project: "This project" };
 const SAVED_FOR: Record<Scope, string> = { session: "Saved for this session.", user: "Saved for me (all projects).", project: "Saved for this project." };
-const BADGE: Record<string, string> = { default: "Default", user: "User", project: "Project", session: "This session", env: "Environment" };
+const BADGE: Record<string, string> = { default: "Default", user: "User", project: "Project", session: "This session", env: "Environment", ant: "ant login" };
 
 export function settingRows(ctx: SettingCtx, busy: boolean): SettingRow[] {
   return describe(ctx).map((r) => ({ ...r, locked: !!(r.def.lockedInTurn && busy) }));
