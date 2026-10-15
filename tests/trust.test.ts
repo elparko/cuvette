@@ -566,6 +566,7 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a LAB.md 
   session = await start(true);
   const notice = session.record.entries(["notice"]).map((e) => String(e.data.text)).find((t) => t.startsWith("Cuvette could not read LAB.md in"));
   expect(notice).toMatch(/\. Cuvette ignores the file\. Fix the file, then start the session again\.$/);
+  await session.send("Summarize the data.");
   const dir = session.record.dir;
   await session.close();
   session = await Session.resume(dir, { provider: new FakeProvider([{ text: "ok" }]), interactive: true });
