@@ -132,6 +132,7 @@ describe("the app server", () => {
     expect(s.steered.map((x) => [x.text, x.now])).toEqual([["use RMS", false], ["stop now", true]]);
     await c.post("api/stop", {});
     expect(s.interrupts).toBeGreaterThan(0);
+    await until(() => ev.msgs.some((m) => m.t === "append" && m.html.includes("The agent did not read these 2 messages")));
     ev.close();
   });
 

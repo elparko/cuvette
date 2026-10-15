@@ -19,7 +19,7 @@ import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
 import { canGoBack, isPlainQuestion, questionHead, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
 import { applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
-import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
+import { droppedNote, inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
 import { terminalStdin } from "./key-stream.ts";
@@ -357,8 +357,12 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
 
   const escape = () => {
     if (status.state !== "idle") {
+      const dropped = stopTurn(session, queueRef.current);
       updateQueue([]);
-      stopTurn(session);
+      if (!dropped.length) return;
+      const restored = !input;
+      if (restored) setText(dropped.join("\n"));
+      line("!", droppedNote(dropped, restored), "yellow");
     } else if (input && keyStyle !== "vim") setText("");
   };
 

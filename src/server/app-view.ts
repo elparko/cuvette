@@ -9,7 +9,7 @@ import {
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, failureText, parseCommand, unknownCommand, type CommandCtx } from "../ui/commands.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
-import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
+import { activityText, droppedNote, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import type { SessionLike } from "../ui/types.ts";
 import { cardHtml, itemHtml, runHtml, splitRuns, type Ctx, type Slot } from "./app-html.ts";
 import { usageFields } from "../ui/messages.ts";
@@ -362,8 +362,9 @@ export class WebView {
 
   stop(): void {
     this.stopping = this.busy;
+    const dropped = stopTurn(this.session, this.queue);
     this.queue = [];
-    stopTurn(this.session);
+    if (dropped.length) this.line("!", droppedNote(dropped, false), "yellow");
     this.sendStatus();
   }
 

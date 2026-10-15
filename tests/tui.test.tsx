@@ -201,6 +201,19 @@ describe("messages during a turn", () => {
     expect(s.sent).toEqual([]);
   });
 
+  test("Esc shows the dropped messages and puts them back in the input box", async () => {
+    const { h, s } = start();
+    s.settings.messages = "queue";
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "later one");
+    await until(() => h.all().includes("Queued: later one"));
+    await type(h, "\x1b");
+    await until(() => h.all().includes('The agent did not read this message: "later one". It is back in the input box.'));
+    await until(() => h.last().includes("> later one"));
+  });
+
   test("a message that the agent did not read before the turn ended goes as the next request", async () => {
     const { h, s } = start();
     await sleep(100);
