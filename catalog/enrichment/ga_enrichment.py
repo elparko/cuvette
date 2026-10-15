@@ -229,6 +229,8 @@ def run_ora(path, gene_sets, id_column, background, padj_column=None, padj_max=N
         query = {str(g).strip() for g in (gene_list.split(",") if isinstance(gene_list, str) else gene_list) if str(g).strip()}
         rule = "the given list of %d genes" % len(query)
     else:
+        if lfc_min is not None and not lfc_column:
+            return _fail("lfc_min %g needs lfc_column, the log2 fold change column. Give lfc_column, or remove lfc_min." % float(lfc_min))
         if not (padj_column and padj_max is not None) and not (lfc_column and lfc_min is not None):
             return _fail("A gene list needs padj_column with padj_max, or lfc_column with lfc_min, or gene_list. The cutoff for a significant gene is a decision.")
         if padj_max is not None and float(padj_max) < 1 and not padj_column:
@@ -242,15 +244,16 @@ def run_ora(path, gene_sets, id_column, background, padj_column=None, padj_max=N
         if lfc_column and (lfc_min is not None or direction != "both"):
             lfc = frame[lfc_column]
             cut = float(lfc_min or 0)
+            tag = " (lfc_min)" if lfc_min is not None else ""
             if direction == "up":
                 sel &= lfc > cut
-                rule += (", " if rule else "") + "%s > %g" % (lfc_column, cut)
+                rule += (", " if rule else "") + "%s > %g%s" % (lfc_column, cut, tag)
             elif direction == "down":
                 sel &= lfc < -cut
-                rule += (", " if rule else "") + "%s < -%g" % (lfc_column, cut)
+                rule += (", " if rule else "") + "%s < -%g%s" % (lfc_column, cut, tag)
             else:
                 sel &= lfc.abs() > cut
-                rule += (", " if rule else "") + "|%s| > %g" % (lfc_column, cut)
+                rule += (", " if rule else "") + "|%s| > %g%s" % (lfc_column, cut, tag)
         elif lfc_column is None and direction != "both":
             return _fail("direction %s needs lfc_column, the log2 fold change column." % direction)
         query = set(frame.loc[sel, "_id"])
