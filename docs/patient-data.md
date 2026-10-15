@@ -17,6 +17,7 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 - The harness masks a result that goes to an MCP client.
 - A helper agent of the `task` tool follows your choice. If you have not chosen, the harness stops the helper. A local model gets no check.
 - After "Mask", the harness does not send the record to a cloud referee or to the title model, because the record holds the values.
+- If you set a notify URL, the text of each question goes to that server. A notify URL must use https, or http on 127.0.0.1 or localhost.
 - The `search_literature` tool sends only its query to api.sciencemadereadable.com. It sends no data file. It refuses a query that has a likely patient identifier. It asks you before each search, also in bypass mode.
 
 ## Settings
