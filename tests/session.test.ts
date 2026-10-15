@@ -3506,3 +3506,10 @@ test("a final answer that the output limit cut gets a notice for every provider"
   const last = session.record.entries(["assistant"]).at(-1)!;
   expect(last.data.final).toBe(true);
 });
+
+test("a null, empty or blank pilot value is missing, not zero", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const out = await session["pilotResult"]({ sample: "Set 1", values: { "positive cell": null, other: "", third: "  " } });
+  expect(out.ok).toBe(false);
+  expect(out.error).toMatch(/^Give the numbers for the pilot sample/);
+});

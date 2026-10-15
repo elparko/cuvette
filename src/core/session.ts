@@ -3543,7 +3543,7 @@ export class Session {
     const sample = String(a.sample ?? "").trim();
     if (!sample) return { ok: false, error: "Give the pilot sample." };
     const values: Record<string, number> = {};
-    for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>)) if (Number.isFinite(Number(v))) values[k] = Number(v);
+    for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>)) if ((typeof v === "number" || (typeof v === "string" && v.trim() !== "")) && Number.isFinite(Number(v))) values[k] = Number(v);
     if (!Object.keys(values).length) return { ok: false, error: "Give the numbers for the pilot sample in values, one for each measure, for example {\"positive cells\": 296}." };
     const plan = this.pilotPlan?.plan ?? this.plan;
     const definitions = plan?.definitions ?? [];
