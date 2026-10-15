@@ -2,6 +2,7 @@ import { testsMarkdown } from "./testcount.ts";
 import { planMarkdown } from "./plan.ts";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
@@ -232,7 +233,7 @@ export function exportScript(record: AnalysisRecord, adapters: LoadedAdapter[], 
   const nodes = liveNodes(record);
   const names = [...new Set(nodes.map((n) => n.adapter).filter(Boolean))];
   const lines = [
-    `import { ToolRunner } from ${JSON.stringify(REPLAY_PATH)};`,
+    `import { ToolRunner } from ${JSON.stringify(pathToFileURL(REPLAY_PATH).href)};`,
     "",
     "// Run: npx tsx <this file>. Each step prints its metrics. A failed step stops the script with exit code 1.",
     `const run = await ToolRunner.start(${JSON.stringify(names)});`,

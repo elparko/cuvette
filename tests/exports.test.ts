@@ -85,6 +85,7 @@ test("protocol lists decisions, route steps, warnings, grouped repeats and a met
 test("script calls ToolRunner and reuses earlier output paths", () => {
   const ts = readFileSync(exportScript(rec, [adapter], join(dir, "s.ts")), "utf8");
   expect(ts).toMatch(/^import \{ ToolRunner \} from ".*replay\.ts";/);
+  expect(ts).toMatch(/^import \{ ToolRunner \} from "file:\/\/\/?.*replay\.ts";/);
   expect(ts).toContain('await ToolRunner.start(["fake"])');
   expect(ts).toContain(`const s1 = await step(1, "fake", "open", { "path": ${JSON.stringify(a)} });`);
   expect(ts).toContain('const s3 = await step(3, "fake", "blur", { "path": s1.outputs[0].path, "sigma": 2 });');
