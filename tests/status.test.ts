@@ -269,3 +269,13 @@ test("cuvette status checks an adapter folder that the user gives for this run",
   expect([...given.unchecked]).toEqual([]);
   expect(given.current.get("mine")?.version).toBe("2.0.0");
 });
+
+test("the status line says that skipped steps are not checked", () => {
+  const row = (step: number, unchecked?: string) => ({ node: `n${step}`, step, tool: "run", title: "Step", current: true, reasons: [], unchecked });
+  const note = "not checked: adapter outside the trusted folders";
+  expect(statusText([row(1, note), row(2, note)] as never)).toMatch(/2 steps not checked\./);
+  expect(statusText([row(1, note), row(2, note)] as never)).not.toMatch(/up to date\.$/);
+  expect(statusText([row(1, note)] as never)).toMatch(/The step is not checked\./);
+  expect(statusText([row(1, note), row(2)] as never)).toMatch(/1 of 2 steps are up to date\. 1 not checked\./);
+  expect(statusText([row(1), row(2)] as never)).toMatch(/All 2 steps are up to date\./);
+});
