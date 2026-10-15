@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { cutText, readIndex } from "./places.ts";
+import { cutText, discardPlace, readIndex, type IndexRow } from "./places.ts";
 
 export type SessionStatus = "answered" | "waiting for you" | "running" | "not started";
 
@@ -194,8 +194,23 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
   };
 }
 
+const STALE_MS = 24 * 3600 * 1000;
+
+function staleEmpty(r: IndexRow): boolean {
+  if (!basename(r.folder).startsWith(".new-") || Date.now() - (Date.parse(r.date) || 0) < STALE_MS) return false;
+  const record = join(r.folder, ".record");
+  if (alive(record)) return false;
+  const log = join(record, "log.jsonl");
+  return !existsSync(log) || !scanLog(log).ask;
+}
+
 function indexed(home: string): SessionInfo[] {
-  return readIndex(join(home, "sessions-index.json")).map((r) => {
+  const rows = readIndex(join(home, "sessions-index.json")).filter((r) => {
+    if (!staleEmpty(r)) return true;
+    if (home === cuvetteHome()) discardPlace({ id: r.id, outDir: r.folder, recordDir: join(r.folder, ".record"), project: r.project, title: "", created: r.date, legacy: false, fallback: false });
+    return false;
+  });
+  return rows.map((r) => {
     const log = join(r.folder, ".record", "log.jsonl");
     if (!existsSync(log)) return { id: r.id, cwd: r.project, used: Date.parse(r.date) || 0, ask: r.title, folder: r.folder, moved: true, name: r.custom || r.name, description: r.description };
     return info(r.id, log, { cwd: r.project, folder: r.folder }, r.title, r);

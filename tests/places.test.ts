@@ -1,5 +1,8 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { createServer } from "node:http";
+import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { COPY_LIMIT_BYTES, discardPlace, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
@@ -289,3 +292,24 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("the index
     chmodSync(parent, 0o700);
   }
 });
+
+test.skipIf(process.platform === "win32")("Ctrl+C while a session starts removes the provisional folder and the index row", async () => {
+  const cwd = project();
+  const held: import("node:http").ServerResponse[] = [];
+  const server = createServer((_, res) => void held.push(res));
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const host = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const code = `import { Session } from ${JSON.stringify(join(__dirname, "../src/core/session.ts"))}; Session.create({ adapters: [], model: "ollama:slow", cwd: ${JSON.stringify(cwd)}, settings: { guidance: false, referee: "none" } });`;
+  const child = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, CUVETTE_HOME: home, OLLAMA_HOST: host }, stdio: "ignore" });
+  const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  const root = join(cwd, "cuvette");
+  const started = () => existsSync(root) && readdirSync(root).some((n) => n.startsWith(".new-")) && held.length > 0;
+  for (let i = 0; i < 600 && !started(); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(started()).toBe(true);
+  child.kill("SIGINT");
+  expect(await exit).toBe(130);
+  server.closeAllConnections();
+  await new Promise((r) => server.close(r));
+  expect(readdirSync(root).filter((n) => n.startsWith(".new-"))).toEqual([]);
+  expect(readIndex()).toEqual([]);
+}, 60_000);

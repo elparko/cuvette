@@ -1,9 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
+import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
 import { ageText, claimLock, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
@@ -247,4 +247,35 @@ test("a clip does not cut an emoji in two", () => {
   expect(() => encodeURIComponent(clip("a".repeat(78) + "😀 and more text", 80))).not.toThrow();
   expect(() => encodeURIComponent(clipStart("😀".repeat(5), 4))).not.toThrow();
   expect(clip("short", 80)).toBe("short");
+});
+
+test("the list removes an empty provisional session that is older than a day and has no live lock", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-stale-"));
+  const prev = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    const day = 24 * 3600_000;
+    const make = (id: string, ageMs: number, log: object[] | undefined, lock = false) => {
+      const folder = join(h, "proj", `.new-${id}`);
+      mkdirSync(join(folder, ".record"), { recursive: true });
+      if (log) writeFileSync(join(folder, ".record", "log.jsonl"), log.map((l) => JSON.stringify(l)).join("\n") + "\n");
+      if (lock) writeFileSync(join(folder, ".record", "open.json"), JSON.stringify({ pid: process.pid }));
+      saveIndexRow({ id, project: join(h, "proj"), outDir: folder, recordDir: join(folder, ".record"), title: "", created: new Date(Date.now() - ageMs).toISOString(), legacy: false, fallback: false });
+      return folder;
+    };
+    const session = { id: 1, kind: "session", data: { cwd: "/x" } };
+    const old = make("20260101-000000-old1", 2 * day, [session]);
+    const never = make("20260101-000000-old2", 2 * day, undefined);
+    const young = make("20260101-000000-new1", 3600_000, [session]);
+    const live = make("20260101-000000-old3", 2 * day, [session], true);
+    const asked = make("20260101-000000-old4", 2 * day, [session, { id: 2, kind: "user", data: { text: "Count" } }]);
+    const ids = listSessions(h).map((s) => s.id).sort();
+    expect(ids).toEqual(["20260101-000000-new1", "20260101-000000-old3", "20260101-000000-old4"]);
+    expect([old, never].map(existsSync)).toEqual([false, false]);
+    expect([young, live, asked].map(existsSync)).toEqual([true, true, true]);
+    expect(readIndex().map((r) => r.id).sort()).toEqual(ids);
+  } finally {
+    if (prev === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = prev;
+  }
 });

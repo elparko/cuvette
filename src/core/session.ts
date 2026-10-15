@@ -384,26 +384,35 @@ export class Session {
     const settings = loadSettings(cwd, overrides, notes);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
-    if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
-    const s = new Session(id, cwd, settings, place, record);
-    const held = claimLock(s.dir);
-    if (held) {
+    const onInterrupt = () => {
       if (!opts.place) discardPlace(place);
-      throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
-    }
-    s.overrides = overrides;
-    s.onceTrusted = !!opts.trustFolder;
+      process.exit(130);
+    };
+    if (!opts.place && !opts.home) process.once("SIGINT", onInterrupt);
     try {
-      await s.init(opts);
-    } catch (e) {
-      s.releaseLock();
-      if (!opts.place) discardPlace(place);
-      throw e;
+      if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
+      const s = new Session(id, cwd, settings, place, record);
+      const held = claimLock(s.dir);
+      if (held) {
+        if (!opts.place) discardPlace(place);
+        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
+      }
+      s.overrides = overrides;
+      s.onceTrusted = !!opts.trustFolder;
+      try {
+        await s.init(opts);
+      } catch (e) {
+        s.releaseLock();
+        if (!opts.place) discardPlace(place);
+        throw e;
+      }
+      if (opts.method) s.startMethod(opts.method);
+      for (const text of notes) s.record.append("notice", { text, warn: true });
+      if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
+      return s;
+    } finally {
+      process.off("SIGINT", onInterrupt);
     }
-    if (opts.method) s.startMethod(opts.method);
-    for (const text of notes) s.record.append("notice", { text, warn: true });
-    if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
-    return s;
   }
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
