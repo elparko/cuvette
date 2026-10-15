@@ -1,7 +1,7 @@
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { extractNumbers } from "../src/core/claims.ts";
@@ -57,7 +57,7 @@ test("blobPath refuses a sha that is not hexadecimal text", () => {
   writeFileSync(join(dir, "secret.txt"), "private");
   writeFileSync(join(dir, "rec", "secret.txt"), "private");
   expect(r.blobPath("../secret.txt")).toBeUndefined();
-  expect(r.blobPath("../../" + dir.split("/").pop() + "/secret.txt")).toBeUndefined();
+  expect(r.blobPath("../../" + basename(dir) + "/secret.txt")).toBeUndefined();
   expect(r.blobPath("../secret")).toBeUndefined();
   expect(r.blobRef("../x")).toBeUndefined();
   expect(r.blobPath("")).toBeUndefined();
@@ -249,7 +249,7 @@ function scriptNode(files: Record<string, string | Buffer>) {
 
 test("numbers from a script output file: a binary file with a .csv name gives none", () => {
   const { r, dir } = scriptNode({ "fake.csv": Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0x31, 0x32, 0x2e, 0x35, 0x20, 0x34, 0x37]), "ok.csv": "x\n12.5\n" });
-  expect(r.numbers().map((n) => [n.path.split("/").pop(), n.value])).toEqual([["ok.csv", 12.5]]);
+  expect(r.numbers().map((n) => [basename(n.path), n.value])).toEqual([["ok.csv", 12.5]]);
   rmSync(dir, { recursive: true, force: true });
 });
 

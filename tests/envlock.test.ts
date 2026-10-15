@@ -39,7 +39,7 @@ test.skipIf(process.platform === "win32")("the lock of a Python environment list
   expect(requirementsText(lock)).toBe("numpy==1.26.4\nanndata==0.10.8\n");
 });
 
-test("two captures of one environment at the same time run one package scan", async () => {
+test.skipIf(process.platform === "win32")("two captures of one environment at the same time run one package scan", async () => {
   const f = fakePython([["numpy", "1.26.4"]]);
   const [a, b] = await Promise.all([captureEnv({ kind: "python", path: f.py }), captureEnv({ kind: "python", path: f.py })]);
   expect(f.calls()).toBe(1);

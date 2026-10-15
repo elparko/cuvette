@@ -108,7 +108,7 @@ describe("adapter add", () => {
     expect(readInstalled().obtest!.kind).toBe("zip");
   });
 
-  test("a zip file with a symbolic link, a path outside it, or too many bytes is refused before unzip", async () => {
+  test.skipIf(process.platform === "win32" || spawnSync("zip", ["-v"]).error !== undefined)("a zip file with a symbolic link, a path outside it, or too many bytes is refused before unzip", async () => {
     const src = fixture(join(work, "lsrc"));
     symlinkSync("/etc", join(src, "etc"));
     execFileSync("zip", ["-q", "-r", "-y", join(work, "link.zip"), "."], { cwd: src });

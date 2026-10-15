@@ -265,7 +265,7 @@ test("the script comments out a harness step, and the notebook has no run-step c
   expect(ts).not.toContain('step(1, ""');
   const nb = JSON.parse(readFileSync(exportNotebook(r, [adapter], join(dir, "h4.ipynb")), "utf8"));
   const code = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code").map((c: { source: string[] }) => c.source.join(""));
-  expect(code).toEqual([`!cuvette run-step fake open '{{"path":"${a}"}}'`]);
+  expect(code).toEqual([`!cuvette run-step fake open '{{"path":${JSON.stringify(a)}}}'`]);
 });
 
 test("the methods sentence fills a name from the result as well as a name from the arguments", () => {

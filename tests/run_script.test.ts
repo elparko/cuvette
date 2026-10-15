@@ -334,7 +334,7 @@ test("write steps lock a hook script of the project", () => {
   expect(settingsScope(l.dirs).files).toContain(join(l.project, "guard.sh"));
 });
 
-test("write steps lock the folder of a hook script and the folder of a hook glob", () => {
+test.skipIf(process.platform === "win32")("write steps lock the folder of a hook script and the folder of a hook glob", () => {
   const l = layout();
   mkdirSync(join(l.project, "hooks"), { recursive: true });
   mkdirSync(join(l.project, "empty"), { recursive: true });
@@ -816,7 +816,7 @@ test("a settings file over 5 MB is checked by its size and its first and last me
 });
 
 
-test("the profile for a model command locks the adapters, methods and skills folders, and the profile for an adapter program opens them", () => {
+test.skipIf(process.platform === "win32")("the profile for a model command locks the adapters, methods and skills folders, and the profile for an adapter program opens them", () => {
   const l = layout();
   const folder = join(l.project, ".cuvette", "adapters");
   const model = writeRules(writeSteps(l.dirs));
@@ -899,7 +899,7 @@ async function withHomeEnv<T>(home: string, body: () => Promise<T> | T): Promise
   }
 }
 
-test("the profile and the bubblewrap arguments lock the adapters, methods and skills folders of the home folder, and not envs or cache", async () => {
+test.skipIf(process.platform === "win32")("the profile and the bubblewrap arguments lock the adapters, methods and skills folders of the home folder, and not envs or cache", async () => {
   const l = layout();
   const home = outsideHome();
   await withHomeEnv(home, () => {

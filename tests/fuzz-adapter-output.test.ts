@@ -114,6 +114,7 @@ describe("fuzz: adapter output readers", () => {
       const made: string[] = [];
       for (let n = r.int(1, 40); n > 0; n--) {
         const name = r.pick(["a b.csv", "ü.png", "日本.txt", "-x", "#1", "%20", "x\ny", "x\\y", " lead", "trail ", "a".repeat(200), "out.csv", "😀.json"]) + r.int(0, 9999);
+        if (process.platform === "win32" && /[\\\n]/.test(name)) continue;
         if (names.has(name)) continue;
         names.add(name);
         const sub = r.bool(0.3) ? join(dir, "sub", "deep") : dir;
@@ -237,7 +238,7 @@ describe("fuzz: Python worker replies", () => {
     writeFileSync(join(dir, "fake.cjs"), FAKE);
     writeFileSync(
       join(dir, "adapter.yaml"),
-      `adapter: { name: t-fuzzpy }\nprogram: { name: t }\nconnection:\n  kind: python\n  interpreter: ["${process.execPath}", "${join(dir, "fake.cjs")}"]\n  call_timeout_s: 3\n  startup_timeout_s: 3\ntools:\n  - { name: f, description: d, function: "m:f" }\n`,
+      `adapter: { name: t-fuzzpy }\nprogram: { name: t }\nconnection:\n  kind: python\n  interpreter: [${JSON.stringify(process.execPath)}, ${JSON.stringify(join(dir, "fake.cjs"))}]\n  call_timeout_s: 3\n  startup_timeout_s: 3\ntools:\n  - { name: f, description: d, function: "m:f" }\n`,
     );
     const plan = (start: Step[], reply: Step[]) => writeFileSync(join(dir, "plan.json"), JSON.stringify({ start, reply }));
     plan([{ text: '{"ready": true}\n' }], [{ text: '{"id":@ID@,"ok":true,"result":1}\n' }]);

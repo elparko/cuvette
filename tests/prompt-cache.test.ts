@@ -56,9 +56,10 @@ test.each([
     expect(pre).not.toContain(r.cwd);
     expect(pre).not.toContain(r.workDir);
     const first = JSON.stringify(r.params.messages[0]);
-    expect(first).toContain(`The project folder is ${r.cwd}.`);
-    expect(first).toContain(`The session folder is ${r.workDir}.`);
-    expect(first).toContain(`The output folder is ${r.outputDir}.`);
+    const escaped = (p: string) => JSON.stringify(p).slice(1, -1);
+    expect(first).toContain(`The project folder is ${escaped(r.cwd)}.`);
+    expect(first).toContain(`The session folder is ${escaped(r.workDir)}.`);
+    expect(first).toContain(`The output folder is ${escaped(r.outputDir)}.`);
   }
   expect(a.params.system[0].cache_control).toBeTruthy();
   expect(a.params.tools.at(-1).cache_control).toBeTruthy();

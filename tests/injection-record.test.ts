@@ -489,8 +489,11 @@ async function boolChange(request: string, proposed: string) {
   session = await Session.create({ adapters: [dir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5, remove_outliers: true });
   await session.send(request);
+  const result = { value: session.decisions.value("remove_outliers"), by: session.record.entries(["decision"]).filter((e) => e.data.key === "remove_outliers").map((e) => `${e.data.new}:${e.data.by}`), open: session.questions.open().map((q) => q.decisionKey) };
+  await session.close();
+  session = undefined;
   rmSync(dir, { recursive: true, force: true });
-  return { value: session.decisions.value("remove_outliers"), by: session.record.entries(["decision"]).filter((e) => e.data.key === "remove_outliers").map((e) => `${e.data.new}:${e.data.by}`), open: session.questions.open().map((q) => q.decisionKey) };
+  return result;
 }
 
 test("a boolean setting changes with no card only for a form tied to its name, also if the model writes the value as n or no", async () => {
@@ -499,7 +502,6 @@ test("a boolean setting changes with no card only for a form tied to its name, a
     expect(bad.value, proposed).toBe(true);
     expect(bad.by).toEqual([]);
     expect(bad.open).toContain("remove_outliers");
-    await session!.close();
   }
   const good = await boolChange("Turn remove_outliers off", "n");
   expect(good.value).toBe(false);
