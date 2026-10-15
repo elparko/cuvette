@@ -455,6 +455,41 @@ function globRegex(pattern: string): RegExp {
   }
 }
 
+const plain = (c: string) => (/[\w/\-]/.test(c) ? c : /[.+$()|{}*?[\]]/.test(c) ? `[${c}]` : ".");
+
+export const literalEre = (text: string) => [...text].map(plain).join("");
+
+export function globEre(pattern: string): string {
+  let re = "";
+  let depth = 0;
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    if (c === "*") {
+      if (pattern[i + 1] === "*") {
+        re += pattern[i + 2] === "/" ? "(.*/)?" : ".*";
+        i += pattern[i + 2] === "/" ? 2 : 1;
+      } else re += "[^/]*";
+    } else if (c === "?") re += "[^/]";
+    else if (c === "[") {
+      const end = pattern.indexOf("]", i + 2);
+      if (end < 0) re += plain(c);
+      else {
+        const body = pattern.slice(i + 1, end).replace(/^!/, "^").replace(/[\\"]/g, "");
+        re += `[${body}]`;
+        i = end;
+      }
+    } else if (c === "{") {
+      depth++;
+      re += "(";
+    } else if (c === "}" && depth) {
+      depth--;
+      re += ")";
+    } else if (c === "," && depth) re += "|";
+    else re += plain(c);
+  }
+  return re + ")".repeat(depth);
+}
+
 const hasGlob = (w: string) => /[*?[\]{}]/.test(w);
 const globPrefix = (base: string, word: string) => resolve(base, word.split(/[/\\]/).filter((_, i, a) => !a.slice(0, i + 1).some(hasGlob)).join("/"));
 const DYNAMIC = /\$\(|`|\beval\b|\b(source|\.)\s+["']?\$|(^|[\s;&|])["']?\$\{?\w/;
@@ -476,12 +511,13 @@ export interface HookScan {
   linkText: Record<string, string>;
   inLinks: string[];
   folders: string[];
+  rootGlobs: string[];
 }
 
 export function hookScriptScan(folder: string, layers?: Record<string, unknown>[]): HookScan {
   const key = folderKey(folder);
   const found = new Set<string>();
-  const result: HookScan = { files: [], large: [], linked: [], incomplete: [], linkText: {}, inLinks: [], folders: [] };
+  const result: HookScan = { files: [], large: [], linked: [], incomplete: [], linkText: {}, inLinks: [], folders: [], rootGlobs: [] };
   try {
     layers ??= projectSettings(key);
   } catch {
@@ -529,10 +565,15 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
     result.linked.push(rel);
     result.linkText[rel] = real;
   };
-  const seenLinks = new Set<string>();
+  const seenLinks = new Map<string, boolean>();
   const addInLink = (p: string): boolean => {
-    if (seenLinks.has(p)) return true;
-    seenLinks.add(p);
+    const seen = seenLinks.get(p);
+    if (seen !== undefined) return seen;
+    const ok = checkInLink(p);
+    seenLinks.set(p, ok);
+    return ok;
+  };
+  const checkInLink = (p: string): boolean => {
     let real = "";
     let inside = "";
     let isFile = false;
@@ -608,8 +649,10 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           const re = globRegex(relative(key, path).split(sep).join("/"));
           let matches = 0;
           const w = walkFiles(prefix, skip, key, realKey, true);
-          if (w.exceeded && t.allowed) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
-          if (t.allowed && existsSync(prefix) && prefix !== key) result.folders.push(prefix);
+          const runs = t.allowed || c.dynamic;
+          if (w.exceeded && runs) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
+          if (runs && existsSync(prefix) && prefix !== key) result.folders.push(prefix);
+          if (runs && prefix === key) result.rootGlobs.push(relative(key, path).split(sep).join("/"));
           for (const o of w.outside) {
             if (!re.test(o.split(sep).join("/"))) continue;
             result.linked.push(o);
@@ -622,7 +665,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           for (const f of [...w.files, ...w.inLinks]) {
             if (re.test(relative(key, f).split(sep).join("/"))) {
               if (matches >= GLOB_CAP) {
-                if (t.allowed) result.incomplete.push(`Too many files match ${t.word}`);
+                if (runs) result.incomplete.push(`Too many files match ${t.word}`);
                 break;
               }
               if (relative(key, f).split(sep).some((part) => VOLATILE_DIR.test(part)) && !SCRIPT_EXT.test(f) && !isExec(f)) continue;
@@ -648,6 +691,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   result.linked = [...new Set(result.linked)];
   result.inLinks = [...new Set(result.inLinks)];
   result.folders = [...new Set(result.folders)];
+  result.rootGlobs = [...new Set(result.rootGlobs)];
   return result;
 }
 

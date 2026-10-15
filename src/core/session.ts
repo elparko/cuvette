@@ -497,8 +497,8 @@ export class Session {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? labDisplayText(stray) !== stray
-          ? `Cuvette did not load the adapter folder ${oneLine(stray)} from the record. The path has control characters, so Cuvette shows no command. Start the session again and give the folder with --adapter.`
+        ? labDisplayText(stray) !== stray || /[\t\n]/.test(stray)
+          ? `Cuvette did not load the adapter folder ${oneLine(stray)} from the record. The path has control characters, so Cuvette shows no command. Start the session again. Give the folder with --adapter.`
           : `Cuvette did not load the adapter folder ${stray} from the record. Run in a terminal: cuvette resume ${id} --adapter ${/^[\w@%+=:,./-]+$/.test(stray) ? stray : `'${stray.replace(/'/g, "'\\''")}'`}`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });

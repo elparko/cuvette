@@ -12,7 +12,7 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
-import { hookScriptScan } from "../core/trust.ts";
+import { globEre, hookScriptScan, literalEre } from "../core/trust.ts";
 import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
@@ -201,6 +201,7 @@ export interface WriteStep {
   path: string;
   allow: boolean;
   fixed?: boolean;
+  pattern?: string;
 }
 
 const within = (p: string, root: string) => {
@@ -247,10 +248,11 @@ export interface SettingsScope {
   locked: string[];
   open: string[];
   files: string[];
+  rootGlobs: string[];
 }
 
 export function settingsScope(dirs: Dirs): SettingsScope {
-  const out: SettingsScope = { locked: [], open: [], files: [] };
+  const out: SettingsScope = { locked: [], open: [], files: [], rootGlobs: [] };
   const project = dirs.projectDir ? realish(dirs.projectDir) : undefined;
   const homes = [...new Set([cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".guided-analysis")].map(realish))];
   const inside = (h: string) => !!project && within(h, project);
@@ -275,6 +277,7 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   const lockedFolders = [...scripts.map((f) => dirname(f)), ...scan.folders].filter((d) => !roots.includes(d));
   out.locked.push(...scripts, ...new Set(lockedFolders));
   out.files.push(...scripts);
+  out.rootGlobs.push(...scan.rootGlobs);
   for (const name of [".cuvette", ".ga"]) {
     const dir = join(dirs.projectDir, name);
     if (homes.filter(inside).some((h) => within(h, realish(dir)))) {
@@ -309,7 +312,9 @@ export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): Wri
   const own = [dirs.workDir, ...(outputOpens(dirs, scope) ? [dirs.outputDir!] : [])];
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both(own).includes(p));
   const keep = both(own);
-  const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
+  const rootGlobs = dirs.projectDir ? scope.rootGlobs : [];
+  const steps: WriteStep[] = both(dirs.projectDir ? [dirs.projectDir] : []).flatMap((root) => rootGlobs.map((g) => ({ path: root, allow: false, pattern: `^${literalEre(root)}/${globEre(g)}$` })));
+  steps.push(...locked.map((path) => ({ path, allow: false })));
   const reopened = keep.filter((k) => locked.some((p) => within(k, p)));
   steps.push(...reopened.map((path) => ({ path, allow: true })));
   if (reopened.length) steps.push(...locked.filter((p) => reopened.some((k) => within(p, k))).map((path) => ({ path, allow: false })));
@@ -341,11 +346,11 @@ export function heldReadRules(held: string[]): string {
 }
 
 export function writeRules(steps: WriteStep[]): string {
-  return steps.map((x) => (x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
+  return steps.map((x) => (x.pattern ? `(deny file-write* (regex #"${x.pattern}"))` : x.fixed ? `(deny file-write-unlink (literal ${sbString(x.path)}))` : `(${x.allow ? "allow" : "deny"} file-write* (subpath ${sbString(x.path)}))`)).join("");
 }
 
 function bwrapLocks(steps: WriteStep[]): string[] {
-  return steps.filter((x) => !x.fixed).flatMap((x) => (existsSync(x.path) ? [x.allow ? "--bind" : "--ro-bind", x.path, x.path] : []));
+  return steps.filter((x) => !x.fixed).flatMap((x) => (!existsSync(x.path) ? [] : x.pattern ? ["--ro-bind", x.path, x.path, ...folderNames(x.path).flatMap((d) => ["--bind", d, d])] : [x.allow ? "--bind" : "--ro-bind", x.path, x.path]));
 }
 
 function programExists(cmd: string | undefined, cwd: string, env: Record<string, string | undefined>): boolean {

@@ -311,6 +311,14 @@ unix("the resume notice shows a path with control characters as plain text and g
   expect(text).not.toContain("cuvette resume");
 });
 
+unix("the resume notice gives no command for a path with a newline or a tab", async () => {
+  for (const name of ["a\nb", "a\tb"]) {
+    const { text } = await strayNotice(name);
+    expect(text).toContain("The path has control characters, so Cuvette shows no command. Start the session again. Give the folder with --adapter.");
+    expect(text).not.toContain("cuvette resume");
+  }
+});
+
 unix("the resume notice puts a path with a special character in single quotes", async () => {
   const { dir, id, text } = await strayNotice("it's!ok");
   expect(text).toContain(`cuvette resume ${id} --adapter '${dir.replace(/'/g, "'\\''")}'`);
