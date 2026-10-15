@@ -11,11 +11,27 @@ export function fitAnswer(q: Question, wanted: unknown, opts: { first?: boolean 
   return [q.recommendation?.value, q.default, opts.first === false ? undefined : q.options[0]?.value].find((x) => x !== undefined && fits(x));
 }
 
-export function assumedInsteadOfWaiting(answer: string, assumed: string[]): string {
-  const m = /^[ \t]*(?:\*\*)?Waits for you:?(?:\*\*)?:?[ \t]*(.*)\n?((?:[ \t]*[-*].*\n?|[ \t]*\n(?=[ \t]*[-*]))*)/im.exec(answer);
-  const open = m ? [m[1] ?? "", ...(m[2] ?? "").split("\n").map((x) => x.replace(/^[ \t]*[-*][ \t]*/, ""))].map((x) => x.trim()).filter((x) => x && !/^nothing\.?$/i.test(x)) : [];
+const WAITS = /^[ \t]*(?:\*\*)?Waits for you:?(?:\*\*)?:?[ \t]*(.*)$/i;
+const ITEM = /^[ \t]*[-*][ \t]+(\S.*)$/;
+
+export function withoutWaits(answer: string): { answer: string; open: string[] } {
+  const lines = answer.split("\n");
+  const at = lines.findIndex((l) => WAITS.test(l));
+  if (at < 0) return { answer, open: [] };
+  const open = [WAITS.exec(lines[at]!)![1]!];
+  let end = at + 1;
+  for (let k = at + 1; k < lines.length; k++) {
+    const item = ITEM.exec(lines[k]!);
+    if (item) {
+      open.push(item[1]!);
+      end = k + 1;
+    } else if (lines[k]!.trim()) break;
+  }
+  const kept = [...lines.slice(0, at), ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+  return { answer: kept, open: open.map((x) => x.trim()).filter((x) => x && !/^nothing\.?$/i.test(x)) };
+}
+
+export function assumptionBlock(assumed: string[], open: string[]): string {
   const lines = [...assumed.map((x) => `- ${x}`), ...open.map((x) => `- Not confirmed by the scientist: ${x}`)];
-  const block = lines.length ? `Assumed because no answer was given:\n${lines.join("\n")}\n` : "";
-  if (!m) return block ? `${answer.trimEnd()}\n\n${block}`.trimEnd() : answer;
-  return (answer.slice(0, m.index) + block + answer.slice(m.index + m[0].length)).replace(/\n{3,}/g, "\n\n").trimEnd();
+  return lines.length ? `Assumed because no answer was given:\n${lines.join("\n")}` : "";
 }

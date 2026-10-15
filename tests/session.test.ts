@@ -756,10 +756,15 @@ test("headless run: an answer that the harness takes from the recommendation is 
   expect(a).toMatchObject({ value: "sigma 2", by: "default" });
   expect(String(a.note)).toMatch(/no answer in the answers file/);
   expect(answer).not.toMatch(/Waits for you/);
-  expect(answer).toContain("Assumed because no answer was given:");
-  expect(answer).toContain("Blur a.tif with which sigma?: used sigma 2.");
-  expect(answer).toContain("Not confirmed by the scientist: Confirm the units of the image.");
   expect(answer).toContain("Uncertain:");
+  expect(answer).not.toContain("Assumed because");
+  const block = session!.assumptions;
+  expect(block).toContain("Assumed because no answer was given:");
+  expect(block).toContain("Blur a.tif with which sigma?: used sigma 2.");
+  expect(block).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+  const final = session!.record.entries(["assistant"]).find((e) => e.data.final)!.data;
+  expect(final.assumed).toBe(block);
+  expect(String(final.text)).not.toContain("Assumed because");
 });
 
 test("headless run: an answer from the answers file is recorded as human and adds no assumption line", async () => {
@@ -767,8 +772,40 @@ test("headless run: an answer from the answers file is recorded as human and add
   const a = session!.record.entries(["answer"]).find((e) => e.data.qid === "q1")!.data;
   expect(a).toMatchObject({ value: "sigma 1", by: "human", note: "answered from the answers file" });
   expect(answer).not.toMatch(/Waits for you/);
-  expect(answer).not.toContain("used sigma");
-  expect(answer).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+  expect(session!.assumptions).not.toContain("used sigma");
+  expect(session!.assumptions).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+});
+
+test("headless run: a bold line after the Waits for you list stays in the answer", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: "The image is blurred.\n\nWaits for you:\n- Confirm the units.\n**Note:** the file has one image.\n" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, referee: "none" } });
+  attachHeadless(session, { answers: {}, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  const answer = await session.send("Blur a.tif");
+  expect(answer).toContain("**Note:** the file has one image.");
+  expect(session.assumptions).not.toContain("Note");
+});
+
+test("a decision that the harness set as default is shown as default on the plan card, not as you", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  session.decisions.applySetup({});
+  session.decisions.change("min_size", 7, { by: "default", reason: "answer to q1" });
+  expect((session as unknown as { whoSet(key: string): string }).whoSet("min_size")).toBe("default");
+  session.decisions.change("min_size", 8, { by: "human", reason: "answer to q2" });
+  expect((session as unknown as { whoSet(key: string): string }).whoSet("min_size")).toBe("you");
+});
+
+test("headless run: the referee reads the assumption block marked as harness text, and the claim check does not", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "ask_scientist", args: { question: "Which sigma?", options: ["sigma 1", "sigma 2"], recommendation: "sigma 2" } }] }, { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: "The image is blurred.\n\nWaits for you:\n- Confirm the units.\n" }]);
+  const referee = new FakeProvider({ steps: [], complete: "[]" });
+  const complete = vi.spyOn(referee, "complete");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  await session.send("Blur a.tif");
+  expect(String(complete.mock.calls[0]![1])).toMatch(/Text of the harness, not of the model[\s\S]*Which sigma\?: used sigma 2\./);
+  const claims = session.record.entries(["claim_check"]).at(-1)!.data as { claims: { text: string }[] };
+  expect(JSON.stringify(claims)).not.toContain("used sigma");
 });
 
 test("an interactive run keeps the Waits for you line", async () => {

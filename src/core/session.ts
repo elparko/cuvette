@@ -41,7 +41,7 @@ import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidat
 import { definitionsOf } from "./plan.ts";
 import { abs, metricsOf, planBatch, swapArgs, writeTable, type BatchPlan, type BatchRow } from "./batch.ts";
 import { NO_REASON, freezePlan, frozenPlan, planChanges, recordDeviation, setDeviationReason, type PlanChange } from "./freeze.ts";
-import { assumedInsteadOfWaiting } from "./answers.ts";
+import { assumptionBlock, withoutWaits } from "./answers.ts";
 import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
@@ -1175,6 +1175,7 @@ export class Session {
     const turnStart = this.record.entries().length;
     let results: Part[] = [];
     this.summaryFailed = false;
+    this.assumptions = "";
     try {
       await this.nameFolder(text);
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
@@ -1982,7 +1983,7 @@ export class Session {
     this.record.append("notice", { text: contextWarning(used, win), warn: true });
   }
 
-  private draft?: { answer: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
+  private draft?: { answer: string; assumed: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
 
   private stoppedText(): string {
     return this.draft ? this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.") : "";
@@ -1993,6 +1994,7 @@ export class Session {
     this.draft = undefined;
     this.record.append("notice", { text: note });
     this.lastAnswer = d.answer;
+    this.assumptions = d.assumed;
     return d.annotated;
   }
 
@@ -2005,26 +2007,31 @@ export class Session {
     return { shown: tail ? `${answer}\n\n${tail}` : answer, annotated: annotate(answer, claims) + (tail ? `\n\n${tail}` : ""), settings, results: missing || undefined };
   }
 
-  private headlessAssumptions(text: string): string {
-    if (!this.settings.headless) return text;
+  assumptions = "";
+
+  private headlessSplit(text: string): { answer: string; block: string } {
+    if (!this.settings.headless) return { answer: text, block: "" };
     const turnStart = this.lastRequest()?.id ?? 0;
     const assumed = this.record.entries(["answer"]).filter((e) => e.id > turnStart && e.data.by === "default" && !e.data.withdrawn).map((e) => `${this.questions.get(String(e.data.qid))?.title ?? String(e.data.qid)}: used ${typeof e.data.value === "string" ? e.data.value : JSON.stringify(e.data.value)}.`);
-    return assumedInsteadOfWaiting(text, assumed);
+    const split = withoutWaits(text);
+    return { answer: split.answer, block: assumptionBlock(assumed, split.open) };
   }
 
   private async finishAnswer(text: string, revised: boolean, signal: AbortSignal): Promise<{ text: string; revise?: string }> {
-    text = this.headlessAssumptions(text);
     if (!this.settings.guidance) {
-      this.record.append("assistant", { text, final: true });
+      const split = this.headlessSplit(text);
+      this.assumptions = split.block;
+      this.record.append("assistant", { text: split.answer, final: true, ...(split.block ? { assumed: split.block } : {}) });
       this.markAnswerReady();
-      this.lastAnswer = text;
-      return { text };
+      this.lastAnswer = split.answer;
+      return { text: split.answer };
     }
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
-    const answer = pre.answer ?? text;
+    const { answer, block } = this.headlessSplit(pre.answer ?? text);
     this.noteSkippedSteps();
     const claims = checkAnswer(answer, this.record.liveView());
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
+    const refereeCtx = block ? { ...ctx, answer: `${answer}\n\n[Text of the harness, not of the model. The harness wrote it from the answers that it chose.]\n${block}` } : ctx;
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
     if (endsWithPromise(answer)) found.push({ f: { check: "answer_unfinished", severity: "warning", message: "The answer ends with a plan for more steps, not with a result. The agent stopped before it finished." }, source: "rule" });
@@ -2032,7 +2039,8 @@ export class Session {
     let first: { id: number; annotated: string } | undefined;
     if (!correcting) {
       const p = this.presentation(answer, claims);
-      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, settings: p.settings, results: p.results });
+      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, settings: p.settings, results: p.results, ...(block ? { assumed: block } : {}) });
+      this.assumptions = block;
       this.lastAnswer = answer;
       this.markAnswerReady();
       first = { id: entry.id, annotated: p.annotated };
@@ -2047,7 +2055,7 @@ export class Session {
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
       this.bus.emit({ type: "status", state: "thinking", purpose: "Reviewing the answer" });
       try {
-        for (const f of await referee(this.refereeProvider, ctx, signal)) found.push({ f, source: "referee" });
+        for (const f of await referee(this.refereeProvider, refereeCtx, signal)) found.push({ f, source: "referee" });
         state = "done";
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
@@ -2064,7 +2072,7 @@ export class Session {
     if (first && errors.length && !revised && this.settings.reviseOnFindings && !signal.aborted) {
       const firstFindings = found.map(({ f, source }) => this.findings.add(f, source).fid);
       this.appendReview(first.id, state, firstFindings, { corrected: true });
-      this.draft = { answer, annotated: first.annotated, claims, found, errors: errors.length, measured: measured(claims), entry: first.id };
+      this.draft = { answer, assumed: block, annotated: first.annotated, claims, found, errors: errors.length, measured: measured(claims), entry: first.id };
       this.record.append("notice", { text: `Review found ${errors.length} problem(s) in the answer above:\n${errors.map((x) => `- ${x.f.message}`).join("\n")}\nThe first answer stays. The agent revises the answer and marks the new one as the correction.` });
       return {
         text: "",
@@ -2075,7 +2083,8 @@ export class Session {
     let shown = first;
     if (!shown) {
       const p = this.presentation(answer, claims);
-      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results });
+      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results, ...(block ? { assumed: block } : {}) });
+      this.assumptions = block;
       this.lastAnswer = answer;
       shown = { id: entry.id, annotated: p.annotated };
     }
@@ -3765,7 +3774,7 @@ export class Session {
     if (!last) return "default";
     const how = String(last.kind === "decision" ? last.data.reason ?? "" : last.data.how ?? "");
     if (how.startsWith("from the method ") && !((last.data.defaultsAccepted as string[] | undefined) ?? []).includes(key)) return how.slice(9);
-    if (last.kind === "decision") return last.data.by === "agent" ? "agent" : String(last.data.reason ?? "").startsWith("set in the confirmed analysis") ? String(last.data.reason).replace(/^.*\((.*)\)$/, "$1") : "you";
+    if (last.kind === "decision") return last.data.by === "agent" ? "agent" : last.data.by === "default" ? "default" : String(last.data.reason ?? "").startsWith("set in the confirmed analysis") ? String(last.data.reason).replace(/^.*\((.*)\)$/, "$1") : "you";
     return ((last.data.defaultsAccepted as string[] | undefined) ?? []).includes(key) || String(last.data.how ?? "").startsWith("defaults") ? "default" : "you";
   }
 
