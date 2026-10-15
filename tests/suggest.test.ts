@@ -165,3 +165,12 @@ test("the hint to start with --adapter is left out for an adapter that loads by 
   expect(suggestOutput(r, ["flowkit"]).join("\n")).not.toContain("To use it");
   expect(suggestOutput(suggestPrograms(folder(), list), [])).toEqual([]);
 });
+
+test("the table route hint is dropped when the table adapter is already loaded", () => {
+  const d = folder();
+  put(d, "a.csv", "x,y\n1,2\n");
+  const r = suggestPrograms(d, list);
+  expect(r.matches[0]?.table).toBe(true);
+  expect(suggestOutput(r, []).join("\n")).toContain("table route");
+  expect(suggestOutput(r, [r.matches[0]!.adapter])).toEqual([]);
+});

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless, readJsonObject } from "../src/core/headless.ts";
 import { Session, announcesStep, coerceArgs, endsWithPromise } from "../src/core/session.ts";
-import { ProviderError } from "../src/core/types.ts";
+import { CutReplyError, ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { saveVersion } from "../src/adapters/locate.ts";
@@ -3096,7 +3096,7 @@ test("full session: plan first from the request to the results, a continue after
   expect(JSON.stringify(provider.requests[4]!.messages)).toContain("The scientist answered the questions above. Call plan now");
   const id = s.id;
   await s.close();
-  session = await Session.resume(id, { provider: new FakeProvider([{ calls: [COUNT] }, { text: "Still 41 particles (step 2)." }, { text: "Still 41 particles (step 2)." }]), cwd, interactive: true, settings: { referee: "none" } });
+  session = await Session.resume(id, { addAdapters: [LAB], provider: new FakeProvider([{ calls: [COUNT] }, { text: "Still 41 particles (step 2)." }, { text: "Still 41 particles (step 2)." }]), cwd, interactive: true, settings: { referee: "none" } });
   const r = session;
   expect(r.plan?.steps[0]?.step).toBe("Count the particles");
   expect(r["approvedEntry"]).toBeGreaterThan(0);
@@ -3650,6 +3650,20 @@ test("a referee that says No findings. makes the review done with zero findings"
   await session.send("Count the particles");
   expect(session.reviewState).toBe("done");
   expect(session.record.entries(["review"]).at(-1)!.data.findings).toEqual([]);
+});
+
+test("a referee reply that is cut after complete findings makes the review done with a notice", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  const found = JSON.stringify({ severity: "warning", message: "The answer does not name the method." });
+  vi.spyOn(referee, "complete").mockRejectedValue(new CutReplyError("cut", `${found}\n{"severity":"warn`));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { reviseOnFindings: false } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  expect(session.reviewState).toBe("done");
+  expect(session.record.entries(["review"]).at(-1)!.data.state).toBe("done");
+  expect(session.findings.list().some((f) => f.source === "referee" && f.message === "The answer does not name the method.")).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /The output limit cut the review short/.test(String(e.data.text)))).toBe(true);
 });
 
 test("a manual review with an empty referee reply keeps the rule findings and gives the failure text", async () => {

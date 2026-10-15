@@ -45,7 +45,7 @@ test("/branch copies the session into a linked folder next to it, and /branches 
   expect(s.record.entries(["branch"])[0]!.data).toEqual({ child: { id: r.id, folder: r.folder, name: "triangle method" }, upTo: last });
   expect(existsSync(join(r.folder, "README.txt"))).toBe(true);
 
-  const b = await Session.resume(r.folder, { provider: new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] }, { text: "The count with Triangle is done." }]) });
+  const b = await Session.resume(r.folder, { addAdapters: [LAB], provider: new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] }, { text: "The count with Triangle is done." }]) });
   open.push(b);
   expect(b.id).toBe(r.id);
   expect(b.history).toEqual(s.history);
@@ -72,7 +72,7 @@ test("/branch at <n> copies up to a rewind point, and /compare shows the key num
   expect(logOf(early.folder).filter((e) => e.kind === "node")).toEqual([]);
 
   const r = s.branch("triangle");
-  const b = await Session.resume(r.folder, { provider: new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] }, { text: "Done." }]) });
+  const b = await Session.resume(r.folder, { addAdapters: [LAB], provider: new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] }, { text: "Done." }]) });
   open.push(b);
   b.setDecision("method", "Triangle", "try Triangle");
   await b.send("Count again with Triangle");

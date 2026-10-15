@@ -252,7 +252,7 @@ test.skipIf(process.platform === "win32")("cuvette status does not run the versi
   expect(existsSync(marker)).toBe(false);
   expect(current.has("evil")).toBe(false);
   expect([...unchecked]).toEqual(["evil"]);
-  expect(statusText(stepStatus(record, { unchecked }))).toMatch(/Up to date .*\n\s+not checked: adapter outside the trusted folders/);
+  expect(statusText(stepStatus(record, { unchecked }))).toMatch(/Not checked .*\n\s+not checked: adapter outside the trusted folders/);
 });
 
 test("cuvette status checks an adapter folder that the user gives for this run", async () => {

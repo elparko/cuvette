@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { findAdapter } from "../src/adapters/manifest.ts";
 import { appAdapters } from "../src/server/app.ts";
 import { Session } from "../src/core/session.ts";
+import { trustFolder } from "../src/core/trust.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
@@ -81,7 +82,30 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   session = undefined;
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual([]);
-  expect(session.record.entries(["notice"]).some((n) => /evil is not installed here/.test(String(n.data.text)))).toBe(true);
+  expect(session.record.entries(["notice"]).some((n) => /the adapter evil from .* before.*does not load it/.test(String(n.data.text)))).toBe(true);
+});
+
+unix("resume does not load an adapter from a recorded path outside the project and names the path in a notice", async () => {
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const dir = evilAdapter(away);
+    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    const id = session.id;
+    expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
+    await session.close();
+    session = undefined;
+    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    expect(session.adapters.map((a) => a.name)).toEqual([]);
+    const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
+    expect(text).toContain(dir);
+    expect(text).toContain("--adapter");
+    await session.close();
+    session = undefined;
+    session = await Session.resume(id, { addAdapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
 });
 
 function installedLab(): string {
@@ -189,4 +213,38 @@ unix("resume with an adapter folder says so when the recorded folder no longer e
   session = await Session.resume(id, { addAdapters: [mine], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   const texts = session.record.entries(["notice"]).map((n) => String(n.data.text));
   expect(texts.some((t) => /adapter lab comes from the folder that you gave/.test(t) && /does not exist now/.test(t) && !/used another folder/.test(t))).toBe(true);
+});
+
+unix("resume of a recorded path with the name of an installed adapter loads the installed one and says so", async () => {
+  const installed = installedLab();
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const dir = evilAdapter(away, "lab");
+    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    const id = session.id;
+    await session.close();
+    session = undefined;
+    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    expect(session.adapters.map((a) => a.root)).toEqual([installed]);
+    const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes(dir));
+    expect(text).toContain("did not use that folder");
+    expect(text).toContain("installed adapter lab");
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
+});
+
+unix("resume still loads an adapter of a trusted project folder, with no notice", async () => {
+  const dir = join(cwd, ".cuvette", "adapters", "lab");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8"));
+  symlinkSync(join(__dirname, "fixtures/lab/server.ts"), join(dir, "server.ts"));
+  trustFolder(cwd);
+  session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab"]);
+  expect(session.record.entries(["notice"]).filter((n) => n.data.warn)).toEqual([]);
 });

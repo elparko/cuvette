@@ -62,7 +62,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
+import { CUT_REVIEW_NOTICE, EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -430,6 +430,8 @@ export class Session {
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
     const gone = new Map<string, boolean>();
     const recorded = new Map<string, string | undefined>();
+    const strayPath = new Map<string, string>();
+    const swapped = new Map<string, string>();
     for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
@@ -437,9 +439,7 @@ export class Session {
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
-      const guarded = [cwd, place.recordDir, place.outDir].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
-      const inGuarded = (path: string) => guarded.some((d) => realpathSync(path) === d || realpathSync(path).startsWith(d + sep));
-      const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : dirs[name] ?? name);
+      const refOf = (name: string, path?: string) => (path && existsSync(path) && known.has(realpathSync(path)) ? path : dirs[name] ?? name);
       for (const a of opts.addAdapters ?? []) {
         try {
           const found = findAdapter(a, cwd);
@@ -450,12 +450,14 @@ export class Session {
       adapters =
         opts.adapters ??
         [...recorded].filter(([name]) => !replaced.includes(name)).map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
+          if (path && existsSync(path) && dirs[name] && ref === dirs[name] && !known.has(realpathSync(path))) swapped.set(name, path);
           try {
             findAdapter(ref, cwd, { byName: ref === name && !dirs[name] });
             return true;
           } catch (e) {
             if (!(e as Error).message.startsWith("no adapter named")) throw e;
             gone.set(name, !!path && existsSync(path) && !!cwd && projectAdapterDirs(cwd).some((d) => resolve(path).startsWith(d + sep)));
+            if (path && existsSync(path) && !known.has(realpathSync(path))) strayPath.set(name, path);
             return false;
           }
         }).map(([, , ref]) => ref);
@@ -476,9 +478,18 @@ export class Session {
       const missing = !!before && !existsSync(before);
       s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
     }
+    for (const [name, path] of swapped) {
+      if (!s.adapters.some((x) => x.name === name)) continue;
+      const text = `The session used the adapter ${name} from ${path} before. This resumed session did not use that folder. It loaded the installed adapter ${name} instead.`;
+      if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
+    }
     for (const [name, untrusted] of gone) {
+      const stray = strayPath.get(name);
+      if (stray && s.adapters.some((x) => x.name === name)) continue;
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
+        : stray
+        ? `The session loaded the adapter ${name} from ${stray} before. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
@@ -2111,8 +2122,10 @@ export class Session {
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
       this.bus.emit({ type: "status", state: "thinking", purpose: REVIEW_PURPOSE });
       try {
-        for (const f of await referee(this.refereeProvider, refereeCtx, signal)) found.push({ f, source: "referee" });
+        let cutShort = false;
+        for (const f of await referee(this.refereeProvider, refereeCtx, signal, () => (cutShort = true))) found.push({ f, source: "referee" });
         state = "done";
+        if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
         this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
@@ -4682,7 +4695,9 @@ export class Session {
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
     if (this.refereeProvider && !this.refereeBlocked()) {
       try {
-        for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+        let cutShort = false;
+        for (const f of await referee(this.refereeProvider, ctx, undefined, () => (cutShort = true))) out.push(this.findings.add(f, "referee"));
+        if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
         this.reviewFailure = e instanceof EmptyReview ? e.message : `The referee did not run: ${(e as Error).message}`;
       }

@@ -165,7 +165,7 @@ export function statusText(states: StepState[], next = "Type /rerun to run the o
   const out = states.filter((s) => !s.current);
   const width = Math.max(...states.map((s) => `Step ${s.step}`.length));
   const lines = states.flatMap((s) => [
-    `${`Step ${s.step}`.padEnd(width)}  ${s.current ? "Up to date " : "Out of date"}  ${clip(s.title, 70)}`,
+    `${`Step ${s.step}`.padEnd(width)}  ${!s.current ? "Out of date" : s.unchecked ? "Not checked" : "Up to date "}  ${clip(s.title, 70)}`,
     ...s.reasons.map((r) => `${" ".repeat(width + 2)}${r.text}`),
     ...(s.unchecked ? [`${" ".repeat(width + 2)}${s.unchecked}`] : []),
   ]);

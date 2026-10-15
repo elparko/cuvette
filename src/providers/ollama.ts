@@ -394,7 +394,7 @@ export class OllamaProvider implements Provider {
       });
       if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
       if (looped) content = cutRepeat(content);
-      if (cut && opts?.failIfCut) throw new CutReplyError("The reply hit the output limit and was cut short.");
+      if (cut && opts?.failIfCut) throw new CutReplyError("The reply hit the output limit and was cut short.", splitThink(content).text);
       return splitThink(content).text;
     } finally {
       idle.stop();
