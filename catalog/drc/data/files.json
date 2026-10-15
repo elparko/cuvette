@@ -1,0 +1,10 @@
+{
+ "data/competitive_synthetic.csv": {"sha256":"7667430a925b84ec729142f0dbfddbc2164f4e03346cee4a8243dd71ac933967","bytes":823},
+ "data/dnase_elisa.csv": {"sha256":"3e3d2b454390e3609a18557f0e55597adc5119cad44feccd34932c6d55b137b3","bytes":1591},
+ "data/lasv_elisa_runs.csv": {"sha256":"a55a3143fb1227651a7b046aaac3d22c4fdaa7e01c1503da82a18b2fbfac3c10","bytes":19327},
+ "data/make_fixtures.R": {"sha256":"adba991318fb3bfa705013ffd26dc0761106cd4e17b20f8dfef6bd393b4c185c","bytes":1667},
+ "data/puromycin.csv": {"sha256":"b685933baef296696ecf329bad7fa5f192cec0af05015e1b3a942993f0a15900","bytes":470},
+ "data/ryegrass.csv": {"sha256":"f9f315ae53c8864ca6c3040a36170de433af0db6c6ca5cd0f0bfb70af6379902","bytes":292},
+ "data/s_alba.csv": {"sha256":"789006c3cdab7d6433401738a897eaa85643de6f16032601fb75d7969a247d02","bytes":1349},
+ "data/splitluc_plates.csv": {"sha256":"488aa9574df87021cbd50740b03a11ad9681302795673cb1a1f6b7a4aee69b65","bytes":6299}
+}

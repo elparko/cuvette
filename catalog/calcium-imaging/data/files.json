@@ -1,0 +1,12 @@
+{
+ "data/demo_rois.csv": {"sha256":"0c6a90c3c1a069c5b64545153ebc2b56c5a80dd42318d3a73165f8387446e2d0","bytes":198},
+ "data/make_synthetic.py": {"sha256":"993d8af2a07d1c0e5c362c9cfa28808aa3e46c4570342f56664270f5b25b0872","bytes":2056},
+ "data/synthetic_correlation.csv": {"sha256":"b240128e3bef09ec5fcdb8b5d2b35ef3ba424fa2998ed97b9da963310caae7ec","bytes":32922},
+ "data/synthetic_groups.csv": {"sha256":"a2ff87b4a80be3d653079efc7b074dc17dda8ff391f517d1029acae0b8bbfeb3","bytes":1773},
+ "data/synthetic_groups3.csv": {"sha256":"03fae3eb46f55ac1897b70fc5faf27e7e418d546217a5cbf8532ecf9f012b090","bytes":446},
+ "data/synthetic_groups3_flat.csv": {"sha256":"542bdb667f9545276252d90a6919518fd0be382b602eb6eec35d93e3477e86bf","bytes":153},
+ "data/synthetic_neuropil_F.csv": {"sha256":"f0134708217a64925659c83ef628c3ccc1651424ad9b20517911d58b723ad373","bytes":15912},
+ "data/synthetic_neuropil_Fneu.csv": {"sha256":"bee5a36a30781dccb8b97f3bd0a403b866a4fed72f51c74029cdba9db70e91f1","bytes":14912},
+ "data/synthetic_stimulus.csv": {"sha256":"872932e66a3be7106c70874ddd039c2c13f1ee60d85b2d776e42b54c15dd8481","bytes":61779},
+ "data/synthetic_transients.csv": {"sha256":"3c0a8cfc8bb205f72ad7f4a663c6ee200fcab72327bd2afee79d233202e86ca5","bytes":26132}
+}

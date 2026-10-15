@@ -1,0 +1,6 @@
+{
+ "data/byte.tif": {"sha256":"59ed6e9dd19291bbdc230092ab7f6bc46fb0537ee4c9eec15dd58021cd9c12be","bytes":736},
+ "data/byte.tif.aux.xml": {"sha256":"d49fcd3ed2a77cf7c4ddec2911213855082d2a0934743a5131e1b469bfbdb1c5","bytes":351},
+ "data/ne_110m_countries.geojson": {"sha256":"a657f0a2053adeef5c0bfb211331664d9335dd70b6206617ed502b824b9c8ac6","bytes":218705},
+ "data/zones.geojson": {"sha256":"0d96b10244d09ee140707a1c149c43db2d515a831686276fa8c6c369af48b16a","bytes":472}
+}

@@ -1,0 +1,9 @@
+{
+ "data/bbbc005/SIMCEPImages_A01_C1_F1_s01_w2.TIF": {"sha256":"ed14db15c8ca39db0227468ba1aebdd9f5462b78167b41c391a9dca71badda43","bytes":317378},
+ "data/bbbc005/SIMCEPImages_A02_C5_F1_s01_w2.TIF": {"sha256":"902fae0a9879d9b1c6e9c6d2f05e6b0f056ec8660052c802d38918e4676ba6c4","bytes":318990},
+ "data/bbbc005/SIMCEPImages_A03_C10_F1_s01_w2.TIF": {"sha256":"659436485a5c8e9e870bff26fed78b9401d976681231922ffc3ce30751a171a7","bytes":321444},
+ "data/bbbc005_dense/SIMCEPImages_A12_C48_F1_s14_w1.TIF": {"sha256":"93fc1c00947056593fe264f30e89b2b11c107da8ae160f18a2d12da62e4a50c6","bytes":329102},
+ "data/bbbc005_dense/SIMCEPImages_A12_C48_F1_s14_w2.TIF": {"sha256":"8ddc186b1781d208d127c9d77af882f3bdc2eec9ea380c6b073ac73fb57601bb","bytes":337274},
+ "data/bbbc005_dense/SIMCEPImages_A24_C100_F1_s02_w1.TIF": {"sha256":"a2a8d5c264295511f1649a488ebc01dbd4a30c5ccd258de767c3999b1b7e8216","bytes":342678},
+ "data/bbbc005_dense/SIMCEPImages_A24_C100_F1_s02_w2.TIF": {"sha256":"f1269959ea6ed49665542913670935f79a47cf08ecb92c2e64b5d4fa20f4cef6","bytes":353856}
+}

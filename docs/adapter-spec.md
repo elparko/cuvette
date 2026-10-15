@@ -17,6 +17,7 @@ my-adapter/
   adapter.ts          optional. Checks, hooks, extra tools, manual routes.
   data/               small test datasets and reference outputs.
   data/SOURCES.md     required if the tests read data. Source and license of each file.
+  data/files.json     the SHA-256 sum and the size of each committed data file. See "Test data".
   evidence/           optional. Notes, macro recorder output, demonstrations.
   server.ts           optional. Code for an MCP server or a worker that the adapter starts.
 ```
@@ -662,6 +663,7 @@ English. It gives a warning, not an error.
 | A skill has no `name` or `description`. | error |
 | A test uses a tool, a data file or a saved name that does not exist. | error |
 | A known-answer test fails (with `--run-tests`). | error |
+| A known-answer test needs data that is not installed, and you decline the download. | none; the test does not run |
 | There is no `STANDARDS.md`. | warning |
 | There are no tests. | warning |
 | A `close` entry has no `difference`. | warning |
@@ -681,3 +683,31 @@ the answer reached the known value. Each confusion names its record entry. The d
 The pull request workflow `.github/workflows/adapter-check.yml` runs `cuvette adapter check` on each changed adapter folder. The checklist rules run inside that
 command, so the workflow needs no new step. The ImageJ job in `.github/workflows/test.yml` passes
 `--gui`.
+
+## Test data
+
+The npm package does not contain `data/` of the catalog adapters. It keeps `data/SOURCES.md`,
+`data/files.json`, the `fetch*.sh` scripts and the files that the self-tests read. The self-tests
+run without a question, so their files must stay in the package. `package.json` lists them.
+
+`data/files.json` maps each committed data file to its SHA-256 sum and its size in bytes.
+Run `node scripts/data-index.mjs` to write it again after you change a data file. A test in
+`tests/testdata.test.ts` fails if the file is out of date.
+
+`cuvette adapter check <name> --run-tests` finds the test data that the computer does not have.
+It shows the adapter name, the file names, the source from `data/SOURCES.md` and the
+size if `data/files.json` lists every file. Then it asks `[y/N]`.
+
+1. If you answer `y`, or you use `--fetch-data`, Cuvette fetches the data of this adapter only.
+2. A test with `fetch:` runs its fetch script. The script checks the SHA-256 sum.
+3. A file in `data/files.json` comes from
+   `https://raw.githubusercontent.com/elparko/cuvette/v<version>/catalog/<name>/`.
+   Cuvette refuses a file with a wrong sum or size and saves nothing.
+4. The tests that need the data do not run in three cases:
+   - You answer `n`.
+   - A run without a terminal has no `--fetch-data`.
+   - The computer has no network.
+5. For a test that does not run, the check prints `skip <test>: <reason>` and a warning.
+   The exit code is 0, as for any test that does not run.
+
+The adapter list, `/programs` and the Sessions page never read a data file.

@@ -1,0 +1,8 @@
+{
+ "data/bsa3_ms2.mzML": {"sha256":"599752d0d8f3c617616a00c832da9ad3c0e163d6ff01292f7182e8fddcc7214b","bytes":289248},
+ "data/peptide_lcms.mzML": {"sha256":"a3dfae633502bc457fb3efeddb5d5006af935a51bd99d9a5974e24232885f9d3","bytes":213090},
+ "data/pi1.fasta": {"sha256":"25cdb1c512e0de1526ea4c96037ba10765082f47a8581b147f8825a9c5c03e62","bytes":1178},
+ "data/pi1.idXML": {"sha256":"f955ea0d1e5c7d5d856e9e19a02244adf6d2c8d58307e6770a193727cd855fe1","bytes":2817},
+ "data/sage_psms.idXML": {"sha256":"4242b17356c7f3b88543a453e62fe69f1e87008692c606d64f3ec703b41cdc98","bytes":495785},
+ "data/standards_td.fasta": {"sha256":"319d7c1092f30e432392503ea62ca745ead99cd4b3829e0c0e9a049fba507dfc","bytes":90720}
+}

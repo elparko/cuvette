@@ -1,0 +1,4 @@
+{
+ "data/example.phy": {"sha256":"d3365cbea79ab6d7b184d1bd9153871616041c6e0e8e591d2a0b4bd08dc0b9bf","bytes":34178},
+ "data/unaligned.fasta": {"sha256":"9f1a95d9a538f3cf3041a8a5ce7ad13236871f857926316499378d200e58800d","bytes":1465}
+}

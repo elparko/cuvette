@@ -1,0 +1,8 @@
+{
+ "data/fay_feuer_births.csv": {"sha256":"05c56e95a3940f37725e1f16686b01c1209d9a8ae9a4fcee3c24657f4b00e7be","bytes":1033},
+ "data/make_fixtures.R": {"sha256":"c53118086dab82f5d271bdf93c452cf98dd2e346a62d3fbc8cc69a5084acf075","bytes":2878},
+ "data/nchs_2020_age_rates.csv": {"sha256":"57e9b17472b15d289a81ea6b3f27e5632b602b6c35139a7c118e3fa95e19855f","bytes":1860},
+ "data/rothman_breast_cancer.csv": {"sha256":"4a725134ee49350e003901ef59f7aec877467e587efab5f11c7f2492c04ad9e0","bytes":72},
+ "data/selvin_us_deaths.csv": {"sha256":"8a2f544658b366036f307ce4ab906c73aa6a9b3b64026e3ab5e5dcc6e3024f4c","bytes":444},
+ "data/tap_water.csv": {"sha256":"beffda1bfcd6c8e287d6013b792c74f9aa81a493516481927429730db4064121","bytes":75}
+}

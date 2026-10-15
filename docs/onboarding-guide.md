@@ -98,7 +98,7 @@ Data and tests:
 - If you calculate an expected value with a different program or language, save the script and its output in `checks/` in the adapter folder. Name both files in the test description.
 - Add a test with bad input that expects `ok: false` and a `contains` on the error. [kat-failure-path]
 - Use public or synthetic data. List each file in `data/SOURCES.md`: `| File | Source | License |`. [kat-data-license]
-- Do not commit a file whose license does not allow redistribution. Write `data/fetch.sh`: it downloads the file, checks its SHA-256 sum and stops on a mismatch. Set `fetch: data/fetch.sh` on each test that reads the file, and add the file to `.gitignore`. The test downloads the file when it is missing, and it skips if the computer has no network. [kat-data-license]
+- Do not commit a file whose license does not allow redistribution. Write `data/fetch.sh`: it downloads the file, checks its SHA-256 sum and stops on a mismatch. Set `fetch: data/fetch.sh` on each test that reads the file, and add the file to `.gitignore`. The check asks before it runs the script. The test skips if you decline or the computer has no network. [kat-data-license]
 - A test runs headless, or it has `gui: true`. Default test runs skip `gui: true` tests; `--gui` runs them. A macro or screen adapter states `gui` on each test. [kat-gui]
 - Take expected numbers from a real program run or a publication, never from your own tool.
 

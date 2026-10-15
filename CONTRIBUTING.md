@@ -144,7 +144,8 @@ You can also write the adapter by hand from the spec. Run the same checker on it
   such as the program's tutorial or its test suite. A number from your own run proves only that
   the tool is stable. If you use one, say so in the test `description`.
 - Use public test data. Keep each file under 1 MB when you can. The data license must let other
-  people copy the file.
+  people copy the file. After you add or change a data file, run `node scripts/data-index.mjs`.
+  The package does not contain `data/`. Users download it when a test needs it.
 - Do not put a secret in `adapter.yaml`. Use `{env:NAME}`.
 - Leave `status: draft`. Do not fill in `approved_by` or `approved_on` yourself.
 

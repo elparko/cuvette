@@ -1,0 +1,10 @@
+{
+ "data/blobs.gif": {"sha256":"507d168e317a6b80cd4a2e94f5ff483769779553b7d02b98cb94f790333d5271","bytes":25765},
+ "data/discs.png": {"sha256":"7481889aa33a0a73882a85097529ba482659a002bdd3c874fb897a239fa33fbe","bytes":737},
+ "data/discs_gradient.png": {"sha256":"f671d4600ec99ce2389dcb3aa278a76838bc292d53db70e28a5eabf87694b780","bytes":46855},
+ "data/discs_noisy.png": {"sha256":"cc6ef0478a869a1f60187d0173b7efb092fce710f4becba586cf54b7196deefd","bytes":55567},
+ "data/discs_saturated.png": {"sha256":"55478fcecfae49be3c830bc481b6260146fcf91a24c477d02b12c8723df9cc1b","bytes":734},
+ "data/discs_touching.png": {"sha256":"e5bc467bf29fff5215e9a5ffcb28ef48b027a39ba3959deb2d38fb5cdfd1f6f8","bytes":716},
+ "data/make-synthetic.ts": {"sha256":"d2ee6aa3f0c9ad7c8dcada3e5746d958bdac96282bf9e20aef157776c6449613","bytes":3623},
+ "data/recording-blobs.ijm": {"sha256":"7105d83a90cdf3d7963a61e84d0660e6cb2ccca974a409bef120a8aa5f20d2ea","bytes":380}
+}

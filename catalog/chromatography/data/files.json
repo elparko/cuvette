@@ -1,0 +1,12 @@
+{
+ "data/hplc_py_integration_areas.csv": {"sha256":"babce76a2f783bffc85daf3cf402f5a5958ce6bb3b68e5e7fdcafbf53e97bc1a","bytes":163},
+ "data/hplc_py_integration_chrom.csv": {"sha256":"3ac92f94b936b2a8cee2c762016603fc038099a6ec1f762008e3e89c6a577a75","bytes":26129},
+ "data/hplc_py_snip_chrom.csv": {"sha256":"b1353e0c84c7a57fe994a9adffbb6b5190441eddef794aba5d45ecb09d3d7a4b","bytes":176766},
+ "data/hplc_py_two_peaks_chrom.csv": {"sha256":"cf31ceb398b9fc7a95297bc7a7ef44a3dfe789578f54a1cec2da96e223000a2f","bytes":230250},
+ "data/hplc_py_two_peaks_truth.csv": {"sha256":"2650281950726f8304d3e7ce599b41633765484b56e0f31f696831bd8d041dce","bytes":173},
+ "data/lactose/lactose_mM_0.5.csv": {"sha256":"4a4de2575098f3ffea609633d0b2e312d38731d070c48fa977affc5f680ffdf3","bytes":7337},
+ "data/lactose/lactose_mM_1.csv": {"sha256":"9bb8e4e639741d3877486b2be195f7485fc129f83a560c3f53c5d43c047b9a2e","bytes":7374},
+ "data/lactose/lactose_mM_2.csv": {"sha256":"97941046a1a0712305b145d725a2d2c33bcb93b42ebbc192a9c9e34c29d61aa9","bytes":7389},
+ "data/lactose/lactose_mM_3.csv": {"sha256":"7beefc3ef2a14e502c5f084bdee37fb699d84c3f84b6f64418580d00fa05e7af","bytes":7399},
+ "data/lactose/lactose_mM_6.csv": {"sha256":"aff86e7f1982e66f2eedef486c867d0d55b20b0e2f78c9fdf17269abd37e2b1c","bytes":7469}
+}

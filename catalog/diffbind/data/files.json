@@ -1,0 +1,6 @@
+{
+ "data/make_fixtures.R": {"sha256":"df2e0f2a0ef5191d98d4012c5fce24c7bf1efc4bd3d7d53ee9155bffbebd8ceb","bytes":1184},
+ "data/tamoxifen_counts.csv": {"sha256":"dde0a58f820fd1a3c799867c956e67515de2f8a040f8b5ea7b2e0b44f999ab94","bytes":231085},
+ "data/tamoxifen_samples.csv": {"sha256":"5a5cd7225aed590bf3872c71963b23784085e9c84c721a1ce37e596e3ef666f2","bytes":707},
+ "data/tamoxifen_scores_decimals.csv": {"sha256":"5a8898c6dc0b870bbb68dba3de77abb14f917146c4f06095e89b4a92b6b213fe","bytes":13851}
+}

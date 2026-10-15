@@ -7,6 +7,7 @@ import { locate } from "../adapters/locate.ts";
 import { ENVS, envNameIn, PROGRAM_INSTALL, R_PACKAGES } from "../core/doctor.ts";
 import { adapterDirs, loadAdapter, Manifest } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
+import { dataGaps, dataNotice, indexed } from "../adapters/testdata.ts";
 import { runTests as runKnownAnswerTests } from "./kat.ts";
 import type { TestOutcome } from "./kat.ts";
 import { benchmarkValues, lint } from "./lint.ts";
@@ -217,7 +218,7 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
     }
     if (t.fetch && !existsSync(join(adapter.root, t.fetch))) errors.push(`test "${t.id}": the fetch script "${t.fetch}" does not exist`);
     for (const rel of t.data) {
-      if (!t.fetch && !existsSync(join(adapter.root, rel))) errors.push(`test "${t.id}": data file "${rel}" does not exist`);
+      if (!t.fetch && !existsSync(join(adapter.root, rel)) && !indexed(adapter.root, rel)) errors.push(`test "${t.id}": data file "${rel}" does not exist`);
     }
     if (!t.expect.length) warnings.push(`test "${t.id}": no expectations`);
     for (const e of t.expect) {
@@ -392,7 +393,14 @@ async function checkVersions(adapter: LoadedAdapter, warnings: string[], noRun =
   }
 }
 
-export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean; gui?: boolean; static?: boolean } = {}): Promise<Report> {
+export interface CheckOptions {
+  runTests?: boolean;
+  gui?: boolean;
+  static?: boolean;
+  fetchData?: (notice: string[]) => Promise<boolean>;
+}
+
+export async function checkAdapter(dirOrName: string, opts: CheckOptions = {}): Promise<Report> {
   const errors: string[] = [];
   const warnings: string[] = [];
   const dir = resolveDir(dirOrName);
@@ -428,6 +436,9 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   let notInstalled: { name: string; ids: string[] }[] = [];
   let toolsKnown = ((tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files") && !(opts.static && m.module);
   if (opts.runTests && !opts.static) {
+    let data: "fetch" | "skip" | undefined;
+    const gaps = opts.fetchData ? dataGaps(adapter, m.tests.filter((t) => opts.gui || !t.gui)) : [];
+    if (gaps.length) data = (await opts.fetchData!(dataNotice(adapter, gaps))) ? "fetch" : "skip";
     const work = mkdtempSync(join(tmpdir(), "cuvette-check-"));
     let runtime: Awaited<ReturnType<typeof import("../adapters/runtime.ts").startAdapter>> | undefined;
     try {
@@ -441,7 +452,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       }
       toolsKnown = true;
       checkStatic(adapter, errors, warnings, tools, toolsKnown);
-      tests = await runKnownAnswerTests(adapter, runtime, { workDir: work, gui: opts.gui });
+      tests = await runKnownAnswerTests(adapter, runtime, { workDir: work, gui: opts.gui, data });
       const skipped = m.tests.filter((t) => t.gui && !opts.gui).length;
       if (skipped) warnings.push(`${skipped} known-answer test(s) open a window (gui: true) and did not run. Run with --gui to include them`);
       notInstalled = missingDependencies(tests, m.program.name);

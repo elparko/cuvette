@@ -392,6 +392,10 @@ export function readSources(text: string): { file: string; source: string; licen
   return rows;
 }
 
+export function sourceRow<T extends { file: string }>(rows: T[], rel: string): T | undefined {
+  return rows.find((r) => r.file && (rel === r.file || rel.startsWith(r.file.replace(/\/?$/, "/")) || (r.file.includes("*") && new RegExp(`^${r.file.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`).test(rel))));
+}
+
 const UNCONFIRMED = /\b(unknown|not confirmed|unconfirmed|unclear|to check|check before|tbd|todo)\b/i;
 
 function lintData(a: LoadedAdapter, out: Finding[]) {
@@ -412,7 +416,7 @@ function lintData(a: LoadedAdapter, out: Finding[]) {
   const rows = readSources(readFileSync(note, "utf8"));
   for (const f of all) {
     const rel = f.replace(/^data\//, "");
-    const row = rows.find((r) => r.file && (rel === r.file || rel.startsWith(r.file.replace(/\/?$/, "/")) || (r.file.includes("*") && new RegExp(`^${r.file.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`).test(rel))));
+    const row = sourceRow(rows, rel);
     if (!row) add(out, "kat-data-license", "data/SOURCES.md", `the test data file ${f} has no row. Add its source and license.`);
     else if (fetchedFiles.includes(f)) {
       if (!row.source) add(out, "kat-data-license", "data/SOURCES.md", `the row for ${row.file} has no source. A fetched file needs the address that the fetch script downloads.`);

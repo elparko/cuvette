@@ -1,0 +1,11 @@
+{
+ "data/bcrxl_metadata.csv": {"sha256":"217e21caf2a2b3dce1c215a73d09e4245dffbe529720440fb6f1f51ee70f7727","bytes":783},
+ "data/make_synthetic.py": {"sha256":"77024b5ec6631fcd4494eec49c7f807c0de5c7d1c38a97442ad75fb5c531a640","bytes":1234},
+ "data/synthetic/metadata.csv": {"sha256":"005cc0ccd4a2967b10bc17e3e6c5c0eb34460507d0c5766758f713c84bbb10de","bytes":121},
+ "data/synthetic/p1_ref.fcs": {"sha256":"780905570987e1908fe27b3ab5ed211a2ce5449a974678745e3b7beb7e5eb680","bytes":6712},
+ "data/synthetic/p1_stim.fcs": {"sha256":"726410e7ee116da5bd3938cab0658470d3b2e2c2a3efc452c76acefb3f28150d","bytes":7912},
+ "data/synthetic/p2_ref.fcs": {"sha256":"0bfe24864f6d8184a511041e350e0705126542ce761b30f85e108fe4cf96ad28","bytes":6612},
+ "data/synthetic/p2_stim.fcs": {"sha256":"d2dc8fc76b2b23b950a3f5fe1ee4b3d82fe7f4425c6442ed68eb59a6988ad416","bytes":7812},
+ "data/synthetic/p3_ref.fcs": {"sha256":"8976517d571b48b7be4abe724f6572d177e502d28dff10e8ccf9a0ac0ea9438e","bytes":6912},
+ "data/synthetic/p3_stim.fcs": {"sha256":"fc9e83177ff1746455dcb93da9eca0233fa44f491929f69d2afebf4e9fe559ff","bytes":8112}
+}

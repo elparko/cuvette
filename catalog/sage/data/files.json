@@ -1,0 +1,8 @@
+{
+ "data/LQSRPAAPPAPGPGQLTLR.mzML": {"sha256":"b22b4253ab566878b74c0ade3afc4abd1986edf6b62fafb18545377c4327adb2","bytes":12237},
+ "data/Q99536.fasta": {"sha256":"c49e2dac2407dd9f6ad41e8ae1e53e798e41af92264cfcbb84cf8cd6b156e76b","bytes":512},
+ "data/bsa1.mzML": {"sha256":"2b9de10e88f29aec06cd6db21413e9ceeb4392b8e23f503599985d2edd4126f9","bytes":792456},
+ "data/bsa2.mzML": {"sha256":"885416bf5c8ad911120bdc9bbda9872bf77d35c421298d7f64522325e0aba30b","bytes":455878},
+ "data/bsa3.mzML": {"sha256":"599752d0d8f3c617616a00c832da9ad3c0e163d6ff01292f7182e8fddcc7214b","bytes":289248},
+ "data/standards.fasta": {"sha256":"9e96a134f9cf8a509d9b00cbd9f49605d1bed93e14cfe2bd0d726da729a84f9e","bytes":45004}
+}

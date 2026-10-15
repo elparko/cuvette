@@ -1,0 +1,7 @@
+{
+ "data/gaussians_noiseless.fits": {"sha256":"3da51daff616d50f1139dc7c6b9a61356175b44f659e48e93fbf792952f011ad","bytes":604800},
+ "data/gaussians_noisy.fits": {"sha256":"a89c467c8cb851f1ce785671a478246dda2976e1553498b28240b012bf17f038","bytes":604800},
+ "data/isolated_truth.csv": {"sha256":"591d74734ff8c47fdfd8d59ec83016921017a36011c723d9a24d3beb91b44bfa","bytes":714},
+ "data/make_data.py": {"sha256":"3b5877c9b77ca8932faa43a279a1d8939071f203d0ec8ef76753fe8b9f926ca5","bytes":1487},
+ "data/truth_100gaussians.csv": {"sha256":"fff9c82b69155a18266a3be0d211727630a19f51942b715b7d184d708f2d10e1","bytes":13223}
+}
