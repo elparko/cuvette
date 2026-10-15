@@ -51,3 +51,42 @@ test("a long run of punctuation does not take quadratic time", () => {
   expect(namesValue(request, alpha, 0.05)).toBe(true);
   expect(Date.now() - start).toBeLessThan(3000);
 });
+
+test("a negation in the same clause before the number makes the number not asked", () => {
+  expect(namesValue("Don't set alpha to 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not use an alpha of 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Never set the alpha to 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Run it without alpha 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Any alpha except 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Any alpha other than 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Use no more than 5 permutations", perms, 5)).toBe(false);
+});
+
+test("a clause after a comma with its own positive value still applies", () => {
+  expect(namesValue("Set alpha to 0.05, not 0.1", alpha, 0.05)).toBe(true);
+  expect(namesValue("Set alpha to 0.05, not 0.1", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not use alpha 0.1 in the second test, use 0.05", alpha, 0.05)).toBe(true);
+  expect(namesValue("Do not use alpha 0.1 in the second test, use 0.05", alpha, 0.1)).toBe(false);
+  expect(namesValue("Do not touch the plots.\nSet alpha to 0.1", alpha, 0.1)).toBe(true);
+});
+
+test("a number in brackets before a full stop is read", () => {
+  expect(namesValue("Use the standard level (alpha 0.05).", alpha, 0.05)).toBe(true);
+  expect(namesValue("(alpha 0.05).", alpha, 0.05)).toBe(true);
+});
+
+test("a negation reaches only five tokens back and not over a clause boundary", () => {
+  const window = { key: "window", label: "Window" };
+  expect(namesValue("I don't have replicates so use window 5", window, 5)).toBe(true);
+  expect(namesValue("I don't have replicates, use window 5", window, 5)).toBe(true);
+  expect(namesValue("I don't have replicates because window 5 is the default", window, 5)).toBe(true);
+  expect(namesValue("Do not worry about the old runs window 5", window, 5)).toBe(true);
+});
+
+test("a value for another target in a later clause is not the value of the setting", () => {
+  const window = { key: "window", label: "Window" };
+  expect(namesValue("don't set window to 5, I want 7 for the threshold", window, 7)).toBe(false);
+  expect(namesValue("don't set window to 5, I want 7 for the threshold", window, 5)).toBe(false);
+  expect(namesValue("Set window, then use 7 for the threshold", window, 7)).toBe(false);
+  expect(namesValue("Do not use window 5, use 7", window, 7)).toBe(true);
+});

@@ -1,4 +1,5 @@
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { harnessWrite } from "./harness-writes.ts";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -82,8 +83,10 @@ function writeIndex(rows: IndexRow[]): void {
     if (damaged) renameSync(path, `${path}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
   }
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(rows, null, 1));
-  renameSync(tmp, path);
+  harnessWrite(path, () => {
+    writeFileSync(tmp, JSON.stringify(rows, null, 1));
+    renameSync(tmp, path);
+  });
 }
 
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {

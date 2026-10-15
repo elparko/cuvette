@@ -625,7 +625,7 @@ tools:
   - name: inspect_fcs
     title: Inspect FCS files
     description: >
-      Read FCS files. Return the cells in each file, the channels with their range, and the channels that look like integer labels. It changes no file.
+      Read FCS files. Return the cells in each file, the channels with their range in the first file, and the channels that look like integer labels in the first file. It changes no file.
     params:
       files: { type: string, description: "Path of a folder with .fcs files, or a comma list of .fcs paths. All files must have the same channels." }
     required: [files]

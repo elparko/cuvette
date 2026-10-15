@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { harnessWrite } from "../core/harness-writes.ts";
 import { dirname, join } from "node:path";
 import { folderTrusted, projectSettingFiles } from "../core/trust.ts";
 import { cuvetteHome, type LoadedAdapter, type Manifest } from "./manifest.ts";
@@ -59,7 +60,7 @@ export function saveAccess(name: string, change: Partial<Record<keyof Access, un
   if (Object.keys(all).length) data.programs = all;
   else delete data.programs;
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  harnessWrite(file, () => writeFileSync(file, JSON.stringify(data, null, 2) + "\n"));
   return next as Access;
 }
 

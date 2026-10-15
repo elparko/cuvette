@@ -287,7 +287,7 @@ def spatial_autocorr(adata, mode="moran", n_perms=0, random_state=0, top_n=20, r
         metrics["n_report_genes_within_cutoff"] = inside
         metrics["rank_cutoff"] = int(rank_cutoff)
         notes.append("%d of %d reported genes are within the top %d" % (inside, len(reported), int(rank_cutoff)))
-    summary = "%s %s for %d genes on %d spots (%s). %d genes have an FDR below 0.05. Top genes: %s.%s" % (
+    summary = "%s %s for %d genes on %d spots (%s). %d genes have an FDR below 0.05 (one-sided p values). Top genes: %s.%s" % (
         "Moran's I" if mode == "moran" else "Geary's C", "was computed", len(frame), a.n_obs, "%d permutations" % n_perms if n_perms else "normal approximation for p values",
         n_sig, ", ".join("%s %.3f" % (g, v) for g, v in zip(top["gene"].head(5), top[stat].head(5))), " " + "; ".join(notes) + "." if notes else "")
     return _result(a, "spatial_autocorr", summary, metrics, [csv], _preview(top, csv, int(top_n)), {"statistic": stat})

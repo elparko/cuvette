@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { harnessWrite } from "./harness-writes.ts";
 import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
@@ -7,7 +8,7 @@ import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS, settingFits, wellTyped } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
-import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
+import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, oneLine, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
 import { folderHasNoPatientData, setFolderNoPatientData } from "./phi.ts";
 
 export type Scope = "session" | "user" | "project";
@@ -293,7 +294,7 @@ export const SETTINGS: SettingDef[] = [
     },
     details: (ctx) => {
       const t = trustStatus(ctx.cwd);
-      return [`Folder: ${t.scan.folder}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : folderLines(t.scan))];
+      return [`Folder: ${oneLine(t.scan.folder)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : folderLines(t.scan))];
     },
   },
   {
@@ -606,7 +607,7 @@ function writeSetting(path: string, name: string, value: unknown): void {
   if (value === undefined) delete data[name];
   else data[name] = value;
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+  harnessWrite(path, () => writeFileSync(path, JSON.stringify(data, null, 2) + "\n"));
 }
 
 export function recordSetting(session: SettingSession | undefined, d: SettingDef, old: unknown, value: unknown, scope: Scope): void {

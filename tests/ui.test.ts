@@ -67,6 +67,12 @@ describe("the permission card for a command", () => {
     expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e]/);
   });
 
+  test("writes out control codes in a string argument that is not a command", () => {
+    const v = card({ purpose: "Write", does: "Writes.", path: "a\u001b[2Jb\u202ec\nd", mode: "x\u0007" });
+    expect(v.args).toEqual(["path = a\\x1b[2Jb\\u202ec\nd", "mode = x\\x07"]);
+    for (const a of v.args) expect(a).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u202a-\u202e]/);
+  });
+
   test("keeps Unicode text and emoji as they are", () => {
     const v = card({ purpose: "Print", does: "Prints.", argv: ["echo", "héllo 日本語 😀"] });
     expect(v.args).toEqual(['Command: echo "héllo 日本語 😀"']);

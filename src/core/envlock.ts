@@ -41,11 +41,16 @@ for d in m.distributions():
     if n and n.lower() not in seen:
         seen[n.lower()] = [n, d.version]
 watch = [p for p in sys.path if p.endswith(("site-packages", "dist-packages"))]
+try:
+    import site
+    watch.append(site.getusersitepackages())
+except Exception:
+    pass
 print(json.dumps({"language": "Python " + sys.version.split()[0], "watch": watch, "packages": sorted(seen.values(), key=lambda x: x[0].lower())}))`;
 
 const R = `ip <- installed.packages(); ip <- ip[!duplicated(ip[, "Package"]), , drop = FALSE]
 cat("LANG\\tR ", as.character(getRversion()), "\\n", sep = "")
-for (p in .libPaths()) cat("LIB\\t", p, "\\n", sep = "")
+for (p in c(.libPaths(), strsplit(Sys.getenv("R_LIBS_USER"), .Platform$path.sep)[[1]])) if (nzchar(p)) cat("LIB\\t", p, "\\n", sep = "")
 cat(paste0("PKG\\t", ip[, "Package"], "\\t", ip[, "Version"], "\\n"), sep = "")`;
 
 const memory = new Map<string, Cached>();
@@ -79,7 +84,7 @@ function mtime(p: string): number | undefined {
 }
 
 function fresh(c: Cached): boolean {
-  return Object.entries(c.stamps).every(([p, t]) => mtime(p) === t);
+  return Object.entries(c.stamps).every(([p, t]) => (mtime(p) ?? -1) === t);
 }
 
 export function lockHash(l: Omit<EnvLock, "hash" | "path">): string {
@@ -152,10 +157,7 @@ async function scan(t: EnvTarget, key: string): Promise<EnvLock | undefined> {
   const base = { kind: t.kind, language: got.language, packages: got.packages };
   const lock: EnvLock = { hash: lockHash(base), path: t.path, ...base };
   const stamps: Record<string, number> = {};
-  for (const p of [t.path, ...got.watch]) {
-    const m = mtime(p);
-    if (m !== undefined) stamps[p] = m;
-  }
+  for (const p of [t.path, ...got.watch]) stamps[p] = mtime(p) ?? -1;
   const c = { stamps, lock };
   memory.set(key, c);
   writeDisk(key, c);
@@ -167,8 +169,9 @@ export function clearEnvCache(): void {
 }
 
 export function packageChanges(before: EnvLock, after: EnvLock): string[] {
-  const old = new Map(before.packages.map((p) => [p.name.toLowerCase(), p]));
-  const now = new Map(after.packages.map((p) => [p.name.toLowerCase(), p]));
+  const norm = (name: string) => name.toLowerCase().replace(/[-_.]+/g, "-");
+  const old = new Map(before.packages.map((p) => [norm(p.name), p]));
+  const now = new Map(after.packages.map((p) => [norm(p.name), p]));
   const out: string[] = [];
   if (before.language !== after.language) out.push(`${before.language || "the language"} to ${after.language}`);
   for (const [k, p] of now) {

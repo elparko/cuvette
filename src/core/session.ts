@@ -56,7 +56,7 @@ import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sampleFiles, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
-import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
+import { cannotTrust, endTrustOnce, longLabRefusal, folderTrusted, labLong, oneLine, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustable, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
@@ -1159,6 +1159,11 @@ export class Session {
     text = this.withoutKeys(text);
     this.busy = true;
     this.endedBy = "stopped";
+    this.turnStartedAt = performance.now();
+    this.answerReadyMs = undefined;
+    this.reviewState = "none";
+    this.reviewFindings = 0;
+    this.turnMs = undefined;
     this.abort = new AbortController();
     const signal = this.abort.signal;
     let revised = false;
@@ -1202,9 +1207,9 @@ export class Session {
       for (let step = 0; step < this.settings.maxSteps; step++) {
         if (!(await this.phiGate(signal))) {
           this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
-          return "";
+          return this.stoppedText();
         }
-        if (!(await this.budgetGate(signal))) return "";
+        if (!(await this.budgetGate(signal))) return this.stoppedText();
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.stepWithRecovery(forceAnswer, signal);
@@ -1276,13 +1281,9 @@ export class Session {
           }
         }
         if (!calls.length && !said && this.draft) {
-          const { answer } = this.draft;
-          this.draft = undefined;
-          this.record.append("notice", { text: "The revision was empty. The first answer is kept, with the problems that the review found." });
-          this.record.append("assistant", { text: answer, final: true });
-          this.lastAnswer = answer;
+          const kept = this.keepDraft("The correction was empty. The first answer stays, with the problems that the review found.");
           this.endedBy = "answer";
-          return answer;
+          return kept;
         }
         if (!calls.length && !said) {
           const cut = res.stopReason === "max_tokens";
@@ -1375,36 +1376,30 @@ export class Session {
         if (this.stopTurn) {
           this.stopTurn = false;
           this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
-          return "";
+          return this.stoppedText();
         }
         if (this.endTurn) {
           this.record.append("notice", { text: this.endTurn });
           this.endTurn = undefined;
-          return "";
+          return this.stoppedText();
         }
         if (signal.aborted) {
           this.record.append("notice", { text: "Stopped. The results so far are kept.", warn: true });
-          return "";
+          return this.stoppedText();
         }
       }
       this.record.append("notice", { text: `Paused after ${this.settings.maxSteps} steps. Type "continue" to go on.`, warn: true });
       this.endedBy = "max_steps";
-      return "";
+      return this.stoppedText();
     } catch (e) {
       const msg = signal.aborted && this.cutReply ? "Stopped. The reply above is not complete." : signal.aborted ? "Stopped." : e instanceof ProviderError ? e.message : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg, warn: true } : { message: msg });
       if (!signal.aborted) this.endedBy = "error";
       this.closeOpenCalls(results);
-      if (this.draft) {
-        const { answer } = this.draft;
-        this.draft = undefined;
-        this.record.append("notice", { text: "The turn stopped during the revision. The first answer is kept, with the problems that the review found." });
-        this.record.append("assistant", { text: answer, final: true });
-        this.lastAnswer = answer;
-        return answer;
-      }
+      if (this.draft) return this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.");
       return "";
     } finally {
+      this.turnMs = Math.round(performance.now() - this.turnStartedAt);
       if (this.planning) this.endPlanning();
       this.waitedQids.clear();
       this.laterQids.clear();
@@ -1423,6 +1418,25 @@ export class Session {
 
   // How the last turn ended: "answer", "max_steps" (the step limit), "error" or "stopped" (Esc, a card or a cancel).
   endedBy: "answer" | "max_steps" | "error" | "stopped" = "stopped";
+
+  // Milliseconds from the start of the last turn to the first shown answer, and to the end of the turn with the review.
+  answerReadyMs?: number;
+  turnMs?: number;
+  private turnStartedAt = 0;
+  reviewState: "done" | "stopped" | "failed" | "none" = "none";
+  reviewFindings = 0;
+
+  private appendReview(answer: number, state: "done" | "stopped" | "failed" | "off", findings: string[], extra: Record<string, unknown> = {}): void {
+    this.record.append("review", { answer, state, findings, ...extra });
+    this.reviewState = state === "off" ? "none" : state;
+    this.reviewFindings = findings.length;
+  }
+
+  private markAnswerReady(): void {
+    if (this.answerReadyMs !== undefined) return;
+    this.answerReadyMs = Math.round(performance.now() - this.turnStartedAt);
+    this.record.append("answer_ready", { at: new Date().toISOString(), elapsedMs: this.answerReadyMs });
+  }
 
   private cutReply = false;
   retryBudgetMs = RETRY_BUDGET_MS;
@@ -1956,11 +1970,33 @@ export class Session {
     this.record.append("notice", { text: contextWarning(used, win), warn: true });
   }
 
-  private draft?: { answer: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number };
+  private draft?: { answer: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
+
+  private stoppedText(): string {
+    return this.draft ? this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.") : "";
+  }
+
+  private keepDraft(note: string): string {
+    const d = this.draft!;
+    this.draft = undefined;
+    this.record.append("notice", { text: note });
+    this.lastAnswer = d.answer;
+    return d.annotated;
+  }
+
+  private presentation(answer: string, claims: ReturnType<typeof checkAnswer>) {
+    const missing = this.resultsNotIn(answer);
+    const settings = this.settingsUsed();
+    const defs = this.approvedEntry ? definitionsOf(this.record) : [];
+    const definitions = defs.length ? `Definitions, from the confirmed analysis:\n${defs.map((d) => `- ${d.measure}: ${d.definition}`).join("\n")}` : "";
+    const tail = [missing, settings, definitions].filter(Boolean).join("\n\n");
+    return { shown: tail ? `${answer}\n\n${tail}` : answer, annotated: annotate(answer, claims) + (tail ? `\n\n${tail}` : ""), settings, results: missing || undefined };
+  }
 
   private async finishAnswer(text: string, revised: boolean, signal: AbortSignal): Promise<{ text: string; revise?: string }> {
     if (!this.settings.guidance) {
       this.record.append("assistant", { text, final: true });
+      this.markAnswerReady();
       this.lastAnswer = text;
       return { text };
     }
@@ -1968,58 +2004,64 @@ export class Session {
     const answer = pre.answer ?? text;
     this.noteSkippedSteps();
     const claims = checkAnswer(answer, this.record.liveView());
-    let kept: string | undefined;
-    let keptClaims: typeof claims | undefined;
-    let keptFound: { f: FindingIn; source: Finding["source"] }[] | undefined;
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
+    if (endsWithPromise(answer)) found.push({ f: { check: "answer_unfinished", severity: "warning", message: "The answer ends with a plan for more steps, not with a result. The agent stopped before it finished." }, source: "rule" });
+    const correcting = this.draft;
+    let first: { id: number; annotated: string } | undefined;
+    if (!correcting) {
+      const p = this.presentation(answer, claims);
+      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, settings: p.settings, results: p.results });
+      this.lastAnswer = answer;
+      this.markAnswerReady();
+      first = { id: entry.id, annotated: p.annotated };
+    }
     if (this.refereeBlocked() && !this.refereeOffNoted) {
       this.refereeOffNoted = true;
       this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds possible patient identifiers that did not go to a cloud model." });
     }
     const turnStart = this.lastRequest()?.id ?? 0;
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
+    let state: "done" | "stopped" | "failed" | "off" = "off";
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
+      this.bus.emit({ type: "status", state: "thinking", purpose: "Reviewing the answer" });
       try {
         for (const f of await referee(this.refereeProvider, ctx, signal)) found.push({ f, source: "referee" });
+        state = "done";
       } catch (e) {
+        state = signal.aborted ? "stopped" : "failed";
         this.record.append("notice", { text: `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
       }
-    }
-    let errors = found.filter((x) => x.f.severity === "error");
+      this.bus.emit({ type: "status", state: "thinking" });
+    } else if (this.refereeProvider && signal.aborted) state = "stopped";
+    const errors = found.filter((x) => x.f.severity === "error");
     const measured = (cs: typeof claims) => cs.filter((c) => c.label === "measured").length;
-    if (revised && this.draft && errors.length >= this.draft.errors && measured(claims) < this.draft.measured) {
-      this.record.append("notice", { text: "The revision lost results and fixed no problem, so the harness kept the first answer." });
-      ({ answer: kept, found: keptFound } = this.draft);
-      keptClaims = checkAnswer(kept, this.record.liveView());
-      errors = keptFound.filter((x) => x.f.severity === "error");
+    if (correcting && errors.length >= correcting.errors && measured(claims) < correcting.measured) {
+      return { text: this.keepDraft("The revision lost results and fixed no problem, so the harness kept the first answer.") };
     }
     this.draft = undefined;
-    if (errors.length && !revised && this.settings.reviseOnFindings) {
-      this.draft = { answer, claims, found, errors: errors.length, measured: measured(claims) };
-      this.record.append("notice", { text: `Review found ${errors.length} problem(s). The agent revises the answer before you see it.` });
+    if (first && errors.length && !revised && this.settings.reviseOnFindings && !signal.aborted) {
+      const firstFindings = found.map(({ f, source }) => this.findings.add(f, source).fid);
+      this.appendReview(first.id, state, firstFindings, { corrected: true });
+      this.draft = { answer, annotated: first.annotated, claims, found, errors: errors.length, measured: measured(claims), entry: first.id };
+      this.record.append("notice", { text: `Review found ${errors.length} problem(s) in the answer above:\n${errors.map((x) => `- ${x.f.message}`).join("\n")}\nThe first answer stays. The agent revises the answer and marks the new one as the correction.` });
       return {
         text: "",
-        revise: "[Review before the answer reaches the scientist]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then give the answer again.",
+        revise: "[Review of your answer. The scientist has already read it.]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then give the answer again. The scientist sees it as the correction.",
       };
     }
-    const finalAnswer = kept ?? answer;
-    const finalClaims = keptClaims ?? claims;
-    const finalFound = keptFound ?? found;
-    if (endsWithPromise(finalAnswer)) finalFound.push({ f: { check: "answer_unfinished", severity: "warning", message: "The answer ends with a plan for more steps, not with a result. The agent stopped before it finished." }, source: "rule" });
-    const fids = finalFound.map(({ f, source }) => this.findings.add(f, source).fid);
-    const missing = this.resultsNotIn(finalAnswer);
-    const settings = this.settingsUsed();
-    const defs = this.approvedEntry ? definitionsOf(this.record) : [];
-    const definitions = defs.length ? `Definitions, from the confirmed analysis:\n${defs.map((d) => `- ${d.measure}: ${d.definition}`).join("\n")}` : "";
-    const tail = [missing, settings, definitions].filter(Boolean).join("\n\n");
-    const shown = tail ? `${finalAnswer}\n\n${tail}` : finalAnswer;
-    const annotated = annotate(finalAnswer, finalClaims) + (tail ? `\n\n${tail}` : "");
-    this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings, results: missing || undefined });
-    this.lastAnswer = finalAnswer;
+    const findings = found.map(({ f, source }) => this.findings.add(f, source).fid);
+    let shown = first;
+    if (!shown) {
+      const p = this.presentation(answer, claims);
+      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results });
+      this.lastAnswer = answer;
+      shown = { id: entry.id, annotated: p.annotated };
+    }
+    this.appendReview(shown.id, state, findings);
     this.offerChecklist();
-    return { text: annotated };
+    return { text: shown.annotated };
   }
 
   private offerChecklist(): void {
@@ -2745,7 +2787,7 @@ export class Session {
 
   private askedFor(f: { key: string; label: string; choices?: unknown[] }, value: unknown): boolean {
     if (this.scientistAsked === undefined || this.askedUsed.has(f.key)) return false;
-    return namesValue(this.scientistAsked, f, value);
+    return namesValue(this.scientistAsked, f, value, this.decisions.fields());
   }
 
   private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
@@ -2985,7 +3027,7 @@ export class Session {
   private async checkTrust(interactive: boolean): Promise<void> {
     const t = trustStatus(this.cwd);
     if (t.scan.labProblem) {
-      const text = `Cuvette could not read LAB.md in ${t.scan.folder}: ${t.scan.labProblem}. Cuvette ignores the file. Fix the file, then start the session again.`;
+      const text = `Cuvette could not read LAB.md in ${oneLine(t.scan.folder)}: ${oneLine(t.scan.labProblem)}. Cuvette ignores the file. Fix the file, then start the session again.`;
       if (!this.record.entries(["notice"]).some((n) => n.data.text === text)) this.record.append("notice", { text, warn: true });
     }
     for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");

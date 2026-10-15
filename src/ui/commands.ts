@@ -434,7 +434,7 @@ const base: Command[] = [
         return;
       }
       const t = tr.trustStatus(cwd);
-      const lines = [`Folder: ${t.scan.folder}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? [tr.cannotTrust(t.scan) ? "Why Cuvette cannot trust the folder:" : "Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
+      const lines = [`Folder: ${tr.oneLine(t.scan.folder)}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? [tr.cannotTrust(t.scan) ? "Why Cuvette cannot trust the folder:" : "Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
       ctx.print(lines.join("\n"), "Folder trust");
       if ((t.state === "new" || t.state === "changed") && ctx.session.askTrust) {
         const q = await ctx.session.askTrust();
@@ -1034,11 +1034,14 @@ const MOST_WORDS: Record<string, number> = { mode: 1, permissions: 1, trust: 1, 
 
 const mostWords = (name: string, args: string[]) => (name === "key" ? (args[0] === "workspace" ? 2 : 1) : MOST_WORDS[name]);
 
+const NEEDS_FINAL_ANSWER = new Set(["export", "cite", "databook", "review"]);
+
 export const commands: Command[] = base.map((c) => ({
   ...c,
   run(args, ctx) {
     const most = mostWords(c.name, args);
     if (most !== undefined && args.length > most) return ctx.error(`Too many words. Use: /${c.name}${c.args ? ` ${c.args}` : ""}`);
+    if (NEEDS_FINAL_ANSWER.has(c.name) && ctx.session.busy) return ctx.error("The review of the answer is still running. Type the command again when it ends.");
     return c.run(args, ctx);
   },
 }));

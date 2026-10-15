@@ -274,7 +274,7 @@ export function labelMap(entries: Entry[], adapters: LoadedAdapter[], c: CaseSpe
 // ---------------------------------------------------------------- transcript
 
 const NOTES = "[Notes from the harness]";
-const REVIEW = "[Review before the answer";
+const REVIEW = /^\[Review (before the answer|of your answer)/;
 
 function argsTable(args: Record<string, unknown>, ctx: RunCtx): string {
   const rows = Object.entries(args).map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td><code>${esc(short(ctx.san(typeof v === "string" ? v : JSON.stringify(v)), 400))}</code></td></tr>`);
@@ -370,8 +370,8 @@ export function transcriptHtml(ctx: RunCtx, c: CaseSpec | undefined, finalText: 
         if (m.role === "user") {
           const p = m.parts[0];
           if (p?.type !== "text" || !p.text) break;
-          if (p.text.startsWith(REVIEW)) {
-            out.push(`<div class="ev harness" id="e${e.id}"><p class="step-head"><span class="tag">review</span> The review sent the answer back to the agent before the scientist saw it.</p>${pre(san(p.text.split("\n").slice(1).join("\n")))}</div>`);
+          if (REVIEW.test(p.text)) {
+            out.push(`<div class="ev harness" id="e${e.id}"><p class="step-head"><span class="tag">review</span> The review sent its problems to the agent. The agent then wrote a correction.</p>${pre(san(p.text.split("\n").slice(1).join("\n")))}</div>`);
           } else if (p.text.startsWith(NOTES)) {
             let text = p.text.slice(NOTES.length).trim();
             const u = String(firstUser?.data.text ?? "");
@@ -530,10 +530,12 @@ function extraTable(ref: ItemScore[], extra: ExtraItem[], c: CaseSpec | undefine
 function checksHtml(ctx: RunCtx, paper: Paper | undefined): string {
   const { entries, san } = ctx;
   const findings = entries.filter((e) => e.kind === "finding");
-  const shown = new Set(((entries.filter((e) => e.kind === "assistant" && e.data.final === true).at(-1)?.data.findings as string[] | undefined) ?? []).map(String));
+  const lastFinal = entries.filter((e) => e.kind === "assistant" && e.data.final === true).at(-1);
+  const reviewed = entries.filter((e) => e.kind === "review" && lastFinal && e.data.answer === lastFinal.id).flatMap((e) => (e.data.findings as string[] | undefined) ?? []);
+  const shown = new Set([...((lastFinal?.data.findings as string[] | undefined) ?? []), ...reviewed].map(String));
   const fRows = findings.map((f) => `<tr><td data-label="Severity"><span class="tag sev-${esc(String(f.data.severity))}">${esc(String(f.data.severity))}</span></td><td data-label="From">${f.data.source === "referee" ? "referee model" : `rule<span class="sub">${esc(String(f.data.check ?? ""))}</span>`}</td><td data-label="Finding">${esc(san(String(f.data.message ?? "")))}</td><td data-label="With the answer">${shown.has(String(f.data.fid)) ? "yes" : "no"}</td></tr>`);
   const fHtml = findings.length
-    ? `<p>The review recorded ${plural(findings.length, "finding")}. A rule finding comes from a fixed check in the harness. A referee finding comes from a second model that reads the record. The harness shows the findings to the scientist with the final answer. The record does not mark a finding as fixed, so a finding from an early review round can apply to a draft that the agent then corrected.</p><div class="table-wrap"><table class="stack"><thead><tr><th>Severity</th><th>From</th><th>Finding</th><th>With the answer</th></tr></thead><tbody>${fRows.join("")}</tbody></table></div>`
+    ? `<p>The review recorded ${plural(findings.length, "finding")}. A rule finding comes from a fixed check in the harness. A referee finding comes from a second model that reads the record. The harness shows the findings to the scientist after the final answer. The record does not mark a finding as fixed, so a finding from an early review round can apply to a draft that the agent then corrected.</p><div class="table-wrap"><table class="stack"><thead><tr><th>Severity</th><th>From</th><th>Finding</th><th>With the answer</th></tr></thead><tbody>${fRows.join("")}</tbody></table></div>`
     : `<p>The review recorded no findings.</p>`;
   const checks = entries.filter((e) => e.kind === "claim_check");
   const last = checks.at(-1);

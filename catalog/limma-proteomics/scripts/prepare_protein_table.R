@@ -81,8 +81,9 @@ run_tool(function() {
   m <- as.matrix(as.data.frame(lapply(df[, cols, drop = FALSE], function(v) suppressWarnings(as.numeric(v))), check.names = FALSE))
   bad <- setdiff(cols[colSums(!is.na(m)) == 0], character())
   if (length(bad)) fail(sprintf("these sample columns have no numbers: %s. Check sample_columns.", paste(head(bad, 6), collapse = ", ")))
-  if (isTRUE(as.logical(pick(p, "zero_as_missing", TRUE)))) m[!is.na(m) & m == 0] <- NA
-  if (!isTRUE(as.logical(pick(p, "already_log2", FALSE)))) {
+  already_log2 <- isTRUE(as.logical(pick(p, "already_log2", FALSE)))
+  if (isTRUE(as.logical(pick(p, "zero_as_missing", !already_log2)))) m[!is.na(m) & m == 0] <- NA
+  if (!already_log2) {
     if (any(m < 0, na.rm = TRUE)) fail("the sample columns have negative numbers, so they are not intensities. Set already_log2 to true if the values are log2 values.")
     m <- log2(m)
   }

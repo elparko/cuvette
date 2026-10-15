@@ -344,7 +344,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       if (d.during) return { icon: "note", line: `You wrote while the agent worked (after step ${show(d.afterStep ?? 0)}): ${clip(show(d.text))}`, technical: tech({ typedAt: d.typedAt, afterTool: d.afterTool, now: d.now }) };
       return { icon: "note", line: `You asked: ${clip(show(d.text))}`, request: true, details: { text: d.text }, technical: tech() };
     case "assistant":
-      return d.final ? { icon: "note", line: clip(plainText(show(d.text))), answer: true, details: { text: d.text }, technical: tech() } : undefined;
+      return d.final ? { icon: "note", line: `${d.corrects ? "Corrected answer: " : ""}${clip(plainText(show(d.text)))}`, answer: true, details: { text: d.text }, technical: tech() } : undefined;
     default:
       return undefined;
   }

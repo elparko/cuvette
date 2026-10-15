@@ -227,14 +227,15 @@ def segment_cells(
     rows = [[int(i), int(a), round(float(c[0]), 2), round(float(c[1]), 2)] for i, a, c in zip(ids, areas, cents)]
     _write_table(cpath, cols, rows)
     n = len(ids)
-    scale = pixel_size * pixel_size if pixel_size > 0 else 1.0
+    calibrated = pixel_size > 0
+    scale = pixel_size * pixel_size if calibrated else 1.0
     metrics = {
         "n_cells": n,
         "mean_area_px": float(areas.mean()) if n else 0.0,
         "median_area_px": float(np.median(areas)) if n else 0.0,
         "removed_border": n_border,
     }
-    if scale != 1.0:
+    if calibrated:
         metrics["mean_area_calibrated"] = metrics["mean_area_px"] * scale
     return {
         "ok": True,
@@ -247,7 +248,7 @@ def segment_cells(
         ],
         "table": _table(cpath, cols, rows),
         "label_image": lpath,
-        "data": {"area_unit": "pixel" if scale == 1.0 else "calibrated unit squared", "calibrated": scale != 1.0, "model": model_type},
+        "data": {"area_unit": "calibrated unit squared" if calibrated else "pixel", "calibrated": calibrated, "model": model_type},
     }
 
 

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { fileHash, harnessWrote, hashBytes } from "../core/harness-writes.ts";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
@@ -237,6 +238,7 @@ export function recordFolders(dirs: Dirs): string[] {
   return both(found);
 }
 
+const INDEX_NAME = /^sessions-index\.json(?:\.(?:bak|damaged-.+))?$/;
 const OPEN_PARTS = ["adapters", "methods", "skills"];
 const SETTINGS_NAMES = ["settings.json", "settings.local.json"];
 
@@ -259,11 +261,11 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   for (const home of homes.filter((h) => inside(h) || h === realish(cuvetteHome()))) {
     let index: string[] = [];
     try {
-      index = readdirSync(home).filter((f) => f.startsWith("sessions-index.json")).map((f) => join(home, f));
+      index = readdirSync(home).filter((f) => INDEX_NAME.test(f)).map((f) => join(home, f));
     } catch {}
-    const files = [...SETTINGS_NAMES.map((f) => join(home, f)), join(home, "sessions-index.json"), ...index];
-    out.locked.push(...files, ...(inside(home) ? [join(home, "sessions")] : []));
-    out.files.push(...files);
+    const settingsFiles = SETTINGS_NAMES.map((f) => join(home, f));
+    out.locked.push(...settingsFiles, join(home, "sessions-index.json"), ...index, ...(inside(home) ? [join(home, "sessions")] : []));
+    out.files.push(...settingsFiles);
   }
   if (!dirs.projectDir) return out;
   for (const name of [".cuvette", ".ga"]) {
@@ -281,9 +283,23 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   return out;
 }
 
+function holdsRecord(dir: string): boolean {
+  return existsSync(join(dir, "log.jsonl")) || existsSync(join(dir, "meta.json"));
+}
+
+// An output folder that is not the work folder opens only if it holds no record, no settings and no code.
+function outputOpens(dirs: Dirs, scope: SettingsScope): boolean {
+  const out = dirs.outputDir;
+  if (!out || both([out]).some((x) => both([dirs.workDir]).includes(x))) return false;
+  const mine = both([dirs.sessionDir]);
+  const others = recordFolders(dirs).filter((r) => !mine.includes(r));
+  const sealed = [...scope.locked, ...others, ...(basename(dirs.sessionDir) === ".record" ? mine : [])];
+  return !both([out]).some((x) => sealed.some((l) => within(x, l)) || x.split(/[\\/]/).includes(".record") || holdsRecord(x));
+}
+
 export function writeSteps(dirs: Dirs, opts: { adapterRoot?: string } = {}): WriteStep[] {
   const scope = settingsScope(dirs);
-  const own = [dirs.workDir, ...(dirs.outputDir ? [dirs.outputDir] : [])];
+  const own = [dirs.workDir, ...(outputOpens(dirs, scope) ? [dirs.outputDir!] : [])];
   const locked = both([...recordFolders(dirs), ...scope.locked]).filter((p) => !both(own).includes(p));
   const keep = both(own);
   const steps: WriteStep[] = locked.map((path) => ({ path, allow: false }));
@@ -363,35 +379,20 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
   return argv;
 }
 
-function hashBytes(path: string, from = 0, limit = Infinity): string {
-  const h = createHash("sha256");
-  const buf = Buffer.alloc(1 << 20);
-  const fd = openSync(path, "r");
-  try {
-    for (let done = 0; done < limit; ) {
-      const n = readSync(fd, buf, 0, Math.min(buf.length, limit - done), from + done);
-      if (!n) break;
-      h.update(buf.subarray(0, n));
-      done += n;
-    }
-  } finally {
-    closeSync(fd);
-  }
-  return h.digest("hex");
+export function logFingerprint(dirs: Dirs): { changed(): string[] } {
+  const logPath = () => join(dirs.sessionDir, "log.jsonl");
+  const logSize = existsSync(logPath()) ? statSync(logPath()).size : 0;
+  const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
+  return {
+    changed() {
+      const log = logPath();
+      if (!logSize) return [];
+      return !existsSync(log) || statSync(log).size < logSize || hashBytes(log, 0, logSize) !== logHash ? [log] : [];
+    },
+  };
 }
 
-const BIG = 5_000_000;
-
-function fileHash(path: string): string {
-  try {
-    const size = statSync(path).size;
-    if (size <= BIG) return hashBytes(path);
-    return `${size}:${hashBytes(path, 0, 1 << 20)}:${hashBytes(path, size - (1 << 20), 1 << 20)}`;
-  } catch {
-    return "";
-  }
-}
-
+// A change of a settings file does not count if the file has the content that the harness wrote. The global session index is not in the check: the sandbox lock protects it, and a second Cuvette process writes it without notice.
 export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[] } {
   const scope = settingsScope(dirs);
   const settingsNow = () => {
@@ -400,18 +401,13 @@ export function fingerprint(dirs: Dirs, withLog: boolean): { changed(): string[]
     return out;
   };
   const settings = settingsNow();
-  const logPath = () => join(dirs.sessionDir, "log.jsonl");
-  const logSize = withLog && existsSync(logPath()) ? statSync(logPath()).size : 0;
-  const logHash = logSize ? hashBytes(logPath(), 0, logSize) : "";
+  const log = withLog ? logFingerprint(dirs) : undefined;
   return {
     changed() {
       const out: string[] = [];
       const now = settingsNow();
-      for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p)) out.push(p);
-      const log = logPath();
-      if (logSize) {
-        if (!existsSync(log) || statSync(log).size < logSize || hashBytes(log, 0, logSize) !== logHash) out.push(log);
-      }
+      for (const p of new Set([...settings.keys(), ...now.keys()])) if (settings.get(p) !== now.get(p) && !harnessWrote(p, now.get(p) ?? "")) out.push(p);
+      out.push(...(log?.changed() ?? []));
       return out;
     },
   };
