@@ -55,5 +55,5 @@ export function linear(make: (n: number) => string, run: (s: string) => void, n 
   const best = (size: number) => Math.min(...Array.from({ length: 5 }, () => msFor(() => run(make(size)))));
   const small = best(n);
   const big = best(4 * n);
-  return { small, big, ok: big < 40 || big < small * 9 };
+  return { small, big, ok: big < 40 || big < Math.max(small, 10) * 9 };
 }

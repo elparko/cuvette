@@ -317,6 +317,7 @@ describe("a short or narrow terminal", () => {
     const argv = ["sh", "-c", `${"abcdefghij".repeat(200)}; rm -rf /tmp/last-word`];
     s.bus.emit({ type: "permission", rid: "rx", tool: "run_command", args: { purpose: "Run", does: "Runs it.", argv }, touches: "Runs on this computer with your user permissions." });
     await until(() => h.term.view().includes("Permission needed: run_command"));
+    await until(() => /lines 1–\d+ of \d+ · /.test(h.term.view()));
     expect(h.term.view()).toMatch(/lines 1–\d+ of \d+ · /);
     for (let i = 0; i < 40 && !h.term.view().includes("last-word"); i++) {
       h.type("\x1b[6~");

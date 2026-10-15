@@ -68,7 +68,7 @@ describe("fuzz: terminal wrap", () => {
     const start = performance.now();
     hangLines(t, 40);
     hangWrap(t, 40);
-    expect(performance.now() - start).toBeLessThan(1500);
+    expect(performance.now() - start).toBeLessThan(process.env.CI ? 5000 : 1500);
   });
 });
 

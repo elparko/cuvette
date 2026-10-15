@@ -191,11 +191,12 @@ test("a deleted log leaves no old data: a new log at the same path and a deleted
   const fig = (n: string) => join(h, n);
   writeFileSync(fig("a.png"), "x");
   writeFileSync(fig("b.png"), "x");
+  let writes = 0;
   const write = (ask: string) => {
     mkdirSync(dir, { recursive: true });
     const lines = [{ id: 1, kind: "session", data: { cwd: "/lab" } }, { id: 2, kind: "user", data: { text: ask } }, { id: 3, kind: "node", data: { outputs: [{ path: fig("a.png") }] } }, { id: 4, kind: "node", data: { outputs: [{ path: fig("b.png") }] } }];
     writeFileSync(log, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
-    const t = new Date(Date.now() - 60000);
+    const t = new Date(Date.now() - 60000 - ++writes * 5000);
     utimesSync(log, t, t);
   };
   write("Count the cells");
