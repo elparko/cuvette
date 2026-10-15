@@ -103,6 +103,7 @@ export interface SessionOptions {
   refereeProvider?: Provider;
   generic?: boolean;
   pick?: boolean;
+  addAdapters?: string[];
   interactive?: boolean;
   home?: boolean;
   place?: Place;
@@ -448,7 +449,7 @@ export class Session {
       const last = record.live(["setting"]).filter((e) => e.data.name === name).at(-1)?.data;
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
-    const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
     for (const [name, untrusted] of gone) {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
@@ -462,7 +463,7 @@ export class Session {
     const resumed = this.record.entries(["session"]).length > 0;
     const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
-    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
+    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a, i, all) => all.findIndex((x) => x.name === a.name) === i).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;

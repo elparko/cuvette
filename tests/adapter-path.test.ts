@@ -126,3 +126,14 @@ unix("resume of a recorded name does not load a folder of the same name in the p
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.root)).toEqual([installed]);
 });
+
+unix("resume with addAdapters keeps the recorded adapters and adds the new one, with no duplicate", async () => {
+  installedLab();
+  const other = evilAdapter(cwd, "other");
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  session = await Session.resume(id, { addAdapters: [other, "lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab", "other"]);
+});
