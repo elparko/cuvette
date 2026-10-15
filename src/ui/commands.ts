@@ -870,7 +870,7 @@ const base: Command[] = [
         const ws = claudeWorkspace() ? ` Workspace ID: ${claudeWorkspace()}.` : "";
         if (k.from === "env") return ctx.notice(`The key ${maskKey(k.key!)} comes from ANTHROPIC_API_KEY in this shell.${ws}`);
         if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.${ws}`);
-        if (antLogin()) return ctx.notice(`Signed in with ant auth login.${ws}`);
+        if (antLogin()) return ctx.notice(`You signed in with ant auth login.${ws}`);
         return ctx.notice("There is no Claude API key. Type /key to add one.");
       }
       if (sub === "remove") {

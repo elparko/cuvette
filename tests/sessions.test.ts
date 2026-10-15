@@ -50,10 +50,12 @@ test("the default keeps a session that has work but no request, and skips one wi
     writeFileSync(join(dir, "log.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
   };
   add("20261009-100000-dddd", ["notice"]);
-  add("20261009-110000-eeee", ["notice", "setting"]);
+  add("20261009-110000-eeee", ["notice", "decision"]);
+  add("20261009-120000-ffff", ["notice", "permission_mode", "setting", "self_test"]);
   const list = listSessions(h);
   expect(defaultSession(list, "/lab/new")?.info.id).toBe("20261009-110000-eeee");
   expect(defaultSession(list.filter((s) => s.id !== "20261009-110000-eeee"), "/lab/new")?.info.id).toBe("20261008-100000-bbbb");
+  expect(list.find((s) => s.id === "20261009-120000-ffff")?.worked).toBe(false);
 });
 
 test("each line has the id, the age, the folder and the first request, shortened", () => {

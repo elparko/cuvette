@@ -583,7 +583,7 @@ export function completeFindings(raw: string): FindingIn[] {
   }).filter((f): f is FindingIn => Boolean(f));
 }
 
-export const CUT_REVIEW_NOTICE = "The review was cut short. The findings here are the ones that the referee finished.";
+export const CUT_REVIEW_NOTICE = "The output limit cut the review short. The findings here are the ones that the referee finished.";
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal, onCut?: () => void): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);

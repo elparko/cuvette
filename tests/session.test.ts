@@ -3663,7 +3663,7 @@ test("a referee reply that is cut after complete findings makes the review done 
   expect(session.reviewState).toBe("done");
   expect(session.record.entries(["review"]).at(-1)!.data.state).toBe("done");
   expect(session.findings.list().some((f) => f.source === "referee" && f.message === "The answer does not name the method.")).toBe(true);
-  expect(session.record.entries(["notice"]).some((e) => /The review was cut short/.test(String(e.data.text)))).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /The output limit cut the review short/.test(String(e.data.text)))).toBe(true);
 });
 
 test("a manual review with an empty referee reply keeps the rule findings and gives the failure text", async () => {

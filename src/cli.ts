@@ -546,7 +546,7 @@ async function main() {
       if (a1 === "status") {
         const k = cred.claudeKey();
         const ws = cred.claudeWorkspace();
-        return console.log((k.from === "none" ? (cred.antLogin() ? "Signed in with ant auth login." : "There is no Claude API key.") : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`) + (ws ? `\nWorkspace ID: ${ws}` : ""));
+        return console.log((k.from === "none" ? (cred.antLogin() ? "You signed in with ant auth login." : "There is no Claude API key.") : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`) + (ws ? `\nWorkspace ID: ${ws}` : ""));
       }
       if (a1 === "remove") return console.log(cred.removeClaudeKey() ? `Removed the key from ${cred.credentialsPath()}.` : "There is no saved key.");
       if (a1 === "workspace") {

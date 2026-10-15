@@ -21,6 +21,7 @@ export interface SessionInfo {
   worked?: boolean;
 }
 
+const WORK_KINDS = new Set(["user", "assistant", "tool_call", "tool_result", "node", "decision", "answer"]);
 const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 export interface OpenLock {
@@ -149,7 +150,7 @@ function parseLog(log: string): Parsed {
     }
     if (!e || typeof e !== "object") continue;
     const d = e.data && typeof e.data === "object" ? e.data : {};
-    if (e.kind !== "session" && e.kind !== "notice") worked = true;
+    if (WORK_KINDS.has(e.kind)) worked = true;
     if (!first && e.kind === "session") first = e;
     if (e.kind === "fork" && typeof e.session === "string") owner = e.session;
     else if (!ask && e.kind === "user" && !d.during) ask = e;

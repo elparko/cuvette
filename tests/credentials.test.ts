@@ -140,14 +140,14 @@ test("/key status says that an ant auth login is signed in, not that there is no
     rmSync(cfg, { recursive: true, force: true });
   }
   expect(notices[0]).toMatch(/^There is no Claude API key/);
-  expect(notices[1]).toBe("Signed in with ant auth login.");
+  expect(notices[1]).toBe("You signed in with ant auth login.");
 });
 
 test("cuvette key status says that an ant auth login is signed in", () => {
   const cfg = antConfig();
   try {
     const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "key", "status"], { env: { ...process.env, CUVETTE_HOME: process.env.CUVETTE_HOME, ANTHROPIC_API_KEY: "", ANTHROPIC_CONFIG_DIR: cfg }, encoding: "utf8", timeout: 60_000 });
-    expect(r.stdout.trim()).toBe("Signed in with ant auth login.");
+    expect(r.stdout.trim()).toBe("You signed in with ant auth login.");
   } finally {
     rmSync(cfg, { recursive: true, force: true });
   }
