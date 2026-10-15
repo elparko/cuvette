@@ -386,3 +386,19 @@ test("a p value in the text of a read_file result does not count as a test", asy
   const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
   expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
 });
+
+test("a tool result that says no p value was computed is not a test in the record", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const withText = (text: string) => ({
+    record: { entries: () => [], live: (types: string[]) => (types.includes("tool_result") ? [{ data: { ok: true, tool: "run_script", text } }] : []), nodes: () => [], numbers: () => [], stale: () => new Set() },
+    decisions: { values: () => ({}) },
+    adapters: [],
+    answer: "The treated cells are significantly larger.",
+    claims: [],
+  });
+  const flagged = async (text: string) => (await run(withText(text) as never)).some((f) => f.check === "significance_without_test");
+  expect(await flagged("mean area 3.1\nno p value computed")).toBe(true);
+  expect(await flagged("The test failed to compute a p value")).toBe(true);
+  expect(await flagged("Welch t test\np value = 0.03")).toBe(false);
+  expect(await flagged("Not a large effect, p = 0.03")).toBe(false);
+});

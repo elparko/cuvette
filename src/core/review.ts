@@ -331,12 +331,18 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
 
 const TEST_IN_TEXT = /\bp[- ]?values?\b|\bp\s*(?:=|<|>|≤)\s*\d|\bq[- ]?values?\b|\badjusted p\b/i;
 
+const NEGATED_P = /\b(?:no|not|without|could not|cannot|can't|couldn't|failed(?: to \w+)?)\s+(?:\w+\s+){0,2}?(?:adjusted\s+)?[pq][- ]?values?\b/gi;
+
+function testInText(text: string): boolean {
+  return text.split(/\r?\n/).some((line) => TEST_IN_TEXT.test(line.replace(NEGATED_P, " ")));
+}
+
 function testInResults(record: ReviewContext["record"]): boolean {
   const named = record.nodes().some((n) => {
     const d = (n.result as { data?: { test?: unknown } } | undefined)?.data;
     return typeof d?.test === "string" && d.test.trim() !== "";
   });
-  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && (e.data.tool === "run_script" || !!e.data.adapter) && TEST_IN_TEXT.test(String(e.data.text ?? "")));
+  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && (e.data.tool === "run_script" || !!e.data.adapter) && testInText(String(e.data.text ?? "")));
 }
 
 function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
