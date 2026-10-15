@@ -10,6 +10,7 @@ import { roleInRecord, stepNumbers } from "../core/housekeeping.ts";
 import { REFUSERS } from "../core/refusals.ts";
 import { planView } from "../core/plan.ts";
 import { parseRoute, shortReason, trail } from "../core/trail.ts";
+import { NO_ALWAYS } from "../ui/cards.ts";
 import { panelHtml } from "./panel-page.ts";
 import { setWindowUrl } from "./notify.ts";
 import { pageHtml } from "./page.ts";
@@ -272,7 +273,7 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
       if (req.method === "POST" && url.pathname === "/api/permission") {
         const body = (await readBody(req)) as { rid?: string; ok?: boolean; note?: string; always?: boolean };
         if (typeof body.rid !== "string" || !permissions.has(body.rid)) return send(res, 404, '{"error":"no such permission request"}');
-        session.respondPermission(body.rid, Boolean(body.ok), body.note ?? "", Boolean(body.always));
+        session.respondPermission(body.rid, Boolean(body.ok), body.note ?? "", Boolean(body.always) && !NO_ALWAYS.has(permissions.get(body.rid)!.tool));
         permissions.delete(body.rid);
         return send(res, 200, '{"ok":true}');
       }

@@ -37,6 +37,17 @@ async function runToQuestion(s: FakeSession) {
 }
 
 describe("window server", () => {
+  test("a request for always allow on a tool in the no-always set is a single allow", async () => {
+    const { s, base, token } = await open();
+    const calls: unknown[][] = [];
+    s.respondPermission = (...a: unknown[]) => void calls.push(a);
+    for (const [rid, tool] of [["r1", "run_command"], ["r2", "run_script"]]) s.bus.emit({ type: "permission", rid, tool, args: {}, touches: "files" });
+    const post = (rid: string) => fetch(`${base}/api/permission?t=${token}`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ rid, ok: true, always: true }) });
+    expect((await post("r1")).status).toBe(200);
+    expect((await post("r2")).status).toBe(200);
+    expect(calls).toEqual([["r1", true, "", false], ["r2", true, "", true]]);
+  });
+
   test("a call that Cuvette blocked does not show as a failed call with the text for the model", async () => {
     const { s, base, token } = await open();
     s.record.append("tool_call", { callId: "a", tool: "read_file", args: { path: "/home/.cuvette/settings.json" } });
