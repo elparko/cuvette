@@ -245,6 +245,10 @@ export function minPossibleP(n1: number, n2: number): number {
   return 2 / c;
 }
 
+export function minPossibleSignedRankP(pairs: number): number {
+  return Math.min(1, 2 / 2 ** pairs);
+}
+
 export function designChecks(rows: SampleRow[], opts: { n?: string; test?: string } = {}): DesignIssue[] {
   const out: DesignIssue[] = [];
   const groups = new Map<string, SampleRow[]>();
@@ -302,8 +306,10 @@ export function designChecks(rows: SampleRow[], opts: { n?: string; test?: strin
     const rank = /mann|whitney|wilcoxon|rank/i.test(opts.test ?? "");
     if (rank && lo >= 2) {
       const [a, b] = [...ns].sort((x, y) => x - y);
-      const p = minPossibleP(a!, b!);
-      if (p > 0.05) out.push({ id: "too_few_rank", check: "too_few", level: "warn", text: `With n = ${a} and n = ${b}, the smallest possible two-sided p of the Mann-Whitney test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.` });
+      const signed = /signed|paired/i.test(opts.test ?? "") || (/wilcoxon/i.test(opts.test ?? "") && !/rank.?sum|mann|whitney/i.test(opts.test ?? ""));
+      const p = signed ? minPossibleSignedRankP(a!) : minPossibleP(a!, b!);
+      const text = signed ? `With n = ${a} pairs, the smallest possible two-sided p of the Wilcoxon signed-rank test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.` : `With n = ${a} and n = ${b}, the smallest possible two-sided p of the Mann-Whitney test is ${p.toPrecision(2)}. The test cannot reach p < 0.05.`;
+      if (p > 0.05) out.push({ id: "too_few_rank", check: "too_few", level: "warn", text });
     }
   }
   const flat = (t: string) => t.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");

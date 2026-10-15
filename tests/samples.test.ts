@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { applyChanges, applyEdit, designChecks, replaySheet, sheetChanges, groupSummary, minPossibleP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
+import { applyChanges, applyEdit, designChecks, replaySheet, sheetChanges, groupSummary, minPossibleP, minPossibleSignedRankP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
 
 function efferocytosis(): string[] {
   const out: string[] = [];
@@ -130,6 +130,16 @@ describe("design checks", () => {
     expect(minPossibleP(3, 3)).toBeCloseTo(0.1);
     expect(minPossibleP(4, 4)).toBeCloseTo(2 / 70);
     expect(designChecks(sheet, { n: "One Set", test: "Welch t-test" }).some((i) => i.id === "too_few_rank")).toBe(false);
+  });
+
+  test("a paired rank test with 5 pairs cannot reach p below 0.05", () => {
+    const five = ["1", "2", "3", "4", "5"].flatMap((m) => [row(`a${m}`, "Pre", `M${m}`), row(`b${m}`, "Post", `M${m}`)]);
+    const issue = designChecks(five, { test: "Wilcoxon signed-rank test" }).find((i) => i.id === "too_few_rank")!;
+    expect(issue.text).toBe("With n = 5 pairs, the smallest possible two-sided p of the Wilcoxon signed-rank test is 0.063. The test cannot reach p < 0.05.");
+    expect(minPossibleSignedRankP(6)).toBeCloseTo(2 / 64);
+    expect(designChecks(five, { test: "Wilcoxon rank-sum test" }).some((i) => i.id === "too_few_rank")).toBe(false);
+    const six = [...five, row("a6", "Pre", "M6"), row("b6", "Post", "M6")];
+    expect(designChecks(six, { test: "Wilcoxon signed-rank test" }).some((i) => i.id === "too_few_rank")).toBe(false);
   });
 });
 
