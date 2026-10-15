@@ -95,8 +95,16 @@ def text_encoding(path):
 def load(path, sheet=None):
     path = os.path.expanduser(path)
     if _is_xlsx(path):
-        return pd.read_excel(path, sheet_name=sheet or 0)
-    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",", encoding=text_encoding(path))
+        frame = pd.read_excel(path, sheet_name=sheet or 0)
+        raw = pd.read_excel(path, sheet_name=sheet or 0, keep_default_na=False)
+    else:
+        sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
+        frame = pd.read_csv(path, sep=sep, encoding=text_encoding(path))
+        raw = pd.read_csv(path, sep=sep, encoding=text_encoding(path), dtype=str, keep_default_na=False)
+    for column in frame.columns:
+        if frame[column].dtype == object:
+            frame[column] = raw[column].where(raw[column].astype(str).str.strip() != "", np.nan)
+    return frame
 
 
 def _need(frame, cols):

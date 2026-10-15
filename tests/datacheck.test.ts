@@ -37,6 +37,15 @@ describe("table checks", () => {
     expect(item(c, "missing:Notes").level).toBe("note");
   });
 
+  test("a group label None in a text column is a label, but None in a number column is a missing value", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => [`M${i + 1}`, ["None", "Drug", "Vehicle"][i % 3]!, i === 4 ? "None" : String(10 + i)]);
+    const c = checkTable(t(["Animal", "Group", "dose"], rows), "plate.csv");
+    expect(c.groups?.sizes.map((g) => g[0]).sort()).toEqual(["Drug", "None", "Vehicle"]);
+    expect(ids(c)).not.toContain("missing:Group");
+    expect(item(c, "missing:dose").level).toBe("ask");
+    expect(item(c, "missing:dose").rows).toEqual([6]);
+  });
+
   test("an empty column is shown, not asked", () => {
     const c = checkTable(t(["id", "value", "spare"], [["a", "1", ""], ["b", "2", ""], ["c", "3", ""]]), "x.csv");
     expect(item(c, "empty:spare")).toMatchObject({ level: "note", text: "Column 'spare' is empty. The harness does not use it." });

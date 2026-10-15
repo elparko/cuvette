@@ -183,4 +183,14 @@ print(json.dumps(out))`,
     expect(out.metrics.n).toBe(3);
     expect(out.summary).toContain("1 of 4 rows have no number in Dose");
   });
+  for (const label of ["None", "NA", "null"]) {
+    test(`the group summary keeps a group named ${label}`, { timeout: slow }, async () => {
+      const file = join(root, `label-${label}.csv`);
+      writeFileSync(file, `Group,Value\n${label},1\n${label},3\nA,10\nA,12\n`);
+      const out = await tables.run("summarize_table", { path: file, group_by: ["Group"], values: ["Value"] });
+      const groups = out.table.rows.map((r) => r[0]);
+      expect(groups).toEqual([label, "A"]);
+      expect(out.table.rows.map((r) => r[2])).toEqual([2, 2]);
+    });
+  }
 });

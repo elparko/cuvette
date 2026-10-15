@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -159,5 +159,44 @@ describe.skipIf(!python || !rscript)("biostats adapter against base R", () => {
     close(exact.metrics.p_value, r.mw, 1e-8);
     const paired = await stats.run("rank_test", { path: file.replace("two", "pair"), outcome: "v", group: "grp", paired: true, id_column: "id", method: "exact" });
     close(paired.metrics.p_value, r.sr, 1e-8);
+  });
+});
+
+describe.skipIf(!python)("biostats adapter group labels that look like missing values", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-labels-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const write = (name: string, labels: string[]) => {
+    const file = join(root, name);
+    const rows = ["group,value"];
+    labels.forEach((label, i) => {
+      for (let k = 0; k < 6; k++) rows.push(`${label},${(i + 1) * 2 + k * 0.7 + (k % 2) * 0.3}`);
+    });
+    writeFileSync(file, rows.join("\n") + "\n");
+    return file;
+  };
+
+  for (const label of ["None", "NA", "null"]) {
+    test(`a group named ${label} stays a group in the one-way ANOVA`, { timeout: slow }, async () => {
+      const file = write(`oneway-${label}.csv`, [label, "A", "B", "C"]);
+      const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
+      expect(out.metrics.n_groups).toBe(4);
+      expect(out.metrics.n).toBe(24);
+    });
+  }
+
+  test("a group named NA stays a group in the Kruskal-Wallis test and the two-group test", { timeout: slow }, async () => {
+    const kw = await stats.run("kruskal_dunn", { path: write("kw.csv", ["NA", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
+    expect(kw.metrics.n).toBe(18);
+    const two = await stats.run("compare_two_groups", { path: write("two.csv", ["None", "A"]), outcome: "value", group: "group" });
+    expect(two.metrics.n_a + two.metrics.n_b).toBe(12);
   });
 });

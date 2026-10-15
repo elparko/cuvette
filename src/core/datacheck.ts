@@ -46,6 +46,8 @@ const GROUP_NAME = /(group|treatment|condition|genotype|arm|cohort|drug|strain|s
 const UNIT_IN_NAME = /\(([^()]+)\)\s*$|\[([^\[\]]+)\]\s*$|[ _](mm|cm|um|µm|nm|mg|g|kg|ug|µg|ng|ml|ul|µl|mM|uM|µM|nM|s|sec|min|h|hr|px|pixels|percent|pct|%)$/i;
 
 export const isMissing = (v: string) => MISSING.has(v.trim().toLowerCase());
+const isNoneWord = (v: string) => v.trim().toLowerCase() === "none";
+const isMissingLabel = (v: string) => isMissing(v) && !isNoneWord(v);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const flat = (s: string) => s.replace(/[\r\n\u0085\u2028\u2029]+/g, " / ");
 const quote = (s: string) => {
@@ -101,7 +103,14 @@ export function columnInfo(t: Table): ColInfo[] {
     t.rows.forEach((r, i) => kinds[kindOf(r[c] ?? "")].push(i));
     const numberLike = kinds.num.length + kinds.comma.length + kinds.astext.length;
     const filled = t.rows.length - kinds.missing.length;
-    return { name, kinds, numeric: numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6 };
+    const numeric = numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6;
+    if (!numeric) {
+      const labels = kinds.missing.filter((i) => isNoneWord(t.rows[i]![c] ?? ""));
+      kinds.missing = kinds.missing.filter((i) => !labels.includes(i));
+      kinds.text.push(...labels);
+      kinds.text.sort((a, b) => a - b);
+    }
+    return { name, kinds, numeric };
   });
   infoCache.set(t, info);
   return info;
@@ -273,11 +282,11 @@ export function checkTable(t: Table, source: string): DataCheck {
   let groups: DataCheck["groups"];
   if (group >= 0) {
     const name = t.columns[group]!;
-    const labels = t.rows.map((r) => (r[group] ?? "").trim()).filter((v) => !isMissing(v));
+    const labels = t.rows.map((r) => (r[group] ?? "").trim()).filter((v) => !isMissingLabel(v));
     const spell = new Map<string, Set<string>>();
     for (const r of t.rows) {
       const raw = r[group] ?? "";
-      if (isMissing(raw)) continue;
+      if (isMissingLabel(raw)) continue;
       const k = raw.trim().toLowerCase().replace(/\s+/g, " ");
       spell.set(k, (spell.get(k) ?? new Set()).add(raw));
     }
@@ -290,7 +299,7 @@ export function checkTable(t: Table, source: string): DataCheck {
     const count = new Map<string, Set<string>>();
     t.rows.forEach((r, i) => {
       const g = (r[group] ?? "").trim();
-      if (isMissing(g)) return;
+      if (isMissingLabel(g)) return;
       const u = unitCol >= 0 ? (r[unitCol] ?? "").trim() : "";
       count.set(g, (count.get(g) ?? new Set()).add(u && !isMissing(u) ? `id\u0001${u}` : `row\u0001${i}`));
     });

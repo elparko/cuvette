@@ -24,14 +24,23 @@ def _fail(message):
     return {"ok": False, "error": message}
 
 
+def _typed(path, enc):
+    frame = pd.read_csv(path, encoding=enc)
+    raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+    for column in frame.columns:
+        if frame[column].dtype == object:
+            frame[column] = raw[column].where(raw[column].str.strip() != "", np.nan)
+    return frame
+
+
 def _read(path):
     path = os.path.expanduser(path)
     for enc in ("utf-8-sig", "cp1252"):
         try:
-            return pd.read_csv(path, encoding=enc)
+            return _typed(path, enc)
         except UnicodeDecodeError:
             pass
-    return pd.read_csv(path, encoding="latin-1")
+    return _typed(path, "latin-1")
 
 
 def _need(frame, columns):
