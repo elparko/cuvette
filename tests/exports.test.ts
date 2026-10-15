@@ -305,3 +305,16 @@ test("after a rewind the protocol keeps the trail numbers, also in a repeated st
   expect(md).toContain("A rewind set aside step 2 of the trail.");
   expect(md).toContain("3. Repeat step 1 for `/w/2.tif`, `/w/3.tif` (steps 3 to 4).");
 });
+
+test("the protocol falls back to the plain index when a step has no trail number", () => {
+  const r = new AnalysisRecord(join(dir, "s5"), "20260101-000000-abd0");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/1.tif" } }));
+  r.addNode(nodeIn({ tool: "fit", args: { src: "/w/x" } }));
+  const all = r.nodes();
+  let calls = 0;
+  const stub = Object.create(r, { nodes: { value: () => (++calls === 1 ? all : []) } });
+  const md = readFileSync(exportProtocol(stub, [adapter], join(dir, "p5.md")), "utf8");
+  expect(md).toContain("1. open");
+  expect(md).toContain("2. fit");
+});

@@ -5,7 +5,7 @@ import { isAbsolute, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
-import { stepNumbers } from "./housekeeping.ts";
+import { stepNumberOf, stepNumbers } from "./housekeeping.ts";
 import { ownerOf, type AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
 import { describeRoute, fillTemplate, show, writeOut } from "./trail.ts";
@@ -173,13 +173,15 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
   if (missing.length) lines.push(`A rewind set aside ${missing.length === 1 ? "step" : "steps"} ${missing.join(", ")} of the trail. This list does not have ${missing.length === 1 ? "it" : "them"}. The other steps keep the numbers of the trail.`, "");
   const groups = group(nodes);
   const sentences: string[] = [];
+  const place = new Map(nodes.map((n, k) => [n.id, k]));
+  const numberOf = (n: Node) => stepNumberOf(numbers, n.id, place.get(n.id)!);
   for (const g of groups) {
-    const here = numbers.get(g.first.id)!;
+    const here = numberOf(g.first);
     lines.push(`${here}. ${g.first.summary ? g.first.summary : g.first.tool}`);
     for (const l of stepLines(adapters, g.first)) lines.push(`   ${l}`);
     sentences.push(methodsSentence(adapters, g.first).replace(/\.?$/, `${cite(nodeCitations(adapters, g.first).methods)}.`));
     if (g.rest.length && g.key) {
-      const rest = g.rest.map((n) => numbers.get(n.id)!);
+      const rest = g.rest.map(numberOf);
       const paths = g.rest.map((n) => `\`${oneLine(show(n.args[g.key!]))}\``).join(", ");
       const joined = rest.every((n, k) => k === 0 || n === rest[k - 1]! + 1);
       const range = rest.length > 1 ? ` (steps ${joined ? `${rest[0]} to ${rest.at(-1)}` : rest.join(", ")})` : "";
