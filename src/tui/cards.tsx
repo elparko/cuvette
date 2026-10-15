@@ -11,7 +11,7 @@ import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionHead, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, phiView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
-  REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
+  KEY_ANT_LOGIN, REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
 import type { DecisionFieldLike, SessionLike } from "../ui/types.ts";
 import type { PlanResponse } from "../core/types.ts";
@@ -596,6 +596,7 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
     <Frame title="Claude API key" color="cyan">
       {props.card.reason ? <Text>{props.card.reason}</Text> : null}
       <Text>Paste your key from {KEYS_URL}. The screen shows it masked.</Text>
+      <Text dimColor>{KEY_ANT_LOGIN}</Text>
       <Text dimColor>No key yet? Type /key help to see the steps. Type /key open to open the keys page.</Text>
       <Text dimColor>The harness checks it with the API, then saves it to {props.path}. Only your user can read that file.</Text>
       <Box marginTop={1}>

@@ -497,6 +497,10 @@ describe("card rendering", () => {
     expect(cardHtml(ctx, slot({ t: "question", q })).match(/Choose\./g)).toHaveLength(1);
   });
 
+  test("the key card tells a user of ant auth login to sign in there", () => {
+    expect(cardHtml(ctx, slot({ t: "key" }))).toContain("If you use ant auth login, sign in there. Cuvette reads that login.");
+  });
+
   test("the Decisions tab shows an empty value as not set", () => {
     const html = decisionsHtml(ctx, [["alpha", "", "human", "not set"], ["min_auc", "0.7", "human", "human"]]);
     expect(html).toContain("Not set");

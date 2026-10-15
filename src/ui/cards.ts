@@ -100,6 +100,7 @@ export function startCards(session: SessionLike, env: Record<string, string | un
 export const needsSetup = (session: SessionLike) => session.decisions.fields().some((f) => f.essential && !f.set);
 
 export const NO_KEY = "There is no Claude API key. Add one now.";
+export const KEY_ANT_LOGIN = "If you use ant auth login, sign in there. Cuvette reads that login.";
 
 export function planIntro(session: SessionLike): string | undefined {
   if (session.record.entries(["plan_approved"]).length) return undefined;
