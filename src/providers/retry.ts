@@ -1,4 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import http from "node:http";
+import https from "node:https";
+import { Readable } from "node:stream";
 import { ProviderError } from "../core/types.ts";
 
 export const RETRIES = 3;
@@ -44,6 +47,27 @@ export function idleSignal(ms: number, user?: AbortSignal): IdleSignal {
   };
   touch();
   return { signal: user ? AbortSignal.any([user, ctl.signal]) : ctl.signal, touch, stop };
+}
+
+const nativeFetch = globalThis.fetch;
+
+// The global fetch ends a request after 300 s without response headers or without body data. The idle timer of the caller must decide that.
+export function longFetch(url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }): Promise<Response> {
+  if (globalThis.fetch !== nativeFetch) return fetch(url, init);
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const body = Buffer.from(init.body);
+    const send = target.protocol === "https:" ? https.request : http.request;
+    const req = send(target, { method: init.method, headers: { ...init.headers, "content-length": String(body.length) }, signal: init.signal }, (res) => {
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(res.headers)) for (const x of Array.isArray(v) ? v : v === undefined ? [] : [v]) headers.append(k, x);
+      const status = res.statusCode ?? 0;
+      const empty = status === 204 || status === 205 || status === 304;
+      resolve(new Response(empty ? null : (Readable.toWeb(res) as ReadableStream), { status, statusText: res.statusMessage ?? "", headers }));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
 }
 
 export function timedOut(signal: AbortSignal | undefined): boolean {

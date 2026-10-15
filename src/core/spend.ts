@@ -22,7 +22,8 @@ export function spendFile(): string {
 
 export function costUsd(model: string, u: Usage): number {
   const p = PRICES[model] ?? FALLBACK;
-  return (u.inputTokens * p.input + u.outputTokens * p.output + (u.cacheRead ?? 0) * p.cacheRead + (u.cacheWrite ?? 0) * p.cacheWrite) / 1e6;
+  const long = Math.min(u.cacheWrite1h ?? 0, u.cacheWrite ?? 0);
+  return (u.inputTokens * p.input + u.outputTokens * p.output + (u.cacheRead ?? 0) * p.cacheRead + ((u.cacheWrite ?? 0) - long) * p.cacheWrite + long * p.input * 2) / 1e6;
 }
 
 export function recordSpend(model: string, u: Usage, session?: string): number {
@@ -136,7 +137,7 @@ export function entryCost(d: Record<string, unknown>): number | undefined {
   const model = String(d.model ?? "");
   const claude = d.provider ? d.provider === "claude" : model.startsWith("claude");
   if (!claude) return undefined;
-  return costUsd(model, { inputTokens: Number(d.inputTokens) || 0, outputTokens: Number(d.outputTokens) || 0, cacheRead: Number(d.cacheRead) || 0, cacheWrite: Number(d.cacheWrite) || 0 });
+  return costUsd(model, { inputTokens: Number(d.inputTokens) || 0, outputTokens: Number(d.outputTokens) || 0, cacheRead: Number(d.cacheRead) || 0, cacheWrite: Number(d.cacheWrite) || 0, cacheWrite1h: Number(d.cacheWrite1h) || 0 });
 }
 
 export interface TurnUsage {

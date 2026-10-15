@@ -63,27 +63,51 @@ export function splitThink(raw: string): { text: string; thinking: string } {
 export class ThinkSplitter {
   private buf = "";
   private inThink = false;
+  private sawTag = false;
+  private textParts: string[] = [];
+  private thinkParts: string[] = [];
 
-  constructor(private emit: (kind: "text" | "thinking", s: string) => void) {}
+  constructor(private emit?: (kind: "text" | "thinking", s: string) => void) {}
+
+  get text(): string {
+    return this.textParts.join("");
+  }
+
+  get thinking(): string {
+    return this.thinkParts.join("");
+  }
 
   push(chunk: string): void {
     this.buf += chunk;
     for (;;) {
-      const tag = this.inThink ? "</think>" : "<think>";
-      const i = this.buf.indexOf(tag);
-      if (i >= 0) {
-        this.out(this.buf.slice(0, i));
-        this.buf = this.buf.slice(i + tag.length);
-        this.inThink = !this.inThink;
+      const tags = this.inThink ? ["</think>"] : this.sawTag ? ["<think>"] : ["<think>", "</think>"];
+      let at = -1;
+      let tag = "";
+      for (const t of tags) {
+        const i = this.buf.indexOf(t);
+        if (i >= 0 && (at < 0 || i < at)) {
+          at = i;
+          tag = t;
+        }
+      }
+      if (at >= 0) {
+        this.out(this.buf.slice(0, at));
+        this.buf = this.buf.slice(at + tag.length);
+        this.sawTag = true;
+        if (tag === "</think>" && !this.inThink) {
+          this.thinkParts.push(...this.textParts);
+          this.textParts = [];
+        } else this.inThink = !this.inThink;
         continue;
       }
       let keep = 0;
-      for (let n = Math.min(tag.length - 1, this.buf.length); n > 0; n--) {
-        if (tag.startsWith(this.buf.slice(this.buf.length - n))) {
-          keep = n;
-          break;
+      for (const t of tags)
+        for (let n = Math.min(t.length - 1, this.buf.length); n > keep; n--) {
+          if (t.startsWith(this.buf.slice(this.buf.length - n))) {
+            keep = n;
+            break;
+          }
         }
-      }
       this.out(this.buf.slice(0, this.buf.length - keep));
       this.buf = this.buf.slice(this.buf.length - keep);
       return;
@@ -96,7 +120,9 @@ export class ThinkSplitter {
   }
 
   private out(s: string): void {
-    if (s) this.emit(this.inThink ? "thinking" : "text", s);
+    if (!s) return;
+    (this.inThink ? this.thinkParts : this.textParts).push(s);
+    this.emit?.(this.inThink ? "thinking" : "text", s);
   }
 }
 
