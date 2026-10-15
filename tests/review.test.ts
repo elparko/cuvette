@@ -261,6 +261,8 @@ describe("referee", () => {
   test("a plain no-findings reply gives no finding", () => {
     expect(parseReferee("No findings.")).toEqual([]);
     expect(parseReferee("none")).toEqual([]);
+    expect(parseReferee("No findings.\nThe answer follows the log in each part.")).toEqual([]);
+    expect(parseReferee("```\nNone.\n```\nChecked all claims.")).toEqual([]);
   });
 
   test("parses fenced JSON lines and arrays", () => {

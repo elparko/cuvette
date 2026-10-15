@@ -512,7 +512,8 @@ function toFinding(x: unknown): FindingIn | undefined {
 
 export function parseReferee(raw: string): FindingIn[] {
   const body = raw.replace(/```[a-z]*\n?/gi, "").trim();
-  if (!body || /^(none|no findings|no problems( found)?|\[\s*\])\.?$/i.test(body)) return [];
+  const firstLine = body.split("\n")[0]!.trim();
+  if (!body || /^(none|no findings|no problems( found)?|\[\s*\])\.?$/i.test(firstLine)) return [];
   const tryParse = (s: string): unknown => {
     try {
       return JSON.parse(s);
