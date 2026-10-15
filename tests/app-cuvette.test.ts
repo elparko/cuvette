@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { cuvetteToken, saveClaudeKey, saveCuvetteToken } from "../src/core/credentials.ts";
 import { savedModel } from "../src/core/firststart.ts";
+import { changeSetting } from "../src/core/settings.ts";
 import { makePkce } from "../src/core/signin.ts";
 import { startApp, type AppHandle } from "../src/server/app.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
@@ -171,10 +172,85 @@ describe("hosted mode on", () => {
       expect(s.calls[0]!.body.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(s.calls[0]!.body.device_name).toContain("(app)");
       expect(cuvetteToken({}).token).toBe("cuv_new");
-      expect(savedModel({ cwd: home, env: {} })).toBe("cuvette");
+      expect(savedModel({ cwd: home, env: {} })).toBe("cuvette:claude-sonnet-5-5");
       const again = await fetch(`${c.base}/auth/cuvette?code=abc&state=${state}`);
       expect(again.status).toBe(400);
       expect(s.calls.filter((x) => x.path === "/v1/auth/token")).toHaveLength(1);
+    });
+
+    test("an error in the redirect sets the error text and stops the waiting", async () => {
+      const s = server({ "/v1/auth/token": () => json(200, {}) });
+      const c = await start(env, s.fn);
+      for (const [error, text] of [
+        ["access_denied", "You stopped the sign-in."],
+        ["sign_in_failed", "The sign-in did not finish. Try again."],
+      ] as const) {
+        const { state } = await begin(c);
+        expect((await (await c.post("api/cuvette", {})).json()).waiting).toBe(true);
+        const r = await fetch(`${c.base}/auth/cuvette?error=${error}&state=${state}`);
+        expect(r.status).toBe(400);
+        expect(await r.text()).toContain(text);
+        const st = await (await c.post("api/cuvette", {})).json();
+        expect(st).toMatchObject({ signedIn: false, waiting: false, error: text });
+      }
+      expect(s.calls).toHaveLength(0);
+    });
+
+    test("an error with an unknown state sets no error text", async () => {
+      const c = await start(env);
+      expect((await fetch(`${c.base}/auth/cuvette?error=access_denied&state=${"x".repeat(32)}`)).status).toBe(400);
+      expect((await (await c.post("api/cuvette", {})).json()).error).toBe("");
+    });
+
+    test("add a sign-in method: asks the server for the link, opens it, and keeps the model", async () => {
+      saveCuvetteToken("cuv_old");
+      const s = server({
+        "/v1/auth/link": () => json(200, { url: "https://api.cuvette.ai/v1/auth/start?provider=github&link=abc" }),
+        "/v1/auth/token": () => json(200, { token: "cuv_new", device_id: "dev_2", account_id: "acc_1" }),
+        "/v1/account": () => json(200, ACCOUNT),
+      });
+      const c = await start(env, s.fn);
+      const r = await (await c.post("api/cuvette/link", { provider: "github" })).json();
+      expect(r.url).toContain("link=abc");
+      expect(s.calls[0]).toMatchObject({ path: "/v1/auth/link", method: "POST", auth: "Bearer cuv_old" });
+      expect(s.calls[0]!.body).toMatchObject({ provider: "github", port: String(app!.port) });
+      const { challenge, state } = s.calls[0]!.body;
+      expect(challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect((await fetch(`${c.base}/auth/cuvette?code=abc&state=${state}`)).status).toBe(200);
+      expect(cuvetteToken({}).token).toBe("cuv_new");
+      expect(savedModel({ cwd: home, env: {} })).toBe("claude");
+    });
+
+    test("add a sign-in method: a server refusal shows its text", async () => {
+      saveCuvetteToken("cuv_old");
+      const s = server({ "/v1/auth/link": () => json(400, { type: "error", error: { type: "invalid_request_error", message: "The provider must be google." } }) });
+      const c = await start(env, s.fn);
+      const r = await c.post("api/cuvette/link", { provider: "github" });
+      expect(r.status).toBe(400);
+      expect((await r.json()).error).toContain("Update Cuvette");
+    });
+
+    test("a signed-in state moves a model that the plan does not include to the first listed plan model", async () => {
+      saveCuvetteToken("cuv_abc");
+      await changeSetting({ cwd: home, env: {} }, "model", "cuvette", "user");
+      const s = server({ "/v1/account": () => json(200, { ...ACCOUNT, models: ["claude-future-9", "claude-haiku-5-5", "claude-sonnet-5-5"] }) });
+      const c = await start(env, s.fn);
+      await c.post("api/cuvette", {});
+      expect(savedModel({ cwd: home, env: {} })).toBe("cuvette:claude-haiku-5-5");
+      await c.post("api/cuvette", {});
+      expect(savedModel({ cwd: home, env: {} })).toBe("cuvette:claude-haiku-5-5");
+    });
+
+    test("a signed-in state keeps a plan model, and does not touch a Claude model", async () => {
+      saveCuvetteToken("cuv_abc");
+      const s = server({ "/v1/account": () => json(200, { ...ACCOUNT, models: ["claude-opus-5-5", "claude-sonnet-5-5"] }) });
+      const c = await start(env, s.fn);
+      await changeSetting({ cwd: home, env: {} }, "model", "cuvette", "user");
+      await c.post("api/cuvette", {});
+      expect(savedModel({ cwd: home, env: {} })).toBe("cuvette");
+      await changeSetting({ cwd: home, env: {} }, "model", "claude:claude-haiku-5-5", "user");
+      await c.post("api/cuvette", {});
+      expect(savedModel({ cwd: home, env: {} })).toBe("claude:claude-haiku-5-5");
     });
 
     test("the verifier matches the challenge of the start URL", async () => {

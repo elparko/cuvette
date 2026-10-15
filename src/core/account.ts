@@ -10,6 +10,7 @@ export const NO_MODEL = "Your plan does not include this model. Choose another m
 export const SUSPENDED = "Cuvette suspended this account. Ask Cuvette support for help.";
 export const NO_PLAN = "Your account has no plan. Choose a plan in Settings, or run `cuvette account plan standard`.";
 export const ALREADY_SUBSCRIBED = "You already have a plan. Use Manage billing to cancel it. Run `cuvette account plan <id>` to change it.";
+export const HOSTED_OFF = "Cuvette hosted is not open yet.";
 export const BAD_CODE = "The sign-in code is not valid, or it expired. Sign in again.";
 
 export const PLAN_IDS = ["basic", "standard", "lab", "lab_plus"] as const;
@@ -97,6 +98,7 @@ export interface HostedError {
   type: string;
   text: string;
   transient: boolean;
+  generic?: boolean;
 }
 
 export function hostedError(status: number, body: unknown, retryAfterHeader?: string | null): HostedError | undefined {
@@ -124,6 +126,20 @@ export function hostedError(status: number, body: unknown, retryAfterHeader?: st
       transient: false,
     };
   if (type === "too_many_requests") return { type, text: TOO_MANY, transient: true };
+  if (type === "hosted_off") return { type, text: HOSTED_OFF, transient: false };
+  if (type === "trial_in_progress") return { type, text: "The plan cannot change during the trial. Change it after the trial ends.", transient: false };
+  if (type === "invalid_request_error") return { type, text: "Cuvette could not use the request. Update Cuvette, then try again.", transient: false };
+  if (type === "not_found_error") return { type, text: "The Cuvette server does not have this item. Select Refresh, then try again.", transient: false };
+  if (type === "request_too_large") return { type, text: "The request is too large. Send less data, then try again.", transient: false };
+  if (type === "api_error") return { type, text: "The Cuvette server had an error. Wait a moment and retry.", transient: true };
+  if (type === "overloaded")
+    return {
+      type,
+      text: `The model service is busy. ${Number.isFinite(seconds) && seconds > 0 ? `Wait ${waitText(seconds)} and retry.` : "Wait a moment and retry."}`,
+      transient: true,
+    };
+  const message = typeof inner.message === "string" ? inner.message.trim().slice(0, 300) : "";
+  if (message) return { type: type || "error", text: message, transient: false, generic: true };
   return undefined;
 }
 
@@ -164,7 +180,19 @@ const query = (r: { from?: string; to?: string; format?: string }) => {
   return s ? `?${s}` : "";
 };
 
-export const getAccount = (ctx: AccountCtx = {}) => request<AccountInfo>(ctx, "GET", "/v1/account");
+let planModels: string[] | undefined;
+
+export const knownPlanModels = (): string[] | undefined => planModels;
+
+export async function getAccount(ctx: AccountCtx = {}): Promise<AccountInfo> {
+  const info = await request<AccountInfo>(ctx, "GET", "/v1/account");
+  planModels = Array.isArray(info.models) ? info.models : undefined;
+  return info;
+}
+
+export async function linkUrl(body: { provider: string; port: string; challenge: string; state: string }, ctx: AccountCtx = {}): Promise<string> {
+  return (await request<{ url: string }>(ctx, "POST", "/v1/auth/link", { body })).url;
+}
 
 export const getUsage = (ctx: AccountCtx = {}, range: { from?: string; to?: string } = {}) => request<UsageReport>(ctx, "GET", `/v1/usage${query({ ...range, format: "json" })}`);
 
@@ -186,6 +214,7 @@ export async function logout(ctx: AccountCtx = {}): Promise<{ revoked: boolean }
     revoked = false;
   }
   removeCuvetteToken();
+  planModels = undefined;
   return { revoked };
 }
 

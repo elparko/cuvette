@@ -7,7 +7,10 @@ import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
-import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
+import { getAccount, logout } from "../src/core/account.ts";
+import { saveCuvetteToken } from "../src/core/credentials.ts";
+import { SETTINGS } from "../src/core/settings.ts";
+import { CLAUDE_MODELS, CUVETTE_MODEL, cuvetteModels, listModels, makeProvider } from "../src/providers/index.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -624,5 +627,36 @@ describe.skipIf(!process.env.CUVETTE_LIVE)("live ollama", () => {
   test("listModels sees local models", async () => {
     const list = await listModels();
     expect(list.some((m) => m.spec === "ollama:qwen3:8b")).toBe(true);
+  });
+});
+
+describe("the Cuvette models in the menu", () => {
+  const oldHome = process.env.CUVETTE_HOME;
+  afterEach(() => {
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+  });
+
+  test("only the plan models that the app lists, each as cuvette:<id>", () => {
+    expect(cuvetteModels(["claude-future-9", "claude-sonnet-5-5"]).map((m) => m.spec)).toEqual(["cuvette:claude-sonnet-5-5"]);
+    expect(cuvetteModels(["claude-sonnet-5-5"])[0]!.label).toBe("Claude Sonnet 5.5 (Cuvette hosted)");
+    expect(cuvetteModels([])).toEqual([]);
+    expect(cuvetteModels(undefined)).toEqual(expect.any(Array));
+  });
+
+  test("the model setting shows the plan models after the app reads the account, and no other Cuvette model", async () => {
+    process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-menu-"));
+    vi.stubEnv("CUVETTE_HOSTED", "1");
+    vi.stubEnv("CUVETTE_TOKEN", "");
+    const choices = () => SETTINGS.find((d) => d.name === "model")!.choices!();
+    expect(choices()).toContain(CUVETTE_MODEL.spec);
+    saveCuvetteToken("cuv_abc");
+    const account = { account_id: "a", models: ["claude-sonnet-5-5", "claude-haiku-5-5"] };
+    await getAccount({ env: {}, fetch: (async () => new Response(JSON.stringify(account), { status: 200 })) as unknown as typeof fetch });
+    expect(choices().filter((c) => c.startsWith("cuvette"))).toEqual(["cuvette:claude-sonnet-5-5", "cuvette:claude-haiku-5-5"]);
+    expect(choices()).toContain("claude:claude-opus-5-5");
+    await logout({ env: {}, fetch: (async () => new Response(null, { status: 204 })) as unknown as typeof fetch });
+    expect(choices()).toContain(CUVETTE_MODEL.spec);
+    vi.unstubAllEnvs();
   });
 });

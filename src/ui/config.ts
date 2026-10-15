@@ -4,7 +4,7 @@ import { removeClaudeKey, removeCuvetteToken, removeElabftw } from "../core/cred
 import { canReset, changeSetting, describe, resetSetting, settingsPath, show, type Scope, type SettingCtx, type SettingDef, type SettingRow } from "../core/settings.ts";
 import { budgetUsd, modelPrice, monthStart, totalSpend } from "../core/spend.ts";
 import { DEFAULT_CLAUDE_MODEL } from "../providers/claude.ts";
-import { CLAUDE_MODELS, CUVETTE_MODEL } from "../providers/index.ts";
+import { CLAUDE_MODELS, CUVETTE_MODEL, cuvetteLabel } from "../providers/index.ts";
 import { usesAnthropicSpec } from "../core/types.ts";
 
 export type Editor =
@@ -109,6 +109,7 @@ export function briefHelp(d: SettingDef): string {
 export function choiceLabel(def: SettingDef, choice: string): string {
   if (def.name !== "model" && def.name !== "referee") return choice;
   if (choice === "cuvette") return CUVETTE_MODEL.label;
+  if (choice.startsWith("cuvette:")) return cuvetteLabel(choice.slice("cuvette:".length));
   const m = CLAUDE_MODELS.find((x) => x.spec === choice || (choice === "claude" && x.spec === `claude:${DEFAULT_CLAUDE_MODEL}`));
   if (m) return choice === "claude" ? `Default Claude model (${m.label.replace(" (default)", "")})` : m.label.replace(" (default)", "");
   return choice === "same" ? "Same as the analysis model" : choice === "none" ? "No check" : choice;
