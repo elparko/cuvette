@@ -7,7 +7,7 @@ import { runProcess } from "../adapters/kinds/common.ts";
 import { accessOf } from "../adapters/access.ts";
 import { adapterTrust } from "../adapters/source.ts";
 import { howToCite } from "./citations.ts";
-import { claudeKey, credentialsPath } from "./credentials.ts";
+import { antLogin, claudeKey, credentialsPath } from "./credentials.ts";
 import { selfTestFor, selfTestOf, type SelfTestRuntime } from "./selftest.ts";
 import { ROOT } from "../root.ts";
 
@@ -209,7 +209,9 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
 
   const key = claudeKey(env);
   checks.push(
-    key.from === "none"
+    key.from === "none" && antLogin(env)
+      ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: "a login from ant auth login" }
+      : key.from === "none"
       ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "missing", detail: "no key is saved. You need a key or a local model.", fix: { command: "cuvette key", link: "https://platform.claude.com/settings/keys" } }
       : { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: key.from === "env" ? "set in ANTHROPIC_API_KEY" : `saved in ${tilde(credentialsPath())}` },
   );

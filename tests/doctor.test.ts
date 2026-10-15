@@ -315,3 +315,16 @@ test("the text shows ok, missing and old rows together, with the counts and the 
   const none = doctorText(checks.map((c) => ({ ...c, status: "ok" as const })), { only: ["missing", "old"] });
   expect(none.trim().split("\n")[0]).toBe("7 ok, 0 missing, 0 old.");
 });
+
+test("a login from ant auth login counts as a Claude credential, so Cuvette can start", async () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-doctor-ant-"));
+  const env = { ANTHROPIC_CONFIG_DIR: cfg };
+  const none = await runDoctor(base({ env, fetch: ollamaDown }));
+  expect(byId(none, "claude-key").status).toBe("missing");
+  expect(canStart(none)).toBe(false);
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  const some = await runDoctor(base({ env, fetch: ollamaDown }));
+  expect(byId(some, "claude-key")).toMatchObject({ status: "ok", detail: "a login from ant auth login" });
+  expect(canStart(some)).toBe(true);
+});
