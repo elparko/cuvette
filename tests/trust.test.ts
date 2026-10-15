@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, hookScriptScan, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -395,6 +395,42 @@ describe("the files of a hook command, found with no shell parsing", () => {
     put("lib/other.sh");
     symlinkSync(join(cwd, "lib", "other.sh"), join(cwd, "hooks", "link.sh"));
     expect(scanFolder(cwd).files["(hook link) hooks/link.sh"]).not.toBe(before.files["(hook link) hooks/link.sh"]);
+  });
+
+  test("a glob word that a command only reads does not lock its folder, and a glob word that the hook runs does", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat results/*.csv"] }, { command: ["sh", "-c", "git add data/*.csv"] }, { command: ["sh", "-c", "hooks/*.sh"] }] } });
+    put("results/a.csv");
+    put("data/b.csv");
+    put("hooks/run.sh");
+    expect(hookScriptScan(cwd).folders).toEqual([join(realpathSync(cwd), "hooks")]);
+  });
+
+  test("a glob that leaves the project does not open the output folders of the project", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./run.sh"] }, { command: ["sh", "-c", "ls ../*.sh"] }, { command: ["sh", "-c", "cd .. && ls *.sh"] }] } });
+    put("run.sh", "python cuvette/out/helper.py\n");
+    put("cuvette/out/helper.py");
+    expect(hooked()).toEqual(["run.sh"]);
+  });
+
+  test("a link to a log or to an output file is not read, and a link to a folder puts the files of the folder in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "hooks/run.sh"] }] } });
+    put("hooks/run.sh");
+    put("logs/x.log", "one");
+    put("cuvette/out/result.csv", "one");
+    put("lib/a.sh");
+    symlinkSync(join(cwd, "logs", "x.log"), join(cwd, "hooks", "log.sh"));
+    symlinkSync(join(cwd, "cuvette", "out", "result.csv"), join(cwd, "hooks", "out.sh"));
+    symlinkSync(join(cwd, "lib"), join(cwd, "hooks", "lib"));
+    symlinkSync(join(cwd, "hooks"), join(cwd, "lib", "back"));
+    const before = scanFolder(cwd);
+    expect(hooked()).toEqual(["hooks/run.sh", "lib/a.sh"]);
+    expect(Object.keys(before.files)).not.toContain("(hook link) hooks/log.sh");
+    expect(Object.keys(before.files)).not.toContain("(hook link) hooks/out.sh");
+    put("logs/x.log", "two");
+    put("cuvette/out/result.csv", "two");
+    expect(scanFolder(cwd).hash).toBe(before.hash);
+    put("lib/a.sh", "changed");
+    expect(scanFolder(cwd).hash).not.toBe(before.hash);
   });
 
   test("a glob match with a script extension in a logs folder is in the hash, and a text file there is not", () => {

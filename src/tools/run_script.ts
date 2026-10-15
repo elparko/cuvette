@@ -271,7 +271,9 @@ export function settingsScope(dirs: Dirs): SettingsScope {
   if (!dirs.projectDir) return out;
   const scan = hookScriptScan(dirs.projectDir);
   const scripts = scan.files;
-  out.locked.push(...scripts, ...new Set([...scripts.map((f) => dirname(f)), ...scan.folders]));
+  const roots = both([dirs.projectDir]);
+  const lockedFolders = [...scripts.map((f) => dirname(f)), ...scan.folders].filter((d) => !roots.includes(d));
+  out.locked.push(...scripts, ...new Set(lockedFolders));
   out.files.push(...scripts);
   for (const name of [".cuvette", ".ga"]) {
     const dir = join(dirs.projectDir, name);
