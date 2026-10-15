@@ -227,3 +227,21 @@ describe.skipIf(!python)("biostats rank test labels", () => {
     expect(out.summary).toContain("leaves out 1 subject");
   });
 });
+
+describe.skipIf(!python)("biostats chi-square effect size", () => {
+  let stats: OpenAdapter;
+  beforeAll(async () => {
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+  });
+
+  test("Cramer's V of a 2 x 2 table does not use the Yates correction", { timeout: slow }, async () => {
+    const counts = [[12, 5], [3, 9]];
+    const yates = await stats.run("chi_square_test", { counts, correction: true });
+    const plain = await stats.run("chi_square_test", { counts, correction: false });
+    expect(yates.metrics.chi2).toBeLessThan(plain.metrics.chi2);
+    close(yates.metrics.cramers_v, plain.metrics.cramers_v);
+  });
+});

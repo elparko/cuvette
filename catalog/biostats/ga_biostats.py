@@ -696,7 +696,8 @@ def chi_square_test(path=None, row=None, column=None, counts=None, correction=No
     n = int(table.sum())
     below = int((expected < 5).sum())
     cells = expected.size
-    cramers_v = float(np.sqrt(chi2 / (n * (min(table.shape) - 1))))
+    chi2_plain = stats.chi2_contingency(table, correction=False)[0] if use else chi2
+    cramers_v = float(np.sqrt(chi2_plain / (n * (min(table.shape) - 1))))
     name = "Pearson chi-square test" + (" with Yates continuity correction" if use else "")
     summary = "%s, %d x %d table, n = %d: chi-square %.4g on %d df, p = %.4g (alpha %g). Cramer's V %.3g." % (name, table.shape[0], table.shape[1], n, chi2, dof, p, alpha, cramers_v)
     warning = ""
