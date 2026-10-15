@@ -11,13 +11,19 @@ Release 0.1.1 includes all changes since 12 October.
 
 - Resume loads a recorded adapter path only if the adapter is installed or the path is in a trusted folder.
 - Resume skips any other recorded path. The notice names the folder and the command that loads it: `cuvette resume <id> --adapter '<folder>'`.
-- The command in the notice quotes the path for a shell and removes control characters from it.
+- The command in the notice quotes the path for a shell. If the path has a control character, a newline or a tab, the notice shows the path as plain text and gives no command.
 - `eln push` and `eln link` take `--adapter`.
 - Resume says so if an installed adapter replaces a recorded folder of the same name.
 - The default session is a session with work, also if it has no request. Work is a message, a tool call, a result, a step, a decision or an answer. A notice is not work.
 - A resume with the same adapter folder that the record names gives no false "another folder" notice.
 - The notice says to run the command in a terminal.
 - A session with work and no request has the status "in progress".
+
+### Session list
+
+- Cuvette stores each row of the session list in its own file in the folder `sessions-index`. Two windows that save at the same time no longer lose a row.
+- Cuvette still reads the old file `sessions-index.json`. It does not write to it.
+- Cuvette moves a row file that has bad JSON or a wrong ID aside. A read error does not move it.
 
 ### Hook scripts
 
@@ -27,6 +33,10 @@ Release 0.1.1 includes all changes since 12 October.
 - A folder that a hook names with a glob is in the scan, also inside the cuvette folder.
 - The sandbox denies writes to the folder of each locked hook script and to each hook glob folder.
 - A glob that is not in a command position gives no incomplete entry.
+- A hook in the project root locks only its own script file, not the whole root folder. The sandbox also denies new files that match a hook glob in the root.
+- A folder that a hook glob names is in the lock only if the hook runs it. This includes a glob in a loop.
+- Cuvette remembers the result for each link, so a rejected link stays rejected and a link cycle ends. Link targets that are logs, cuvette output or records are skipped. The hash covers the files of a linked folder.
+- The macOS sandbox matches a name with a non-ASCII character as a whole name part. It keeps a POSIX class such as `[[:space:]]` in a glob. A `?` or a negated bracket denies a whole name part, so the deny is wider.
 - The folder walk adds only regular files. A link inside the project gets a link hash, and the scan adds its target. The pattern `**/` matches zero folders.
 
 ### Referee and key status
@@ -42,16 +52,21 @@ Release 0.1.1 includes all changes since 12 October.
 - The status row of an unchecked step shows "Not checked".
 - A large output that someone deleted shows "missing", not "changed".
 - The table route hint no longer shows if the table adapter is a default adapter.
-- The browser app does not show first setup again after you leave it.
+- The browser app does not show first setup again after you leave it. It shows setup again only after you quit a session that has no key.
+- If the call to leave setup fails, the page shows a message and stays on setup.
 - Leave setup first sends the choice to the server. Then it shows the start page. Setup shows again after a session closes with no key.
-- An install job that throws an error ends as failed and shows the error message. A new install can start after it.
+- An install job that throws an error ends as failed and shows the error message. A new install can start after it. The finish step runs once, so a late error cannot replace a good result.
+- `OLLAMA_HOST` can be a bare host, a host with a port, or a bare IPv6 address. Cuvette adds `http://` and the port 11434 if they are missing. It treats `0.0.0.0` as a local address. The model query has a time limit.
 - After Ctrl+C, the command line waits up to 20 seconds for the app to close. The app waits up to 6 seconds for an install to stop. So the session closes if an install runs.
-- The app prints "Stopping. Press Ctrl+C again to quit now." after the first Ctrl+C. A second Ctrl+C quits at once.
+- The app prints "Stopping. Press Ctrl+C again to quit now." if the close takes more than one second. A second Ctrl+C or a second stop signal quits at once.
 
 ### Data and statistics
 
-- The power tool reads "unpaired" as the two-sample design.
+- The power tool and the sample check read "unpaired", "un-paired" and "non-paired" as the two-sample design.
 - `inspect_data` keeps the channel axis of a TIFF file, warns if it drops planes, and shows the bit depth of the dtype.
+- `/rewind` clears the last answer and the assumptions.
+- The referee reads a reply of "None." followed by a formatted object as findings.
+- `inspect_data` warns if a TIFF file has more than one image series, if a folder has an image that it cannot read, and if it used a maximum projection.
 - A table cell that is not finite stays text, and the column stays a number column. An ID such as `5E3` stays text.
 
 ### Windows
