@@ -41,6 +41,7 @@ import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidat
 import { definitionsOf } from "./plan.ts";
 import { abs, metricsOf, planBatch, swapArgs, writeTable, type BatchPlan, type BatchRow } from "./batch.ts";
 import { NO_REASON, freezePlan, frozenPlan, planChanges, recordDeviation, setDeviationReason, type PlanChange } from "./freeze.ts";
+import { assumedInsteadOfWaiting } from "./answers.ts";
 import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
@@ -2001,7 +2002,15 @@ export class Session {
     return { shown: tail ? `${answer}\n\n${tail}` : answer, annotated: annotate(answer, claims) + (tail ? `\n\n${tail}` : ""), settings, results: missing || undefined };
   }
 
+  private headlessAssumptions(text: string): string {
+    if (!this.settings.headless) return text;
+    const turnStart = this.lastRequest()?.id ?? 0;
+    const assumed = this.record.entries(["answer"]).filter((e) => e.id > turnStart && e.data.by === "default" && !e.data.withdrawn).map((e) => `${this.questions.get(String(e.data.qid))?.title ?? String(e.data.qid)}: used ${typeof e.data.value === "string" ? e.data.value : JSON.stringify(e.data.value)}.`);
+    return assumedInsteadOfWaiting(text, assumed);
+  }
+
   private async finishAnswer(text: string, revised: boolean, signal: AbortSignal): Promise<{ text: string; revise?: string }> {
+    text = this.headlessAssumptions(text);
     if (!this.settings.guidance) {
       this.record.append("assistant", { text, final: true });
       this.markAnswerReady();
@@ -3097,7 +3106,7 @@ export class Session {
     return text;
   }
 
-  async answer(qid: string, value: unknown, note = ""): Promise<void> {
+  async answer(qid: string, value: unknown, note = "", by: "human" | "default" = "human"): Promise<void> {
     value = this.valueWithoutKeys(value);
     note = this.withoutKeys(note);
     if (qid === this.trustQid) {
@@ -3120,9 +3129,9 @@ export class Session {
       if (changes) value = { changes };
     }
     if (open?.decisionKey && open.status === "open") this.decisions.validate(open.decisionKey, this.questions.match(open, value));
-    const q = this.questions.answer(qid, value, note);
+    const q = this.questions.answer(qid, value, note, by);
     this.laterQids.delete(qid);
-    if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
+    if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by, reason: `answer to ${qid}` });
     if (waited) return;
     const quiet = isChecklistQuestion(q);
     this.notes.push(`The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);

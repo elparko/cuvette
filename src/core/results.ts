@@ -465,7 +465,7 @@ function show(v: unknown): Cell {
 
 function chosenBy(record: AnalysisRecord, key: string, owner: string): string {
   const last = record.entries(["decision"]).filter((e) => e.data.key === key).at(-1);
-  if (last) return `${last.data.by === "agent" ? "agent" : last.data.by === "profile" ? "lab profile" : "scientist"}${last.data.reason ? ` (${last.data.reason})` : ""}`;
+  if (last) return `${last.data.by === "agent" ? "agent" : last.data.by === "profile" ? "lab profile" : last.data.by === "default" ? "default, set by the harness" : "scientist"}${last.data.reason ? ` (${last.data.reason})` : ""}`;
   const setup = record.entries(["setup"]).at(-1);
   if (setup && Object.hasOwn((setup.data.values as object) ?? {}, key)) {
     if (((setup.data.defaultsAccepted as string[]) ?? []).includes(key)) return "default, accepted at setup";

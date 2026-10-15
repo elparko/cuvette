@@ -10,3 +10,12 @@ export function fitAnswer(q: Question, wanted: unknown, opts: { first?: boolean 
   }
   return [q.recommendation?.value, q.default, opts.first === false ? undefined : q.options[0]?.value].find((x) => x !== undefined && fits(x));
 }
+
+export function assumedInsteadOfWaiting(answer: string, assumed: string[]): string {
+  const m = /^[ \t]*(?:\*\*)?Waits for you:?(?:\*\*)?:?[ \t]*(.*)\n?((?:[ \t]*[-*].*\n?|[ \t]*\n(?=[ \t]*[-*]))*)/im.exec(answer);
+  const open = m ? [m[1] ?? "", ...(m[2] ?? "").split("\n").map((x) => x.replace(/^[ \t]*[-*][ \t]*/, ""))].map((x) => x.trim()).filter((x) => x && !/^nothing\.?$/i.test(x)) : [];
+  const lines = [...assumed.map((x) => `- ${x}`), ...open.map((x) => `- Not confirmed by the scientist: ${x}`)];
+  const block = lines.length ? `Assumed because no answer was given:\n${lines.join("\n")}\n` : "";
+  if (!m) return block ? `${answer.trimEnd()}\n\n${block}`.trimEnd() : answer;
+  return (answer.slice(0, m.index) + block + answer.slice(m.index + m[0].length)).replace(/\n{3,}/g, "\n\n").trimEnd();
+}

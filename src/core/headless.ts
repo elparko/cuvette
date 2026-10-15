@@ -13,12 +13,12 @@ export function readJsonObject(path: string): Record<string, unknown> {
   return v;
 }
 
-export async function answerHeadless(s: Session, q: Question, value: unknown, note: string): Promise<void> {
+export async function answerHeadless(s: Session, q: Question, value: unknown, note: string, by: "human" | "default" = "human"): Promise<void> {
   const tries = [value, q.recommendation?.value, q.default].filter((x, i, a) => x !== undefined && a.findIndex((y) => String(y) === String(x)) === i);
   let refusal = "";
   for (const v of tries) {
     try {
-      await s.answer(q.qid, v, refusal ? `${note}; the harness used a fallback` : note);
+      await s.answer(q.qid, v, refusal ? `${note}; the harness used a fallback` : note, refusal ? "default" : by);
     } catch (err) {
       refusal ||= (err as Error).message;
       continue;
@@ -41,7 +41,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         const go = allow.has("all") || allow.has("data-change");
         const stop = !go && q.recommendation?.value === "stop";
         if (stop) s.record.append("notice", { text: `Headless mode stops at a likely unit change. ${q.text.split(" The method ")[0]} Pass --allow data-change to continue.` });
-        setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record"), 0);
+        setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record", "default"), 0);
         return;
       }
       const has = (k: string) => Object.hasOwn(answers, k);
@@ -58,7 +58,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         return;
       }
       const note = fromFile !== undefined ? "answered from the answers file" : q.recommendation ? `no answer in the answers file; the harness used the recommendation${q.recommendation.reason ? `: ${q.recommendation.reason}` : ""}` : q.decisionKey ? "no answer in the answers file; the harness used the default" : "no answer in the answers file; the agent uses its own recommendation";
-      setTimeout(() => void answerHeadless(s, q, v, note), 0);
+      setTimeout(() => void answerHeadless(s, q, v, note, fromFile !== undefined ? "human" : "default"), 0);
     }
     if (e.type === "permission") {
       const ok = allow.has("all") || (e.search ? allow.has("search") : allow.has(e.tool));

@@ -690,6 +690,54 @@ test("headless run: a blocked decision with no recommendation uses the default o
   expect((q.data as { recommendation?: { value: unknown } }).recommendation?.value).toBe("Otsu");
   const notes = session.record.entries(["answer"]).map((e) => String(e.data.note));
   expect(notes.some((n) => /used the recommendation: The tool uses this value if the call gives no method/.test(n))).toBe(true);
+  expect(session.record.entries(["answer"]).every((e) => e.data.by === "default")).toBe(true);
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "method")!.data.by).toBe("default");
+});
+
+const UNITS_ANSWER = "The image is blurred.\n\nUncertain:\n- The units are not known.\n\nWaits for you:\n- Confirm the units of the image.\n";
+
+function askRun(answers: Record<string, unknown>) {
+  const provider = new FakeProvider([
+    { calls: [{ name: "ask_scientist", args: { question: "Blur a.tif with which sigma?", options: ["sigma 1", "sigma 2"], recommendation: "sigma 2", reason: "This suits the file." } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: UNITS_ANSWER },
+  ]);
+  return Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, referee: "none" } }).then(async (s) => {
+    session = s;
+    attachHeadless(s, { answers, allow: new Set(["all"]) });
+    s.decisions.applySetup({});
+    return s.send("Blur a.tif");
+  });
+}
+
+test("headless run: an answer that the harness takes from the recommendation is not recorded as human", async () => {
+  const answer = await askRun({});
+  const a = session!.record.entries(["answer"]).find((e) => e.data.qid === "q1")!.data;
+  expect(a).toMatchObject({ value: "sigma 2", by: "default" });
+  expect(String(a.note)).toMatch(/no answer in the answers file/);
+  expect(answer).not.toMatch(/Waits for you/);
+  expect(answer).toContain("Assumed because no answer was given:");
+  expect(answer).toContain("Blur a.tif with which sigma?: used sigma 2.");
+  expect(answer).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+  expect(answer).toContain("Uncertain:");
+});
+
+test("headless run: an answer from the answers file is recorded as human and adds no assumption line", async () => {
+  const answer = await askRun({ "Blur a.tif with which sigma?": "sigma 1" });
+  const a = session!.record.entries(["answer"]).find((e) => e.data.qid === "q1")!.data;
+  expect(a).toMatchObject({ value: "sigma 1", by: "human", note: "answered from the answers file" });
+  expect(answer).not.toMatch(/Waits for you/);
+  expect(answer).not.toContain("used sigma");
+  expect(answer).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+});
+
+test("an interactive run keeps the Waits for you line", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: UNITS_ANSWER }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({});
+  const answer = await session.send("Blur a.tif");
+  expect(answer).toContain("Waits for you:\n- Confirm the units of the image.");
+  expect(answer).not.toContain("Assumed because");
 });
 
 test("blind mode adds a mid-session adapter folder to the allow list and hides it from the file tools", async () => {
