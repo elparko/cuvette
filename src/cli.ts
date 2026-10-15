@@ -392,11 +392,12 @@ async function interactive(resumeId?: string, folder?: string) {
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
   if (!adapters.length && !resumeId && !sample) {
     const dir = resolve(folder ?? process.cwd());
-    const { suggestPrograms, suggestLines } = await import("./core/suggest.ts");
+    const { suggestPrograms, suggestOutput } = await import("./core/suggest.ts");
+    const { loadSettings } = await import("./core/config.ts");
     const { adapterIndex } = await import("./adapters/catalog.ts");
     const hint = suggestPrograms(dir, adapterIndex(dir));
-    const lines = suggestLines(hint);
-    if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
+    const lines = suggestOutput(hint, loadSettings(dir).defaultAdapters);
+    if (lines.length) console.error(lines.join("\n"));
   }
   const s = resumeId
     ? await Session.resume(resumeId, { addAdapters: adapters, model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
