@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -155,4 +155,13 @@ test("the app looks up an adapter name from the request by name only", () => {
   expect(found).toMatch(/catalog/);
   expect(appAdapters(undefined, ["x"], cwd)).toEqual(["x"]);
   expect(appAdapters(undefined, undefined, cwd)).toEqual([]);
+});
+
+test("the app finds a project adapter by name when the folder is trusted for the run", () => {
+  const dir = join(cwd, ".cuvette", "adapters", "foo");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8").replace("name: lab,", "name: foo,"));
+  expect(() => appAdapters("foo", undefined, cwd, false)).toThrow(/no adapter named/);
+  expect(appAdapters("foo", undefined, cwd, true).map((d) => realpathSync(d))).toEqual([realpathSync(dir)]);
+  expect(() => appAdapters("foo", undefined, cwd, false)).toThrow(/no adapter named/);
 });
