@@ -250,7 +250,10 @@ function moduleFiles(name: string): string[] {
   return [...parents, `${base}.py`, `${base}/__init__.py`, `${base}/__main__.py`];
 }
 
-const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|rb|pl|php|ps1|r)$/i;
+const LAUNCHER = /^(env|uv|npx|pnpx|bunx|cmd|exec|time|nice|xargs)(\.exe)?$/i;
+const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|rb|pl|php|ps1|r|bat|cmd)$/i;
+const DATA_EXT = /\.(log|json|txt|csv|db|tsv|out)$/i;
+const OUTPUT_DIR = /^(cuvette|\.record|output|outputs|data)$/i;
 const FOLDER_EXT = /\.(js|mjs|ts|py|sh)$/i;
 const VOLATILE_DIR = /^(logs?|state|caches?|\.cache|tmp|temp|__pycache__)$/i;
 const FOLDER_FILE_LIMIT = 50;
@@ -261,16 +264,17 @@ interface HookWord {
 }
 
 function segmentWords(words: string[]): HookWord[] {
-  const out: HookWord[] = words.length ? [{ word: words[0]!, explicit: true }] : [];
+  const lead = words.find((w) => !/^\w+=/.test(w));
+  const out: HookWord[] = lead ? [{ word: lead, explicit: true }] : [];
   let script = false;
   for (let i = 0; i < words.length; i++) {
     const bare = words[i]!.replace(/^["']|["']$/g, "");
     for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push({ word: w, explicit: false });
-    if (INTERPRETER.test(basename(bare))) {
+    if (INTERPRETER.test(basename(bare)) || LAUNCHER.test(basename(bare))) {
       script = true;
       continue;
     }
-    if (!script || bare.startsWith("-") && bare !== "-m") continue;
+    if (!script || bare.startsWith("-") && bare !== "-m" || /^\/[ck]$/i.test(bare) || /^\w+=/.test(bare) || bare === "run") continue;
     if (bare === "-m" && words[i + 1]) {
       out.push(...moduleFiles(words[i + 1]!.replace(/^["']|["']$/g, "")).map((word) => ({ word, explicit: true })));
       script = false;
@@ -291,6 +295,23 @@ function scriptWords(argv: string[]): HookWord[] {
   return out;
 }
 
+function namedFiles(script: string, key: string): string[] {
+  let text = "";
+  try {
+    text = statSync(script).size < 256 * 1024 ? readFileSync(script, "utf8") : "";
+  } catch {}
+  const out: string[] = [];
+  for (const m of text.matchAll(/[\w./-]+\.(?:js|mjs|ts|py|sh)\b/g)) {
+    const path = resolve(dirname(script), m[0]);
+    const rel = relative(key, path);
+    if (path === script || rel.startsWith("..") || isAbsolute(rel) || rel.split(sep).some((part) => part.startsWith(".") || VOLATILE_DIR.test(part) || OUTPUT_DIR.test(part))) continue;
+    try {
+      if (statSync(path).isFile()) out.push(path);
+    } catch {}
+  }
+  return out;
+}
+
 function codeFolder(dir: string): string[] | undefined {
   const found: string[] = [];
   let count = 0;
@@ -303,7 +324,7 @@ function codeFolder(dir: string): string[] | undefined {
     }
     for (const name of names) {
       if (name === "node_modules") return false;
-      if (name.startsWith(".") || VOLATILE_DIR.test(name)) continue;
+      if (name.startsWith(".") || VOLATILE_DIR.test(name) || OUTPUT_DIR.test(name)) continue;
       const p = join(d, name);
       let l;
       try {
@@ -341,13 +362,18 @@ export function hookScripts(folder: string, layers?: Record<string, unknown>[]):
           const path = resolve(key, word);
           const rel = relative(key, path);
           if (!word || rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
-          if (!explicit && (!SCRIPT_EXT.test(word) || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
+          if (!explicit && (DATA_EXT.test(word) || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
+          const own = (d: string) => d !== key && !relative(key, d).split(sep).some((part) => OUTPUT_DIR.test(part));
           try {
             const st = statSync(path);
             if (st.isFile()) {
+              if (!explicit && !SCRIPT_EXT.test(word) && (process.platform === "win32" || !(st.mode & 0o111))) continue;
               found.add(path);
-              if (FOLDER_EXT.test(path)) for (const f of codeFolder(dirname(path)) ?? []) found.add(f);
-            } else if (st.isDirectory() && explicit) for (const f of codeFolder(path) ?? []) found.add(f);
+              if (FOLDER_EXT.test(path)) {
+                const d = dirname(path);
+                for (const f of own(d) ? codeFolder(d) ?? [] : namedFiles(path, key)) found.add(f);
+              }
+            } else if (st.isDirectory() && explicit && own(path)) for (const f of codeFolder(path) ?? []) found.add(f);
           } catch {}
         }
   }

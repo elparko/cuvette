@@ -129,6 +129,30 @@ test("a log or state file that a hook writes does not change the trust hash", ()
   expect(trustStatus(cwd).state).toBe("changed");
 });
 
+test("an extensionless script behind a launcher that is not an interpreter is in the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["env", "./hooks/check"] }, { command: ["uv", "run", "hooks/second"] }, { command: ["npx", "./bin/hook"] }, { command: ["sh", "-c", "X=1 ./tools/third"] }, { command: ["cmd", "/c", "win.bat"] }] } });
+  for (const d of ["hooks", "bin", "tools"]) mkdirSync(join(cwd, d));
+  for (const f of ["hooks/check", "hooks/second", "bin/hook", "tools/third", "win.bat"]) writeFileSync(join(cwd, f), "x");
+  const keys = Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)"));
+  for (const f of ["hooks/check", "hooks/second", "bin/hook", "tools/third", "win.bat"]) expect(keys).toContain(`(hook script) ${f}`);
+});
+
+test("a hook script in the project root does not pull the output folders into the trust hash", () => {
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "./hook.sh"] }] } });
+  writeFileSync(join(cwd, "hook.sh"), "python tools/helper.py\n");
+  mkdirSync(join(cwd, "tools"));
+  writeFileSync(join(cwd, "tools", "helper.py"), "1\n");
+  writeFileSync(join(cwd, "analysis.py"), "1\n");
+  mkdirSync(join(cwd, "cuvette", "s1"), { recursive: true });
+  trustFolder(cwd);
+  writeFileSync(join(cwd, "cuvette", "s1", "step1.py"), "print(1)\n");
+  writeFileSync(join(cwd, "analysis.py"), "2\n");
+  expect(trustStatus(cwd).state).toBe("trusted");
+  expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)")).sort()).toEqual(["(hook script) hook.sh", "(hook script) tools/helper.py"]);
+  writeFileSync(join(cwd, "tools", "helper.py"), "evil()\n");
+  expect(trustStatus(cwd).state).toBe("changed");
+});
+
 test("a script that imports a module in its own small folder has that module in the trust hash", () => {
   project(".ga", { hooks: { SessionStart: [{ command: ["node", "tools/hook.js"] }] } });
   mkdirSync(join(cwd, "tools"));
