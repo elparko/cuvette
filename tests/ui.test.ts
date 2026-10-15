@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { cardFromEvent, cardId, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { ALWAYS_SCOPE, NO_ALWAYS, cardFromEvent, cardId, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { failureText, problemOf } from "../src/ui/commands.ts";
@@ -36,6 +36,23 @@ describe("card queue", () => {
   test("the permission view hides the code from the arguments", () => {
     const v = permissionView({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", timeout: 60 }, touches: "files" });
     expect(v).toMatchObject({ title: "Permission needed: run_script", purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", args: ["timeout = 60"], always: true });
+  });
+});
+
+describe("the always allow choice", () => {
+  const view = (tool: string, search?: { root: string; purpose: string }) => permissionView({ t: "permission", rid: "r1", tool, args: {}, touches: "files", search });
+
+  test("is missing for the tools in the no-always set", () => {
+    for (const tool of ["eln_push", "run_command", "write_file", "search_literature"]) {
+      expect(NO_ALWAYS.has(tool)).toBe(true);
+      expect(view(tool).always).toBe(false);
+      expect(view(tool).touches).not.toContain(ALWAYS_SCOPE);
+    }
+  });
+
+  test("shows the scope in the card text for other tools", () => {
+    expect(view("run_script").always).toBe(true);
+    expect(view("run_script").touches).toContain("Always allow: this session only.");
   });
 });
 

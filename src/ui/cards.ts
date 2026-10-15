@@ -126,8 +126,11 @@ export function applyRewind(session: SessionLike, n: number): { ok: boolean; tex
 
 const ARG_LIMIT = 1000;
 
+export const NO_ALWAYS = new Set(["eln_push", "run_command", "write_file", "search_literature"]);
+export const ALWAYS_SCOPE = "Always allow: this session only.";
+
 export function permissionView(card: Extract<Card, { t: "permission" }>) {
-  const always = card.tool !== "eln_push" && !card.search;
+  const always = !NO_ALWAYS.has(card.tool) && !card.search;
   const { purpose, does } = plainOf(card.args);
   const argv = Array.isArray(card.args.argv) ? card.args.argv : undefined;
   const given = card.code ?? (argv ? undefined : codeOf(card.args));
@@ -145,7 +148,7 @@ export function permissionView(card: Extract<Card, { t: "permission" }>) {
     args,
     code,
     always,
-    touches: card.search ? card.touches : `This will touch: ${card.touches}`,
+    touches: card.search ? card.touches : `This will touch: ${card.touches}${always ? ` ${ALWAYS_SCOPE}` : ""}`,
   };
 }
 
