@@ -162,7 +162,11 @@ function gitFolder(git: string, key: string, st: WalkState, found: string[]): vo
   const config = join(git, "config");
   if (existsSync(config)) st.files[relative(key, config)] = readHash(config);
   const hooks = join(git, "hooks");
-  if (lstatSync(hooks, { throwIfNoEntry: false })?.isDirectory()) walk(hooks, key, st, found);
+  const l = lstatSync(hooks, { throwIfNoEntry: false });
+  if (l?.isSymbolicLink()) {
+    st.files[`(link) ${relative(key, hooks)}`] = linkHash(hooks);
+    if (statSync(hooks, { throwIfNoEntry: false })?.isDirectory()) st.linked.push(relative(key, hooks));
+  } else if (l?.isDirectory()) walk(hooks, key, st, found);
 }
 
 function walk(dir: string, key: string, st: WalkState, found: string[]): void {

@@ -507,6 +507,28 @@ describe.skipIf(process.platform === "win32")("fuzz: links in a project folder",
     }
   });
 
+  test("a .git/hooks link to a folder outside blocks trust, and a link to a file is hashed", () => {
+    const outside = join(root, `hooks-outside-${counter++}`);
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "post-checkout"), "echo one");
+    const folder = join(root, `hooks-link-${counter++}`);
+    const base = join(folder, ".cuvette", "adapters", "tool");
+    mkdirSync(join(base, ".git"), { recursive: true });
+    writeFileSync(join(base, "adapter.yaml"), "name: tool\n");
+    symlinkSync(outside, join(base, ".git", "hooks"));
+    expect(scanFolder(folder).linked).toEqual([join(".cuvette", "adapters", "tool", ".git", "hooks")]);
+    expect(trustStatus(folder).state).toBe("changed");
+    expect(() => trustFolder(folder)).toThrow(/cannot trust/);
+    rmSync(join(base, ".git", "hooks"));
+    const target = join(root, `hooks-file-${counter++}`);
+    writeFileSync(target, "one");
+    symlinkSync(target, join(base, ".git", "hooks"));
+    trustFolder(folder);
+    expect(trustStatus(folder).state).toBe("trusted");
+    writeFileSync(target, "two");
+    expect(trustStatus(folder).state).toBe("changed");
+  });
+
   test("a link loop and a link that points at its own folder do not stop the scan", () => {
     const folder = join(root, "loops");
     const base = join(folder, ".cuvette", "adapters");
