@@ -214,6 +214,7 @@ export interface Enforcement {
   applied: Record<string, unknown>;
   deviations: Deviation[];
   waiting: string[];
+  commit?: () => void;
 }
 
 export interface QuestionOption {
@@ -272,6 +273,7 @@ export interface PreToolUseResult {
   waitingOn?: string[];
   deviations?: Deviation[];
   applied?: Record<string, unknown>;
+  commit?: () => void;
 }
 
 export interface PostToolUseInput {

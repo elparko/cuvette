@@ -2404,6 +2404,7 @@ export class Session {
       if (res.cancelled) return error("not run. The turn stopped before the scientist answered the card.");
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
+    pre.commit?.();
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
     const many = kept.length > 1;
