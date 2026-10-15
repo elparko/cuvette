@@ -7,7 +7,7 @@ import { runProcess } from "../adapters/kinds/common.ts";
 import { accessOf } from "../adapters/access.ts";
 import { adapterTrust } from "../adapters/source.ts";
 import { howToCite } from "./citations.ts";
-import { claudeKey, credentialsPath } from "./credentials.ts";
+import { antLogin, claudeKey, credentialsPath } from "./credentials.ts";
 import { selfTestFor, selfTestOf, type SelfTestRuntime } from "./selftest.ts";
 import { ROOT } from "../root.ts";
 
@@ -209,7 +209,9 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
 
   const key = claudeKey(env);
   checks.push(
-    key.from === "none"
+    key.from === "none" && antLogin(env)
+      ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: "a login from ant auth login" }
+      : key.from === "none"
       ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "missing", detail: "no key is saved. You need a key or a local model.", fix: { command: "cuvette key", link: "https://platform.claude.com/settings/keys" } }
       : { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: key.from === "env" ? "set in ANTHROPIC_API_KEY" : `saved in ${tilde(credentialsPath())}` },
   );
@@ -340,7 +342,7 @@ export function safeFixes(checks: Check[]): string[] {
   return [...new Set(cmds)];
 }
 
-export function doctorText(checks: Check[], opts: { only?: Status[]; brief?: boolean } = {}): string {
+export function doctorText(checks: Check[], opts: { only?: Status[]; brief?: boolean; cite?: boolean } = {}): string {
   const lines: string[] = [];
   let group = "";
   const modelRow = (c: Check) => c.id === "claude-key" || c.id === "ollama";
@@ -357,13 +359,15 @@ export function doctorText(checks: Check[], opts: { only?: Status[]; brief?: boo
     lines.push(`  ${c.status.padEnd(8)} ${c.name}: ${c.detail}`);
     if (c.status !== "ok" && c.fix?.command) lines.push(`           Install: ${c.fix.command}`);
     if (c.status !== "ok" && c.fix?.link) lines.push(`           ${c.fix.command ? "Or download" : "Download"}: ${c.fix.link}`);
-    if (c.cite && !opts.brief) lines.push(`           How to cite: ${c.cite}`);
   }
   const n = (s: Status) => checks.filter((c) => c.status === s).length;
   lines.push("", `${n("ok")} ok, ${n("missing")} missing, ${n("old")} old.`);
   lines.push(canStart(checks) ? "Cuvette can start: Node is new enough and a model is ready." : "Cuvette cannot start yet. It needs Node 22 or later, and a Claude API key or an Ollama model.");
   const fixes = safeFixes(checks);
   if (fixes.length) lines.push(`cuvette doctor --fix installs ${fixes.length} missing Python environment${fixes.length === 1 ? "" : "s"} or R package set${fixes.length === 1 ? "" : "s"}. It asks before it starts.`);
+  const cited = checks.filter((c) => c.cite);
+  if (cited.length && opts.cite) lines.push("", "How to cite", ...cited.map((c) => `  ${c.name}: ${c.cite}`));
+  else if (cited.length && !opts.brief && !opts.only) lines.push("The citation of each program: cuvette doctor --cite");
   return lines.join("\n");
 }
 

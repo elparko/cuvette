@@ -14,12 +14,12 @@ import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, instal
 import { adapterDirs, findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { START_VERSION_TIMEOUT_MS } from "../adapters/locate.ts";
-import { makeProvider } from "../providers/index.ts";
+import { makeProvider, modelSpecProblem } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
 import { pathRefusalReason } from "./refusals.ts";
-import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { COPY_LIMIT_BYTES, cutText, discardPlace, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
@@ -384,22 +384,35 @@ export class Session {
     const settings = loadSettings(cwd, overrides, notes);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
-    if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
-    const s = new Session(id, cwd, settings, place, record);
-    const held = claimLock(s.dir);
-    if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
-    s.overrides = overrides;
-    s.onceTrusted = !!opts.trustFolder;
+    const onInterrupt = () => {
+      if (!opts.place) discardPlace(place);
+      if (!process.listenerCount("SIGINT")) process.exit(130);
+    };
+    if (!opts.place && !opts.home) process.once("SIGINT", onInterrupt);
     try {
-      await s.init(opts);
-    } catch (e) {
-      s.releaseLock();
-      throw e;
+      if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
+      const s = new Session(id, cwd, settings, place, record);
+      const held = claimLock(s.dir);
+      if (held) {
+        if (!opts.place) discardPlace(place);
+        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
+      }
+      s.overrides = overrides;
+      s.onceTrusted = !!opts.trustFolder;
+      try {
+        await s.init(opts);
+      } catch (e) {
+        s.releaseLock();
+        if (!opts.place) discardPlace(place);
+        throw e;
+      }
+      if (opts.method) s.startMethod(opts.method);
+      for (const text of notes) s.record.append("notice", { text, warn: true });
+      if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
+      return s;
+    } finally {
+      process.off("SIGINT", onInterrupt);
     }
-    if (opts.method) s.startMethod(opts.method);
-    for (const text of notes) s.record.append("notice", { text, warn: true });
-    if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
-    return s;
   }
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
@@ -473,10 +486,21 @@ export class Session {
     const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a, i, all) => all.findIndex((x) => x.name === a.name) === i).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
+    const checkSetting = (name: "model" | "referee", skip: boolean) => {
+      const value = String(this.settings[name] ?? "");
+      if (skip || !value || (name === "referee" && (value === "same" || value === "none"))) return;
+      const problem = modelSpecProblem(value);
+      if (!problem) return;
+      const held = resolveSetting(findSetting(name)!, { cwd: this.cwd, env: process.env });
+      const project = held.source === "project";
+      throw new Error(`The setting ${name} has the value "${value}"${held.file ? ` in ${held.file}` : ""}. ${problem} Run: cuvette config set ${name} <name>${project ? " --project" : ""}`);
+    };
+    checkSetting("model", !!opts.provider || !!opts.model);
+    checkSetting("referee", !!opts.refereeProvider || !!opts.referee);
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings), headless: this.settings.headless }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
-    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
+    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort, headless: this.settings.headless });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
@@ -3242,12 +3266,12 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next) }) : this.provider;
+    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next), headless: next.headless }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name) || (name === "show_thinking" && next.referee === "same")
       ? next.referee === "same"
         ? provider
         : next.referee && next.referee !== "none"
-          ? await makeProvider(next.referee, { effort: next.effort })
+          ? await makeProvider(next.referee, { effort: next.effort, headless: next.headless })
           : undefined
       : this.refereeProvider;
     const wasCloud = isCloud(this.provider.info);
@@ -4779,8 +4803,9 @@ export class Session {
     this.interrupt();
     await this.titling?.catch(() => {});
     await this.starting.catch(() => {});
-    this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
+    if (this.record.entries().every((e) => e.kind === "session" || e.kind === "notice")) discardPlace(this.place);
+    this.releaseLock();
   }
 }
 

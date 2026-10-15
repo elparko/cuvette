@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
-import { CLAUDE_MODELS } from "../providers/index.ts";
+import { CLAUDE_MODELS, modelSpecProblem } from "../providers/index.ts";
 import { DEFAULTS, settingFits, wellTyped } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
@@ -598,6 +598,10 @@ export function parseValue(d: SettingDef, raw: unknown): unknown {
   if (!v) throw new Error(`${d.label} needs a value.`);
   const choices = d.choices?.() ?? [];
   if (!d.free && choices.length && !choices.includes(v)) throw new Error(`${d.label} must be one of: ${choices.join(", ")}.`);
+  if (d.name === "model" || (d.name === "referee" && v !== "same" && v !== "none")) {
+    const problem = modelSpecProblem(v);
+    if (problem) throw new Error(`${d.label} cannot be "${v}". ${problem}`);
+  }
   return v;
 }
 

@@ -237,3 +237,15 @@ test("the folder answer about patient data goes to the user settings, next to th
   await changeSetting(ctx, "local_model", "ollama:qwen3:8b", "session");
   expect(s.settings.local_model).toBe("ollama:qwen3:8b");
 });
+
+test("a model or referee value that is not a model spec is not saved", async () => {
+  for (const name of ["model", "referee"]) {
+    await expect(changeSetting({ cwd, env: {} }, name, "gpt4", "user")).rejects.toThrow(/cannot be "gpt4".*claude:<id>/);
+    await expect(changeSetting({ cwd, env: {} }, name, "ollama:", "user")).rejects.toThrow(/Name an Ollama model/);
+    await expect(changeSetting({ cwd, env: {} }, name, "openai:http://x", "user")).rejects.toThrow(/openai:<base url>\|<model>/);
+  }
+  expect(existsSync(settingsPath("user", cwd))).toBe(false);
+  for (const ok of ["claude", "claude:claude-sonnet-5-5", "ollama:qwen3:8b", "openai:http://localhost:1234/v1|m", "fake:"]) await changeSetting({ cwd, env: {} }, "model", ok, "user");
+  for (const ok of ["same", "none"]) await changeSetting({ cwd, env: {} }, "referee", ok, "user");
+  expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8"))).toMatchObject({ model: "fake:", referee: "none" });
+});

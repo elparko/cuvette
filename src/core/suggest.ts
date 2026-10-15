@@ -151,3 +151,9 @@ export function suggestLines(s: Suggestions): string[] {
   if (rest.length) lines.push(`Other matches: ${rest.slice(0, 4).map((m) => `${m.program} (${m.reason})`).join("; ")}.`);
   return lines;
 }
+
+export function suggestOutput(s: Suggestions, defaults: string[]): string[] {
+  const lines = suggestLines(s);
+  const best = s.matches[0]?.adapter;
+  return lines.length && best && !defaults.includes(best) ? [...lines, `To use it, run: cuvette --adapter ${best}`] : lines;
+}

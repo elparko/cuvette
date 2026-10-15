@@ -81,11 +81,12 @@ Usage
   setting wins over a user setting. If the folder is read-only, the session folder goes to
   ~/.cuvette/projects/.
 
-  cuvette doctor [--fix] [--adapter <name>] [--no-self-test]
+  cuvette doctor [--fix] [--cite] [--adapter <name>] [--no-self-test]
                                        check Node, the model, the Python environments, R, Java and each adapter's program;
                                        then run the known-answer test of each adapter, for example "Fails by 0.003 on the t statistic";
                                        --adapter checks and tests one adapter only; --no-self-test skips the tests;
-                                       --fix installs the missing Python environments and R packages after it asks
+                                       --fix installs the missing Python environments and R packages after it asks;
+                                       --cite lists how to cite each program
   cuvette programs                     list each adapter with its program: status, version, size, last use, access
   cuvette programs install|update|remove|check <adapter>
   cuvette programs path <adapter> <path|none>   use a program in a custom place (none: forget the path)
@@ -120,7 +121,8 @@ Usage
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
   cuvette eln link <session> <id>      read an eLabFTW experiment and propose setup values
-  cuvette sessions                     list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
+  cuvette sessions [--clean]           list the sessions, newest first: folder, age, first request ("moved" if a folder is gone);
+                                       --clean removes the empty sessions that never started and are older than one day
   cuvette export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
   cuvette export <session> --format pptx|pdf --images figures|qc|pilot|all|<glob> [--order step|group|name]
             [--per-page 1|2|4|6|9] [--size 16:9|a4|letter]
@@ -215,6 +217,8 @@ const { values: o, positionals: pos } = parseArgs({
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
+    clean: { type: "boolean" },
+    cite: { type: "boolean" },
     "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
@@ -302,11 +306,28 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   const fs = await import("./core/firststart.ts");
   console.log("Welcome to Cuvette. First, choose the model that does the analysis.\n");
   fs.CHOICES.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
+  console.log("  q  Quit. Cuvette saves nothing.\n     If you use `ant auth login`, run it, then start Cuvette again.\n");
+  let empty = 0;
+  const quit = (text: string): never => {
+    console.log(text);
+    process.exit(0);
+  };
+  const typed = (answer: string, message: string): string => {
+    const v = answer.trim();
+    if (v) return (empty = 0), v;
+    if (++empty >= 3) quit("You typed nothing three times. Cuvette saved nothing. Start Cuvette again when you are ready.");
+    console.log(message);
+    return "";
+  };
   let pick = "";
-  while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
+  while (pick !== "1" && pick !== "2") {
+    pick = typed(await ask("Type 1 or 2: "), "You typed nothing. Type 1 for Claude, 2 for a local model, or q to quit.");
+    if (/^q/i.test(pick)) quit("Cuvette saved nothing.");
+    if (pick && pick !== "1" && pick !== "2") console.log(`"${pick}" is not a choice. Type 1 for Claude, 2 for a local model, or q to quit.`);
+  }
   if (pick === "1") {
     for (let i = 1; ; i++) {
-      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key: ");
+      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key. Type q to quit: ");
       if (pasted.trim() === "?") {
         const kh = await import("./core/keyhelp.ts");
         console.log(`\n${kh.keyGuideText()}\n`);
@@ -314,7 +335,8 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
         i--;
         continue;
       }
-      if (!pasted.trim()) {
+      if (/^q$/i.test(pasted.trim())) quit("Cuvette saved nothing. If you use `ant auth login`, run it, then start Cuvette again.");
+      if (!typed(pasted, "You typed nothing. Paste the key, type ? for help, or type q to quit.")) {
         i--;
         continue;
       }
@@ -372,11 +394,12 @@ async function interactive(resumeId?: string, folder?: string) {
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
   if (!adapters.length && !resumeId && !sample) {
     const dir = resolve(folder ?? process.cwd());
-    const { suggestPrograms, suggestLines } = await import("./core/suggest.ts");
+    const { suggestPrograms, suggestOutput } = await import("./core/suggest.ts");
+    const { loadSettings } = await import("./core/config.ts");
     const { adapterIndex } = await import("./adapters/catalog.ts");
     const hint = suggestPrograms(dir, adapterIndex(dir));
-    const lines = suggestLines(hint);
-    if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
+    const lines = suggestOutput(hint, loadSettings(dir).defaultAdapters);
+    if (lines.length) console.error(lines.join("\n"));
   }
   const s = resumeId
     ? await Session.resume(resumeId, { addAdapters: adapters, model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
@@ -434,13 +457,14 @@ async function app(folder?: string) {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
   });
-  await a.close();
+  await Promise.race([a.close(), new Promise((r) => setTimeout(r, 2000).unref())]);
   process.exit(0);
 }
 
 async function main() {
   if (o.help) return console.log(HELP);
   if (o.version) return console.log(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
+  if (typeof o.mode === "string" && !["watch", "follow", "teach", "plan"].includes(o.mode)) fail(`Unknown mode "${o.mode}". Use one of: watch, follow, teach, plan.`);
   if (typeof o.print === "string") return headless(o.print);
   const [cmd, a1, a2, a3] = pos;
   if (typeof o.method === "string" && (cmd === undefined || existsSync(cmd))) {
@@ -544,6 +568,7 @@ async function main() {
       const r = await checkClaudeKey(key);
       if (!r.ok) return fail(r.text);
       console.log(`${r.text} Saved to ${cred.saveClaudeKey(key)}.`);
+      if (process.env.ANTHROPIC_API_KEY) console.log(cred.ENV_KEY_WARNING);
       return;
     }
     case "eln": {
@@ -667,7 +692,7 @@ async function main() {
       const scope = only ? { adapters: { [only]: loadAdapter(adapterDirs()[only]!).manifest } } : {};
       let checks = await dr.runDoctor({ onProgress: progress, ...scope });
       if (tty) process.stderr.write("\r".padEnd(41) + "\r");
-      console.log(dr.doctorText(checks));
+      console.log(dr.doctorText(checks, { cite: !!o.cite }));
       let selfTestFailed = false;
       if (!o["no-self-test"]) {
         const rows = await dr.runSelfTests(checks, { only, onProgress: (t) => tty && process.stderr.write(`\rTesting ${t}...`.padEnd(40)) });
@@ -761,7 +786,11 @@ async function main() {
       return;
     }
     case "sessions": {
-      const { listSessions, sessionLine } = await import("./core/sessions.ts");
+      const { listSessions, sessionLine, cleanSessions } = await import("./core/sessions.ts");
+      if (o.clean) {
+        const gone = cleanSessions();
+        return console.log(gone.length ? `Removed ${gone.length} empty session${gone.length === 1 ? "" : "s"} that never started:\n${gone.join("\n")}` : "No empty session to remove.");
+      }
       const list = listSessions();
       if (!list.length) return console.log("No sessions yet.");
       for (const s of list) console.log(sessionLine(s));
@@ -954,9 +983,11 @@ async function main() {
 main().catch((e) => fail(`cuvette: ${(e as Error).message}`));
 
 let lines: string[] | undefined;
+let inputEnded = false;
 
 async function ask(prompt: string): Promise<string> {
   process.stderr.write(prompt);
+  if (inputEnded) return "";
   if (!lines) {
     let all = "";
     if (process.stdin.isTTY) {
@@ -968,8 +999,9 @@ async function ask(prompt: string): Promise<string> {
       };
       process.once("SIGINT", stop);
       return new Promise((resolve) => {
-        rl.once("line", (l) => (process.off("SIGINT", stop), resolve(l), rl.close()));
-        rl.once("close", () => (process.off("SIGINT", stop), resolve("")));
+        let got = false;
+        rl.once("line", (l) => ((got = true), process.off("SIGINT", stop), resolve(l), rl.close()));
+        rl.once("close", () => (process.off("SIGINT", stop), (inputEnded = !got), resolve("")));
       });
     }
     for await (const c of process.stdin) all += c;
