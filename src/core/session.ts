@@ -481,7 +481,10 @@ export class Session {
       const value = String(this.settings[name] ?? "");
       if (skip || !value || (name === "referee" && (value === "same" || value === "none"))) return;
       const problem = modelSpecProblem(value);
-      if (problem) throw new Error(`The setting ${name} has the value "${value}". ${problem} Run: cuvette config set ${name} <name>`);
+      if (!problem) return;
+      const held = resolveSetting(findSetting(name)!, { cwd: this.cwd, env: process.env });
+      const project = held.source === "project";
+      throw new Error(`The setting ${name} has the value "${value}"${held.file ? ` in ${held.file}` : ""}. ${problem} Run: cuvette config set ${name} <name>${project ? " --project" : ""}`);
     };
     checkSetting("model", !!opts.provider || !!opts.model);
     checkSetting("referee", !!opts.refereeProvider || !!opts.referee);
