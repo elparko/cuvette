@@ -233,14 +233,15 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     broadcastIdle({ t: "switch" });
   };
 
-  const quit = async () => {
-    if (current && !current.owned) return;
+  const quit = async (): Promise<string | void> => {
+    if (current && !current.owned) return TERMINAL_QUIT;
     await detach();
     broadcastIdle({ t: "switch" });
     opts.onQuit?.();
   };
 
   const TERMINAL_SESSION = "This session belongs to the terminal. Open another session there.";
+  const TERMINAL_QUIT = "This session belongs to the terminal. Type /quit there to leave.";
 
   const open = (o: { folder?: string; resume?: string; first?: string; adapter?: string }) => {
     opening = (async () => {

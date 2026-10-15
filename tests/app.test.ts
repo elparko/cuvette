@@ -136,6 +136,16 @@ describe("the app server", () => {
     ev.close();
   });
 
+  test("/quit in the app shows a line when the terminal owns the session", async () => {
+    const s = new FakeSession({ delayMs: 1 });
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    const ev = await events(app);
+    await c.post("api/send", { text: "/quit" });
+    await until(() => ev.msgs.some((m) => m.t === "append" && String(m.html).includes("This session belongs to the terminal. Type /quit there to leave.")));
+    ev.close();
+  });
+
   test("Stop keeps the streamed text and removes the open question card from the conversation", async () => {
     const s = new FakeSession({ delayMs: 100 });
     app = await startApp({ session: s, env });

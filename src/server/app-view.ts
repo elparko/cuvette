@@ -19,7 +19,7 @@ export interface ViewHost {
   token: string;
   env: Record<string, string | undefined>;
   url(path: string): string;
-  quit(): Promise<void>;
+  quit(): Promise<string | void>;
 }
 
 type Fields = Record<string, unknown>;
@@ -386,7 +386,7 @@ export class WebView {
         this.collapser = new Collapser();
         this.send(this.snapshot());
       },
-      quit: () => void this.host.quit(),
+      quit: () => void this.host.quit().then((text) => text && this.line("▸", text)),
       outputs: () => this.mapper.outputs,
       toggleDetails: () => this.toggleDetails(),
       startWindow: async () => this.host.url("graph/"),
