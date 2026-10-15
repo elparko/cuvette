@@ -21,9 +21,11 @@ export function globToRegex(pattern: string): RegExp {
 const LIST_CAP = 2000;
 const TABLE_CAP = 8 * 1024 * 1024;
 
+const isDeep = (pattern: string) => pattern.includes("**") || pattern.includes("/");
+
 export function matchFiles(folder: string, pattern: string, limit = Infinity): string[] {
   const re = globToRegex(pattern.replaceAll("\\", "/"));
-  const deep = pattern.includes("**") || pattern.includes("/");
+  const deep = isDeep(pattern);
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -125,7 +127,7 @@ export function startFiles(c: KindContext): AdapterRuntime {
       run(a) {
         const folder = resolve(String(a.folder));
         if (!existsSync(folder) || !statSync(folder).isDirectory()) return { ok: false, error: `${folder} is not a folder` };
-        const found = matchFiles(folder, String(a.pattern), LIST_CAP + 1);
+        const found = matchFiles(folder, String(a.pattern), isDeep(String(a.pattern)) ? LIST_CAP + 1 : Infinity);
         const cut = found.length > LIST_CAP;
         const files = found.slice(0, LIST_CAP);
         const rows = files.map((p) => {

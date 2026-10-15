@@ -19,6 +19,7 @@ export interface RecordPlaces {
   project?: string;
 }
 
+export const isTempOrDamaged = (f: string) => f.startsWith(".tmp-") || f.includes(".damaged-");
 const isBlobFile = (f: string) => !f.startsWith(".tmp-") && !f.includes(".ref.json");
 
 const HASHES = new Map<string, string>();
