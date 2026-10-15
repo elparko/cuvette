@@ -1220,7 +1220,8 @@ export class Session {
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
-        if (res.note) this.record.append("notice", { text: res.note });
+        const note = res.note ?? (res.stopReason === "max_tokens" ? "The reply hit the output limit and was cut short." : undefined);
+        if (note) this.record.append("notice", { text: note });
         const thinking = res.message.parts.flatMap((p) => (p.type === "thinking" && p.text ? [p.text] : [])).join("\n");
         if (thinking) this.record.append("thinking", { text: thinking });
         let said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();

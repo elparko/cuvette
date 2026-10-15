@@ -3495,3 +3495,14 @@ test("the claim check belongs to the answer entry that it checked, also if the h
   const kept = checks.filter((e) => e.data.answerEntry === finals.at(-1)!.id);
   expect(kept.at(-1)!.data.claims).toEqual(expect.arrayContaining([expect.objectContaining({ value: 0.938, label: "measured" })]));
 });
+
+test("a final answer that the output limit cut gets a notice for every provider", async () => {
+  const cut = { text: "The counts are", stop: "max_tokens" as const };
+  const provider = new FakeProvider([cut, cut, cut]);
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices.filter((t) => /output limit/.test(t) && /cut/.test(t)).length).toBeGreaterThan(0);
+  const last = session.record.entries(["assistant"]).at(-1)!;
+  expect(last.data.final).toBe(true);
+});
