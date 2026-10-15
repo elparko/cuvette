@@ -1271,7 +1271,7 @@ export class Session {
           const tail = said.slice(-400);
           const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
-          const turnStart = this.lastRequest()?.id ?? 0;
+          const turnStart = this.realRequest()?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
           const planNote = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1);
@@ -2053,7 +2053,7 @@ export class Session {
       this.refereeOffNoted = true;
       this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds possible patient identifiers that did not go to a cloud model." });
     }
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
     let state: "done" | "stopped" | "failed" | "off" = "off";
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
@@ -2141,7 +2141,7 @@ export class Session {
   }
 
   private resultsNotIn(answer: string): string {
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     const stale = this.record.stale();
     const said = extractNumbers(answer).map((f) => f.value);
     const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 0.005);
@@ -4493,7 +4493,7 @@ export class Session {
 
   private noteSkippedSteps() {
     if (!this.plan || this.planning || !this.approvedEntry) return;
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     if (this.approvedEntry < turnStart) return;
     for (const x of this.plan.steps) {
       if (!x.tool || x.status === "done" || x.status === "skipped" || this.planWarned.has(`skip:${x.step}`)) continue;

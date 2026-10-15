@@ -3458,3 +3458,20 @@ test("an approved plan step is done after a read-only adapter tool made a node: 
   expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan/.test(String(e.data.text)))).toBe(false);
   expect(session.plan?.steps[0]?.status).toBe("done");
 });
+
+test("after a step-limit pause and continue, the reminder and the not-done audit still use the approved plan", async () => {
+  const two = { ...PLAN, steps: [PLAN.steps[0], { step: "Count the particles", method: "Threshold count", tool: "count", decisions: [{ key: "method", label: "Threshold method", recommendation: "Otsu" }] }] };
+  const done = { text: "Blurred with sigma 2." };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: two }] }, { calls: [blur] }, { calls: [blur] }, done, done, done, done, done, done]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none", maxSteps: 4 } });
+  session.decisions.applySetup({ method: "Otsu" });
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  expect(session.record.entries(["notice"]).some((e) => /Paused after 4 steps/.test(String(e.data.text)))).toBe(true);
+  await session.send("continue");
+  const texts = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done: Count the particles/.test(t))).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan: Count the particles/.test(String(e.data.text)))).toBe(true);
+});
