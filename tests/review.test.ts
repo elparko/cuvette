@@ -465,6 +465,9 @@ test("a tool result that says no p value was computed is not a test in the recor
   expect(await flagged("The test failed to compute a p value")).toBe(true);
   expect(await flagged("Welch t test\np value = 0.03")).toBe(false);
   expect(await flagged("Not a large effect, p = 0.03")).toBe(false);
+  expect(await flagged("The tool could not compute a p value")).toBe(true);
+  expect(await flagged("There is no p value in the output")).toBe(true);
+  expect(await flagged("not adjusted p values: 0.01")).toBe(false);
 });
 
 test("the finding and the log text keep the integer digits of a number", async () => {

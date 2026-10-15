@@ -332,7 +332,7 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
 
 const TEST_IN_TEXT = /\bp[- ]?values?\b|\bp\s*(?:=|<|>|≤)\s*\d|\bq[- ]?values?\b|\badjusted p\b/i;
 
-const NEGATED_P = /\b(?:no|not|without|could not|cannot|can't|couldn't|failed(?: to \w+)?)\s+(?:\w+\s+){0,2}?(?:adjusted\s+)?[pq][- ]?values?\b/gi;
+const NEGATED_P = /\b(?:no|not|without|(?:could not|cannot|can't|couldn't|failed to|did not|didn't|unable to) \w+)\s+(?:(?:a|an|the|any)\s+)?[pq][- ]?values?\b/gi;
 
 function testInText(text: string): boolean {
   return text.split(/\r?\n/).some((line) => TEST_IN_TEXT.test(line.replace(NEGATED_P, " ")));
