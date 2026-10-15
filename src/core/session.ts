@@ -14,7 +14,7 @@ import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, instal
 import { adapterDirs, findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { START_VERSION_TIMEOUT_MS } from "../adapters/locate.ts";
-import { makeProvider } from "../providers/index.ts";
+import { makeProvider, modelSpecProblem } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
@@ -477,6 +477,14 @@ export class Session {
     const cutLine = resumed && this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a, i, all) => all.findIndex((x) => x.name === a.name) === i).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
+    const checkSetting = (name: "model" | "referee", skip: boolean) => {
+      const value = String(this.settings[name] ?? "");
+      if (skip || !value || (name === "referee" && (value === "same" || value === "none"))) return;
+      const problem = modelSpecProblem(value);
+      if (problem) throw new Error(`The setting ${name} has the value "${value}". ${problem} Run: cuvette config set ${name} <name>`);
+    };
+    checkSetting("model", !!opts.provider || !!opts.model);
+    checkSetting("referee", !!opts.refereeProvider || !!opts.referee);
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
