@@ -1,4 +1,5 @@
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -61,6 +62,24 @@ test("blobPath refuses a sha that is not hexadecimal text", () => {
   expect(r.blobRef("../x")).toBeUndefined();
   expect(r.blobPath("")).toBeUndefined();
   expect(r.blobPath("a".repeat(65))).toBeUndefined();
+});
+
+test("a reference blob gives its path only while the file has the recorded content", () => {
+  const dir = tmp();
+  const work = join(dir, "out");
+  const r = new AnalysisRecord(join(dir, "rec"), "s1", { workDir: work, exportDir: work, project: dir });
+  const big = join(dir, "big.bin");
+  writeFileSync(big, Buffer.alloc(COPY_LIMIT_BYTES + 1, 7));
+  const sha = r.putBlob(big);
+  expect(r.blobPath(sha)).toBe(big);
+  const same = statSync(big);
+  utimesSync(big, same.atime, new Date(same.mtimeMs + 5000));
+  expect(r.blobPath(sha)).toBe(big);
+  const bytes = readFileSync(big);
+  bytes[10] = 9;
+  writeFileSync(big, bytes);
+  utimesSync(big, same.atime, new Date(same.mtimeMs + 9000));
+  expect(r.blobPath(sha)).toBeUndefined();
 });
 
 test("nodes, edges, descendants and stale marks", () => {

@@ -102,6 +102,35 @@ test("figures are copied to figures/ with the step number and a readable name, w
   expect(copyFigures(record, out).map((f) => f.path).sort()).toEqual(figs.map((f) => f.path).sort());
 });
 
+test("a figure that changed after the run is copied from the recorded blob, with a note", () => {
+  const { record, out } = sampleRecord();
+  const live = join(out, "histogram_red intensity.png");
+  const other = Buffer.concat([PNG, Buffer.from([1, 2, 3])]);
+  writeFileSync(live, other);
+  const figs = copyFigures(record, out);
+  const fig = figs.find((f) => f.path.endsWith("step02-histogram-red-intensity.png"))!;
+  expect(readFileSync(fig.path)).toEqual(PNG);
+  expect(fig.note).toMatch(/changed after the run/);
+  expect(figs.find((f) => f.path.endsWith("box.png"))!.note).toBeUndefined();
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures: figs });
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /changed after the run/.test(String(r[2])))).toBe(true);
+});
+
+test("a table that changed after the run is read from the recorded blob, with a note", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s3");
+  const out = record.workDir;
+  const path = join(out, "means.csv");
+  writeFileSync(path, "group,mean\n1,0.7\n2,1.9\n");
+  const sha = record.putBlob(path);
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path, kind: "table", sha }], result: { metrics: {} }, summary: "Means." }));
+  writeFileSync(path, "group,mean\n1,9.9\n2,9.9\n");
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: out, figures: [] });
+  const table = sheets.find((x) => x.name.startsWith("Step 1"))!;
+  expect(table.rows).toEqual([[1, 0.7], [2, 1.9]]);
+  expect(sheets[0]!.rows.some((r) => r[0] === "Note" && /changed after the run/.test(String(r[2])))).toBe(true);
+});
+
 test("the Steps sheet shows no curly-brace text when a summary names a value that the result lacks", () => {
   const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s2");
   const out = record.workDir;

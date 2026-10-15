@@ -18,7 +18,7 @@ export interface RecordPlaces {
   project?: string;
 }
 
-function sha256File(path: string): string {
+export function sha256File(path: string): string {
   const h = createHash("sha256");
   const fd = openSync(path, "r");
   const buf = Buffer.alloc(1 << 20);
@@ -299,7 +299,10 @@ export class AnalysisRecord {
     const hit = this.blobName(sha);
     if (hit && existsSync(join(this.blobDir, hit))) return join(this.blobDir, hit);
     const ref = this.blobRef(sha);
-    return ref && existsSync(ref.path) ? ref.path : undefined;
+    if (!ref || !existsSync(ref.path)) return undefined;
+    const st = statSync(ref.path);
+    if (st.size === ref.size && st.mtime.toISOString() === ref.mtime) return ref.path;
+    return sha256File(ref.path) === ref.sha256 ? ref.path : undefined;
   }
 
   addNode(n: NodeIn): Node {

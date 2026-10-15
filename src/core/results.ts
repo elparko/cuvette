@@ -3,7 +3,7 @@ import { pilotRows, validationRows } from "./pilot.ts";
 import { AFTER_RESULT, NO_DEVIATIONS, deviations, frozenPlan } from "./freeze.ts";
 import { approvedPlan, definitionsOf } from "./plan.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, extname, isAbsolute, join, relative } from "node:path";
+import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { zip } from "../eln/zip.ts";
 import { allRefs, formatRef, sessionCitations, toBibtex, type CitationStyle, type Ref } from "./citations.ts";
@@ -11,7 +11,7 @@ import { checkAnswer } from "./claims.ts";
 import type { DecisionField } from "./decisions.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
-import { ownerOf, type AnalysisRecord } from "./record.ts";
+import { ownerOf, sha256File, type AnalysisRecord } from "./record.ts";
 import { replaySheet } from "./samples.ts";
 import type { Node, TablePreview } from "./types.ts";
 import { renvLock, requirementsText } from "./envlock.ts";
@@ -360,6 +360,16 @@ export interface FigureFile {
   node: string;
   path: string;
   source: string;
+  note?: string;
+}
+
+const CHANGED_NOTE = "The file changed after the run. The workbook uses the copy that the record kept.";
+
+function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string }): { path?: string; changed: boolean } {
+  const blob = o.sha ? record.blobPath(o.sha) : undefined;
+  if (blob && resolve(blob) !== resolve(o.path)) return { path: blob, changed: existsSync(o.path) && o.sha!.length === 64 && sha256File(o.path) !== o.sha };
+  if (o.sha && !blob && record.blobRef(o.sha)) return { path: undefined, changed: true };
+  return { path: existsSync(o.path) ? o.path : undefined, changed: false };
 }
 
 function figureSources(n: Node, record: AnalysisRecord): { path: string; sha?: string }[] {
@@ -380,7 +390,7 @@ function figureSources(n: Node, record: AnalysisRecord): { path: string; sha?: s
       for (const v of [".svg", ".pdf", ".eps"]) if (existsSync(stem + v)) add(stem + v);
     }
   }
-  return out.filter((f) => existsSync(f.path) || (f.sha && record.blobPath(f.sha)));
+  return out.filter((f) => recordedSource(record, f).path);
 }
 
 export function copyFigures(record: AnalysisRecord, dir: string): FigureFile[] {
@@ -403,11 +413,12 @@ export function copyFigures(record: AnalysisRecord, dir: string): FigureFile[] {
       for (let k = 2; used.has(name) && used.get(name) !== f.path; k++) name = `${stem}-${k}${ext}`;
       used.set(name, f.path);
       const dest = join(figDir, name);
-      const src = existsSync(f.path) ? f.path : record.blobPath(f.sha!)!;
+      const found = recordedSource(record, f);
+      const src = found.path!;
       mkdirSync(figDir, { recursive: true });
       const fresh = existsSync(dest) && statSync(dest).size === statSync(src).size && statSync(dest).mtimeMs >= statSync(src).mtimeMs;
       if (!fresh) copyFileSync(src, dest);
-      out.push({ step, node: n.id, path: dest, source: f.path });
+      out.push({ step, node: n.id, path: dest, source: f.path, ...(found.changed ? { note: CHANGED_NOTE } : {}) });
     }
   }
   return out;
@@ -569,16 +580,21 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     const result = (n.result ?? {}) as { table?: TablePreview; metrics?: Record<string, number> };
     const sources: { title: string; table: ReturnType<typeof readTable> }[] = [];
     const seen = new Set<string>();
+    const read = (path: string, sha?: string) => {
+      const found = recordedSource(record, { path, sha });
+      if (found.changed) summary.push(["Note", `${basename(path)} (step ${step})`, "changed after the run", CHANGED_NOTE]);
+      return found.path ? readTable(found.path) : undefined;
+    };
     if (result.table?.columns?.length) {
       const p = result.table.path;
-      const full = p && TABLE.has(extname(p).toLowerCase()) ? readTable(p) : undefined;
+      const full = p && TABLE.has(extname(p).toLowerCase()) ? read(p, n.outputs.find((o) => o.path === p)?.sha) : undefined;
       if (p) seen.add(p);
       sources.push({ title: p ? basename(p, extname(p)) : stepTitle(n), table: full ?? previewTable(result.table) });
     }
     for (const o of n.outputs) {
       if (seen.has(o.path) || !TABLE.has(extname(o.path).toLowerCase())) continue;
       seen.add(o.path);
-      const t = readTable(o.path);
+      const t = read(o.path, o.sha);
       if (t) sources.push({ title: basename(o.path, extname(o.path)), table: t });
     }
     const names: string[] = [];
@@ -616,6 +632,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const listed = new Set<string>();
   for (const f of w.figures) {
     listed.add(f.path);
+    if (f.note) summary.push(["Note", `${basename(f.source)} (step ${f.step})`, "changed after the run", f.note]);
     fileRows.push([f.step, "figure", rel(dir, f.path), f.source === f.path ? "" : rel(dir, f.source)]);
   }
   for (const n of nodes) {
