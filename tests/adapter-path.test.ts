@@ -81,7 +81,30 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   session = undefined;
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual([]);
-  expect(session.record.entries(["notice"]).some((n) => /evil is not installed here/.test(String(n.data.text)))).toBe(true);
+  expect(session.record.entries(["notice"]).some((n) => /evil was loaded from .* does not load it/.test(String(n.data.text)))).toBe(true);
+});
+
+unix("resume does not load an adapter from a recorded path outside the project and names the path in a notice", async () => {
+  const away = mkdtempSync(join(tmpdir(), "cuvette-away-"));
+  try {
+    const dir = evilAdapter(away);
+    session = await Session.create({ adapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    const id = session.id;
+    expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
+    await session.close();
+    session = undefined;
+    session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    expect(session.adapters.map((a) => a.name)).toEqual([]);
+    const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
+    expect(text).toContain(dir);
+    expect(text).toContain("--adapter");
+    await session.close();
+    session = undefined;
+    session = await Session.resume(id, { addAdapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+    expect(session.adapters.map((a) => a.name)).toEqual(["evil"]);
+  } finally {
+    rmSync(away, { recursive: true, force: true });
+  }
 });
 
 function installedLab(): string {

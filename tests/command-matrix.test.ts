@@ -153,7 +153,7 @@ const STATES: Record<string, () => Promise<{ s: Session; cards?: Card[] }>> = {
     const dir = s.place.outDir;
     await s.close();
     appendFileSync(join(dir, ".record", "log.jsonl"), ['not json', '{"id":98,"kind":"step","data":null}', '{"id":99,"kind":"setup","data":{}}', '{"id":100,"kind":"decision","data":{"key":5}}', '{"id":101,"kind":"usage","data":{}}', '{"id":102,"kind":"tool_result","data":{}}', '{"id":103,"kind":"node","data":{"id":"n9","parents":[],"outputs":[]}}', ""].join("\n"));
-    const back = await Session.resume(dir, { provider: new FakeProvider([{ text: "ok" }]) });
+    const back = await Session.resume(dir, { addAdapters: [LAB], provider: new FakeProvider([{ text: "ok" }]) });
     open.push(back);
     return { s: back };
   },
@@ -492,7 +492,7 @@ describe("the text names the problem and the next step", () => {
     nodes[1].data.parents = [nodes[0].data.id];
     writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
     const topId = Math.max(...lines.map((e) => e.id));
-    const s = await Session.resume(dir, { provider: new FakeProvider([count("Li"), { text: "Third." }]) });
+    const s = await Session.resume(dir, { addAdapters: [LAB], provider: new FakeProvider([count("Li"), { text: "Third." }]) });
     open.push(s);
     expect(s.record.nodes().map((n) => n.id)).toEqual([nodes[1].data.id]);
     expect(s.record.nodes()[0]!.parents).toEqual([]);

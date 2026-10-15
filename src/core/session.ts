@@ -430,6 +430,7 @@ export class Session {
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
     const gone = new Map<string, boolean>();
     const recorded = new Map<string, string | undefined>();
+    const strayPath = new Map<string, string>();
     for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
@@ -437,9 +438,7 @@ export class Session {
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
-      const guarded = [cwd, place.recordDir, place.outDir].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
-      const inGuarded = (path: string) => guarded.some((d) => realpathSync(path) === d || realpathSync(path).startsWith(d + sep));
-      const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : dirs[name] ?? name);
+      const refOf = (name: string, path?: string) => (path && existsSync(path) && known.has(realpathSync(path)) ? path : dirs[name] ?? name);
       for (const a of opts.addAdapters ?? []) {
         try {
           const found = findAdapter(a, cwd);
@@ -456,6 +455,7 @@ export class Session {
           } catch (e) {
             if (!(e as Error).message.startsWith("no adapter named")) throw e;
             gone.set(name, !!path && existsSync(path) && !!cwd && projectAdapterDirs(cwd).some((d) => resolve(path).startsWith(d + sep)));
+            if (path && existsSync(path) && !known.has(realpathSync(path))) strayPath.set(name, path);
             return false;
           }
         }).map(([, , ref]) => ref);
@@ -477,8 +477,12 @@ export class Session {
       s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
     }
     for (const [name, untrusted] of gone) {
+      const stray = strayPath.get(name);
+      if (stray && s.adapters.some((x) => x.name === name)) continue;
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
+        : stray
+        ? `The adapter ${name} was loaded from ${stray}. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
