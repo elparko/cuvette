@@ -197,7 +197,8 @@ test("the short list puts the missing environments on one line, with no install 
   expect(short).not.toContain("uv venv");
   expect(short).not.toContain("How to cite");
   expect(short).toContain("cuvette doctor --fix installs 2");
-  expect(doctorText(checks)).toContain("How to cite: Author (2020).");
+  expect(doctorText(checks)).not.toContain("Author (2020).");
+  expect(doctorText(checks, { cite: true })).toContain("How to cite\n  Java: Java (1995).\n  biostats: Author (2020).\n  science: Author (2020).");
   expect(doctorText(checks, { only: ["missing"] })).toContain("Download: https://qupath.github.io");
 });
 
@@ -302,7 +303,8 @@ test("the text shows ok, missing and old rows together, with the counts and the 
   const text = doctorText(checks);
   expect(text).toContain("Needed to start\n  ok       Node: version 24.1.0\n  missing  Claude API key: no key is saved.\n           Install: cuvette key\n           Or download: https://platform.claude.com/settings/keys");
   expect(text).toContain("  old      Java: version 1.6 is older than 8.\n           Install: brew install --cask temurin");
-  expect(text).toContain("  missing  cellprofiler: CellProfiler was not found.\n           Download: https://cellprofiler.org/releases\n           How to cite: Stirling 2021");
+  expect(text).toContain("  missing  cellprofiler: CellProfiler was not found.\n           Download: https://cellprofiler.org/releases");
+  expect(text).not.toContain("Stirling 2021");
   expect(text).toContain("3 ok, 3 missing, 1 old.");
   expect(text).toContain("Cuvette can start");
   expect(text).toContain("cuvette doctor --fix installs 1 missing Python environment or R package set.");

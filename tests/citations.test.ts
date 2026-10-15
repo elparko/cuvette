@@ -252,7 +252,12 @@ describe("outputs", () => {
     expect(html).toMatch(/<strong>Used in a comparison\.<\/strong>[\s\S]*start="9"><li>Holm S\./);
     const check: Check = { id: "program:deseq2", group: "Programs", name: "deseq2", status: "ok", detail: "DESeq2 1.52.0", cite: "Love, M. I., Huber, W., & Anders, S. (2014)." };
     expect(doctorHtml([check], true, [check])).toContain("How to cite: Love, M. I., Huber, W., &amp; Anders, S. (2014).");
-    expect(doctorText([check])).toContain("           How to cite: Love, M. I., Huber, W., & Anders, S. (2014).");
+    expect(doctorText([check], { cite: true })).toContain("How to cite\n  deseq2: Love, M. I., Huber, W., & Anders, S. (2014).");
+    const missing: Check = { id: "program:fiji", group: "Programs", name: "fiji", status: "missing", detail: "Not found.", cite: "Schindelin, J. (2012)." };
+    const both = doctorText([check, missing], { cite: true });
+    expect(both.indexOf("  missing  fiji: Not found.")).toBeLessThan(both.indexOf("How to cite"));
+    expect(doctorText([check])).not.toContain("Love");
+    expect(doctorText([check])).toContain("cuvette doctor --cite");
   });
 
   test("the Programs page shows How to cite for each program", async () => {
