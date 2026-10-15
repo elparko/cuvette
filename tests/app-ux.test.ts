@@ -109,10 +109,20 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await page.eval(`document.activeElement === ${notes}`)).toBe(true);
   });
 
-  test("a new question card takes the focus when the focus is on its old card", async () => {
+  test("a new question card takes the focus when the focus is on its old card, and ignores keys for 400 ms", async () => {
+    await page.eval(`window.__now = Date.now(); window.__realNow = Date.now; Date.now = () => window.__now`);
     await page.eval(`(() => { const b = document.querySelector('[data-card][data-type="question"] .opts .btn'); b.focus(); b.click(); })()`);
     expect(await until(page, `document.querySelector('[data-card][data-type="question"]')?.textContent.includes("Which second test?")`)).toBe(true);
     expect(await until(page, `document.activeElement?.matches('[data-card][data-type="question"]')`)).toBe(true);
+    const down = () => page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }))`);
+    const sel = () => page.eval<string>(`document.querySelector('[data-card][data-type="question"]').dataset.sel`);
+    const before = await sel();
+    await down();
+    expect(await sel()).toBe(before);
+    await page.eval(`window.__now += 500`);
+    await down();
+    expect(await sel()).not.toBe(before);
+    await page.eval(`Date.now = window.__realNow`);
   });
 
   test("card keys: Enter on a focused card button is that button, arrows move the focus, Enter in Other answers", async () => {

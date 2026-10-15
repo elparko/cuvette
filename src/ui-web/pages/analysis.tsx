@@ -62,6 +62,7 @@ function markSel(card: HTMLElement, i: number) {
   card.dataset.sel = String(i);
 }
 
+const CARD_QUIET_MS = 400;
 const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
 
 function Thinking({ text, done }: { text: string; done: boolean }) {
@@ -211,6 +212,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // A card that did not change stays in the page, so that a screen reader does not read it again.
   const cardText = useRef(new Map<string, string>());
   const keptCards = useRef<Set<Element>>(new Set());
+  const cardOpened = useRef<{ card: Element | null; at: number }>({ card: null, at: 0 });
   useLayoutEffect(() => {
     if (cardsRef.current) keptCards.current = patchCards(cardsRef.current, stream.cards, cardText.current);
   }, [stream.cards]);
@@ -265,6 +267,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     }
     const card = activeCard(box);
     for (const c of box.querySelectorAll("[data-card]")) c.classList.toggle("active", c === card);
+    if (card && card !== cardOpened.current.card) cardOpened.current = { card, at: Date.now() };
     if (!card) {
       // The answered card is gone. Keep the keyboard in the page, but do not open a phone keyboard.
       if (document.activeElement === document.body && !document.querySelector("[role=dialog]") && !matchMedia("(pointer: coarse)").matches) inputRef.current?.focus({ preventScroll: true });
@@ -329,6 +332,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (document.querySelector("[role=dialog], [role=menu]")) return;
       const card = activeCard(cardsRef.current);
       if (!card) return;
+      if (card === cardOpened.current.card && Date.now() - cardOpened.current.at < CARD_QUIET_MS) return;
       if (a && a !== card && e.key === "Enter" && a.closest("button, a[href], summary, [role=tab], [role=button]")) return;
       if (a && !inCards && a.closest("[role=tab]")) return;
       const bs = optionButtons(card);
