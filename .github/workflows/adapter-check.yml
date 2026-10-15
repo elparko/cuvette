@@ -38,11 +38,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vitest run
         env:
           CI: "false"
+      - name: Create the files that the Tauri build script needs
+        run: |
+          mkdir -p desktop/build/core desktop/build/bin
+          touch desktop/build/bin/node-aarch64-apple-darwin
+          chmod +x desktop/build/bin/node-aarch64-apple-darwin
       - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
 
   adapter-check:

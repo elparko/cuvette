@@ -4,7 +4,8 @@ export function nodeTooOld(version) {
   return Number.parseInt(version.split(".")[0], 10) < 22;
 }
 
-if (nodeTooOld(process.versions.node)) {
-  process.stderr.write(`${nodeTooOldMessage(process.versions.node)}\n`);
-  process.exit(1);
+export function main(version, stderr, exit) {
+  if (!nodeTooOld(version)) return;
+  stderr.write(`${nodeTooOldMessage(version)}\n`);
+  exit(1);
 }
