@@ -32,6 +32,7 @@ export function cardId(c: Card): string {
   if (c.t === "plan") return `plan:${c.stage}:${c.version}`;
   if (c.t === "clarify") return `clarify:${c.qids.join(",")}`;
   if (c.t === "instruction") return `instruction:${c.step}`;
+  if (c.t === "phi") return `phi:${c.rid}`;
   return c.t;
 }
 
