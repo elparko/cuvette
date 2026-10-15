@@ -39,7 +39,7 @@ export interface Table {
   quotes?: CsvNotes;
 }
 
-const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "?", "."]);
+const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "<na>", "?", "."]);
 const NUM = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
 const COMMA = /^[-+]?\d+,\d+$/;
 const ID_NAME = /^(sample|sample ?id|id|subject|subject ?id|patient|patient ?id|animal|animal ?id|mouse|mouse ?id|donor|donor ?id|specimen|well|image|file|field|name)$/;

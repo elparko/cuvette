@@ -193,9 +193,9 @@ describe.skipIf(!python)("biostats adapter group labels and missing group marks"
     });
   }
 
-  for (const label of ["NA", "N/A", "null", "NaN"]) {
+  for (const label of ["NA", "Na", "N/A", "#N/A", "<NA>", "null", "NaN", "-", "?", "."]) {
     test(`a group written ${label} is a missing group, not a group`, { timeout: slow }, async () => {
-      const file = write(`missing-${label.replace("/", "-")}.csv`, [label, "A", "B", "C"]);
+      const file = write(`missing-${label.replace(/\W/g, "_")}.csv`, [label, "A", "B", "C"]);
       const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
       expect(out.metrics.n_groups).toBe(3);
       expect(out.metrics.n).toBe(18);

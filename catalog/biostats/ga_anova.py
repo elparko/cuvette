@@ -24,15 +24,15 @@ def _fail(message):
     return {"ok": False, "error": message}
 
 
-MISSING_TEXT = {"", "NA", "N/A", "n/a", "NaN", "nan", "null", "NULL", "Null"}
+MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
 
 
 def _typed(path, enc):
     frame = pd.read_csv(path, encoding=enc)
     raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
     for column in frame.columns:
-        if frame[column].dtype == object:
-            frame[column] = raw[column].where(~raw[column].str.strip().isin(MISSING_TEXT), np.nan)
+        if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
     return frame
 
 

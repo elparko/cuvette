@@ -66,7 +66,7 @@ describe("table checks", () => {
   });
 
   test("a group row written NA, N/A, null or empty is a missing group and not a group", () => {
-    for (const mark of ["NA", "N/A", "null", ""]) {
+    for (const mark of ["NA", "Na", "N/A", "#N/A", "<NA>", "null", "NaN", "-", "?", "."]) {
       const rows = Array.from({ length: 12 }, (_, i) => [`M${i + 1}`, i === 0 ? mark : ["Drug", "Vehicle"][i % 2]!, String(10 + i)]);
       const c = checkTable(t(["Animal", "Group", "dose"], rows), "plate.csv");
       expect(c.groups?.sizes.map((g) => g[0]).sort()).toEqual(["Drug", "Vehicle"]);

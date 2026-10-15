@@ -13,7 +13,7 @@ describe.skipIf(!python)("table readers keep None as a label and read NA as miss
   beforeAll(() => {
     root = mkdtempSync(join(tmpdir(), "cuvette-group-reads-"));
     file = join(root, "groups.csv");
-    writeFileSync(file, "cell,group,value\nc1,None,1\nc2,NA,2\nc3,null,3\nc4,A,4\nc5,,5\n");
+    writeFileSync(file, "cell,group,value\nc1,None,1\nc2,NA,2\nc3,null,3\nc4,A,4\nc5,,5\nc6,#N/A,6\nc7,Na,7\n");
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -29,10 +29,24 @@ print(json.dumps([None if v != v else v for v in frame["group"].tolist()]))`,
     );
 
   test("the bench assay reader", { timeout: slow }, async () => {
-    expect(await read("bench-assays", "ga_bench_assays", `m.load(${JSON.stringify(file)})`)).toEqual(["None", null, null, "A", null]);
+    expect(await read("bench-assays", "ga_bench_assays", `m.load(${JSON.stringify(file)})`)).toEqual(["None", null, null, "A", null, null, null]);
   });
 
   test("the patch clamp reader", { timeout: slow }, async () => {
-    expect(await read("patch-clamp", "pc_read", `m.read_labels_csv(${JSON.stringify(file)})`)).toEqual(["None", null, null, "A", null]);
+    expect(await read("patch-clamp", "pc_read", `m.read_labels_csv(${JSON.stringify(file)})`)).toEqual(["None", null, null, "A", null, null, null]);
+  });
+
+  test("the readers keep the labels if pandas reads text as the string type", { timeout: slow }, async () => {
+    const prefix = "import pandas\npandas.options.future.infer_string = True\n";
+    const out = await pyJson<(string | null)[]>(
+      python!,
+      `${prefix}import sys
+sys.path.insert(0, ${JSON.stringify(join(CATALOG, "biostats"))})
+import ga_biostats as m
+frame = m._read(${JSON.stringify(file)})
+print(json.dumps([None if v != v else v for v in frame["group"].tolist()]))`,
+      root,
+    );
+    expect(out).toEqual(["None", null, null, "A", null, null, null]);
   });
 });
