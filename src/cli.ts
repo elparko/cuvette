@@ -302,11 +302,28 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   const fs = await import("./core/firststart.ts");
   console.log("Welcome to Cuvette. First, choose the model that does the analysis.\n");
   fs.CHOICES.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
+  console.log("  q  Quit. Nothing is saved.\n     If you use `ant auth login`, run it, then start Cuvette again.\n");
+  let empty = 0;
+  const quit = (text: string): never => {
+    console.log(text);
+    process.exit(0);
+  };
+  const typed = (answer: string, message: string): string => {
+    const v = answer.trim();
+    if (v) return (empty = 0), v;
+    if (++empty >= 3) quit("Nothing was typed three times. Nothing was saved. Start Cuvette again when you are ready.");
+    console.log(message);
+    return "";
+  };
   let pick = "";
-  while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
+  while (pick !== "1" && pick !== "2") {
+    pick = typed(await ask("Type 1 or 2: "), "Nothing was typed. Type 1 for Claude, 2 for a local model, or q to quit.");
+    if (/^q/i.test(pick)) quit("Nothing was saved.");
+    if (pick && pick !== "1" && pick !== "2") console.log(`"${pick}" is not a choice. Type 1 for Claude, 2 for a local model, or q to quit.`);
+  }
   if (pick === "1") {
     for (let i = 1; ; i++) {
-      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key: ");
+      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key. Type q to quit: ");
       if (pasted.trim() === "?") {
         const kh = await import("./core/keyhelp.ts");
         console.log(`\n${kh.keyGuideText()}\n`);
@@ -314,7 +331,8 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
         i--;
         continue;
       }
-      if (!pasted.trim()) {
+      if (/^q$/i.test(pasted.trim())) quit("Nothing was saved. If you use `ant auth login`, run it, then start Cuvette again.");
+      if (!typed(pasted, "Nothing was typed. Paste the key, type ? for help, or type q to quit.")) {
         i--;
         continue;
       }
@@ -954,9 +972,11 @@ async function main() {
 main().catch((e) => fail(`cuvette: ${(e as Error).message}`));
 
 let lines: string[] | undefined;
+let inputEnded = false;
 
 async function ask(prompt: string): Promise<string> {
   process.stderr.write(prompt);
+  if (inputEnded) return "";
   if (!lines) {
     let all = "";
     if (process.stdin.isTTY) {
@@ -968,8 +988,9 @@ async function ask(prompt: string): Promise<string> {
       };
       process.once("SIGINT", stop);
       return new Promise((resolve) => {
-        rl.once("line", (l) => (process.off("SIGINT", stop), resolve(l), rl.close()));
-        rl.once("close", () => (process.off("SIGINT", stop), resolve("")));
+        let got = false;
+        rl.once("line", (l) => ((got = true), process.off("SIGINT", stop), resolve(l), rl.close()));
+        rl.once("close", () => (process.off("SIGINT", stop), (inputEnded = !got), resolve("")));
       });
     }
     for await (const c of process.stdin) all += c;

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
@@ -280,6 +280,28 @@ describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-termin
     expect(r.out).toContain("Type a number from 1 to 2");
     expect(r.out).toContain("Saved the model ollama:llama3.1:8b.");
     expect(r.out).not.toContain("ollama:9");
+  }, 60_000);
+
+  test("empty input at the first start gives a message, and q quits with nothing saved", async () => {
+    const h = ptyHome();
+    const r = await drive([["Type 1 or 2", "\r"], ["Nothing was typed(.|\\n)*Type 1 or 2", "x\r"], ["is not a choice(.|\\n)*Type 1 or 2", "q\r"]], cleanEnv(h), join(h, "proj"));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Nothing was typed. Type 1 for Claude, 2 for a local model, or q to quit.");
+    expect(r.out).toContain('"x" is not a choice.');
+    expect(r.out).toContain("Nothing was saved.");
+    expect(existsSync(join(h, "cv", "credentials.json"))).toBe(false);
+    const h2 = ptyHome();
+    const k = await drive([["Type 1 or 2", "1\r"], ["Paste", "\r"], ["Nothing was typed. Paste the key(.|\\n)*Paste", "q\r"]], cleanEnv(h2), join(h2, "proj"));
+    expect(k.code).toBe(0);
+    expect(k.out).toContain("Nothing was typed. Paste the key, type ? for help, or type q to quit.");
+    expect(k.out).toContain("ant auth login");
+  }, 60_000);
+
+  test("input that ends at the first start stops with a message and does not loop", async () => {
+    const h = ptyHome();
+    const r = await drive([["Type 1 or 2", "\x04"]], cleanEnv(h), join(h, "proj"));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Nothing was typed three times.");
   }, 60_000);
 
   test("NO_COLOR gives a terminal app with no color codes", async () => {

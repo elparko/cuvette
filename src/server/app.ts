@@ -9,7 +9,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
-import { claudeKey, isCredentialsFile } from "../core/credentials.ts";
+import { antLogin, claudeKey, isCredentialsFile } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
@@ -199,7 +199,7 @@ export function chooseFolder(start: string): Promise<string> {
 }
 
 export function needsFirstSetup(model: string, env: Record<string, string | undefined>): boolean {
-  return model.startsWith("claude") && claudeKey(env).from === "none";
+  return model.startsWith("claude") && claudeKey(env).from === "none" && !antLogin(env);
 }
 
 const HIDE_WHEN_READY = new Set(["claude-key", "ollama"]);

@@ -112,6 +112,19 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
   return k ? { key: k, from: "file" } : { from: "none" };
 }
 
+export function antLogin(env: Record<string, string | undefined> = process.env): boolean {
+  const root = env.ANTHROPIC_CONFIG_DIR || (process.platform === "win32" ? (env.APPDATA ? join(env.APPDATA, "Anthropic") : env.USERPROFILE ? join(env.USERPROFILE, "AppData", "Roaming", "Anthropic") : "") : env.XDG_CONFIG_HOME ? join(env.XDG_CONFIG_HOME, "anthropic") : env.HOME ? join(env.HOME, ".config", "anthropic") : "");
+  if (!root) return false;
+  let profile = env.ANTHROPIC_PROFILE;
+  if (!profile) {
+    try {
+      profile = readFileSync(join(root, "active_config"), "utf8").trim();
+    } catch {}
+  }
+  profile ||= "default";
+  return /^[\w.-]+$/.test(profile) && existsSync(join(root, "credentials", `${profile}.json`));
+}
+
 function write(values: Record<string, unknown>): string {
   mkdirSync(cuvetteHome(), { recursive: true });
   const path = credentialsPath();
