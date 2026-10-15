@@ -2,7 +2,7 @@ import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, Networ
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { IMAGE_PASTE_HELP, pastedImageOnly } from "../lib/drop.ts";
-import { patchCards } from "../lib/cards.ts";
+import { cardTakesFocus, patchCards } from "../lib/cards.ts";
 import { onTableCopy } from "../lib/table-copy.ts";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
@@ -62,6 +62,7 @@ function markSel(card: HTMLElement, i: number) {
   card.dataset.sel = String(i);
 }
 
+const CARD_QUIET_MS = 400;
 const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
 
 function Thinking({ text, done }: { text: string; done: boolean }) {
@@ -171,6 +172,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   const itemCount = useRef(0);
   itemCount.current = stream.items.length;
+  const stop = async () => {
+    const r = await post<{ dropped?: string[] }>("api/stop", {});
+    const back = (r?.dropped ?? []).join("\n");
+    if (back) setText((t) => (t.trim() ? `${t}\n${back}` : back));
+  };
+
   const send = useCallback(async (value: string, now = false) => {
     if (!value.trim()) return true;
     askNotify();
@@ -211,6 +218,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // A card that did not change stays in the page, so that a screen reader does not read it again.
   const cardText = useRef(new Map<string, string>());
   const keptCards = useRef<Set<Element>>(new Set());
+  const cardOpened = useRef<{ card: Element | null; at: number }>({ card: null, at: 0 });
   useLayoutEffect(() => {
     if (cardsRef.current) keptCards.current = patchCards(cardsRef.current, stream.cards, cardText.current);
   }, [stream.cards]);
@@ -265,6 +273,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     }
     const card = activeCard(box);
     for (const c of box.querySelectorAll("[data-card]")) c.classList.toggle("active", c === card);
+    if (card && card !== cardOpened.current.card) cardOpened.current = { card, at: Date.now() };
     if (!card) {
       // The answered card is gone. Keep the keyboard in the page, but do not open a phone keyboard.
       if (document.activeElement === document.body && !document.querySelector("[role=dialog]") && !matchMedia("(pointer: coarse)").matches) inputRef.current?.focus({ preventScroll: true });
@@ -275,7 +284,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (keptHere) return;
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
-    const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
+    const free = cardTakesFocus(a, document.body, box);
     if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
       card.focus({ preventScroll: true });
@@ -309,6 +318,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
   // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
   useEffect(() => {
+    let digits = "";
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
@@ -329,6 +339,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (document.querySelector("[role=dialog], [role=menu]")) return;
       const card = activeCard(cardsRef.current);
       if (!card) return;
+      if (card === cardOpened.current.card && Date.now() - cardOpened.current.at < CARD_QUIET_MS) return;
       if (a && a !== card && e.key === "Enter" && a.closest("button, a[href], summary, [role=tab], [role=button]")) return;
       if (a && !inCards && a.closest("[role=tab]")) return;
       const bs = optionButtons(card);
@@ -341,6 +352,18 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         }
         return;
       }
+      if (bs.length >= 10 && /^[0-9]$/.test(e.key)) {
+        const n = Number(digits + e.key);
+        digits = n >= 1 && n <= bs.length ? digits + e.key : e.key;
+        const at = Number(digits) - 1;
+        if (bs[at]) {
+          e.preventDefault();
+          markSel(card, at);
+          if (a === card || bs.includes(a as HTMLButtonElement)) bs[at]!.focus();
+        }
+        return;
+      }
+      digits = "";
       if (/^[1-9]$/.test(e.key)) {
         const b = bs[Number(e.key) - 1];
         if (b) {
@@ -491,7 +514,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   };
 
   const submit = (now = false) => {
-    if (sugg.length && text.startsWith("/") && !text.includes(" ")) return pick(sugg[sel]);
+    if (sugg.length && text.startsWith("/") && !text.includes(" ") && !commands.some((c) => c.name === text.slice(1))) return pick(sugg[sel]);
     const v = text;
     setText("");
     setSugg([]);
@@ -653,7 +676,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </Button>
               )}
               {busy && (
-                <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="h-7 text-destructive">
+                <Button variant="outline" size="sm" onClick={() => void stop()} className="h-7 text-destructive">
                   <SquareIcon className="size-3 fill-current" /> Stop
                 </Button>
               )}
@@ -710,7 +733,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   }
                   if (e.key === "Escape") {
                     if (sugg.length) setSugg([]);
-                    else if (busy) void post("api/stop", {});
+                    else if (busy) void stop();
                     return;
                   }
                   if (e.key === "Enter" && !e.shiftKey) {

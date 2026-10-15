@@ -26,6 +26,15 @@ export type Card =
 
 export type CardType = Card["t"];
 
+export function cardId(c: Card): string {
+  if (c.t === "permission") return `permission:${c.rid}`;
+  if (c.t === "question") return `question:${c.q.qid}`;
+  if (c.t === "plan") return `plan:${c.stage}:${c.version}`;
+  if (c.t === "clarify") return `clarify:${c.qids.join(",")}`;
+  if (c.t === "instruction") return `instruction:${c.step}`;
+  return c.t;
+}
+
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
   if (typeof v === "string") return v;
@@ -91,7 +100,8 @@ export const needsSetup = (session: SessionLike) => session.decisions.fields().s
 
 export const NO_KEY = "There is no Claude API key. Add one now, or press Esc if you use `ant auth login`.";
 
-export function planIntro(session: SessionLike): string {
+export function planIntro(session: SessionLike): string | undefined {
+  if (session.record.entries(["plan_approved"]).length) return undefined;
   return session.planFirst ? "The agent asks a few questions, proposes the metrics, and shows them on one sample. You confirm before the batch runs." : "Type /plan to get questions, proposed metrics and a demonstration before any step runs.";
 }
 

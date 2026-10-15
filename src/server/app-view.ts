@@ -9,7 +9,7 @@ import {
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, failureText, parseCommand, unknownCommand, type CommandCtx } from "../ui/commands.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
-import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
+import { activityText, droppedNote, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import type { SessionLike } from "../ui/types.ts";
 import { cardHtml, itemHtml, runHtml, splitRuns, type Ctx, type Slot } from "./app-html.ts";
 import { usageFields } from "../ui/messages.ts";
@@ -19,7 +19,7 @@ export interface ViewHost {
   token: string;
   env: Record<string, string | undefined>;
   url(path: string): string;
-  quit(): Promise<void>;
+  quit(): Promise<string | void>;
 }
 
 type Fields = Record<string, unknown>;
@@ -67,7 +67,8 @@ export class WebView {
     if (st) this.status = { state: st.state, tool: st.tool, purpose: st.purpose, since: st.since };
     if (this.status.state === "idle") this.settled.push(...this.collapser.flush());
     this.pending = this.status.state === "idle" ? [] : this.collapser.preview();
-    this.line("▸", planIntro(session), undefined, true, false);
+    const intro = planIntro(session);
+    if (intro) this.line("▸", intro, undefined, true, false);
     this.ctx = this.makeCtx();
     for (const c of startCards(session, host.env)) this.openCard(c, false);
     if (needsSetup(session)) void openSetup(this.ctx);
@@ -360,11 +361,13 @@ export class WebView {
     this.line("▸", "The questions stay open. They come back with /questions.", undefined, true);
   }
 
-  stop(): void {
+  stop(): string[] {
     this.stopping = this.busy;
+    const dropped = stopTurn(this.session, this.queue);
     this.queue = [];
-    stopTurn(this.session);
+    if (dropped.length) this.line("!", droppedNote(dropped, true), "yellow");
     this.sendStatus();
+    return dropped;
   }
 
   private makeCtx(): CommandCtx {
@@ -385,7 +388,7 @@ export class WebView {
         this.collapser = new Collapser();
         this.send(this.snapshot());
       },
-      quit: () => void this.host.quit(),
+      quit: () => void this.host.quit().then((text) => text && this.line("▸", text)),
       outputs: () => this.mapper.outputs,
       toggleDetails: () => this.toggleDetails(),
       startWindow: async () => this.host.url("graph/"),

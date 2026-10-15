@@ -130,8 +130,20 @@ describe("the app server", () => {
     await c.post("api/send", { text: "use RMS", now: false });
     await c.post("api/send", { text: "stop now", now: true });
     expect(s.steered.map((x) => [x.text, x.now])).toEqual([["use RMS", false], ["stop now", true]]);
-    await c.post("api/stop", {});
+    const stopped = await (await c.post("api/stop", {})).json();
+    expect(stopped.dropped).toEqual(["use RMS", "stop now"]);
     expect(s.interrupts).toBeGreaterThan(0);
+    await until(() => ev.msgs.some((m) => m.t === "append" && m.html.includes("The agent did not read these 2 messages") && String(m.html).includes("back in the input box")));
+    ev.close();
+  });
+
+  test("/quit in the app shows a line when the terminal owns the session", async () => {
+    const s = new FakeSession({ delayMs: 1 });
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    const ev = await events(app);
+    await c.post("api/send", { text: "/quit" });
+    await until(() => ev.msgs.some((m) => m.t === "append" && String(m.html).includes("This session belongs to the terminal. Type /quit there to leave.")));
     ev.close();
   });
 

@@ -17,6 +17,7 @@ export interface InputBoxProps {
   single?: boolean;
   mask?: string;
   active?: boolean;
+  gate?: () => boolean;
   onChange(text: string): void;
   onSubmit(text: string): void;
   onEscape?(): void;
@@ -60,6 +61,7 @@ export function InputBox(props: InputBoxProps) {
 
   const onKey = (seq: string): boolean => {
     const p = latest.current;
+    if (p.gate && !p.gate()) return false;
     const k = decodeKey(seq);
     if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key), true;
     const r = press(ed.current, k, p.style, p.width, p.single);
@@ -133,9 +135,9 @@ export function InputBox(props: InputBoxProps) {
   );
 }
 
-export function Field(props: { value: string; onChange: (v: string) => void; onSubmit: (v: string) => void; onCancel?: () => void; mask?: string; indent?: number }) {
+export function Field(props: { gate?: () => boolean; value: string; onChange: (v: string) => void; onSubmit: (v: string) => void; onCancel?: () => void; mask?: string; indent?: number }) {
   const { columns } = useWindowSize();
   return (
-    <InputBox single value={props.value} width={Math.max(10, columns - 8 - (props.indent ?? 0))} mask={props.mask} onChange={props.onChange} onSubmit={props.onSubmit} onEscape={props.onCancel} />
+    <InputBox single gate={props.gate} value={props.value} width={Math.max(10, columns - 8 - (props.indent ?? 0))} mask={props.mask} onChange={props.onChange} onSubmit={props.onSubmit} onEscape={props.onCancel} />
   );
 }

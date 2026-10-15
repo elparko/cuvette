@@ -10,6 +10,8 @@ import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
 
+export const REVIEW_PURPOSE = "Reviewing the answer";
+
 export type ReasonKind = "decision" | "input" | "adapter" | "program" | "environment" | "parent";
 
 export interface Reason {

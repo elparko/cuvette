@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, render, useApp, useInput, usePaste, useStdout, useWindowSize } from "ink";
 import { Text } from "./text.tsx";
+import { guardCardOpened, guardNoteKey } from "./key-guard.ts";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
@@ -17,8 +18,8 @@ import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
 import { canGoBack, isPlainQuestion, questionHead, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
-import { applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
-import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
+import { cardId, applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { droppedNote, inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
 import { terminalStdin } from "./key-stream.ts";
@@ -189,7 +190,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
 
   useEffect(() => {
     const first = startCards(session, env);
-    line("▸", planIntro(session), undefined, true);
+    const intro = planIntro(session);
+    if (intro) line("▸", intro, undefined, true);
     if (opts.firstMessage) session.send(opts.firstMessage).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
     if (!opts.firstMessage && opts.autoSetup !== false && needsSetup(session)) void openSetup({ openCard: addCard } as CommandCtx);
     for (const c of first) addCard(c);
@@ -356,8 +358,12 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
 
   const escape = () => {
     if (status.state !== "idle") {
+      const dropped = stopTurn(session, queueRef.current);
       updateQueue([]);
-      stopTurn(session);
+      if (!dropped.length) return;
+      const restored = !input;
+      if (restored) setText(dropped.join("\n"));
+      line("!", droppedNote(dropped, restored), "yellow");
     } else if (input && keyStyle !== "vim") setText("");
   };
 
@@ -383,6 +389,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   usePaste(() => {});
 
   useInput((ch, key) => {
+    guardNoteKey();
     if (key.ctrl && ch === "c") {
       const now = Date.now();
       if (now - lastCtrlC.current < 2000) return void quit();
@@ -411,6 +418,10 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   });
 
   const card = cards[0];
+  const cardKey = card ? cardId(card) : "";
+  useEffect(() => {
+    if (cardKey) guardCardOpened();
+  }, [cardKey]);
   const program = session.adapterInfo[0]?.title ?? "the program";
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";

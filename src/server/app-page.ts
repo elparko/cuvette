@@ -556,14 +556,16 @@ function markSel(card, i) {
   bs.forEach((b, j) => b.classList.toggle("sel", j === i));
   card.dataset.sel = String(i);
 }
+let cardEl = null, cardAt = 0, manyDigits = "";
 function focusCard() {
   const card = activeCard();
   for (const c of document.querySelectorAll("#cards [data-card]")) c.classList.toggle("active", c === card);
   if (!card) return;
+  if (card !== cardEl) { cardEl = card; cardAt = Date.now(); }
   const bs = optionButtons(card);
   markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
   const a = document.activeElement;
-  const typing = a && (a.tagName === "INPUT" || a.tagName === "SELECT" || (a.tagName === "TEXTAREA" && a.value.trim()));
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
   if (!typing && page === "session") { card.tabIndex = -1; card.focus({ preventScroll: true }); }
 }
 document.addEventListener("keydown", (e) => {
@@ -573,9 +575,17 @@ document.addEventListener("keydown", (e) => {
   if (document.querySelector("dialog[open]")) return;
   const card = activeCard();
   if (!card) return;
+  if (card === cardEl && Date.now() - cardAt < 400) return;
   const bs = optionButtons(card);
   let i = Number(card.dataset.sel || 0);
   if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }
+  if (bs.length >= 10 && /^[0-9]$/.test(e.key)) {
+    const n = Number(manyDigits + e.key);
+    manyDigits = n >= 1 && n <= bs.length ? manyDigits + e.key : e.key;
+    if (bs[Number(manyDigits) - 1]) { e.preventDefault(); markSel(card, Number(manyDigits) - 1); }
+    return;
+  }
+  manyDigits = "";
   if (/^[1-9]$/.test(e.key)) { const b = bs[Number(e.key) - 1]; if (b) { e.preventDefault(); markSel(card, Number(e.key) - 1); b.click(); } return; }
   const nav = (act) => card.querySelector('[data-act="' + act + '"]');
   if (e.key === "ArrowLeft" && nav("back")) { e.preventDefault(); nav("back").click(); return; }
@@ -620,6 +630,12 @@ async function post(path, body) {
   try { return await call(path, body); } catch (e) { toast(e.message); }
 }
 
+async function stopAgent() {
+  const r = await post("api/stop", {});
+  const back = ((r && r.dropped) || []).join("\n");
+  if (back) $("msg").value = $("msg").value.trim() ? $("msg").value + "\n" + back : back;
+}
+
 async function send(text, now) {
   if (!text.trim()) return;
   askNotify();
@@ -629,14 +645,14 @@ async function send(text, now) {
 
 $("composer").addEventListener("submit", (e) => {
   e.preventDefault();
-  if (sugg.length && $("msg").value.indexOf(" ") < 0 && $("msg").value.startsWith("/")) { pickSuggest(suggSel); return; }
+  if (sugg.length && $("msg").value.indexOf(" ") < 0 && $("msg").value.startsWith("/") && !commands.some((c) => c.name === $("msg").value.slice(1))) { pickSuggest(suggSel); return; }
   const v = $("msg").value;
   $("msg").value = "";
   hideSuggest();
   send(v, false);
 });
 $("sendnow").addEventListener("click", () => { const v = $("msg").value; $("msg").value = ""; send(v, true); });
-$("stop").addEventListener("click", () => post("api/stop", {}));
+$("stop").addEventListener("click", () => stopAgent());
 $("showq").addEventListener("click", () => send("/questions", false));
 $("openfolder").addEventListener("click", () => { chooser($("chooser2")); $("folderdlg").showModal(); });
 const MODES = [["watch", "Watch", "The agent runs the steps."], ["follow", "Follow", "You run the steps."], ["teach", "Teach", "You work. The agent checks."], ["plan", "Plan", "The agent plans only."]];
@@ -664,7 +680,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleMode
 $("msg").addEventListener("keydown", (e) => {
   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); suggSel = (suggSel + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length; drawSuggest(); return; }
   if (sugg.length && e.key === "Tab") { e.preventDefault(); pickSuggest(suggSel); return; }
-  if (e.key === "Escape") { if (sugg.length) hideSuggest(); else if (status.state !== "idle") post("api/stop", {}); return; }
+  if (e.key === "Escape") { if (sugg.length) hideSuggest(); else if (status.state !== "idle") stopAgent(); return; }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("msg").addEventListener("input", async () => {

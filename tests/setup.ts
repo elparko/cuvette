@@ -5,6 +5,7 @@ import { afterAll } from "vitest";
 import { readOldEnv } from "../src/core/old-names.ts";
 
 readOldEnv();
+process.env.CUVETTE_CARD_GUARD_MS = "0";
 
 const tempRoot = mkdtempSync(join(realpathSync(tmpdir()), "cuvette-test-"));
 process.env.TMPDIR = tempRoot;

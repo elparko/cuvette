@@ -6,7 +6,7 @@ import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { KEYS_URL, keyGuideText } from "../core/keyhelp.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
-import { statusText, stepStatus, type StepState } from "../core/status.ts";
+import { REVIEW_PURPOSE, statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
@@ -89,6 +89,31 @@ export function table(headers: string[], rows: string[][]): string {
   const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
   const fmt = (r: string[]) => r.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd();
   return [fmt(headers), fmt(widths.map((w) => "-".repeat(w))), ...rows.map(fmt)].join("\n");
+}
+
+function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line && line.length + 1 + word.length > width) (lines.push(line), (line = word));
+    else line = line ? `${line} ${word}` : word;
+  }
+  return [...lines, line];
+}
+
+export function helpTable(headers: [string, string], rows: string[][], width = 80, nameMax = 22): string {
+  const nameW = Math.max(headers[0].length, ...rows.map((r) => r[0]!.length).filter((n) => n <= nameMax));
+  const helpW = width - nameW - 2;
+  const out = [`${headers[0].padEnd(nameW)}  ${headers[1]}`, `${"-".repeat(nameW)}  ${"-".repeat(Math.min(headers[1].length, helpW))}`];
+  for (const [name, help] of rows) {
+    const helpLines = wrapWords(help!, helpW);
+    if (name!.length <= nameW) {
+      out.push(`${name!.padEnd(nameW)}  ${helpLines[0]}`, ...helpLines.slice(1).map((l) => " ".repeat(nameW + 2) + l));
+      continue;
+    }
+    out.push(...wrapWords(name!, width - 4).map((l, i) => (i ? "    " : "") + l), ...helpLines.map((l) => " ".repeat(nameW + 2) + l));
+  }
+  return out.join("\n");
 }
 
 function clip(s: string, n = 48): string {
@@ -313,7 +338,7 @@ const base: Command[] = [
     run(_, ctx) {
       const rows = commands.map((c) => [`/${c.name}${c.args ? " " + c.args : ""}`, c.help]);
       const keys = ctx.keys?.() ?? "Keys: Esc stops the agent. Shift+Tab changes the mode. Ctrl+C twice quits. Up and Down show past input.";
-      ctx.print(table(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
+      ctx.print(helpTable(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
     },
   },
   { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },
@@ -1041,7 +1066,7 @@ export const commands: Command[] = base.map((c) => ({
   run(args, ctx) {
     const most = mostWords(c.name, args);
     if (most !== undefined && args.length > most) return ctx.error(`Too many words. Use: /${c.name}${c.args ? ` ${c.args}` : ""}`);
-    if (NEEDS_FINAL_ANSWER.has(c.name) && ctx.session.busy) return ctx.error("The review of the answer is still running. Type the command again when it ends.");
+    if (NEEDS_FINAL_ANSWER.has(c.name) && ctx.session.busy) return ctx.error(ctx.session.lastStatus?.purpose === REVIEW_PURPOSE ? "The review of the answer is still running. Type the command again when it ends." : "The agent is still working on this turn. Type the command again when the turn ends. Esc stops the turn.");
     return c.run(args, ctx);
   },
 }));

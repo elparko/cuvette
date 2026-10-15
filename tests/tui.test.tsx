@@ -6,6 +6,7 @@ import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } fro
 import { liveTail, tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/ui/commands.ts";
+import { PICK_LABEL } from "../src/ui/cards.ts";
 import React from "react";
 import { Static, render } from "ink";
 import { ItemView, activityText, busyHint, runningText } from "../src/tui/view.tsx";
@@ -60,6 +61,16 @@ describe("transcript", () => {
     await until(() => h.all().includes("Type /help for commands."));
     expect(h.all()).toContain("> count the cells from before");
     expect(h.all()).toContain("There are 42 cells.");
+  });
+
+  test("a resumed session with a confirmed plan does not show the plan intro", async () => {
+    const h = makeHarness();
+    const s = new FakeSession({ delayMs: 0 });
+    s.record.append("plan_approved", { phase: "Confirmed", version: 1, text: "Question: Q1", plan: {}, mode: "watch", answers: [] });
+    const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+    live = { h, s, done };
+    await until(() => h.all().includes("Type /help for commands."));
+    expect(h.all()).not.toContain("Type /plan to get questions");
   });
 
   test("shows steps with route, settings, fidelity, deviation and failure", async () => {
@@ -201,6 +212,19 @@ describe("messages during a turn", () => {
     expect(s.sent).toEqual([]);
   });
 
+  test("Esc shows the dropped messages and puts them back in the input box", async () => {
+    const { h, s } = start();
+    s.settings.messages = "queue";
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "later one");
+    await until(() => h.all().includes("Queued: later one"));
+    await type(h, "\x1b");
+    await until(() => h.all().includes('The agent did not read this message: "later one". It is back in the input box.'));
+    await until(() => h.last().includes("> later one"));
+  });
+
   test("a message that the agent did not read before the turn ended goes as the next request", async () => {
     const { h, s } = start();
     await sleep(100);
@@ -244,6 +268,69 @@ describe("cards", () => {
     await type(h, "c");
     await until(() => h.all().includes("import numpy as np"));
     expect(h.last().match(/import numpy as np/g)).toHaveLength(1);
+  });
+
+  test("permission card ignores keys that follow typing and acts after a pause", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      await submit(h, "go");
+      await until(() => h.all().includes("Permission needed: run_script"));
+      await type(h, "a");
+      await type(h, "y");
+      await type(h, "\r");
+      expect(s.record.entries(["permission"])).toHaveLength(0);
+      expect(h.last()).toContain("Permission needed: run_script");
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      h.type("y");
+      await until(() => s.record.entries(["permission"]).length === 1);
+      expect(s.record.entries(["permission"])[0]!.data).toMatchObject({ decision: "allowed" });
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
+  });
+
+  test("a question card with no options ignores Enter and text that follow typing", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      s.askMany([{ qid: "qf", session: s.id, decisionKey: "k", title: "Which name?", text: "Type a name.", options: [], status: "open", created: new Date().toISOString() } as never]);
+      await until(() => h.term.view().includes("Your answer:"));
+      await type(h, "hello");
+      await type(h, "\r");
+      expect(s.record.entries(["answer"])).toHaveLength(0);
+      expect(h.term.view()).not.toContain("Your answer: hello");
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      await type(h, "ok");
+      await until(() => h.term.view().includes("Your answer: ok"));
+      h.type("\r");
+      await until(() => s.record.entries(["answer"]).length === 1);
+      expect(s.record.entries(["answer"])[0]!.data).toMatchObject({ value: "ok" });
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
+  });
+
+  test("the key guard does not restart when the same card arrives again", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      s.proposePlan("Question: Q1");
+      await until(() => h.all().includes("approve and start"));
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      s.proposePlan("Question: Q1");
+      await sleep(100);
+      h.type("a");
+      await until(() => s.planResponses.length === 1);
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
   });
 
   test("permission: n asks for a note and denies", async () => {
@@ -873,6 +960,19 @@ describe("plan card", () => {
     expect(s.planResponses[0]).toEqual({ action: "approve", mode: "follow" });
   });
 
+  test("the plan card and the permission card name the Esc key", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.proposePlan("Question: Q1");
+    await until(() => h.all().includes("approve and start"));
+    expect(h.term.view()).toContain("x or Esc cancel");
+    await type(h, "x");
+    await until(() => s.planResponses.length === 1);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    expect(h.term.view()).toContain("Esc stops the agent.");
+  });
+
   test("c sends a change, p offers the other program, x cancels", async () => {
     const { h, s } = start();
     await sleep(100);
@@ -1020,6 +1120,25 @@ describe("proposed analysis card", () => {
     await type(h, "1");
     await until(() => s.planResponses.length === 2);
     expect(s.planResponses[1]).toEqual({ action: "confirm" });
+  });
+});
+
+describe("the demonstration card", () => {
+  test("letters that the scientist types after o go to the text, not to the card keys", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "plan", stage: "pilot", version: 1, text: "Pilot sample: Set 1", update: false, qids: [], programs: [], mode: "watch", settings: [{ index: 1, step: 1, label: "Threshold", value: 40 }] });
+    await until(() => h.all().includes("Confirm and run all?"));
+    await type(h, "o");
+    await until(() => h.term.view().includes("Your answer:"));
+    await type(h, "d");
+    await type(h, "e");
+    await type(h, "e");
+    await until(() => h.term.view().includes("Your answer: dee"));
+    expect(h.term.view()).not.toContain(PICK_LABEL);
+    h.type("\r");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toMatchObject({ action: "change", text: "dee" });
   });
 });
 

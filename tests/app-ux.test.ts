@@ -87,20 +87,93 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`document.activeElement.blur()`);
   });
 
-  test("a new question card does not take the focus from a header button", async () => {
-    const notes = `document.querySelector('header button[aria-label$="the status notes"]')`;
-    await page.eval(`${notes}.focus()`);
+  test("Enter on an exact command name runs that command, not the first suggestion", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/send", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    await setText("#msg", "/program");
+    expect(await until(page, `document.querySelector("#cmd-list")`)).toBe(true);
+    await page.eval(`document.querySelector("#msg").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/send"))`)).toBe(true);
+    expect(await page.eval(`JSON.parse(window.__calls.find((c) => c.url.includes("api/send")).body).text`)).toBe("/program");
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/send")`);
+    await setText("#msg", "");
+    await page.eval(`document.activeElement.blur()`);
+  });
+
+  test("a new question card does not take the focus from the empty message box", async () => {
+    await setText("#msg", "");
+    await page.eval(`document.querySelector("#msg").focus()`);
     const t = new URL(url).searchParams.get("t");
     await page.eval(`fetch("api/send?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ text: "Compare the groups" }) })`);
     expect(await until(page, `document.querySelector("[data-card] .opts .btn")`)).toBe(true);
     await wait(200);
-    expect(await page.eval(`document.activeElement === ${notes}`)).toBe(true);
+    expect(await page.eval(`document.activeElement === document.querySelector("#msg")`)).toBe(true);
   });
 
-  test("a new question card takes the focus when the focus is on its old card", async () => {
+  test("a new question card takes the focus when the focus is on its old card, and ignores keys for 400 ms", async () => {
+    await page.eval(`window.__now = Date.now(); window.__realNow = Date.now; Date.now = () => window.__now`);
     await page.eval(`(() => { const b = document.querySelector('[data-card][data-type="question"] .opts .btn'); b.focus(); b.click(); })()`);
     expect(await until(page, `document.querySelector('[data-card][data-type="question"]')?.textContent.includes("Which second test?")`)).toBe(true);
     expect(await until(page, `document.activeElement?.matches('[data-card][data-type="question"]')`)).toBe(true);
+    const down = () => page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }))`);
+    const sel = () => page.eval<string>(`document.querySelector('[data-card][data-type="question"]').dataset.sel`);
+    const before = await sel();
+    await down();
+    expect(await sel()).toBe(before);
+    await page.eval(`window.__now += 500`);
+    await down();
+    expect(await sel()).not.toBe(before);
+    await page.eval(`Date.now = window.__realNow`);
+  });
+
+  test("the old page ignores card keys for 400 ms after a card opens and keeps the focus in the message box", async () => {
+    await page.go(`${url}&ui=old`);
+    expect(await until(page, `document.querySelector("#cards [data-card]")`)).toBe(true);
+    await page.eval(MOCK);
+    await page.eval(`window.__mocks.push({ part: "api/", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    const card = `document.querySelector("#cards [data-card]")`;
+    await page.eval(`${card}.tabIndex = -1; ${card}.focus(); cardAt = Date.now()`);
+    const enter = () => page.eval(`${card}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
+    const acts = () => page.eval<number>(`window.__calls.filter((c) => c.url.includes("api/") && c.body).length`);
+    await enter();
+    expect(await acts()).toBe(0);
+    await page.eval(`cardAt -= 500`);
+    await enter();
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/") && c.body)`)).toBe(true);
+    await page.eval(`document.querySelector("#msg").focus(); cardEl = null; focusCard()`);
+    expect(await page.eval(`document.activeElement === document.querySelector("#msg")`)).toBe(true);
+    await page.go(url);
+    expect(await until(page, `document.querySelector('[data-card][data-type="question"]')`)).toBe(true);
+    await page.eval(MOCK);
+  });
+
+  test("with 10 or more options a digit moves the selection and Enter answers", async () => {
+    await page.eval(`(() => {
+      document.activeElement.blur();
+      const card = document.createElement("div");
+      card.dataset.card = "many";
+      card.dataset.type = "question";
+      card.id = "many-card";
+      const opts = document.createElement("div");
+      opts.className = "opts";
+      window.__clicks = [];
+      for (let i = 1; i <= 12; i++) {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = "Option " + i;
+        b.addEventListener("click", () => window.__clicks.push(i));
+        opts.append(b);
+      }
+      card.append(opts);
+      document.querySelector("[data-card]").parentElement.prepend(card);
+    })()`);
+    const key = (k: string) => page.eval(`document.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
+    await key("1");
+    await key("2");
+    expect(await page.eval(`document.querySelector("#many-card").dataset.sel`)).toBe("11");
+    expect(await page.eval(`window.__clicks.length`)).toBe(0);
+    await key("Enter");
+    expect(await page.eval(`window.__clicks`)).toEqual([12]);
+    await page.eval(`document.querySelector("#many-card").remove()`);
   });
 
   test("card keys: Enter on a focused card button is that button, arrows move the focus, Enter in Other answers", async () => {

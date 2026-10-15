@@ -37,6 +37,7 @@ export interface SessionLike {
   mode: Mode;
   permissionMode: "ask" | "bypass";
   busy: boolean;
+  lastStatus?: { purpose?: string };
   model: ModelInfo;
   adapterInfo: { name: string; title: string; version: string; programVersion: string; trust?: string }[];
   bus: Bus;

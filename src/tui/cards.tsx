@@ -1,10 +1,11 @@
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
-import { Box, useInput } from "ink";
+import { Box, useBoxMetrics, useInput, type DOMElement } from "ink";
 import { Text } from "./text.tsx";
 import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
+import { guardPass } from "./key-guard.ts";
 import type { Question } from "../core/types.ts";
 import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionHead, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
@@ -17,7 +18,7 @@ import type { PlanResponse } from "../core/types.ts";
 
 export type { Card } from "../ui/cards.ts";
 
-function Frame({ title, color, children, arrows }: { title: string; color: string; children: React.ReactNode; arrows?: boolean }) {
+function Frame({ title, color, children, arrows, follow }: { title: string; color: string; children: React.ReactNode; arrows?: boolean; follow?: number }) {
   const max = useContext(CardRows);
   const parts = React.Children.toArray(children);
   const tail = parts.length > 1 ? parts.pop() : undefined;
@@ -32,7 +33,7 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
       <CardRows.Provider value={Infinity}>
-        <Fit max={max - 2} head={head} tail={tail} arrows={arrows} />
+        <Fit max={max - 2} head={head} tail={tail} arrows={arrows} follow={follow} />
       </CardRows.Provider>
     </Box>
   );
@@ -51,9 +52,9 @@ function useOnce() {
     };
 }
 
-function Hang({ head, lead, children }: { head: React.ReactNode; lead: number; children: React.ReactNode }) {
+function Hang({ head, lead, children, boxRef }: { head: React.ReactNode; lead: number; children: React.ReactNode; boxRef?: React.Ref<DOMElement> }) {
   return (
-    <Box>
+    <Box ref={boxRef}>
       <Box width={lead} flexShrink={0}>
         <Text>{head}</Text>
       </Box>
@@ -64,7 +65,7 @@ function Hang({ head, lead, children }: { head: React.ReactNode; lead: number; c
   );
 }
 
-function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
+function Prompt(props: { guarded?: boolean; label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
   const [v, setV] = useState(props.initial ?? "");
   useInput((_, key) => {
     if (key.tab && key.shift && props.onBack) props.onBack();
@@ -72,7 +73,7 @@ function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) 
   return (
     <Box>
       <Text>{props.label} </Text>
-      <Field value={v} onChange={setV} onSubmit={props.onSubmit} onCancel={props.onCancel} indent={props.label.length + 1} />
+      <Field gate={props.guarded ? guardPass : undefined} value={v} onChange={setV} onSubmit={props.onSubmit} onCancel={props.onCancel} indent={props.label.length + 1} />
     </Box>
   );
 }
@@ -96,6 +97,7 @@ export function PermissionCard(props: {
   const onInterrupt = once(props.onInterrupt);
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       if (input === "y") onAllow();
       else if (input === "a" && always) onAlways();
       else if (input === "n") setAsking(true);
@@ -134,11 +136,14 @@ export function PermissionCard(props: {
           onCancel={() => setAsking(false)}
         />
       ) : (
-        <Text>
-          <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
-          {always ? ` · a always allow ${card.tool} in this session` : ""}
-          {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
-        </Text>
+        <Box flexDirection="column">
+          <Text>
+            <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
+            {always ? ` · a always allow ${card.tool} in this session` : ""}
+            {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
+          </Text>
+          <Text dimColor>Esc stops the agent.</Text>
+        </Box>
       )}
     </Frame>
   );
@@ -148,6 +153,7 @@ export function PhiCard(props: { card: Extract<Card, { t: "phi" }>; onAction: (a
   const v = phiView(props.card);
   const onAction = useOnce()(props.onAction);
   useInput((input, key) => {
+    if (!guardPass()) return;
     if (key.escape) return onAction("stop");
     const a = v.actions.find((x) => x.key === input);
     if (a) onAction(a.act);
@@ -185,6 +191,7 @@ export function QuestionCard(props: {
   note?: string;
   title?: string;
   escText?: string;
+  onTyping?: (on: boolean) => void;
 }) {
   const q = props.card.q;
   const once = useOnce();
@@ -195,15 +202,35 @@ export function QuestionCard(props: {
   const [other, setOther] = useState(free);
   const [cursor, setCursor] = useState(() => questionCursor(q, props.current));
   const [need, setNeed] = useState("");
+  const [digits, setDigits] = useState("");
+  const onTyping = props.onTyping;
+  useEffect(() => {
+    onTyping?.(other);
+    return () => onTyping?.(false);
+  }, [other]);
   const recIndex = recommendedIndex(q);
   const missing = questionNeed(q);
   const head = questionHead(q);
   const compact = useCompact();
   const gap = compact ? 0 : 1;
+  const optsRef = useRef<DOMElement>(null);
+  const rowRef = useRef<DOMElement>(null);
+  const opts = useBoxMetrics(optsRef);
+  const row = useBoxMetrics(rowRef);
+  const follow = opts.hasMeasured && row.hasMeasured ? opts.top + row.top + (cursor === q.options.length - 1 && !free ? 1 : 0) : undefined;
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       const n = Number(input);
-      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) onAnswer(q.options[n - 1]!.value);
+      const many = q.options.length >= 10;
+      if (many && /^[0-9]$/.test(input)) {
+        const typed = Number(digits + input) >= 1 && Number(digits + input) <= q.options.length ? digits + input : input;
+        setDigits(typed);
+        if (Number(typed) >= 1 && Number(typed) <= q.options.length) setCursor(Number(typed) - 1);
+        return;
+      }
+      if (digits) setDigits("");
+      if (!many && Number.isInteger(n) && n >= 1 && n <= q.options.length) onAnswer(q.options[n - 1]!.value);
       else if (key.upArrow) setCursor((c) => (c + q.options.length - 1) % q.options.length);
       else if (key.downArrow) setCursor((c) => (c + 1) % q.options.length);
       else if (input === "o") setOther(true);
@@ -217,7 +244,7 @@ export function QuestionCard(props: {
     { isActive: !other },
   );
   return (
-    <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta">
+    <Frame title={props.title ?? `Your decision: ${head.title}`} color="magenta" arrows={false} follow={follow}>
       {props.progress ? <Text dimColor>{props.progress}</Text> : null}
       {head.text ? <Text>{head.text}</Text> : null}
       {q.evidence && !compact ? (
@@ -226,51 +253,50 @@ export function QuestionCard(props: {
         </Box>
       ) : null}
       {props.note ? <Text color="yellow">{props.note}</Text> : null}
-      <Box flexDirection="column">
-        <Box flexDirection="column" marginTop={gap}>
-          {q.options.map((o, i) => (
-            <Hang key={i} head={<Text color={i === cursor && !other ? "magenta" : undefined}>{i === cursor && !other ? "▸" : " "} <Text color="magenta">{i + 1}</Text> </Text>} lead={4}>
-              <Text color={i === cursor && !other ? "magenta" : undefined}>
-                {o.label}
-                {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
-              </Text>
-            </Hang>
-          ))}
-          {free ? null : (
-            <Text>
-              {"  "}
-              <Text color="magenta">o</Text> other: type your own answer
+      <Box ref={optsRef} flexDirection="column" marginTop={gap}>
+        {q.options.map((o, i) => (
+          <Hang key={i} boxRef={i === cursor ? rowRef : undefined} head={<Text color={i === cursor && !other ? "magenta" : undefined}>{i === cursor && !other ? "▸" : " "} <Text color="magenta">{String(i + 1).padStart(String(q.options.length).length)}</Text> </Text>} lead={String(q.options.length).length + 3}>
+            <Text color={i === cursor && !other ? "magenta" : undefined}>
+              {o.label}
+              {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
             </Text>
-          )}
-        </Box>
-        {q.recommendation?.reason && !compact ? (
-          <Box marginTop={1}>
-            <Text dimColor>Recommended: {q.recommendation.reason}</Text>
-          </Box>
-        ) : null}
-        {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
-        {other ? (
-          <Prompt
-            label="Your answer:"
-            initial={free ? questionStartText(q, props.current) : ""}
-            onSubmit={(v) => {
-              const t = v.trim();
-              if (t) return onAnswer(t);
-              const r = questionEnter(q, cursor);
-              if ("value" in r && free) onAnswer(r.value);
-              else setNeed(questionNeed(q) ?? "Type your answer.");
-            }}
-            onCancel={() => (free ? onDismiss() : setOther(false))}
-            onBack={onBack}
-          />
-        ) : (
-          <Text dimColor>
-            {compact
-              ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
-              : `↑↓ choose · Enter accepts · a number answers at once${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
+          </Hang>
+        ))}
+        {free ? null : (
+          <Text>
+            {"  "}
+            <Text color="magenta">o</Text> other: type your own answer
           </Text>
         )}
       </Box>
+      {q.recommendation?.reason && !compact ? (
+        <Box marginTop={1}>
+          <Text dimColor>Recommended: {q.recommendation.reason}</Text>
+        </Box>
+      ) : null}
+      {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
+      {other ? (
+        <Prompt
+          guarded
+          label="Your answer:"
+          initial={free ? questionStartText(q, props.current) : ""}
+          onSubmit={(v) => {
+            const t = v.trim();
+            if (t) return onAnswer(t);
+            const r = questionEnter(q, cursor);
+            if ("value" in r && free) onAnswer(r.value);
+            else setNeed(questionNeed(q) ?? "Type your answer.");
+          }}
+          onCancel={() => (free ? onDismiss() : setOther(false))}
+          onBack={onBack}
+        />
+      ) : (
+        <Text dimColor>
+          {compact
+            ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
+            : `↑↓ choose · Enter accepts · ${q.options.length >= 10 ? "a number moves to that option" : "a number answers at once"}${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
+        </Text>
+      )}
     </Frame>
   );
 }
@@ -287,6 +313,7 @@ export function InstructionCard(props: {
   const onAgent = once(props.onAgent);
   const onInterrupt = once(props.onInterrupt);
   useInput((input, key) => {
+    if (!guardPass()) return;
     if (key.return) onDone();
     else if (input === "s") onAgent();
     else if (key.escape) onInterrupt();
@@ -649,6 +676,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const [raw, setSt] = useState<PlanState>(() => planInit(card));
   const [, setTick] = useState(0);
   const [refused, setRefused] = useState("");
+  const [typing, setTyping] = useState(false);
   const all = props.session.questions.open();
   const st = planResolve(card, raw, all);
   const step = st.step;
@@ -665,6 +693,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const mode = st.mode;
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       if (step === "program") {
         const n = Number(input);
         if (Number.isInteger(n) && n >= 1 && n <= switches.length) act({ a: "program", index: n - 1 });
@@ -686,7 +715,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       else if (input === "m") act({ a: "mode" });
       else if (input === "p" && switches.length) act({ a: "programs" });
     },
-    { isActive: (card.stage === "plan" && (step === "actions" || step === "program")) || (card.stage === "pilot" && step === "decisions") },
+    { isActive: (card.stage === "plan" && (step === "actions" || step === "program")) || (card.stage === "pilot" && step === "decisions" && !typing) },
   );
   const ask = (key: string, question: Question, onAnswer: (v: unknown) => void) => (
     <QuestionCard key={key} card={{ t: "question", q: question }} onAnswer={onAnswer} onDismiss={() => act({ a: "back" })} />
@@ -719,7 +748,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       {editor ??
         (card.stage === "pilot" ? (
           <Box flexDirection="column">
-            <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} />
+            <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} onTyping={setTyping} />
             {items ? <Text dimColor>e change a setting by its number{card.details ? ` · d ${st.details ? "hide" : "show"} details` : ""}</Text> : null}
           </Box>
         ) : q ? (
@@ -763,7 +792,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
                   <Text color="green">a</Text> approve and start
                 </Text>
               )}{" "}
-              · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel
+              · <Text color="cyan">c</Text> change · <Text color="red">x</Text> or <Text color="red">Esc</Text> cancel
               {items ? <Text> · <Text color="cyan">1-{Math.min(9, items)}</Text>{items > 9 ? <Text>/<Text color="cyan">e</Text></Text> : null} edit</Text> : null}
               {card.details ? <Text> · <Text color="cyan">d</Text> {st.details ? "hide" : "show"} details</Text> : null}
               {" "}· <Text color="cyan">m</Text> mode {mode}

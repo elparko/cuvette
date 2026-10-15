@@ -24,9 +24,16 @@ export function nextQueued(session: SessionLike, queue: string[]): { next?: stri
   return { next, rest };
 }
 
-export function stopTurn(session: SessionLike): void {
-  session.takeSteered?.();
+export function stopTurn(session: SessionLike, queued: string[] = []): string[] {
+  const dropped = [...(session.takeSteered?.() ?? []), ...queued];
   session.interrupt();
+  return dropped;
+}
+
+export function droppedNote(dropped: string[], restored: boolean): string {
+  const shown = dropped.map((m) => `"${m.length > 60 ? `${m.slice(0, 59)}…` : m}"`).join(", ");
+  const one = dropped.length === 1;
+  return `The agent did not read ${one ? "this message" : `these ${dropped.length} messages`}: ${shown}. ${restored ? `${one ? "It is" : "They are"} back in the input box.` : "Type again if you still need it."}`;
 }
 
 export function inputPlaceholder(session: SessionLike, busy: boolean): string {
