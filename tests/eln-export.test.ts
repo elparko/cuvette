@@ -29,6 +29,13 @@ test("the archive has one top folder with ro-crate-metadata.json", async () => {
   expect(files.has(`${top}ro-crate-metadata.json`)).toBe(true);
 });
 
+test("answer.md holds the assumptions as text of the harness", async () => {
+  s.record.append("assistant", { text: "There are 41 particles.", final: true, assumed: "Assumed because no answer was given:\n- Which sigma?: used sigma 2." });
+  const { files, top } = await exported();
+  const text = files.get(`${top}analysis/answer.md`)!.toString();
+  expect(text).toMatch(/Text of the harness, not of the model:\n\nAssumed because no answer was given:\n- Which sigma\?: used sigma 2\./);
+});
+
 test("the metadata has the descriptor, the root dataset, hasPart and a person", async () => {
   const { meta, graph } = await exported();
   expect(meta["@context"]).toBe("https://w3id.org/ro/crate/1.2/context");

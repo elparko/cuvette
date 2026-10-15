@@ -148,7 +148,7 @@ export function collect(src: ElnSource): ElnContent {
   const files: ElnFile[] = [
     ...(plan.length ? [file("plan.md", `${plan.join("\n").replace(/^## /, "# ")}\n`, "The confirmed analysis, with its pilot, that the scientist confirmed before the analysis")] : []),
     file("question.md", `# Question\n\n${question || "No question was recorded."}\n`),
-    file("answer.md", `# Final answer\n\n${answer || "No final answer was recorded."}\n${settings ? `\nSettings: ${settings}\n` : ""}`),
+    file("answer.md", `# Final answer\n\n${answer || "No final answer was recorded."}\n${last?.data.assumed ? `\nText of the harness, not of the model:\n\n${String(last.data.assumed)}\n` : ""}${settings ? `\nSettings: ${settings}\n` : ""}`),
     file("protocol.md", readFileSync(protocolPath), "Protocol with the manual route for each step"),
     file("trail.html", readFileSync(trailPath), "Audit trail"),
     file("decisions.csv", csv([["key", "label", "value", "owner", "set_by"], ...decisionRows.map((r) => [r.key, r.label, r.value, r.owner, r.setBy])]), "Each decision and who set it"),

@@ -18,7 +18,7 @@ export interface CoreDeps {
 
 const PLAN_STEPS_SHORT = {
   type: "array",
-  items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] } }, required: ["step"] },
+  items: { type: "object", properties: { step: { type: "string" }, tool: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] } }, required: ["step"] },
 };
 
 const PLAN_FULL = {
@@ -204,7 +204,7 @@ export function coreTools(d: CoreDeps): Tool[] {
           if (d.plan && d.fullPlan?.()) return d.plan(a);
           const steps = a.steps;
           if (!Array.isArray(steps)) return { ok: false, error: "steps must be a list. Each item is an object with step and status." };
-          const list = steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") }));
+          const list = steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo"), ...(s.tool ? { tool: String(s.tool) } : {}) }));
           d.log("note", { text: "Plan:\n" + list.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`).join("\n"), plan: list, by: "agent" });
           return { ok: true, summary: `Plan with ${list.length} steps.` };
         },

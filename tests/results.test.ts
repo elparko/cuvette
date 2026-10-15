@@ -144,6 +144,16 @@ test("the workbook has Summary, one sheet for each step table, Steps, Metrics an
   expect(files).toContain("2 table means.csv");
 });
 
+test("the Summary sheet marks the assumptions as text of the harness and a default decision as set by the harness", () => {
+  const { record, out } = sampleRecord();
+  record.append("assistant", { text: "The mean is 2.33.", final: true, assumed: "Assumed because no answer was given:\n- Which sigma?: used sigma 2." });
+  record.append("decision", { key: "alpha", old: null, new: 0.05, by: "default", reason: "answer to q1" });
+  const fields = [{ key: "alpha", label: "Significance level", value: 0.05, set: true, owner: "human" }] as never;
+  const summary = buildWorkbook({ record, adapters: [], fields, programs: [], dir: out, figures: [] })[0]!.rows;
+  expect(summary).toContainEqual(["Assumption", "Which sigma?: used sigma 2.", "", "text of the harness, not of the model"]);
+  expect(summary).toContainEqual(["Decision", "Significance level", 0.05, "default, set by the harness (answer to q1)"]);
+});
+
 test("writeResults writes results.xlsx and the line names the sheets, the figures and the folder", () => {
   const { record, out } = sampleRecord();
   const saved = writeResults({ record, adapters: [], fields: [], programs: [], dir: out, xlsx: true });

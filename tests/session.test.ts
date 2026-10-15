@@ -321,6 +321,95 @@ test("an answer while plan steps are open gets one reminder to finish them", asy
   const notes = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps that are not done: Blur the image/.test((p as { text: string }).text));
   expect(notes.length).toBeGreaterThan(0);
   expect(answer).toMatch(/Done\./);
+  expect(session.record.entries(["assistant"]).map((e) => e.data.text)).toContain("There are particles.");
+});
+
+const SIX_STEPS = [
+  { step: "Check data quality", status: "doing" },
+  { step: "Blur the image", status: "todo" },
+  { step: "Count the particles", status: "todo" },
+  { step: "Correct the two tests", status: "todo" },
+  { step: "Make one plot", status: "todo" },
+  { step: "Write the conclusion", status: "todo" },
+];
+
+test("an answer after steps that have results gets no plan call, one answer and one referee call", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: SIX_STEPS } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { text: "There are 64 particles after the blur." },
+    { text: "The plan is updated. All six steps were already done." },
+  ]);
+  const referee = new FakeProvider({ steps: [], complete: "[]" });
+  const complete = vi.spyOn(referee, "complete");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count the particles");
+  expect(provider.requests).toHaveLength(4);
+  expect(answer).toMatch(/^There are 64 particles/);
+  expect(answer).not.toMatch(/plan is updated/i);
+  expect(session.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
+  expect(complete).toHaveBeenCalledTimes(1);
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text));
+  expect(nudges).toHaveLength(0);
+});
+
+test("a plan step with no result at all gets one reminder that names it, and the first answer stays", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", status: "todo" }] } }] },
+    { text: "The image holds particles." },
+    { text: "The plan is updated. The count did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text)).map((p) => (p as { text: string }).text);
+  expect(nudges).toHaveLength(1);
+  expect(nudges[0]).toContain("Count the particles");
+  expect(nudges[0]).not.toMatch(/call plan/);
+  expect(answer).toMatch(/^The image holds particles/);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the plan: Count the particles/.test(String(e.data.text)))).toBe(true);
+});
+
+test("an approved plan with a step that the model skips keeps the old reminder and shows the skip reason", async () => {
+  const two = { ...PLAN, steps: [PLAN.steps[0], { step: "Count the particles", method: "Threshold count", tool: "count", decisions: [{ key: "method", label: "Threshold method", recommendation: "Otsu" }] }] };
+  const provider = new FakeProvider([
+    CLARIFY,
+    { calls: [{ name: "plan", args: two }] },
+    { calls: [blur] },
+    { text: "Blurred with sigma 2." },
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", tool: "count", status: "skipped", reason: "The scientist asked only for the blur." }] } }] },
+    { text: "Blurred with sigma 2. No count was needed." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  const texts = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done: Count the particles\. Do the next one now with a tool\. If a step cannot be done, call plan and mark it skipped with the reason\./.test(t))).toBe(true);
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices).toContain("Skipped from the approved plan: Count the particles. Reason: The scientist asked only for the blur.");
+  expect(notices.some((t) => /Reason: none given/.test(t))).toBe(false);
+});
+
+test("an unapproved plan step with a tool that never ran gets a reminder that names it", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Blur the image", tool: "blur", status: "todo" }, { step: "Make one plot", tool: "make_plot", status: "todo" }] } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: "The image is blurred." },
+    { text: "The plot did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Blur and plot");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text)).map((p) => (p as { text: string }).text);
+  expect(nudges).toHaveLength(1);
+  expect(nudges[0]).toContain("Make one plot");
+  expect(nudges[0]).not.toContain("Blur the image");
+  expect(answer).toMatch(/^The image is blurred/);
+  expect(session.record.entries(["assistant"]).map((e) => e.data.text)).toContain("The plot did not run.");
 });
 
 test("a revision that loses results and fixes nothing is replaced by the first answer", async () => {
@@ -641,6 +730,148 @@ test("headless run: a blocked decision with no recommendation uses the default o
   expect((q.data as { recommendation?: { value: unknown } }).recommendation?.value).toBe("Otsu");
   const notes = session.record.entries(["answer"]).map((e) => String(e.data.note));
   expect(notes.some((n) => /used the recommendation: The tool uses this value if the call gives no method/.test(n))).toBe(true);
+  expect(session.record.entries(["answer"]).every((e) => e.data.by === "default")).toBe(true);
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "method")!.data.by).toBe("default");
+});
+
+const UNITS_ANSWER = "The image is blurred.\n\nUncertain:\n- The units are not known.\n\nWaits for you:\n- Confirm the units of the image.\n";
+
+function askRun(answers: Record<string, unknown>) {
+  const provider = new FakeProvider([
+    { calls: [{ name: "ask_scientist", args: { question: "Blur a.tif with which sigma?", options: ["sigma 1", "sigma 2"], recommendation: "sigma 2", reason: "This suits the file." } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: UNITS_ANSWER },
+  ]);
+  return Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, referee: "none" } }).then(async (s) => {
+    session = s;
+    attachHeadless(s, { answers, allow: new Set(["all"]) });
+    s.decisions.applySetup({});
+    return s.send("Blur a.tif");
+  });
+}
+
+test("headless run: an answer that the harness takes from the recommendation is not recorded as human", async () => {
+  const answer = await askRun({});
+  const a = session!.record.entries(["answer"]).find((e) => e.data.qid === "q1")!.data;
+  expect(a).toMatchObject({ value: "sigma 2", by: "default" });
+  expect(String(a.note)).toMatch(/no answer in the answers file/);
+  expect(answer).not.toMatch(/Waits for you/);
+  expect(answer).toContain("Uncertain:");
+  expect(answer).not.toContain("Assumed because");
+  const block = session!.assumptions;
+  expect(block).toContain("Assumed because no answer was given:");
+  expect(block).toContain("Blur a.tif with which sigma?: used sigma 2.");
+  expect(block).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+  const final = session!.record.entries(["assistant"]).find((e) => e.data.final)!.data;
+  expect(final.assumed).toBe(block);
+  expect(String(final.text)).not.toContain("Assumed because");
+});
+
+test("headless run: an answer from the answers file is recorded as human and adds no assumption line", async () => {
+  const answer = await askRun({ "Blur a.tif with which sigma?": "sigma 1" });
+  const a = session!.record.entries(["answer"]).find((e) => e.data.qid === "q1")!.data;
+  expect(a).toMatchObject({ value: "sigma 1", by: "human", note: "answered from the answers file" });
+  expect(answer).not.toMatch(/Waits for you/);
+  expect(session!.assumptions).not.toContain("used sigma");
+  expect(session!.assumptions).toContain("Not confirmed by the scientist: Confirm the units of the image.");
+});
+
+test("headless run: a bold line after the Waits for you list stays in the answer", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: "The image is blurred.\n\nWaits for you:\n- Confirm the units.\n**Note:** the file has one image.\n" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, referee: "none" } });
+  attachHeadless(session, { answers: {}, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  const answer = await session.send("Blur a.tif");
+  expect(answer).toContain("**Note:** the file has one image.");
+  expect(session.assumptions).not.toContain("Note");
+});
+
+test("headless run: an answers-file value that fits no option is recorded as default with a notice", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { method: "banana" }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), recommendation: { value: "Otsu", reason: "It suits the file." }, evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("answered"));
+  expect(session.record.entries(["answer"]).find((e) => e.data.qid === q.qid)!.data).toMatchObject({ value: "Otsu", by: "default" });
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "method")!.data.by).toBe("default");
+  expect(session.record.entries(["notice"]).some((e) => /gave 'banana' for method, which does not fit the options/.test(String(e.data.text)))).toBe(true);
+});
+
+test("headless run: an answers-file value that fits an option stays human", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { method: "Triangle" }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), recommendation: { value: "Otsu", reason: "" }, evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("answered"));
+  expect(session.record.entries(["answer"]).find((e) => e.data.qid === q.qid)!.data).toMatchObject({ value: "Triangle", by: "human" });
+});
+
+test("the plan card keeps a harness default as default and shows the recorded value, not the proposed one", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  session.decisions.applySetup({});
+  const q = await session.questions.ask({ decisionKey: "method", title: "Threshold method", text: "?", options: ["Default", "Otsu", "Triangle"].map((v) => ({ value: v, label: v })), evidence: "" });
+  await session.answer(q.qid, "Otsu", "harness", "default");
+  const asked = { key: "method", label: "Threshold method", value: "Triangle", by: "agent" };
+  (session as unknown as { planQids: Map<string, unknown> }).planQids.set(q.qid, asked);
+  const proposed = { key: "method", label: "Threshold method", value: "Triangle", by: "agent" };
+  const plan = { steps: [{ step: "Count", status: "todo", decisions: [asked, proposed] }] };
+  (session as unknown as { fillDecisions(p: unknown): void }).fillDecisions(plan);
+  expect(asked).toMatchObject({ value: "Otsu", by: "default" });
+  expect(proposed).toMatchObject({ value: "Otsu", by: "default" });
+});
+
+test("a plan step without a tool is not covered by a read-only result", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Make one plot", status: "todo" }] } }] },
+    { calls: [LOOK] },
+    { text: "The folder holds one adapter." },
+    { text: "The plot did not run." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Plot");
+  const nudges = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps/.test((p as { text: string }).text));
+  expect(nudges).toHaveLength(1);
+});
+
+test("the model reads that the harness used the default, not that the scientist answered", async () => {
+  await askRun({});
+  const result = session!.record.entries(["tool_result"]).find((e) => e.data.tool === "ask_scientist")!.data;
+  expect(String(result.summary)).toMatch(/^No answer was given; the harness used the default: sigma 2/);
+  const human = await askRun({ "Blur a.tif with which sigma?": "sigma 1" });
+  expect(human).toBeDefined();
+  expect(String(session!.record.entries(["tool_result"]).find((e) => e.data.tool === "ask_scientist")!.data.summary)).toMatch(/^The scientist answered: sigma 1/);
+});
+
+test("a decision that the harness set as default is shown as default on the plan card, not as you", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  session.decisions.applySetup({});
+  session.decisions.change("min_size", 7, { by: "default", reason: "answer to q1" });
+  expect((session as unknown as { whoSet(key: string): string }).whoSet("min_size")).toBe("default");
+  session.decisions.change("min_size", 8, { by: "human", reason: "answer to q2" });
+  expect((session as unknown as { whoSet(key: string): string }).whoSet("min_size")).toBe("you");
+});
+
+test("headless run: the referee reads the assumption block marked as harness text, and the claim check does not", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "ask_scientist", args: { question: "Which sigma?", options: ["sigma 1", "sigma 2"], recommendation: "sigma 2" } }] }, { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: "The image is blurred.\n\nWaits for you:\n- Confirm the units.\n" }]);
+  const referee = new FakeProvider({ steps: [], complete: "[]" });
+  const complete = vi.spyOn(referee, "complete");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true } });
+  attachHeadless(session, { answers: {}, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  await session.send("Blur a.tif");
+  expect(String(complete.mock.calls[0]![1])).toMatch(/Text of the harness, not of the model[\s\S]*Which sigma\?: used sigma 2\./);
+  const claims = session.record.entries(["claim_check"]).at(-1)!.data as { claims: { text: string }[] };
+  expect(JSON.stringify(claims)).not.toContain("used sigma");
+});
+
+test("an interactive run keeps the Waits for you line", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] }, { text: UNITS_ANSWER }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none" } });
+  session.decisions.applySetup({});
+  const answer = await session.send("Blur a.tif");
+  expect(answer).toContain("Waits for you:\n- Confirm the units of the image.");
+  expect(answer).not.toContain("Assumed because");
 });
 
 test("blind mode adds a mid-session adapter folder to the allow list and hides it from the file tools", async () => {

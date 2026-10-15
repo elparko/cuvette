@@ -71,6 +71,17 @@ test("a run with an answer exits 0, and its script, flow and replay give the sam
   expect(missing.err).toContain("no input given for input_1");
 });
 
+test("a headless run with a question the harness answered gives assumptions apart from the answer", () => {
+  const h = home();
+  const model = fake("assume", [{ calls: [{ name: "ask_scientist", args: { question: "Which column?", options: ["x", "y"], recommendation: "x" } }] }, { calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { text: "The mean of x is 2.5.\n\nWaits for you:\n- Confirm the units.\n" }]);
+  const json = JSON.parse(headless(h, model).out);
+  expect(json.answer).not.toContain("Waits for you");
+  expect(json.assumptions).toContain("Which column?: used x.");
+  const text = cli(h, ["-p", "Give the mean of x", "--adapter", "drivefix", "--model", fake("assume2", [{ calls: [{ name: "ask_scientist", args: { question: "Which column?", options: ["x", "y"], recommendation: "x" } }] }, { calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { text: "The mean of x is 2.5.\n\nWaits for you:\n- Confirm the units.\n" }]), "--trust-folder"]);
+  expect(text.out).toMatch(/The mean of x is 2\.5\.[\s\S]*Assumed because no answer was given:[\s\S]*Which column\?: used x\./);
+  expect(text.out).not.toContain("Waits for you");
+});
+
 test("a script stops with exit code 1 at a failed step", () => {
   const h = home();
   const model = fake("answer2", [{ calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { text: "The mean of x is 2.5." }]);

@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from "node:fs";
-import { fitAnswer } from "./answers.ts";
+import { fileFits, fitAnswer } from "./answers.ts";
 import type { Session } from "./session.ts";
 import { METHOD_DATA_TITLE } from "./datacompare.ts";
 import type { Question } from "./types.ts";
@@ -13,12 +13,12 @@ export function readJsonObject(path: string): Record<string, unknown> {
   return v;
 }
 
-export async function answerHeadless(s: Session, q: Question, value: unknown, note: string): Promise<void> {
+export async function answerHeadless(s: Session, q: Question, value: unknown, note: string, by: "human" | "default" = "human"): Promise<void> {
   const tries = [value, q.recommendation?.value, q.default].filter((x, i, a) => x !== undefined && a.findIndex((y) => String(y) === String(x)) === i);
   let refusal = "";
   for (const v of tries) {
     try {
-      await s.answer(q.qid, v, refusal ? `${note}; the harness used a fallback` : note);
+      await s.answer(q.qid, v, refusal ? `${note}; the harness used a fallback` : note, refusal ? "default" : by);
     } catch (err) {
       refusal ||= (err as Error).message;
       continue;
@@ -41,7 +41,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         const go = allow.has("all") || allow.has("data-change");
         const stop = !go && q.recommendation?.value === "stop";
         if (stop) s.record.append("notice", { text: `Headless mode stops at a likely unit change. ${q.text.split(" The method ")[0]} Pass --allow data-change to continue.` });
-        setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record"), 0);
+        setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record", "default"), 0);
         return;
       }
       const has = (k: string) => Object.hasOwn(answers, k);
@@ -49,6 +49,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
       const fromFile = q.decisionKey && has(q.decisionKey) ? answers[q.decisionKey] : has(q.title) ? answers[q.title] : catchAll ? answers["*"] : undefined;
       const wanted = fromFile ?? q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
+      const filed = fromFile !== undefined && (!q.decisionKey || !q.options.length || fileFits(q, fromFile));
       const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted, { first: false }) : wanted ?? q.default) : wanted ?? fallback;
       if (v === undefined) {
         const why = `The answers file has no value for ${q.decisionKey || q.title} that fits the question, and the question has no recommendation and no default. No one can answer it in a headless run. Give the value in the answers file.`;
@@ -57,8 +58,9 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
         }, 0);
         return;
       }
-      const note = fromFile !== undefined ? "answered from the answers file" : q.recommendation ? `no answer in the answers file; the harness used the recommendation${q.recommendation.reason ? `: ${q.recommendation.reason}` : ""}` : q.decisionKey ? "no answer in the answers file; the harness used the default" : "no answer in the answers file; the agent uses its own recommendation";
-      setTimeout(() => void answerHeadless(s, q, v, note), 0);
+      const note = fromFile !== undefined && filed ? "answered from the answers file" : fromFile !== undefined ? `the answers file value does not fit the options; the harness used ${q.recommendation ? "the recommendation" : "the default"}` : q.recommendation ? `no answer in the answers file; the harness used the recommendation${q.recommendation.reason ? `: ${q.recommendation.reason}` : ""}` : q.decisionKey ? "no answer in the answers file; the harness used the default" : "no answer in the answers file; the agent uses its own recommendation";
+      if (fromFile !== undefined && !filed) s.record.append("notice", { text: `The answers file gave '${String(fromFile)}' for ${q.decisionKey || q.title}, which does not fit the options. The harness used '${String(v)}' instead.` });
+      setTimeout(() => void answerHeadless(s, q, v, note, filed ? "human" : "default"), 0);
     }
     if (e.type === "permission") {
       const ok = allow.has("all") || (e.search ? allow.has("search") : allow.has(e.tool));
