@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "n
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { APP_CLOSE_LIMIT_MS, startApp, type AppHandle } from "../src/server/app.ts";
 import { cardHtml, decisionsHtml, itemHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
@@ -188,6 +188,115 @@ describe("the app server", () => {
     const ok = await c.get(`api/file?p=${encodeURIComponent(s.record.blobPath(sha)!)}&download=1`);
     expect(ok.status).toBe(200);
     expect(ok.headers.get("content-disposition")).toContain("attachment");
+  });
+
+  test("the session picture route refuses a link that points outside the session folder", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cuvette-thumb-"));
+    const proj = join(root, "proj");
+    mkdirSync(proj);
+    writeFileSync(join(root, "outside.png"), "x");
+    writeFileSync(join(proj, "ok.png"), "x");
+    symlinkSync(join(root, "outside.png"), join(proj, "link.png"));
+    const log = (id: string, fig: string) => {
+      mkdirSync(join(home, "sessions", id), { recursive: true });
+      const rows = [
+        { kind: "session", session: id, data: { cwd: proj } },
+        { kind: "node", data: { outputs: [{ path: fig }] } },
+      ];
+      writeFileSync(join(home, "sessions", id, "log.jsonl"), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    };
+    const legacyFig = join(home, "sessions", "thumb-legacy", "work", "fig.png");
+    mkdirSync(join(home, "sessions", "thumb-legacy", "work"), { recursive: true });
+    writeFileSync(legacyFig, "x");
+    log("thumb-legacy", legacyFig);
+    log("thumb-ok", join(proj, "ok.png"));
+    log("thumb-link", join(proj, "link.png"));
+    app = await startApp({ env, start: home, makeSession: async () => new FakeSession() });
+    const c = client(app);
+    expect((await c.get("api/thumb?id=thumb-ok")).status).toBe(200);
+    expect((await c.get("api/thumb?id=thumb-legacy")).status).toBe(200);
+    expect((await c.get("api/thumb?id=thumb-link")).status).toBe(404);
+  });
+
+  test("a secret file inside the session folder is not served", async () => {
+    const s = new FakeSession();
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    mkdirSync(s.workDir, { recursive: true });
+    writeFileSync(join(s.workDir, ".env"), "TOKEN=1\n");
+    writeFileSync(join(s.workDir, "notes.txt"), "ok\n");
+    expect((await c.get(`api/file?p=${encodeURIComponent(join(s.workDir, ".env"))}`)).status).toBe(404);
+    expect((await c.get(`api/file?p=${encodeURIComponent(join(s.workDir, "notes.txt"))}`)).status).toBe(200);
+  });
+
+  test("an unexpected error returns 500 with a plain message and logs the cause", async () => {
+    const s = new FakeSession();
+    s.interrupt = () => {
+      throw new Error("internal path /secret/place");
+    };
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      app = await startApp({ session: s, env });
+      const r = await client(app).post("api/stop", {});
+      expect(r.status).toBe(500);
+      expect(await r.json()).toEqual({ error: "The server could not handle the request." });
+      expect(err.mock.calls.some((a) => String(a[0]).includes("internal path /secret/place"))).toBe(true);
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  const closeWhileOpening = async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const made = new FakeSession();
+    const closed = vi.spyOn(made, "close");
+    const attached = vi.fn();
+    (made as unknown as { markOpen: unknown }).markOpen = attached;
+    let asked = false;
+    const handle = await startApp({
+      env,
+      start: home,
+      makeSession: async () => {
+        asked = true;
+        await gate;
+        return made;
+      },
+    });
+    expect((await client(handle).post("api/open", { folder: home })).status).toBe(200);
+    await until(() => asked);
+    let done = false;
+    const stopping = handle.close().then(() => (done = true));
+    return { release, stopping, closed, attached, isDone: () => done };
+  };
+
+  test("close waits for an open that is still pending, then closes the new session", async () => {
+    const t = await closeWhileOpening();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.isDone()).toBe(false);
+    t.release();
+    await t.stopping;
+    expect(t.closed).toHaveBeenCalled();
+  });
+
+  test("an open that finishes after close started closes its session and does not attach it", async () => {
+    const t = await closeWhileOpening();
+    t.release();
+    await t.stopping;
+    expect(t.attached).not.toHaveBeenCalled();
+    expect(t.closed).toHaveBeenCalled();
+  });
+
+  test("a permission card for a tool that never allows always sends a plain allow from the app", async () => {
+    const s = new FakeSession();
+    const calls: unknown[][] = [];
+    s.respondPermission = (...a: unknown[]) => void calls.push(a);
+    const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+    view.openCard({ t: "permission", rid: "rx", tool: "run_command", args: {}, touches: "a command" });
+    const id = view.slots.find((x) => x.card.t === "permission")!.id;
+    await view.act(id, { act: "always", fields: {} });
+    expect(calls).toEqual([["rx", true]]);
+    view.close();
   });
 
   test("a download of a file with a Unicode name works, and the app keeps running", async () => {
