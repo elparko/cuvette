@@ -22,7 +22,7 @@ import { pathRefusalReason } from "./refusals.ts";
 import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
-import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
+import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, headText, pointerText, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
@@ -1220,7 +1220,8 @@ export class Session {
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
-        if (res.note) this.record.append("notice", { text: res.note });
+        const note = res.note ?? (res.stopReason === "max_tokens" ? "The reply hit the output limit and was cut short." : undefined);
+        if (note) this.record.append("notice", { text: note });
         const thinking = res.message.parts.flatMap((p) => (p.type === "thinking" && p.text ? [p.text] : [])).join("\n");
         if (thinking) this.record.append("thinking", { text: thinking });
         let said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
@@ -1271,7 +1272,7 @@ export class Session {
           const tail = said.slice(-400);
           const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
-          const turnStart = this.lastRequest()?.id ?? 0;
+          const turnStart = this.realRequest()?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
           const planNote = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1);
@@ -2033,7 +2034,7 @@ export class Session {
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const { answer, block } = this.headlessSplit(pre.answer ?? text);
     this.noteSkippedSteps();
-    const claims = checkAnswer(answer, this.record.liveView());
+    const claims = checkAnswer(answer, this.record.liveView(), { log: false });
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const refereeCtx = block ? { ...ctx, answer: `${answer}\n\n[Text of the harness, not of the model. The harness wrote it from the answers that it chose.]\n${block}` } : ctx;
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
@@ -2047,13 +2048,14 @@ export class Session {
       this.assumptions = block;
       this.lastAnswer = answer;
       this.markAnswerReady();
+      logClaimCheck(this.record, claims, entry.id);
       first = { id: entry.id, annotated: p.annotated };
     }
     if (this.refereeBlocked() && !this.refereeOffNoted) {
       this.refereeOffNoted = true;
       this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds possible patient identifiers that did not go to a cloud model." });
     }
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
     let state: "done" | "stopped" | "failed" | "off" = "off";
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
@@ -2090,6 +2092,7 @@ export class Session {
       const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results, ...(block ? { assumed: block } : {}) });
       this.assumptions = block;
       this.lastAnswer = answer;
+      logClaimCheck(this.record, claims, entry.id);
       shown = { id: entry.id, annotated: p.annotated };
     }
     this.appendReview(shown.id, state, findings);
@@ -2100,7 +2103,7 @@ export class Session {
   private offerChecklist(): void {
     const id = setGuideline(this.record);
     if (!id || this.record.entries(["notice"]).some((e) => e.data.checklist === "offer")) return;
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     if (!this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf)) return;
     if (this.plan?.steps.some((s) => s.tool && s.status !== "done" && s.status !== "skipped")) return;
     this.record.append("notice", { text: offerText(buildChecklist(this.record, id)), checklist: "offer" });
@@ -2141,7 +2144,7 @@ export class Session {
   }
 
   private resultsNotIn(answer: string): string {
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     const stale = this.record.stale();
     const said = extractNumbers(answer).map((f) => f.value);
     const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 0.005);
@@ -2502,7 +2505,7 @@ export class Session {
         ok: output.ok,
         error: output.error === undefined ? undefined : hideKeys(output.error).text,
         summary: hideKeys(summary).text,
-        text: hideKeys(output.text ?? "").text.slice(0, 4000),
+        text: hideKeys(output.text ?? "").text.slice(0, tool.name === "run_script" ? this.recordedTextLimit() : 4000),
         metrics: output.metrics,
         table: output.table,
         images: images.map((o) => o.sha),
@@ -2608,12 +2611,16 @@ export class Session {
     return stepStatus(this.record, { labels: this.labels() });
   }
 
+  private recordedTextLimit(): number {
+    return this.provider.info.small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
+  }
+
   private render(tool: Tool, o: ToolOutput): { text: string; images?: string[] } {
     const adapter = this.adapterOf(tool);
     const cloud = isCloud(this.provider.info);
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
-    const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
+    const limit = this.recordedTextLimit();
     if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") {
       const reason = !o.ok && o.error && !o.text.includes(o.error) ? `ERROR: ${o.error}\n` : "";
       return { text: reason + (o.text.length > limit ? `${headText(o.text, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text) };
@@ -3540,7 +3547,7 @@ export class Session {
     const sample = String(a.sample ?? "").trim();
     if (!sample) return { ok: false, error: "Give the pilot sample." };
     const values: Record<string, number> = {};
-    for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>)) if (Number.isFinite(Number(v))) values[k] = Number(v);
+    for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>)) if ((typeof v === "number" || (typeof v === "string" && v.trim() !== "")) && Number.isFinite(Number(v))) values[k] = Number(v);
     if (!Object.keys(values).length) return { ok: false, error: "Give the numbers for the pilot sample in values, one for each measure, for example {\"positive cells\": 296}." };
     const plan = this.pilotPlan?.plan ?? this.plan;
     const definitions = plan?.definitions ?? [];
@@ -4480,13 +4487,12 @@ export class Session {
     if (!this.plan || this.planning || !this.approvedEntry) return;
     const name = tool.remoteName ?? tool.name;
     if (name === "calculate") return;
-    if (tool.readOnly) return;
     const i = matchStep(this.plan, name, tool.adapter);
     if (i >= 0) {
       if (this.plan.steps[i]!.status !== "skipped") this.plan.steps[i]!.status = "done";
       return;
     }
-    if (this.planWarned.has(name)) return;
+    if (tool.readOnly || this.planWarned.has(name)) return;
     this.planWarned.add(name);
     this.record.append("notice", { text: `Not in the approved plan: ${name}. Reason: ${lastSentence(this.lastSaid) || "the agent gave none yet."}`, plan: "deviation", tool: name });
     this.notes.push(`${name} is not in the approved plan. Call plan now to add it as a step, with the reason.`);
@@ -4494,7 +4500,7 @@ export class Session {
 
   private noteSkippedSteps() {
     if (!this.plan || this.planning || !this.approvedEntry) return;
-    const turnStart = this.lastRequest()?.id ?? 0;
+    const turnStart = this.realRequest()?.id ?? 0;
     if (this.approvedEntry < turnStart) return;
     for (const x of this.plan.steps) {
       if (!x.tool || x.status === "done" || x.status === "skipped" || this.planWarned.has(`skip:${x.step}`)) continue;
