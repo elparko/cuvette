@@ -870,7 +870,7 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   }
 }
 
-export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
+export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : process.platform === "win32" ? `"${p}"` : `'${p.replace(/'/g, `'\\''`)}'`);
 
 const show = (v: unknown) => oneLine(typeof v === "string" ? v : JSON.stringify(v));
 

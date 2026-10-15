@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { findAdapter } from "../src/adapters/manifest.ts";
 import { appAdapters } from "../src/server/app.ts";
 import { Session } from "../src/core/session.ts";
-import { trustFolder } from "../src/core/trust.ts";
+import { shellQuote, trustFolder } from "../src/core/trust.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
@@ -82,7 +82,7 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   session = undefined;
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual([]);
-  expect(session.record.entries(["notice"]).map((n) => String(n.data.text))).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run in a terminal: cuvette resume ${id} --adapter '${dir}'`);
+  expect(session.record.entries(["notice"]).map((n) => String(n.data.text))).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(dir)}`);
 });
 
 unix("the resume command in the notice quotes the path for a shell and strips control characters", async () => {
@@ -116,7 +116,7 @@ unix("resume does not load an adapter from a recorded path outside the project a
     expect(session.adapters.map((a) => a.name)).toEqual([]);
     const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
     expect(text).toContain(dir);
-    expect(text).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run in a terminal: cuvette resume ${id} --adapter '${dir}'`);
+    expect(text).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(dir)}`);
     await session.close();
     session = undefined;
     session = await Session.resume(id, { addAdapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
@@ -305,7 +305,7 @@ unix("the notice for a recorded adapter folder quotes a path with a space", asyn
     session = undefined;
     session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
     const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
-    expect(text).toContain(`Run in a terminal: cuvette resume ${id} --adapter '${dir}'`);
+    expect(text).toContain(`Run in a terminal: cuvette resume ${id} --adapter ${shellQuote(dir)}`);
   } finally {
     rmSync(away, { recursive: true, force: true });
   }

@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, longLabRefusal, scanFolder, shellQuote, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -1056,3 +1056,20 @@ test.skipIf(process.platform === "win32")("trust remove writes out a control cod
   expect(out.stdout).not.toMatch(CONTROL);
   expect(out.stdout).toContain(String.raw`a\\u202eb\nc" was not in the list.`);
 }, 120000);
+
+describe("shellQuote", () => {
+  test.skipIf(process.platform === "win32")("single quotes keep $ ` \\ \" ! and a single quote literal in a POSIX shell", () => {
+    for (const p of ["/a b", "/a$HOME b", "/a`id` b", "/a\\b c", '/a"b c', "/a!b c", "/o'brien lab", "/a\nb"]) {
+      const out = spawnSync("sh", ["-c", `printf %s ${shellQuote(p)}`], { encoding: "utf8" });
+      expect(out.stdout).toBe(p);
+    }
+  });
+
+  test("a plain path stays bare", () => {
+    expect(shellQuote("/tmp/lab-1/data.v2")).toBe("/tmp/lab-1/data.v2");
+  });
+
+  test.skipIf(process.platform !== "win32")("double quotes without escapes on Windows", () => {
+    expect(shellQuote("C:\\My Folder\\lab")).toBe('"C:\\My Folder\\lab"');
+  });
+});

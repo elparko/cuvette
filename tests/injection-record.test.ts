@@ -435,7 +435,7 @@ test("the trust card quotes a folder path with a space, and the trust command do
   writeFileSync(join(cwd, "LAB.md"), longRule(200));
   const scan = scanFolder(cwd);
   const before = folderLines(scan).join("\n");
-  expect(before).toMatch(/Then run in a terminal: cuvette trust add ".*my data"/);
+  expect(before).toMatch(/Then run in a terminal: cuvette trust add ["'].*my data["']/);
   expect(folderLines(scan, true).join("\n")).not.toContain("Then run");
 });
 
