@@ -358,11 +358,14 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
 
   const fsCtx = () => ({ cwd: current?.session.cwd ?? opts.folder ?? process.cwd(), env, fetch: opts.fetch });
 
+  let closing = false;
+
   const route = async (req: IncomingMessage, res: ServerResponse, url: URL) => {
     const p = url.pathname;
     const get = req.method === "GET";
     const post = req.method === "POST";
     const c = current;
+    if (closing && post) return send(res, 409, { error: "Cuvette is stopping. Nothing changed. Start the app again to continue." });
     if (get && p === "/") {
       const page = url.searchParams.get("ui") === "old" ? undefined : newUiPage();
       return send(res, 200, page ?? appPageHtml(token), "text/html; charset=utf-8");
@@ -669,6 +672,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     port,
     token,
     async close() {
+      closing = true;
       clearInterval(beat);
       // An install runs in its own process group, so Ctrl+C in the terminal does not stop it. Stop it here, and let it release its lock.
       const open = [...jobs.values()].filter((j) => !j.done);
