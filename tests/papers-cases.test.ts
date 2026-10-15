@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { buildCases, caseGaps, listedHashes, loadCase, makeSanitizer, sourceText } from "../src/bench/papers-cases.ts";
+import { answerDraftIds, buildCases, caseGaps, listedHashes, loadCase, makeSanitizer, sourceText } from "../src/bench/papers-cases.ts";
 import { computedFault, type ItemScore } from "../src/bench/papers-score.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
 
@@ -169,4 +169,13 @@ test("buildCases writes an index, a case page and a sanitized session record", (
   expect(log).not.toContain("/Users/");
   expect(log).toContain("{data}/toy/toy.csv");
   expect(existsSync(join(root, "out", "papers", "case.css"))).toBe(true);
+});
+
+test("answerDraftIds marks an answer message in the old and the new record shape, also a rejected revision", () => {
+  const e = (id: number, kind: string, data: Record<string, unknown> = {}) => ({ id, kind, data }) as never;
+  const msg = (id: number) => e(id, "message", { message: { role: "assistant", parts: [] } });
+  const next = [msg(1), e(2, "assistant", { final: true }), e(3, "claim_check", { answerEntry: 2 }), msg(4), e(5, "notice", { text: "The revision lost results and fixed no problem, so the harness kept the first answer." })];
+  expect([...answerDraftIds(next)]).toEqual([1, 4]);
+  const old = [msg(1), e(2, "claim_check"), e(3, "assistant", { final: true }), msg(4), e(5, "tool_call")];
+  expect([...answerDraftIds(old)]).toEqual([1]);
 });

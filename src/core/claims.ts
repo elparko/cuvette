@@ -300,7 +300,7 @@ function designConstant(text: string, f: Found): boolean {
   return DESIGN.some((d) => d.values.some((x) => Math.abs(x - v) < 1e-9) && cued(text, f, d));
 }
 
-export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
+export function checkAnswer(text: string, record: AnalysisRecord, opts: { log?: boolean } = {}): Claim[] {
   const nodes = record.nodes?.() ?? [];
   const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
   const stale = outOfDateNodes(record);
@@ -341,13 +341,17 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
       claims.push({ text: sentenceText, value: null, label: cited ? "literature" : "inferred" });
     }
   }
+  if (opts.log === false) return claims;
   const last = record.entries(["assistant"]).at(-1);
-  const answerEntry = last && last.data.text === text ? last.id : undefined;
+  logClaimCheck(record, claims, last && last.data.text === text ? last.id : undefined);
+  return claims;
+}
+
+export function logClaimCheck(record: AnalysisRecord, claims: Claim[], answerEntry: number | undefined): void {
   const unsourced = claims.filter((c) => c.label === "unsourced").length;
   const lastCheck = record.entries?.(["claim_check"]).at(-1)?.data;
   const same = lastCheck && lastCheck.answerEntry === answerEntry && lastCheck.unsourced === unsourced && JSON.stringify(lastCheck.claims) === JSON.stringify(claims);
   if (!same) record.append("claim_check", { answerEntry, claims, unsourced });
-  return claims;
 }
 
 export function annotate(text: string, claims: Claim[]): string {

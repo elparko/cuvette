@@ -3485,3 +3485,100 @@ test("a notice tells the scientist when the version check no longer finds the pr
   const text = session.record.entries(["notice"]).map((e) => String(e.data.text)).join("\n");
   expect(text).toContain("did not find Fiji at /Applications/Fiji.app: not found");
 });
+
+test("a number in the late part of a long script output is a measured claim, not unsourced", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+  const code = "save_table('t', [{'a': 1}])\nprint('x' * 9000)\nprint('late total 7342.5')";
+  const args = { purpose: "Total", does: "Saves a table and prints a long text and the total.", code };
+  const answer = "The late total is 7342.5.";
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args }] }, { text: answer }, { text: answer }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, permissionMode: "bypass" } });
+  await session.send("total");
+  const claims = (session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string }[] }).claims;
+  expect(claims.find((c) => c.value === 7342.5)?.label).toBe("measured");
+});
+
+test("an approved plan step is done after a read-only adapter tool made a node: no reminder and no not-done notice", async () => {
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  (session["tools"].get("blur") as { readOnly: boolean }).readOnly = true;
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  expect(session.record.nodes().map((n) => n.tool)).toEqual(["blur"]);
+  const texts = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done/.test(t))).toBe(false);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan/.test(String(e.data.text)))).toBe(false);
+  expect(session.plan?.steps[0]?.status).toBe("done");
+});
+
+test("after a step-limit pause and continue, the reminder and the not-done audit still use the approved plan", async () => {
+  const two = { ...PLAN, steps: [PLAN.steps[0], { step: "Count the particles", method: "Threshold count", tool: "count", decisions: [{ key: "method", label: "Threshold method", recommendation: "Otsu" }] }] };
+  const done = { text: "Blurred with sigma 2." };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: two }] }, { calls: [blur] }, { calls: [blur] }, done, done, done, done, done, done]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none", maxSteps: 4 } });
+  session.decisions.applySetup({ method: "Otsu" });
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  expect(session.record.entries(["notice"]).some((e) => /Paused after 4 steps/.test(String(e.data.text)))).toBe(true);
+  await session.send("continue");
+  const texts = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done: Count the particles/.test(t))).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan: Count the particles/.test(String(e.data.text)))).toBe(true);
+});
+
+test("the claim check belongs to the answer entry that it checked, also if the harness keeps the first answer", async () => {
+  const first = "The ratio is 0.938. Also 999 cells.";
+  const provider = new FakeProvider([
+    { calls: [{ name: "calculate", args: { items: [{ name: "ratio", expression: "4696 / 5007" }] } }] },
+    { text: first },
+    { text: "Also 999 cells." },
+    { text: "Also 999 cells." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("What is the ratio?");
+  const finals = session.record.entries(["assistant"]).filter((e) => e.data.final);
+  const checks = session.record.entries(["claim_check"]);
+  expect(checks.length).toBeGreaterThan(0);
+  expect(checks.every((e) => finals.some((f) => f.id === e.data.answerEntry))).toBe(true);
+  expect(session.record.entries(["notice"]).some((e) => /kept the first answer/.test(String(e.data.text)))).toBe(true);
+  const kept = checks.filter((e) => e.data.answerEntry === finals.at(-1)!.id);
+  expect(kept.at(-1)!.data.claims).toEqual(expect.arrayContaining([expect.objectContaining({ value: 0.938, label: "measured" })]));
+});
+
+test("a final answer that the output limit cut gets a notice for every provider", async () => {
+  const cut = { text: "The counts are", stop: "max_tokens" as const };
+  const provider = new FakeProvider([cut, cut, cut]);
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices.filter((t) => /output limit/.test(t) && /cut/.test(t)).length).toBeGreaterThan(0);
+  const last = session.record.entries(["assistant"]).at(-1)!;
+  expect(last.data.final).toBe(true);
+});
+
+test("a null, empty or blank pilot value is missing, not zero", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const out = await session["pilotResult"]({ sample: "Set 1", values: { "positive cell": null, other: "", third: "  " } });
+  expect(out.ok).toBe(false);
+  expect(out.error).toMatch(/^Give the numbers for the pilot sample/);
+});
+
+test("a number that a small model did not see in a cut script output is not a measured claim", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+  const code = "save_table('t', [{'a': 1}])\nprint('x' * 5000)\nprint('seen total 111.5')\nprint('y' * 2000)\nprint('unseen total 222.5')";
+  const args = { purpose: "Totals", does: "Saves a table and prints a long text and two totals.", code };
+  const answer = "The seen total is 111.5. The unseen total is 222.5.";
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args }] }, { text: answer }, { text: answer }]);
+  provider.info = { ...provider.info, small: true };
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, permissionMode: "bypass" } });
+  await session.send("totals");
+  const claims = (session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string }[] }).claims;
+  expect(claims.find((c) => c.value === 111.5)?.label).toBe("measured");
+  expect(claims.find((c) => c.value === 222.5)?.label).toBe("unsourced");
+});

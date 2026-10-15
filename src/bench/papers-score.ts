@@ -67,8 +67,8 @@ export function finalAnswer(record: Pick<AnalysisRecord, "entries">): Entry | un
 
 export function finalClaims(record: Pick<AnalysisRecord, "entries">): { entry: Entry; claims: Claim[] } | undefined {
   const final = finalAnswer(record);
-  const checks = record.entries(["claim_check"]).filter((e) => !final || e.id < final.id);
-  const entry = checks.at(-1);
+  const all = record.entries(["claim_check"]);
+  const entry = (final && all.filter((e) => e.data.answerEntry === final.id).at(-1)) || all.filter((e) => !final || e.id < final.id).at(-1);
   return entry ? { entry, claims: (entry.data.claims ?? []) as Claim[] } : undefined;
 }
 
