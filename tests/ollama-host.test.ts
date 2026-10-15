@@ -16,6 +16,20 @@ test("the Ollama host gets the http scheme and the port 11434 when they are miss
   expect(host("http://10.0.0.5:9999/")).toBe("http://10.0.0.5:9999");
 });
 
+test("the Ollama host keeps the port from the text, also when the port is the default port of http", () => {
+  expect(host("host:80")).toBe("http://host:80");
+  expect(host("host:80/base")).toBe("http://host:80/base");
+  expect(host(":11434")).toBe("http://localhost:11434");
+  expect(host(":8080")).toBe("http://localhost:8080");
+});
+
+test("the Ollama host accepts an IPv6 address with or without brackets", () => {
+  expect(host("::1")).toBe("http://[::1]:11434");
+  expect(host("[::1]")).toBe("http://[::1]:11434");
+  expect(host("[::1]:8080")).toBe("http://[::1]:8080");
+  expect(host("http://[::1]:11434")).toBe("http://[::1]:11434");
+});
+
 test("0.0.0.0 counts as a local address", () => {
   expect(localUrl(host("0.0.0.0"))).toBe(true);
   expect(localUrl(host("http://0.0.0.0:11434"))).toBe(true);

@@ -444,6 +444,42 @@ describe("a long install that throws", () => {
     end.mockRestore();
     expect(stream).toContain('"done":true,"ok":true,"text":"Installed zeta."');
   });
+
+  test("an error when a stream ends does not keep the job in the list: the delete is still scheduled", async () => {
+    let release = () => {};
+    const exec = vi.fn(async (_c: string, line: (l: string) => void) => {
+      line("go");
+      await new Promise<void>((r) => (release = r));
+      return 0;
+    });
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const abort = new AbortController();
+    const live = await fetch(`${base}api/programs/progress?job=${job.job}&t=${app.token}`, { signal: abort.signal });
+    const reader = live.body!.getReader();
+    await reader.read();
+    const realEnd = ServerResponse.prototype.end;
+    let thrown = 0;
+    const end = vi.spyOn(ServerResponse.prototype, "end").mockImplementation(function (this: ServerResponse, ...a: unknown[]) {
+      if (!thrown) {
+        thrown++;
+        throw new Error("socket gone");
+      }
+      return (realEnd as (...x: unknown[]) => ServerResponse).apply(this, a);
+    } as never);
+    const delays: unknown[] = [];
+    const realSet = globalThis.setTimeout;
+    const timer = vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => (delays.push(ms), realSet(fn, ms, ...rest))) as never);
+    release();
+    await vi.waitFor(() => expect(thrown).toBe(1));
+    await vi.waitFor(() => expect(delays).toContain(600_000));
+    timer.mockRestore();
+    abort.abort();
+    await reader.cancel().catch(() => {});
+    end.mockRestore();
+  });
 });
 
 describe("a long install: stop, password, and a second action at the same time", () => {

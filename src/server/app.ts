@@ -558,7 +558,11 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         if (job.done) return;
         job.done = done;
         jobSend(job, { done: true, ...done });
-        for (const x of job.subs) x.end();
+        for (const x of job.subs) {
+          try {
+            x.end();
+          } catch {}
+        }
         job.subs.clear();
         setTimeout(() => jobs.delete(id), 600_000).unref();
       };

@@ -433,6 +433,26 @@ describe("the files of a hook command, found with no shell parsing", () => {
     expect(scanFolder(cwd).hash).not.toBe(before.hash);
   });
 
+  test("a glob in a for loop locks the folder of the glob, and warns when the folder has too many files", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in tools/*/*; do $f; done"] }] } });
+    put("tools/x/a.sh");
+    expect(hookScriptScan(cwd).folders).toEqual([join(realpathSync(cwd), "tools")]);
+    for (let i = 0; i < 5100; i++) writeFileSync(join(cwd, "tools", "x", `f${i}.dat`), "");
+    expect(scanFolder(cwd).incomplete.join(" ")).toContain("Too many files in the script folder tools");
+  });
+
+  unixOnly("a link that a first hook rejected stays rejected for a second hook with the same glob", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "hooks/*.sh"] }, { command: ["sh", "-c", "for f in hooks/*.sh; do sh $f; done"] }] } });
+    put("hooks/run.sh");
+    put("cuvette/out/result.csv", "one");
+    symlinkSync(join(cwd, "cuvette", "out", "result.csv"), join(cwd, "hooks", "out.sh"));
+    expect(hooked()).toEqual(["hooks/run.sh"]);
+    put("cuvette/out/result.csv", "two");
+    const before = scanFolder(cwd).hash;
+    put("cuvette/out/result.csv", "three");
+    expect(scanFolder(cwd).hash).toBe(before);
+  });
+
   test("a glob match with a script extension in a logs folder is in the hash, and a text file there is not", () => {
     project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in tools/*/*; do $f; done"] }] } });
     put("tools/logs/run.sh");
