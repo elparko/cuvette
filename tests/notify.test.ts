@@ -2,10 +2,10 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
-import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
+import { ntfyNotifier } from "../src/server/notify.ts";
 
 interface Post {
   method?: string;
@@ -35,10 +35,8 @@ afterAll(() => new Promise<void>((ok) => server.close(() => ok())));
 beforeEach(() => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-notify-"));
   posts = [];
-  setWindowUrl(undefined);
 });
 afterEach(async () => {
-  setWindowUrl(undefined);
   await session?.close();
   session = undefined;
 });
@@ -72,18 +70,54 @@ test("a blocking scientist-owned decision posts the question to the ntfy topic",
   expect(p.headers.title).toBe("A question waits for you");
   expect(p.headers.click).toBeUndefined();
   expect(p.body.split("\n")[0]).toBe(open[0].title);
+  expect(p.body).not.toContain("?t=");
   expect(p.body).toContain(open[0].text);
   expect(open[0].title).toMatch(/Threshold method/i);
 });
 
-test("the post carries the window address when one is set", async () => {
-  setWindowUrl("http://127.0.0.1:4500/?t=abc");
-  const s = await blockedSession();
-  await s.send("Count the particles");
-  for (let i = 0; i < 1500 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
-  expect(posts).toHaveLength(1);
-  expect(posts[0].headers.click).toBe("http://127.0.0.1:4500/?t=abc");
-  expect(posts[0].body.split("\n").at(-1)).toBe("http://127.0.0.1:4500/?t=abc");
+test("a plain http address that is not local gets no post and one report", async () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  try {
+    const send = ntfyNotifier("http://ntfy.example.org/topic-once");
+    const q = { qid: "q1", title: "T", text: "Body" } as never;
+    await send(q);
+    await send(q);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).toContain("ntfy.example.org");
+    expect(String(err.mock.calls[0][0])).not.toContain("topic-once");
+  } finally {
+    err.mockRestore();
+    fetchSpy.mockRestore();
+  }
+});
+
+test("an address with a user name or password gets no post and one report", async () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  try {
+    const send = ntfyNotifier("https://user:secret@ntfy.example.org/topic-cred");
+    const q = { qid: "q1", title: "T", text: "Body" } as never;
+    await send(q);
+    await send(q);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).not.toContain("secret");
+  } finally {
+    err.mockRestore();
+    fetchSpy.mockRestore();
+  }
+});
+
+test("an https address gets the post", async () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+  try {
+    await ntfyNotifier("https://ntfy.example.org/topic")({ qid: "q1", title: "T", text: "Body" } as never);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  } finally {
+    fetchSpy.mockRestore();
+  }
 });
 
 test("a dead topic address does not break the question", async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { FakeSession } from "../src/ui/fake-session.ts";
-import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
+import { ntfyNotifier } from "../src/server/notify.ts";
 import { startWindow, tokenOk } from "../src/server/window.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -139,7 +139,7 @@ describe("window server", () => {
 });
 
 describe("ntfy notifier", () => {
-  test("posts the question title and the window URL", async () => {
+  test("posts the question title and text only", async () => {
     const got: { body: string; title?: string; click?: string }[] = [];
     const srv = createServer((req, res) => {
       let body = "";
@@ -153,15 +153,9 @@ describe("ntfy notifier", () => {
     closers.push(() => srv.close());
     const topic = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/my-topic`;
     const q = { qid: "q1", title: "Which cutoff?", text: "Pick one." } as never;
-    setWindowUrl(undefined);
     await ntfyNotifier(topic)(q);
     expect(got[0]!.body).toBe("Which cutoff?\nPick one.");
     expect(got[0]!.click).toBeUndefined();
-    setWindowUrl("http://127.0.0.1:9/?t=abc");
-    await ntfyNotifier(topic)(q);
-    expect(got[1]!.body).toContain("http://127.0.0.1:9/?t=abc");
-    expect(got[1]!.click).toBe("http://127.0.0.1:9/?t=abc");
-    setWindowUrl(undefined);
   });
 
   test("does not throw when the topic is unreachable", async () => {
