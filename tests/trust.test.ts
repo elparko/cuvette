@@ -221,14 +221,97 @@ describe("the files of a hook command, found with no shell parsing", () => {
     expect(trustStatus(cwd).state).toBe("trusted");
   });
 
-  test("a new step script in the output folder does not change the hash, also when the setting names another folder", () => {
-    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py", "results/s2/step2.py"] }] }, output_folder: "results" });
+  const unixOnly = test.skipIf(process.platform === "win32");
+
+  unixOnly("a link to the root folder, a link to a file outside and a link loop make the folder not trustable, with no walk outside", () => {
+    const outside = mkdtempSync(join(tmpdir(), "cuvette-outside-"));
+    writeFileSync(join(outside, "secret.sh"), "outside\n");
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/root", "hooks/file.sh", "hooks/a"] }] } });
+    put("hooks/index.js");
+    symlinkSync("/", join(cwd, "hooks", "root"));
+    symlinkSync(join(outside, "secret.sh"), join(cwd, "hooks", "file.sh"));
+    symlinkSync(join(cwd, "hooks", "b"), join(cwd, "hooks", "a"));
+    symlinkSync(join(cwd, "hooks", "a"), join(cwd, "hooks", "b"));
+    const scan = scanFolder(cwd);
+    expect(scan.linked.sort()).toEqual(["hooks/a", "hooks/file.sh", "hooks/root"]);
+    expect(Object.keys(scan.files).some((f) => f.includes("secret"))).toBe(false);
+    expect(trustStatus(cwd).state).toBe("changed");
+    expect(trustText(trustStatus(cwd))).toContain("hooks/root");
+  });
+
+  unixOnly("a link inside a script folder to a folder outside the project makes the folder not trustable", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+    put("hooks/index.js");
+    symlinkSync(tmpdir(), join(cwd, "hooks", "out"));
+    expect(scanFolder(cwd).linked).toEqual(["hooks/out"]);
+  });
+
+  test("a script folder with too many entries makes the folder not trustable", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+    put("hooks/index.js");
+    for (let i = 0; i < 5100; i++) writeFileSync(join(cwd, "hooks", `f${i}.dat`), "");
+    const scan = scanFolder(cwd);
+    expect(scan.incomplete.join(" ")).toContain("Too many files in the script folder hooks");
+  });
+
+  test("a glob in a quoted loop hashes each match, and a dynamic command also hashes the folder of the glob", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in hooks/*.sh; do $f; done"] }] } });
+    put("hooks/a.sh");
+    put("hooks/b.sh");
+    put("hooks/lib.py");
+    put("hooks/notes.md");
+    expect(hooked()).toEqual(["hooks/a.sh", "hooks/b.sh", "hooks/lib.py"]);
+  });
+
+  test("a glob with no match hashes the folder of the glob", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "run-all tools/*.zzz"] }] } });
+    put("tools/one.py");
+    expect(hooked()).toEqual(["tools/one.py"]);
+  });
+
+  test("a brace glob and a question mark glob match files", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "ls pre/{x,y}.rb pre/c?.rb"] }] } });
+    for (const f of ["x", "y", "z", "c1", "c22"]) put(`pre/${f}.rb`);
+    expect(hooked()).toEqual(["pre/c1.rb", "pre/x.rb", "pre/y.rb"]);
+  });
+
+  test("output files in a script folder stay out of the hash, and the package files go in", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks"] }] } });
+    put("hooks/index.js");
+    put("hooks/package.json", "{}");
+    put("hooks/out.h5", "1");
+    put("hooks/arr.npy", "1");
+    put("hooks/page.html", "1");
+    expect(hooked()).toEqual(["hooks/index.js", "hooks/package.json"]);
+  });
+
+  test("node adds the extension itself, so a path with no extension hashes the script", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "./hooks/check"] }] } });
+    put("hooks/check.js");
+    expect(hooked()).toContain("hooks/check.js");
+  });
+
+  test("a new step script in the default output folder does not change the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py"] }] } });
     put("hooks/check.js");
     put("cuvette/s1/step1.py");
-    put("results/s2/step2.py");
-    expect(hooked()).toEqual(["cuvette/s1/step1.py", "hooks/check.js"]);
-    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py"] }] } });
     expect(hooked()).toEqual(["hooks/check.js"]);
+  });
+
+  test("a project setting for the output folder never removes a hook script from the hash", () => {
+    for (const folder of [".", "..", "hooks", "/", cwd]) {
+      project(".ga", { hooks: { SessionStart: [{ command: ["python3", "hooks/check.py"] }] }, output_folder: folder });
+      put("hooks/check.py");
+      expect(hooked()).toEqual(["hooks/check.py"]);
+    }
+  });
+
+  test("a project setting for the output folder adds a skip for a direct child folder that no hook names", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "*/run.js"] }] }, output_folder: "results" });
+    put("hooks/check.js");
+    put("results/run.js");
+    put("hooks/run.js");
+    expect(hooked()).toEqual(["hooks/check.js", "hooks/run.js"]);
   });
 });
 

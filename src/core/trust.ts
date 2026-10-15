@@ -339,11 +339,40 @@ function namedFiles(script: string, key: string, skip: (rel: string) => boolean)
   return out;
 }
 
-function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, limit: number): { files: string[]; count: number; stopped: boolean } {
-  const files: string[] = [];
-  let count = 0;
-  let stopped = false;
-  const visit = (d: string) => {
+const WALK_ENTRIES = 5000;
+const WALK_DEPTH = 8;
+const GLOB_CAP = 500;
+const MANIFEST = /(^|[\\/])(package(-lock)?\.json|pyproject\.toml|requirements\.txt)$/i;
+const NODE_EXT = [".js", ".mjs", ".cjs", ".ts"];
+
+interface Walk {
+  files: string[];
+  count: number;
+  exceeded: boolean;
+  outside: string[];
+}
+
+function isExec(p: string): boolean {
+  try {
+    return process.platform !== "win32" && (statSync(p).mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+function escapes(p: string, realKey: string): boolean {
+  try {
+    const rel = relative(realKey, realpathSync(p));
+    return rel.startsWith("..") || isAbsolute(rel);
+  } catch {
+    return true;
+  }
+}
+
+function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, realKey: string): Walk {
+  const out: Walk = { files: [], count: 0, exceeded: false, outside: [] };
+  let entries = 0;
+  const visit = (d: string, depth: number) => {
     let names: string[];
     try {
       names = readdirSync(d).sort();
@@ -351,99 +380,208 @@ function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, lim
       return;
     }
     for (const name of names) {
-      if (stopped) return;
+      if (out.exceeded) return;
       const p = join(d, name);
       if (name.startsWith(".") || SKIPPED_DIR.test(name) || VOLATILE_DIR.test(name) || skip(relative(key, p))) continue;
+      if (++entries > WALK_ENTRIES) {
+        out.exceeded = true;
+        return;
+      }
       let l;
       try {
         l = lstatSync(p);
       } catch {
         continue;
       }
-      if (l.isSymbolicLink()) continue;
-      if (l.isDirectory()) visit(p);
-      else {
-        if (++count > limit) {
-          stopped = true;
-          return;
-        }
-        files.push(p);
+      if (l.isSymbolicLink()) {
+        if (escapes(p, realKey)) out.outside.push(relative(key, p));
+        continue;
+      }
+      if (l.isDirectory()) {
+        if (depth >= WALK_DEPTH) out.exceeded = true;
+        else visit(p, depth + 1);
+      } else {
+        out.count++;
+        out.files.push(p);
       }
     }
   };
-  visit(dir);
-  return { files, count, stopped };
+  visit(dir, 0);
+  return out;
 }
 
-function codeFolder(dir: string, skip: (rel: string) => boolean, key: string): string[] | undefined {
+const scriptLike = (f: string) => SCRIPT_EXT.test(f) || MANIFEST.test(f) || (!/\.[^./\\]+$/.test(f) && isExec(f));
+
+function codeFolder(dir: string, skip: (rel: string) => boolean, key: string, realKey: string): string[] | undefined {
   try {
     if (readdirSync(dir).includes("node_modules")) return undefined;
   } catch {
     return undefined;
   }
-  const r = walkFiles(dir, skip, key, FOLDER_FILE_LIMIT);
-  return r.stopped ? undefined : r.files.filter((f) => FOLDER_EXT.test(f));
+  const r = walkFiles(dir, skip, key, realKey);
+  if (r.exceeded || r.count > FOLDER_FILE_LIMIT) return undefined;
+  return r.files.filter((f) => FOLDER_EXT.test(f) || MANIFEST.test(f));
 }
 
-export function hookScriptScan(folder: string, layers?: Record<string, unknown>[]): { files: string[]; large: string[] } {
+function globRegex(pattern: string): RegExp {
+  let re = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    if (c === "*") {
+      if (pattern[i + 1] === "*") {
+        re += ".*";
+        i++;
+      } else re += "[^/]*";
+    } else if (c === "?") re += "[^/]";
+    else if (c === "{") re += "(?:";
+    else if (c === "}") re += ")";
+    else if (c === ",") re += pattern.slice(0, i).split("{").length > pattern.slice(0, i).split("}").length ? "|" : ",";
+    else if (c === "[" || c === "]") re += c;
+    else re += c.replace(/[.+^$()|\\]/g, "\\$&");
+  }
+  try {
+    return new RegExp(`^${re}$`);
+  } catch {
+    return /^$/;
+  }
+}
+
+const hasGlob = (w: string) => /[*?[\]{}]/.test(w);
+const DYNAMIC = /\$\(|`|\beval\b|\b(source|\.)\s+["']?\$|(^|[\s;&|])["']?\$\{?\w/;
+
+function userOutputFolder(): string | undefined {
+  try {
+    const v = JSON.parse(readFileSync(join(cuvetteHome(), "settings.json"), "utf8"))?.output_folder;
+    return typeof v === "string" && v.trim() ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface HookScan {
+  files: string[];
+  large: string[];
+  linked: string[];
+  incomplete: string[];
+  linkText: Record<string, string>;
+}
+
+export function hookScriptScan(folder: string, layers?: Record<string, unknown>[]): HookScan {
   const key = folderKey(folder);
   const found = new Set<string>();
-  const large: string[] = [];
+  const result: HookScan = { files: [], large: [], linked: [], incomplete: [], linkText: {} };
   try {
     layers ??= projectSettings(key);
   } catch {
-    return { files: [], large };
+    return result;
   }
-  let outFolder = "cuvette";
-  for (const l of layers) if (typeof l.output_folder === "string" && l.output_folder.trim()) outFolder = l.output_folder;
-  const outRoot = outputRoot(key, outFolder);
+  let realKey = key;
+  try {
+    realKey = realpathSync(key);
+  } catch {}
+  const commands: string[][] = [];
+  for (const l of layers) {
+    const hooks = l.hooks;
+    if (!hooks || typeof hooks !== "object") continue;
+    for (const list of Object.values(hooks as Record<string, unknown>))
+      for (const h of Array.isArray(list) ? list : []) if (Array.isArray(h?.command)) commands.push(h.command.map(String));
+  }
+  const all = commands.map((c) => ({ argv: c, tokens: tokens(c, key), dynamic: DYNAMIC.test(c.join(" ")) }));
+  const named: string[] = [];
+  for (const c of all) for (const t of c.tokens) for (const b of t.base) named.push(resolve(b, t.word.replace(/[*?[\]{}].*$/, "")));
+  const roots = [outputRoot(key, userOutputFolder() ?? "cuvette")];
+  for (const l of layers) {
+    const v = typeof l.output_folder === "string" ? l.output_folder.trim() : "";
+    if (!v || isAbsolute(v) || /[\\/]/.test(v) || v === "." || v === "..") continue;
+    const root = resolve(key, v);
+    if (!named.some((n) => n === root || n.startsWith(root + sep))) roots.push(root);
+  }
   const skip = (rel: string) => {
     const abs = resolve(key, rel);
     const parts = rel.split(sep);
     if (parts.some((part) => SKIPPED_DIR.test(part))) return true;
     if (parts[0] === ".git" && parts[1] !== "hooks") return true;
-    return abs === outRoot || abs.startsWith(outRoot + sep);
+    return roots.some((r) => abs === r || abs.startsWith(r + sep));
   };
   const own = (d: string) => d !== key && !skip(relative(key, d));
-  for (const l of layers) {
-    const hooks = l.hooks;
-    if (!hooks || typeof hooks !== "object") continue;
-    for (const list of Object.values(hooks as Record<string, unknown>))
-      for (const h of Array.isArray(list) ? list : []) {
-        if (!Array.isArray(h?.command)) continue;
-        for (const t of tokens(h.command.map(String), key)) {
-          for (const base of t.base) {
-            const path = resolve(base, t.word);
-            const rel = relative(key, path);
-            if (!t.word || rel === "" || rel.startsWith("..") || isAbsolute(rel) || skip(rel)) continue;
-            let st;
-            try {
-              st = statSync(path);
-            } catch {
-              continue;
-            }
-            if (st.isFile()) {
-              if (!t.allowed && (DENY_EXT.test(path) || st.size === 0 || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) continue;
-              found.add(path);
-              if (FOLDER_EXT.test(path)) {
-                const d = dirname(path);
-                for (const f of own(d) ? codeFolder(d, skip, key) ?? [] : namedFiles(path, key, skip)) found.add(f);
-              }
-            } else if (st.isDirectory() && own(path)) {
-              const r = walkFiles(path, skip, key, SCRIPT_FOLDER_LIMIT);
-              if (!r.stopped) {
-                for (const f of r.files) if (!DENY_EXT.test(f)) found.add(f);
-              } else {
-                large.push(rel.split(sep).join("/"));
-                const all = walkFiles(path, skip, key, Infinity).files;
-                for (const f of all.filter((x) => SCRIPT_EXT.test(x)).slice(0, SCRIPT_FOLDER_LIMIT)) found.add(f);
-              }
+  const link = (rel: string, real: string) => {
+    result.linked.push(rel);
+    result.linkText[rel] = real;
+  };
+  const addFolder = (path: string, rel: string) => {
+    const r = walkFiles(path, skip, key, realKey);
+    for (const o of r.outside) result.linked.push(o);
+    if (r.exceeded) {
+      result.incomplete.push(`Too many files in the script folder ${rel}`);
+      return;
+    }
+    if (r.count > SCRIPT_FOLDER_LIMIT) result.large.push(rel.split(sep).join("/"));
+    for (const f of r.files.filter(scriptLike).slice(0, SCRIPT_FOLDER_LIMIT)) found.add(f);
+  };
+  const addFile = (path: string) => {
+    found.add(path);
+    if (!FOLDER_EXT.test(path)) return;
+    const d = dirname(path);
+    for (const f of own(d) ? codeFolder(d, skip, key, realKey) ?? [] : namedFiles(path, key, skip)) found.add(f);
+  };
+  const consider = (path: string, t: Token, glob = false) => {
+    const rel = relative(key, path);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel) || skip(rel)) return;
+    let real: string;
+    try {
+      real = realpathSync(path);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ELOOP") link(rel, "loop");
+      return;
+    }
+    const inside = relative(realKey, real);
+    if (inside.startsWith("..") || isAbsolute(inside)) return link(rel, real);
+    let st;
+    try {
+      st = statSync(path);
+    } catch {
+      return;
+    }
+    if (st.isFile()) {
+      if (!t.allowed && !glob && (DENY_EXT.test(path) && !MANIFEST.test(path) || st.size === 0 || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) return;
+      if (glob && DENY_EXT.test(path) && !MANIFEST.test(path)) return;
+      addFile(path);
+    } else if (st.isDirectory() && own(path)) addFolder(path, rel);
+  };
+  for (const c of all) {
+    for (const t of c.tokens) {
+      for (const base of t.base) {
+        const path = resolve(base, t.word);
+        if (hasGlob(t.word)) {
+          const rel = relative(key, path);
+          if (rel.startsWith("..") || isAbsolute(rel)) continue;
+          const prefix = resolve(base, t.word.split(/[/\\]/).filter((_, i, a) => !a.slice(0, i + 1).some(hasGlob)).join("/"));
+          const re = globRegex(relative(key, path).split(sep).join("/"));
+          let matches = 0;
+          const w = walkFiles(prefix, skip, key, realKey);
+          for (const f of w.files) {
+            if (matches >= GLOB_CAP) break;
+            if (re.test(relative(key, f).split(sep).join("/"))) {
+              matches++;
+              consider(f, t, true);
             }
           }
+          if ((!matches || c.dynamic) && prefix !== key && existsSync(prefix)) consider(prefix, t);
+          continue;
         }
+        let target = path;
+        if (!existsSync(target) && t.allowed) {
+          const ext = NODE_EXT.find((e) => existsSync(path + e));
+          if (ext) target = path + ext;
+        }
+        consider(target, t);
       }
+    }
   }
-  return { files: [...found], large: [...new Set(large)] };
+  result.files = [...found];
+  result.large = [...new Set(result.large)];
+  result.linked = [...new Set(result.linked)];
+  return result;
 }
 
 export function hookScripts(folder: string, layers?: Record<string, unknown>[]): string[] {
@@ -547,6 +685,9 @@ export function scanFolder(folder: string): FolderScan {
   const scripts = hookScriptScan(key, layers);
   for (const p of scripts.files) files[`(hook script) ${relative(key, p).split(sep).join("/")}`] = scriptHash(p);
   for (const f of scripts.large) files[`(large script folder) ${f}`] = "large";
+  for (const [rel, real] of Object.entries(scripts.linkText)) files[`(linked script) ${rel}`] = sha(`link:${real}`);
+  linked.push(...scripts.linked);
+  incomplete.push(...scripts.incomplete);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
   const keys = Object.keys(values).filter((k) => !SAFE_KEYS.has(k));
