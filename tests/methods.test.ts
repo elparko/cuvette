@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -249,4 +249,11 @@ test("saveMethod replaces the file in one step, so a reader of the old file keep
   saveMethod({ ...m, saved: "2" });
   expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
   expect(readFileSync(file, "utf8")).toContain('"saved": "2"');
+});
+
+test.skipIf(process.platform === "win32")("the first saved method creates the home folder private to the user", () => {
+  const fresh = join(tmpdir(), `cuvette-method-fresh-${process.pid}-${Date.now()}`);
+  process.env.CUVETTE_HOME = fresh;
+  saveMethod({ name: "mode-check", saved: "1" } as any);
+  expect(statSync(fresh).mode & 0o777).toBe(0o700);
 });

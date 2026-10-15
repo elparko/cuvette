@@ -335,6 +335,25 @@ describe("update and remove", () => {
     expect(existsSync(join(home, "outside"))).toBe(true);
   });
 
+  test("an update whose move-aside fails leaves the installed folder untouched", async () => {
+    const r = join(work, "aside");
+    fixture(r);
+    repo(r);
+    expect(applyInstall((await prepareAdd(`file://${r}`)).id, { confirmed: true }).ok).toBe(true);
+    const oldText = readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8");
+    fixture(r, { version: "1.1.0" });
+    commit(r);
+    const plan = await prepareUpdate("obtest");
+    const blocker = `${userAdapterDir("obtest")}.old-${plan.id}`;
+    mkdirSync(blocker);
+    writeFileSync(join(blocker, "x"), "x");
+    const out = applyInstall(plan.id, { confirmed: true });
+    expect(out.ok).toBe(false);
+    expect(readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8")).toBe(oldText);
+    expect(readInstalled().obtest!.version).toBe("1.0.0");
+    expect(readdirSync(join(home, "adapters")).sort()).toEqual(["obtest", `obtest.old-${plan.id}`]);
+  });
+
   test("an update that fails after the old folder moved aside puts the old folder back", async () => {
     const r = join(work, "fail");
     fixture(r);
@@ -383,6 +402,32 @@ describe("trust labels", () => {
     const aside = readdirSync(home).filter((f) => f.startsWith("installed-adapters.json.damaged-"));
     expect(aside).toHaveLength(1);
     expect(readFileSync(join(home, aside[0]!), "utf8")).toBe('{"adapters": {"a":');
+  });
+
+  test("an index that cannot be read gives one notice that names the file and an empty list", () => {
+    mkdirSync(indexFile());
+    const told: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+    try {
+      expect(readInstalled()).toEqual({});
+      readInstalled();
+    } finally {
+      process.stderr.write = write;
+    }
+    expect(told).toHaveLength(1);
+    expect(told[0]).toContain(indexFile());
+    expect(readdirSync(home).some((f) => f.includes(".damaged-"))).toBe(false);
+  });
+
+  test.skipIf(process.platform === "win32")("a symbolic link in the home adapter folder counts as a home adapter", () => {
+    const dir = fixture(join(work, "linked-source"), { name: "linked", code: true });
+    mkdirSync(join(home, "adapters"), { recursive: true });
+    symlinkSync(dir, join(home, "adapters", "linked"));
+    const link = join(home, "adapters", "linked");
+    expect(adapterTrust(link).codeConfirmed).toBe(false);
+    confirmCode(link);
+    expect(adapterTrust(link).codeConfirmed).toBe(true);
   });
 
   test("code in the home adapter folder without an install entry is not confirmed, and a project adapter is not affected", () => {

@@ -346,12 +346,12 @@ test("a temporary file and a moved-aside reference file are not blobs", () => {
   const r = new AnalysisRecord(join(dir, "rec"), "s1");
   const sha = "a".repeat(64);
   writeFileSync(join(dir, "rec", "blobs", `${sha}.ref.json.damaged-2026-01-01`), "x");
-  writeFileSync(join(dir, "rec", "blobs", ".tmp-1-abcd"), "x");
+  writeFileSync(join(dir, "rec", "blobs", ".tmp-123-" + sha), "x");
   expect(r.blobPath(sha)).toBeUndefined();
   expect(r.blobPath("a".repeat(10))).toBeUndefined();
   const real = r.putBlob(Buffer.from("abc"), ".txt");
   expect(readdirSync(join(dir, "rec", "blobs")).filter((f) => f.startsWith(real))).toEqual([real + ".txt"]);
-  expect(readdirSync(join(dir, "rec", "blobs")).some((f) => f.startsWith(".tmp-") && f !== ".tmp-1-abcd")).toBe(false);
+  expect(readdirSync(join(dir, "rec", "blobs")).some((f) => f.startsWith(".tmp-") && f !== ".tmp-123-" + sha)).toBe(false);
 });
 
 test.skipIf(process.platform === "win32")("the record folder and blob folder are private, and so is the log", () => {

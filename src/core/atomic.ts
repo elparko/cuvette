@@ -1,15 +1,24 @@
 import { randomBytes } from "node:crypto";
-import { copyFileSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 
 const tempIn = (path: string) => join(dirname(path), `.tmp-${process.pid}-${randomBytes(4).toString("hex")}`);
 
-function viaTemp(path: string, fill: (tmp: string) => void): void {
-  const tmp = tempIn(path);
+function viaTemp(path: string, fill: (tmp: string) => void, keepMode = false): void {
+  let real = path;
+  try {
+    real = realpathSync(path);
+  } catch {}
+  const tmp = tempIn(real);
   try {
     fill(tmp);
-    renameSync(tmp, path);
+    if (keepMode) {
+      try {
+        chmodSync(tmp, statSync(real).mode & 0o777);
+      } catch {}
+    }
+    renameSync(tmp, real);
   } catch (e) {
     rmSync(tmp, { force: true });
     throw e;
@@ -17,11 +26,11 @@ function viaTemp(path: string, fill: (tmp: string) => void): void {
 }
 
 export function writeFileAtomic(path: string, text: string | Buffer, mode?: number): void {
-  viaTemp(path, (tmp) => writeFileSync(tmp, text, mode === undefined ? undefined : { mode }));
+  viaTemp(path, (tmp) => writeFileSync(tmp, text, mode === undefined ? undefined : { mode }), mode === undefined);
 }
 
 export function copyFileAtomic(from: string, path: string): void {
-  viaTemp(path, (tmp) => copyFileSync(from, tmp));
+  viaTemp(path, (tmp) => copyFileSync(from, tmp), true);
 }
 
 export function ensureHome(): void {

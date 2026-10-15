@@ -1,3 +1,4 @@
+import { ensureHome } from "../core/atomic.ts";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
@@ -480,6 +481,7 @@ export function applyInstall(id: string, opts: { confirmed: boolean }): { ok: bo
   if (!opts.confirmed) return { ok: false, text: "Nothing installed. The install needs your confirmation." };
   const target = userAdapterDir(p.name);
   if (p.mode === "add" && existsSync(target)) return { ok: false, text: `The folder ${target} exists. Nothing installed.` };
+  ensureHome();
   mkdirSync(join(cuvetteHome(), "adapters"), { recursive: true });
   const fresh = `${target}.new-${p.id}`;
   rmSync(fresh, { recursive: true, force: true });
@@ -494,17 +496,29 @@ export function applyInstall(id: string, opts: { confirmed: boolean }): { ok: bo
     return { ok: false, text: "The staged files changed after the card. Nothing installed. Start again." };
   }
   const old = `${target}.old-${p.id}`;
-  rmSync(old, { recursive: true, force: true });
   const hadOld = existsSync(target);
+  const failed = (e: unknown) => ({ ok: false, text: `Nothing installed: ${(e as Error).message}${hadOld ? " The old files stay in place." : ""}` });
+  if (hadOld) {
+    try {
+      renameSync(target, old);
+    } catch (e) {
+      rmSync(fresh, { recursive: true, force: true });
+      return failed(e);
+    }
+  }
   try {
-    if (hadOld) renameSync(target, old);
     renameSync(fresh, target);
+  } catch (e) {
+    if (hadOld) renameSync(old, target);
+    rmSync(fresh, { recursive: true, force: true });
+    return failed(e);
+  }
+  try {
     saveInstalled(p.entry);
   } catch (e) {
     rmSync(target, { recursive: true, force: true });
     if (hadOld) renameSync(old, target);
-    rmSync(fresh, { recursive: true, force: true });
-    return { ok: false, text: `Nothing installed: ${(e as Error).message} The old files stay in place.` };
+    return failed(e);
   }
   rmSync(old, { recursive: true, force: true });
   const code = p.card.code.length && p.card.trust === "unlisted";

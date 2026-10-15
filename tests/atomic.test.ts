@@ -1,4 +1,4 @@
-import { existsSync, linkSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, symlinkSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
@@ -28,12 +28,30 @@ test("writeFileAtomic puts the new text in a new file and leaves no temporary fi
 
 test("writeFileAtomic removes its temporary file if the rename fails", () => {
   const dir = tmp();
-  const file = join(dir, "target");
-  writeFileAtomic(join(dir, "other"), "x");
-  expect(() => writeFileAtomic(join(dir, "missing", "f"), "x")).toThrow();
-  writeFileSync(join(dir, "keep"), "");
-  expect(readdirSync(dir).sort()).toEqual(["keep", "other"]);
-  expect(existsSync(file)).toBe(false);
+  mkdirSync(join(dir, "target"));
+  writeFileSync(join(dir, "target", "inner"), "x");
+  expect(() => writeFileAtomic(join(dir, "target"), "x")).toThrow();
+  expect(readdirSync(dir)).toEqual(["target"]);
+  expect(readdirSync(join(dir, "target"))).toEqual(["inner"]);
+});
+
+test.skipIf(process.platform === "win32")("writeFileAtomic keeps the mode of the file it replaces, if no mode is given", () => {
+  const file = join(tmp(), "f");
+  writeFileSync(file, "old", { mode: 0o640 });
+  chmodSync(file, 0o640);
+  writeFileAtomic(file, "new");
+  expect(statSync(file).mode & 0o777).toBe(0o640);
+});
+
+test.skipIf(process.platform === "win32")("writeFileAtomic writes through a symbolic link and keeps the link", () => {
+  const dir = tmp();
+  mkdirSync(join(dir, "real"));
+  writeFileSync(join(dir, "real", "f"), "old");
+  symlinkSync(join(dir, "real", "f"), join(dir, "link"));
+  writeFileAtomic(join(dir, "link"), "new");
+  expect(lstatSync(join(dir, "link")).isSymbolicLink()).toBe(true);
+  expect(readFileSync(join(dir, "real", "f"), "utf8")).toBe("new");
+  expect(readdirSync(join(dir, "real"))).toEqual(["f"]);
 });
 
 test.skipIf(process.platform === "win32")("writeFileAtomic sets the mode of a new file", () => {

@@ -1,6 +1,6 @@
 import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
-import { noticeOnce } from "./atomic.ts";
+import { ensureHome, noticeOnce } from "./atomic.ts";
 import { KnownAnswerTest, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter, Manifest } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -58,6 +58,7 @@ function endsCut(path: string): boolean {
 }
 
 function write(c: LabChange): void {
+  ensureHome();
   mkdirSync(dirOf(c.adapter), { recursive: true });
   appendFileSync(fileOf(c.adapter), (endsCut(fileOf(c.adapter)) ? "\n" : "") + JSON.stringify(c) + "\n");
 }

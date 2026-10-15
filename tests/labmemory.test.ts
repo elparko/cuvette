@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "vitest";
@@ -144,4 +144,11 @@ describe("lab memory file damage", () => {
       process.stderr.write = write;
     }
   });
+});
+
+test.skipIf(process.platform === "win32")("a first lab memory change creates the home folder private to the user", () => {
+  const fresh = join(home, "fresh");
+  process.env.CUVETTE_HOME = fresh;
+  propose("demo", "standard", { text: "t" }, "r");
+  expect(statSync(fresh).mode & 0o777).toBe(0o700);
 });

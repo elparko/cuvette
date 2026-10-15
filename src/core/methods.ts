@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { writeFileAtomic } from "./atomic.ts";
+import { ensureHome, writeFileAtomic } from "./atomic.ts";
 import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -140,6 +140,7 @@ export function saveMethod(m: Method, project?: string): string {
   const p = pathOf(m.name, dir);
   const before = project ? trustStatus(project).state : undefined;
   try {
+    if (!project) ensureHome();
     mkdirSync(dir, { recursive: true });
     writeFileAtomic(p, JSON.stringify(m, null, 2) + "\n");
   } catch (e) {
