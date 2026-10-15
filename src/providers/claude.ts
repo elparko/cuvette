@@ -125,7 +125,7 @@ export class ClaudeProvider implements Provider {
   }
 
   toNative(messages: Message[]): unknown[] {
-    const budget = new ImageBudget();
+    const budget = new ImageBudget(messages);
     const out: unknown[] = [];
     for (const m of messages) {
       if (m.role === "assistant") {

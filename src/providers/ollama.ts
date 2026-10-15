@@ -119,7 +119,7 @@ export class OllamaProvider implements Provider {
   }
 
   toNative(system: string, messages: Message[]): unknown[] {
-    const budget = new ImageBudget();
+    const budget = new ImageBudget(messages);
     const out: any[] = [{ role: "system", content: system }];
     for (const m of messages) {
       if (m.role === "assistant") {

@@ -201,7 +201,7 @@ describe("claude", () => {
     expect(block.content).toContain("left out of an error result");
   });
 
-  test("image limits: 4 per result, 50 per conversation", () => {
+  test("image limits: 4 per result, 50 per conversation, the newest images stay", () => {
     dirImg();
     const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
     const msgs: Message[] = [];
@@ -209,9 +209,10 @@ describe("claude", () => {
       msgs.push({ role: "user", parts: [{ type: "tool_result", callId: `c${i}`, name: "t", text: "x", images: Array(6).fill(imgPath) }] });
     const native: any[] = p.toNative(msgs);
     const counts = native.map((m) => m.content[0].content.filter((b: any) => b?.type === "image").length);
-    expect(counts.slice(0, 12)).toEqual(Array(12).fill(4));
-    expect(counts[12]).toBe(2);
+    expect(counts[0]).toBe(2);
+    expect(counts.slice(1)).toEqual(Array(12).fill(4));
     expect(native[0].content[0].content[0].text).toContain("not attached");
+    expect(native[12].content[0].content[0].text).toContain("not attached");
   });
 
   test("refusal returns a declined text part and drops tool calls from raw", async () => {
