@@ -352,6 +352,23 @@ describe("claude", () => {
     expect(calls[0].params.tool_choice).toEqual({ type: "none" });
   });
 
+  test("a missing key gives a short message and no SDK text; a headless run does not name /key", async () => {
+    const sdk = "Could not resolve authentication method. Expected either apiKey or authToken to be set.";
+    const say = async (headless: boolean) => {
+      const { client } = fakeClient([new Error(sdk)]);
+      return new ClaudeProvider("claude-opus-5-5", { client, retries: 0, headless }).step(req([user("x")])).then(() => "", (err) => err.message as string);
+    };
+    expect(await say(true)).toBe("No valid Claude credentials. Run cuvette key, or set ANTHROPIC_API_KEY.");
+    expect(await say(false)).toBe("No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.");
+  });
+
+  test("an SDK credentials error keeps its text, with control codes written out", async () => {
+    const { client } = fakeClient([new Error("failed to parse credentials file /home/u/.config/anthropic/credentials/work.json\x1b[31m")]);
+    const msg = await new ClaudeProvider("claude-opus-5-5", { client, retries: 0 }).step(req([user("x")])).then(() => "", (err) => err.message as string);
+    expect(msg).toContain("Detail: failed to parse credentials file /home/u/.config/anthropic/credentials/work.json\\x1b[31m");
+    expect(msg).not.toContain("\x1b");
+  });
+
   test("maps SDK errors to ProviderError", async () => {
     const auth = new Anthropic.AuthenticationError(401, {} as any, "nope", new Headers());
     const rate = new Anthropic.RateLimitError(429, {} as any, "slow", new Headers());

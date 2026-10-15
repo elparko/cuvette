@@ -17,3 +17,9 @@ test("the folder code of the page uses the same filter for the tooltip and the b
   expect(html).toContain("b.dataset.path = path");
   expect(html).not.toContain("b.title = path;");
 });
+
+test("the old setup page says when the key is empty and has a Leave setup button", () => {
+  const html = appPageHtml("tok");
+  expect(html).toContain("You typed no key. Paste the key, or choose the local model.");
+  expect(html).toContain('data-page-go="start">Leave setup</button>');
+});

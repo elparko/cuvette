@@ -1,8 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { savedClaudeKey } from "../src/core/credentials.ts";
+import { antLogin, savedClaudeKey } from "../src/core/credentials.ts";
+import { startCards } from "../src/ui/cards.ts";
+import { needsFirstSetup } from "../src/server/app.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
 import { settingsPath } from "../src/core/settings.ts";
 
@@ -85,4 +87,41 @@ test("the sample copies only the CSV, and the data are the Student 1908 values",
   expect(s.request).toContain("sleep.csv");
   expect(readFileSync(join(SAMPLE_DIR, "README.md"), "utf8")).toContain("public domain");
   expect(existsSync(join(dest, "README.md"))).toBe(false);
+});
+
+test("a login from ant auth login counts as a credential, so the first start is not needed", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  const env = { ANTHROPIC_CONFIG_DIR: cfg };
+  expect(antLogin(env)).toBe(false);
+  expect(needsFirstStart({ cwd, env })).toBe(true);
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(antLogin(env)).toBe(true);
+  expect(needsFirstStart({ cwd, env })).toBe(false);
+  expect(needsFirstSetup("claude", env)).toBe(false);
+  expect(needsFirstSetup("claude", {})).toBe(true);
+  expect(antLogin({ ...env, ANTHROPIC_PROFILE: "work" })).toBe(false);
+  writeFileSync(join(cfg, "active_config"), "work\n");
+  expect(antLogin(env)).toBe(false);
+  writeFileSync(join(cfg, "credentials", "work.json"), "{}");
+  expect(antLogin(env)).toBe(true);
+  expect(antLogin({ ...env, ANTHROPIC_PROFILE: "../x" })).toBe(false);
+  expect(needsFirstStart({ cwd, env: { ...env, ANTHROPIC_PROFILE: "other" } })).toBe(true);
+});
+
+test("choose Claude warns when ANTHROPIC_API_KEY is set, because that key wins", async () => {
+  const check = async () => ({ ok: true, text: "The key works." });
+  const shadowed = await chooseClaude(KEY, { cwd, env: { ANTHROPIC_API_KEY: "sk-ant-other" }, check });
+  expect(shadowed.text).toContain("This shell also has ANTHROPIC_API_KEY. Cuvette uses that one first.");
+  const plain = await chooseClaude(KEY, { cwd, env: {}, check });
+  expect(plain.text).not.toContain("ANTHROPIC_API_KEY");
+});
+
+test("the key card does not show for a user of ant auth login", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-card-"));
+  const session = { model: { provider: "claude" }, questions: { open: () => [] } } as never;
+  expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg }).map((c) => c.t)).toEqual(["key"]);
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg })).toEqual([]);
 });

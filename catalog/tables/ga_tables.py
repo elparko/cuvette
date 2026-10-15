@@ -3,6 +3,7 @@ import os
 import re
 import textwrap
 import warnings
+import zipfile
 from collections import deque
 from datetime import date, datetime
 
@@ -14,6 +15,7 @@ import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string, get_column_letter
+from openpyxl.utils.exceptions import InvalidFileException
 
 warnings.filterwarnings("ignore")
 
@@ -92,18 +94,38 @@ def text_encoding(path):
     return "latin-1"
 
 
+class BadFile(ValueError):
+    pass
+
+
+_FILE_ERRORS = (zipfile.BadZipFile, InvalidFileException, pd.errors.ParserError, pd.errors.EmptyDataError)
+
+
+def _bad_file(path):
+    ext = os.path.splitext(path)[1].lstrip(".").lower()
+    kind = ext if _is_xlsx(path) else "tsv" if ext in ("tsv", "tab") else "csv"
+    return BadFile("The file is not a valid %s file: %s" % (kind, os.path.basename(path)))
+
+
 MISSING_TEXT = {"", "na", "n/a", "#n/a", "<na>", "null", "nan", "-", "—", "?", "."}
 
 
 def load(path, sheet=None):
     path = os.path.expanduser(path)
-    if _is_xlsx(path):
-        frame = pd.read_excel(path, sheet_name=sheet or 0)
-        raw = pd.read_excel(path, sheet_name=sheet or 0, keep_default_na=False)
-    else:
-        sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
-        frame = pd.read_csv(path, sep=sep, encoding=text_encoding(path))
-        raw = pd.read_csv(path, sep=sep, encoding=text_encoding(path), dtype=str, keep_default_na=False)
+    try:
+        if _is_xlsx(path):
+            frame = pd.read_excel(path, sheet_name=sheet or 0)
+            raw = pd.read_excel(path, sheet_name=sheet or 0, keep_default_na=False)
+        else:
+            sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
+            frame = pd.read_csv(path, sep=sep, encoding=text_encoding(path))
+            raw = pd.read_csv(path, sep=sep, encoding=text_encoding(path), dtype=str, keep_default_na=False)
+    except _FILE_ERRORS:
+        raise _bad_file(path) from None
+    except ValueError as e:
+        if "Excel file format" in str(e):
+            raise _bad_file(path) from None
+        raise
     for column in frame.columns:
         if pd.api.types.is_object_dtype(frame[column]) or pd.api.types.is_string_dtype(frame[column]):
             frame[column] = raw[column].where(~raw[column].astype(str).str.strip().str.lower().isin(MISSING_TEXT), np.nan)
@@ -359,7 +381,10 @@ def read_table(path, sheet=None, table=None, range=None, groups_to_rows=True):
     path = os.path.expanduser(path)
     if not os.path.exists(path):
         return _fail("No file at %s." % path)
-    cells, merges, sheets, sheet_name = _grid(path, sheet)
+    try:
+        cells, merges, sheets, sheet_name = _grid(path, sheet)
+    except _FILE_ERRORS:
+        return _fail(str(_bad_file(path)))
     if not cells:
         return _fail("The sheet is empty.")
     tables, notes = _find_tables(cells, merges)

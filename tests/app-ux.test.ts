@@ -638,6 +638,22 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/suggest")`);
   });
 
+  test("first start: an empty key gives a message, and Leave setup goes to the Start page", async () => {
+    await page.eval(`(() => {
+      window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { needed: true, hasKey: false, model: "claude", ollama: { reachable: false, models: [] }, choices: [{ id: "claude", label: "Use Claude", help: "" }, { id: "local", label: "Use a local model", help: "" }], recommended: "qwen3:8b", sample: "/tmp/Cuvette sample", keyGuide: { title: "", intro: "", steps: [], notes: [] } } }) });
+      window.cuvetteApp.show("setup");
+    })()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Use Claude")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Use Claude").click()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Save the key")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Save the key").click()`);
+    expect(await until(page, `(document.querySelector("main [role=alert]") || {}).textContent === "You typed no key. Paste the key, or choose the local model."`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Leave setup").click()`);
+    expect(await until(page, `!document.querySelector("main").textContent.includes("Welcome to Cuvette")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart"))`);
+    await goPage("Analysis");
+  });
+
   test("first start: a saved local model shows the next steps and the new model, also if Ollama does not run", async () => {
     await page.eval(`(() => {
       window.__model = "claude";

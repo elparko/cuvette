@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { KEY_GUIDE } from "./keyhelp.ts";
-import { claudeKey, keyProblem, saveClaudeKey } from "./credentials.ts";
+import { claudeKey, ENV_KEY_WARNING, noClaudeCredentials, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
 import { ROOT } from "../root.ts";
 
@@ -57,7 +57,8 @@ export function savedModel(ctx: Ctx = {}): string {
 }
 
 export function needsFirstStart(ctx: Ctx = {}): boolean {
-  return claudeKey(ctx.env ?? process.env).from === "none" && savedModel(ctx).startsWith("claude");
+  const env = ctx.env ?? process.env;
+  return noClaudeCredentials(env) && savedModel(ctx).startsWith("claude");
 }
 
 export async function firstStartState(ctx: Ctx = {}): Promise<FirstStartState> {
@@ -73,7 +74,8 @@ export async function chooseClaude(key: string, ctx: Ctx & { check?: (key: strin
   if (!r.ok) return r;
   const path = saveClaudeKey(k);
   await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", "claude", "user");
-  return { ok: true, text: `${r.text} Saved the key to ${path}. The model is Claude.` };
+  const shadowed = (ctx.env ?? process.env).ANTHROPIC_API_KEY ? ` ${ENV_KEY_WARNING}` : "";
+  return { ok: true, text: `${r.text} Saved the key to ${path}. The model is Claude.${shadowed}` };
 }
 
 export async function chooseLocal(model: string | undefined, ctx: Ctx = {}): Promise<{ ok: boolean; text: string; model: string }> {
