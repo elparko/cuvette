@@ -1278,6 +1278,7 @@ describe("the output cap name of the openai provider", () => {
     capture([new Response(JSON.stringify({ choices: [{ message: { content: '{"severity":"info","message":"A"}' }, finish_reason: "length" }] }), { status: 200, headers: { "content-type": "application/json" } })]);
     const p = await makeProvider("openai:http://localhost:1234/v1|m");
     await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toBeInstanceOf(CutReplyError);
+    await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toMatchObject({ text: '{"severity":"info","message":"A"}' });
     expect(await p.complete("S", "Q")).toContain("severity");
   });
 });

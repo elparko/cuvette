@@ -62,7 +62,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
+import { CUT_REVIEW_NOTICE, EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -2115,8 +2115,10 @@ export class Session {
     if (this.refereeProvider && !signal.aborted && !nothingToCheck && !this.refereeBlocked()) {
       this.bus.emit({ type: "status", state: "thinking", purpose: REVIEW_PURPOSE });
       try {
-        for (const f of await referee(this.refereeProvider, refereeCtx, signal)) found.push({ f, source: "referee" });
+        let cutShort = false;
+        for (const f of await referee(this.refereeProvider, refereeCtx, signal, () => (cutShort = true))) found.push({ f, source: "referee" });
         state = "done";
+        if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
         this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
@@ -4686,7 +4688,9 @@ export class Session {
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
     if (this.refereeProvider && !this.refereeBlocked()) {
       try {
-        for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+        let cutShort = false;
+        for (const f of await referee(this.refereeProvider, ctx, undefined, () => (cutShort = true))) out.push(this.findings.add(f, "referee"));
+        if (cutShort) this.record.append("notice", { text: CUT_REVIEW_NOTICE });
       } catch (e) {
         this.reviewFailure = e instanceof EmptyReview ? e.message : `The referee did not run: ${(e as Error).message}`;
       }

@@ -7,7 +7,7 @@ import { stepNumbers as nodeStepNumbers } from "./housekeeping.ts";
 import { outOfDateNodes } from "./status.ts";
 import { checkText, summary } from "./ste.ts";
 import { latestValue, testRows } from "./testcount.ts";
-import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
+import { CutReplyError, type Claim, type Entry, type Finding, type FindingIn, type Node, type Provider } from "./types.ts";
 import { fmtSig } from "./plain.ts";
 
 export interface ReviewContext {
@@ -572,9 +572,30 @@ export class EmptyReview extends Error {
   }
 }
 
-export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
+export function completeFindings(raw: string): FindingIn[] {
+  const lines = raw.replace(/```[a-z]*\n?/gi, "").split("\n").map((l) => l.trim().replace(/,$/, "")).filter((l) => l.startsWith("{") && l.endsWith("}"));
+  return lines.map((l) => {
+    try {
+      return toFinding(JSON.parse(l));
+    } catch {
+      return undefined;
+    }
+  }).filter((f): f is FindingIn => Boolean(f));
+}
+
+export const CUT_REVIEW_NOTICE = "The review was cut short. The findings here are the ones that the referee finished.";
+
+export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal, onCut?: () => void): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
+  let raw: string;
+  try {
+    raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
+  } catch (e) {
+    const found = e instanceof CutReplyError ? completeFindings(e.text) : [];
+    if (!found.length) throw e;
+    onCut?.();
+    return found;
+  }
   if (!raw.trim()) throw new EmptyReview();
   return parseReferee(raw);
 }

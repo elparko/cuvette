@@ -382,7 +382,7 @@ export class OpenAIProvider implements Provider {
       return body;
     };
     const reply = await this.exchange(make, signal, undefined, undefined);
-    if (opts?.failIfCut && reply.finish === "length") throw new CutReplyError("The reply hit the output limit and was cut short.");
+    if (opts?.failIfCut && reply.finish === "length") throw new CutReplyError("The reply hit the output limit and was cut short.", (reply.text ?? splitThink(reply.content).text).trim());
     return (reply.text ?? splitThink(reply.content).text).trim();
   }
 }

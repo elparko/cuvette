@@ -281,7 +281,7 @@ export class ClaudeProvider implements Provider {
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
       if (!this.fixedClient) recordSpend(this.model, usageOf(u, false));
-      if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.");
+      if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.", (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n"));
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
       throw mapError(e, this.model, this.headless);
