@@ -141,3 +141,28 @@ test("a retry in its own clause for the same setting applies, and a statement of
   apply("Do not set min cells to 1,000, use 500", cells, 500);
   apply("I don't have replicates so use window 5", oldWindow, 5, []);
 });
+
+test("a cause word, an abbreviation or a bullet does not end the reach of an opening negation wrongly", () => {
+  const window5 = { key: "window", label: "Window" };
+  const no = (text: string, field: typeof alpha, value: number, others: (typeof alpha)[] = []) => expect(namesValue(text, field, value, others), text).toBe(false);
+  const yes = (text: string, field: typeof alpha, value: number, others: (typeof alpha)[] = []) => expect(namesValue(text, field, value, others), text).toBe(true);
+  no("Do not, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Do not, since it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Do not, while the old runs stay, set alpha to 0.1", alpha, 0.1);
+  no("Do not, per Dr. Smith, set window to 5", window5, 5);
+  no("Do not, per Prof. Smith vs. Jones, set window to 5", window5, 5);
+  no("Do not, see Fig. 2, set window to 5", window5, 5);
+  no("Do not, as in No. 3, set window to 5", window5, 5);
+  no("Do not, per Smith et al. set window to 5", window5, 5);
+  no("Do not touch the plots. set window to 5", window5, 5);
+  yes("Do not touch the plots. Set window to 5", window5, 5);
+  yes("- Do not change alpha\n- Set min cells to 5", cells, 5, [alpha]);
+  no("Cannot, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("You cannot, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("You could not, because it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  no("Please would not, since it breaks old runs, set alpha to 0.1", alpha, 0.1);
+  yes("I don't have replicates, use window 5", window5, 5);
+  no("Skip QC, set min cells to 5", cells, 5);
+  no("Without rerunning, set window to 5", window5, 5);
+  no("Except for sample 3, use window 5", window5, 5);
+});

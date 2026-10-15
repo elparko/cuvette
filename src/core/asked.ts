@@ -28,6 +28,9 @@ const NEGATION = new Set(["not", "never", "without", "except", "avoid", "unless"
 const CONNECT = new Set(["for", "as", "of", "on", "in"]);
 const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?", "."]);
 const CLAUSE_END = /[,;.!?][)"'\]]*$/;
+const CAUSE = new Set(["because", "since", "while"]);
+const STATEMENT_SUBJECT = new Set(["i", "we", "it", "there", "this", "that", "they"]);
+const ABBREVIATION = new Set(["dr.", "mr.", "mrs.", "ms.", "prof.", "approx.", "e.g.", "i.e.", "vs.", "fig.", "al.", "cf.", "ca."]);
 const BOUNDARY = new Set(["and", "but", "so", "then", "because", "since", "while", "instead"]);
 const AFTER_WORD = new Set(["to", "as", "of", "at", "is", "="]);
 const SETTING_VERB = new Set(["use", "set", "take", "apply", "run", "try", "make", "change"]);
@@ -40,6 +43,10 @@ const AFTER = 4;
 const AFTER_TEXT = 6;
 const BEFORE_TEXT = 3;
 
+function trimEndBrackets(s: string): string {
+  return s.replace(/^[("'[]+/, "").replace(/[)"'\]]+$/, "");
+}
+
 function trimEnd(s: string): string {
   let n = s.length;
   while (n > 0 && TAIL.has(s[n - 1]!)) n--;
@@ -49,9 +56,13 @@ function trimEnd(s: string): string {
 function items(text: string): Item[] {
   const out: Item[] = [];
   const merged = text.replace(THOUSANDS, (_, a: string, b: string) => a + b.replace(/\D/g, ""));
-  for (const line of merged.toLowerCase().replace(/n['\u2019]t\b/g, " not").split(/\r?\n/)) {
+  const cased = merged.replace(/n['\u2019]t\b/g, " not").split(/\r?\n/);
+  for (const [row, line] of merged.toLowerCase().replace(/n['\u2019]t\b/g, " not").split(/\r?\n/).entries()) {
     let first = true;
-    for (const raw of line.split(/\s+|(=)/).filter(Boolean)) {
+    const asWritten = (cased[row] ?? "").split(/\s+|(=)/).filter(Boolean);
+    const tokens = line.split(/\s+|(=)/).filter(Boolean);
+    for (const [at, raw] of tokens.entries()) {
+      if (first && /^[-*\u2022\u2013\u2014]+$/.test(raw)) continue;
       const size = out.length;
       const token = trimEnd(raw.replace(/^[("'[]+/, ""));
       if (NUMBER.test(token)) out.push({ w: token, num: Number(token.replace(",", ".")), head: true, tail: true, clause: 0, sent: 0 });
@@ -64,7 +75,12 @@ function items(text: string): Item[] {
         if (first) out[size]!.nl = true;
         if (BOUNDARY.has(trimEnd(raw))) out[size]!.br = true;
       }
-      if (out.length > size && CLAUSE_END.test(raw)) out.at(-1)!.ce = /[;.!?][)"'\]]*$/.test(raw) ? "x" : ",";
+      if (out.length > size && CLAUSE_END.test(raw)) {
+        const next = tokens[at + 1] ? asWritten[at + 1] ?? "" : "";
+        const dotOnly = /\.[)"'\]]*$/.test(raw) && !/[;!?][)"'\]]*$/.test(raw);
+        const notEnd = dotOnly && (ABBREVIATION.has(trimEndBrackets(raw)) || (trimEndBrackets(raw) === "no." && /^\d/.test(next)) || /^\p{Ll}/u.test(next));
+        if (!notEnd) out.at(-1)!.ce = /[;.!?][)"'\]]*$/.test(raw) ? "x" : ",";
+      }
       first = false;
     }
   }
@@ -88,7 +104,6 @@ interface Layout {
   prevMask: number[];
   nextBegin: number[];
   nextMask: number[];
-  start: number[];
   neg: Record<"yes" | "no", number[]>;
   lead: number[];
   bound: number[];
@@ -155,7 +170,7 @@ function layout(words: Item[], field: Field, others: Field[]): Layout {
       nextBits = begins[i]!;
     }
   }
-  return { own: kept.filter((s) => s.mask === OWN).map((s) => [s.b, s.e]), inName, named, starts: begins, prevEnd, prevMask, nextBegin, nextMask, start: [], neg: { yes: [], no: [] }, lead: [], bound: [] };
+  return { own: kept.filter((s) => s.mask === OWN).map((s) => [s.b, s.e]), inName, named, starts: begins, prevEnd, prevMask, nextBegin, nextMask, neg: { yes: [], no: [] }, lead: [], bound: [] };
 }
 
 function joined(words: Item[], from: number, to: number, connect = true): boolean {
@@ -216,19 +231,17 @@ function scope(words: Item[], l: Layout): void {
       lead = -1;
       bound = -1;
     }
-    l.start.push(from);
     l.neg.yes.push(near.yes);
     l.neg.no.push(near.no);
     l.lead.push(lead);
     l.bound.push(bound);
-    const first = words[from]!.w === "please" ? from + 1 : from;
     for (const flag of ["yes", "no"] as const) {
       if (negWord(words, i, flag === "yes") && !l.named[i] && !CALM.has(words[i + 1]?.w ?? "")) {
         near[flag] = i;
-        if (flag === "yes" && lead < 0 && i <= first + 1) lead = i;
+        if (flag === "yes" && lead < 0 && i <= from + 5 && !STATEMENT_SUBJECT.has(words[from]!.w)) lead = i;
       }
     }
-    if (it.br && !(it.w === "and" && l.starts[i + 1])) bound = i;
+    if (it.br && !CAUSE.has(it.w) && !(it.w === "and" && l.starts[i + 1])) bound = i;
   }
 }
 
