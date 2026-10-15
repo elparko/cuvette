@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { harnessWrite } from "./harness-writes.ts";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
@@ -90,7 +90,6 @@ function writeIndex(rows: IndexRow[]): void {
 }
 
 const LOCK_WAIT_MS = 6000;
-const LOCK_OLD_MS = 30_000;
 export const INDEX_BUSY = "The session list is busy. Try again.";
 
 function pidAlive(pid: number): boolean {
@@ -111,23 +110,43 @@ function lockHolder(path: string): { pid?: number; token?: string } {
   }
 }
 
-function stealStale(path: string): void {
+const LOCK_UNREADABLE_MS = 120_000;
+const STEAL_OLD_MS = 10_000;
+
+function lockStale(path: string): { token?: string } | undefined {
+  const holder = lockHolder(path);
+  if (holder.pid !== undefined) return pidAlive(holder.pid) ? undefined : { token: holder.token };
   try {
-    const holder = lockHolder(path);
-    const old = Date.now() - statSync(path).mtimeMs > LOCK_OLD_MS;
-    if (!old && (holder.pid === undefined || pidAlive(holder.pid))) return;
-    const aside = `${path}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
-    renameSync(path, aside);
-    if (lockHolder(aside).token !== holder.token) {
-      try {
-        linkSync(aside, path);
-      } catch {}
-    }
-    rmSync(aside, { force: true });
-  } catch {}
+    return Date.now() - statSync(path).mtimeMs > LOCK_UNREADABLE_MS ? { token: undefined } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-function withIndexLock<T>(fn: () => T): T {
+function stealStale(path: string): void {
+  if (!lockStale(path)) return;
+  const steal = `${path}.steal`;
+  const mine = `${process.pid}:${randomBytes(8).toString("hex")}`;
+  try {
+    writeFileSync(steal, JSON.stringify({ pid: process.pid, token: mine }), { flag: "wx" });
+  } catch {
+    const h = lockHolder(steal);
+    let old = false;
+    try {
+      old = Date.now() - statSync(steal).mtimeMs > STEAL_OLD_MS;
+    } catch {}
+    if ((h.pid !== undefined && !pidAlive(h.pid)) || old) rmSync(steal, { force: true });
+    return;
+  }
+  try {
+    const stale = lockStale(path);
+    if (stale && lockHolder(path).token === stale.token) rmSync(path, { force: true });
+  } catch {} finally {
+    if (lockHolder(steal).token === mine) rmSync(steal, { force: true });
+  }
+}
+
+export function withIndexLock<T>(fn: () => T): T {
   const path = `${indexPath()}.lock`;
   mkdirSync(dirname(path), { recursive: true });
   const token = `${process.pid}:${randomBytes(8).toString("hex")}`;
@@ -150,23 +169,14 @@ function withIndexLock<T>(fn: () => T): T {
   }
 }
 
-function orBusy<T>(run: () => T, busy: T): T {
-  try {
-    return run();
-  } catch (e) {
-    if ((e as Error).message === INDEX_BUSY) return busy;
-    throw e;
-  }
-}
-
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
-  orBusy(() => withIndexLock(() => {
+  withIndexLock(() => {
     const all = readIndex();
     const old = all.find((r) => r.id === p.id);
     const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
     writeIndex([...all.filter((r) => r.id !== p.id), row]);
-  }), undefined);
+  });
 }
 
 export function cutText(s: string, n: number): string {
@@ -175,23 +185,23 @@ export function cutText(s: string, n: number): string {
 }
 
 export function renameIndexRow(id: string, custom: string): boolean {
-  return orBusy(() => withIndexLock(() => {
+  return withIndexLock(() => {
     const rows = readIndex();
     const row = rows.find((r) => r.id === id);
     if (!row) return false;
     row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
     writeIndex(rows);
     return true;
-  }), false);
+  });
 }
 
 export function removeIndexRow(id: string): boolean {
-  return orBusy(() => withIndexLock(() => {
+  return withIndexLock(() => {
     const rows = readIndex();
     if (!rows.some((r) => r.id === id)) return false;
     writeIndex(rows.filter((r) => r.id !== id));
     return true;
-  }), false);
+  });
 }
 
 export function slug(text: string, max = 40): string {
@@ -366,7 +376,13 @@ export function findPlace(ref: string, opts: { cwd?: string; outputFolder?: stri
     if (!existsSync(path)) return undefined;
     if (existsSync(join(path, "log.jsonl")) && !existsSync(join(path, "meta.json"))) return { ...legacyPlace(basename(path), cwd), recordDir: path, outDir: join(path, "work") };
     const p = findUp(path, opts.outputFolder ?? "cuvette") ?? inIndex(path);
-    if (p) saveIndexRow(p);
+    if (p) {
+      try {
+        saveIndexRow(p);
+      } catch (e) {
+        if ((e as Error).message !== INDEX_BUSY) throw e;
+      }
+    }
     return p;
   }
   const row = readIndex().find((r) => r.id === ref);

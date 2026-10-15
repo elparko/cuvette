@@ -418,13 +418,52 @@ test.skipIf(process.platform === "win32")("a holder that is killed with SIGKILL 
   expect(readIndex().map((r) => r.id)).toEqual(["k"]);
 });
 
-test("a write that waits six seconds for a live lock does not run, and the callers keep working", () => {
+test("a write that waits six seconds for a live lock does not run, and the caller gets the busy error", () => {
   writeLock(process.pid);
-  expect(removeIndexRow("none")).toBe(false);
-  saveIndexRow(rowOf("late"));
+  expect(() => removeIndexRow("none")).toThrow("The session list is busy. Try again.");
+  expect(() => saveIndexRow(rowOf("late"))).toThrow("The session list is busy. Try again.");
   expect(readIndex()).toEqual([]);
   expect(existsSync(lockPath())).toBe(true);
 }, 60_000);
+
+test("a lock of a live process is never stolen, also when the file is old", () => {
+  writeLock(process.pid);
+  const old = new Date(Date.now() - 600_000);
+  utimesSync(lockPath(), old, old);
+  expect(() => saveIndexRow(rowOf("late"))).toThrow("busy");
+  expect(existsSync(lockPath())).toBe(true);
+}, 60_000);
+
+test("three processes with dead locks that appear all the time never hold the lock together and lose no row", async () => {
+  const dead = deadPid();
+  const go = join(home, "go3");
+  const inside = join(home, "inside");
+  const code = (tag: string) => `
+    import { existsSync, writeFileSync, appendFileSync, rmSync } from "node:fs";
+    import { saveIndexRow, withIndexLock, indexPath } from ${JSON.stringify(join(__dirname, "../src/core/places.ts"))};
+    writeFileSync(${JSON.stringify(go)} + "-${tag}", "");
+    while (!existsSync(${JSON.stringify(go)})) {}
+    for (let i = 0; i < 170; i++) {
+      if (i % 5 === 0) { try { writeFileSync(indexPath() + ".lock", JSON.stringify({ pid: ${dead}, token: "dead" }), { flag: "wx" }); } catch {} }
+      withIndexLock(() => {
+        try { writeFileSync(${JSON.stringify(inside)}, "${tag}", { flag: "wx" }); } catch { appendFileSync(${JSON.stringify(home)} + "/bad", "x"); }
+        for (let k = 0; k < 2000; k++) Math.sqrt(k);
+        rmSync(${JSON.stringify(inside)}, { force: true });
+      });
+      saveIndexRow({ id: "${tag}-" + i, recordDir: "/x", outDir: "/x/" + i, project: "/x", title: "t", created: "2026-01-01", legacy: false, fallback: false });
+    }
+  `;
+  const run = (tag: string) => {
+    const child = spawn(process.execPath, [TSX_CLI, "--eval", code(tag)], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
+    return new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  };
+  const exits = Promise.all([run("a"), run("b"), run("c")]);
+  for (let i = 0; i < 1200 && !["a", "b", "c"].every((t) => existsSync(`${go}-${t}`)); i++) await new Promise((r) => setTimeout(r, 50));
+  writeFileSync(go, "");
+  expect(await exits).toEqual([0, 0, 0]);
+  expect(existsSync(join(home, "bad"))).toBe(false);
+  expect(readIndex()).toHaveLength(510);
+}, 600_000);
 
 test("a steal of a stale lock leaves no moved-aside file", () => {
   staleLock();

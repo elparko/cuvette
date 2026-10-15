@@ -304,6 +304,17 @@ describe("the app server", () => {
     finish();
   });
 
+  test("a busy session list gives the status 503 with the busy text, not no such session", async () => {
+    writeFileSync(join(home, "sessions-index.json.lock"), JSON.stringify({ pid: process.pid, token: "other" }));
+    app = await startApp({ session: new FakeSession(), env });
+    const c = client(app);
+    for (const path of ["api/session-remove", "api/session-rename"]) {
+      const r = await c.post(path, { id: "x", name: "y" });
+      expect(r.status).toBe(503);
+      expect((await r.json()).error).toBe("The session list is busy. Try again.");
+    }
+  }, 60_000);
+
   test("the setup page uses the first-start choices and the doctor checks", async () => {
     const doctor = async () => [
       { id: "node", group: "Needed to start" as const, name: "Node", status: "ok" as const, detail: "version 24" },
