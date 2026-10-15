@@ -124,8 +124,6 @@ function stackObjects(s: string): { start: number; end: number }[] {
 }
 
 function balancedObjects(s: string): { start: number; end: number }[] {
-  const quick = stackObjects(s);
-  if (quick.length) return quick;
   const found: { start: number; end: number }[] = [];
   let budget = 8 * s.length + 10_000;
   for (let i = 0; i < s.length; i++) {
@@ -149,11 +147,8 @@ function balancedObjects(s: string): { start: number; end: number }[] {
   return found;
 }
 
-export function extractTextToolCall(
-  text: string,
-  toolNames: string[],
-): { name: string; args: Record<string, unknown>; rest: string } | null {
-  for (const { start, end } of balancedObjects(text)) {
+function callIn(text: string, spans: { start: number; end: number }[], toolNames: string[]): { name: string; args: Record<string, unknown>; rest: string } | null {
+  for (const { start, end } of spans) {
     let obj: any;
     try {
       obj = JSON.parse(text.slice(start, end));
@@ -177,6 +172,13 @@ export function extractTextToolCall(
     return { name: obj.name, args, rest };
   }
   return null;
+}
+
+export function extractTextToolCall(
+  text: string,
+  toolNames: string[],
+): { name: string; args: Record<string, unknown>; rest: string } | null {
+  return callIn(text, stackObjects(text), toolNames) ?? callIn(text, balancedObjects(text), toolNames);
 }
 
 export function lastCallNumber(messages: { parts: { type: string; id?: string }[] }[]): number {

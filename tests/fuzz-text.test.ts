@@ -144,6 +144,7 @@ describe("fuzz: the think tags and the text tool call", () => {
     }
     for (const n of [1, 8, 9, 50, 3000]) expect(extractTextToolCall("{".repeat(n) + " " + call({ path: "a" }) + " done", ["read_file"])?.args, `${n} open braces`).toEqual({ path: "a" });
     expect(extractTextToolCall('He said "hi {x" then ' + call({ path: "b" }), ["read_file"])?.args).toEqual({ path: "b" });
+    expect(extractTextToolCall('A stray {" in the text, then ' + call({ path: "c" }), ["read_file"])?.args).toEqual({ path: "c" });
     expect(extractTextToolCall("{ nothing " + call({ path: "a" }), ["read_file"])?.args).toEqual({ path: "a" });
     expect(extractTextToolCall(call({ path: "a" }), ["other"])).toBeNull();
   });
