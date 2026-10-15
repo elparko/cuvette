@@ -1,0 +1,6 @@
+{
+ "data/a.bed": {"sha256":"22acafc90c8835c13c2a5bddf2e06307b9e9d935e9809218aa834267e7a57c19","bytes":100},
+ "data/aluY.chr1_0_10Mb.bed": {"sha256":"272de0aaca0ffc8c9529f1fa9b1abba5a1e60c5f0908b7cd84e13341861e6fb3","bytes":22537},
+ "data/b.bed": {"sha256":"7fb81c0bf61859eeeee40e96834d1bb127852d1b512342ba0db223c55617af20","bytes":118},
+ "data/exons.chr1_0_10Mb.bed": {"sha256":"c923d06ce4fd72a1f63cb3f4a246100b93f62a1a88f406969bdd0135ca7957b0","bytes":168292}
+}

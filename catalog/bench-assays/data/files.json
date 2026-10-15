@@ -1,0 +1,11 @@
+{
+ "data/cell_counts.xlsx": {"sha256":"58cdc87eddfe9f0f1bf643c70593cecc5167b3ed2943da03f6a1f5df628385a8","bytes":5044},
+ "data/counter_export.csv": {"sha256":"9afe1e7aeeaaa2debedfaaa8b90190d0a808764343a5c5b03517547b4d6a6a3e","bytes":75},
+ "data/dual_luciferase.csv": {"sha256":"a10b7d8057d12f18381ece05569f57a8d98213de084c5b81ea2248016e2ec49a","bytes":344},
+ "data/make_fixtures.py": {"sha256":"565e1f26ec9d9d4f736e8e9edad9e714eaafe49e03f2ea8a3bfe0374e94267cc","bytes":6605},
+ "data/nanodrop.csv": {"sha256":"e6d7b146c730cac53a725858ca6e5e69883a1a38286a4aa335f3ec101dc9a547","bytes":113},
+ "data/protein_4pl.csv": {"sha256":"511276c5707d588d71944da56dcf20d637b5ed432327b0e56c139120af7bc305","bytes":844},
+ "data/protein_linear.csv": {"sha256":"03afd336973d2b023247e84f17744994854a737ed6141f6fb77ee05b7e43142a","bytes":560},
+ "data/protein_quadratic.csv": {"sha256":"e4eab1a4a80741b12ced3f7a84db028638cb99ebff857ac0964a913e51839a1f","bytes":576},
+ "data/western_blots.csv": {"sha256":"6d976558f1afa00ff62f5079f24abad8fea88ca37707c60d07f5cc302bceb881","bytes":320}
+}

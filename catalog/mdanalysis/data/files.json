@@ -1,0 +1,6 @@
+{
+ "data/4AKE.pdb": {"sha256":"ff798ee8791878eb58bac1c6bed32042f51b455512ac93b50bda8fa0ff0e7f78","bytes":309339},
+ "data/adk_backbone_h.dcd": {"sha256":"e3eda927533bf224c398b30d9d1d4c031bd2cc5c9cd783d93b4b2e0b731f8d7a","bytes":268652},
+ "data/adk_backbone_h.pdb": {"sha256":"23eff26e4e8ee4dc2df85ac7706caaec50a66385b02a2226b58d0842b0e39960","bytes":109415},
+ "data/make_adk_small.py": {"sha256":"7ca1c545597014e35f2bc25272f05ab54680984ef3ed564c3d79adef3b0df648","bytes":456}
+}

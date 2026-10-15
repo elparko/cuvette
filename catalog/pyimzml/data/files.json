@@ -1,0 +1,9 @@
+{
+ "data/Example_Continuous.ibd": {"sha256":"e8f2fefb1a0b6947b9ad78c773d20c1381f7728e060010c8d2f174ac414ff099","bytes":335976},
+ "data/Example_Continuous.imzML": {"sha256":"04237b10d61db093d2c5529f380d676d400383e8cbe55b3fe0e09bb97ae2ea8e","bytes":23898},
+ "data/lipids_tiny.ibd": {"sha256":"7d289495081dcce668a23a3cb6ddfa449eeafe9e85c7843028d5236851e156c9","bytes":592},
+ "data/lipids_tiny.imzML": {"sha256":"720d40f699a88c6ed53b1dbc757f35728e3f4d8d70a01b7d3e9145da831ba188","bytes":32325},
+ "data/lipids_tiny_continuous.ibd": {"sha256":"61167072372e2c63fbc692702b6bd4cbb834e333093ea3e38d95a9f75a43950e","bytes":240},
+ "data/lipids_tiny_continuous.imzML": {"sha256":"62afbe0f87c209b08ec04e78c11fe97434c4f6c2d8f189110dadfd2c07ebb298","bytes":32325},
+ "data/pyimzML_LICENSE": {"sha256":"cb5e8e7e5f4a3988e1063c142c60dc2df75605f4c46515e776e3aca6df976e14","bytes":11325}
+}

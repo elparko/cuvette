@@ -1,0 +1,10 @@
+{
+ "data/make_test_data.py": {"sha256":"aeb9a094c7aefce73fdbd6cf23c22bd621d8600a1f3ee09b92461f1313fe9487","bytes":4605},
+ "data/messy_lab.xlsx": {"sha256":"eec928bffb14c4c7a16ec64dfcaa07d0762353dcf3417518819cc636460819d8","bytes":5849},
+ "data/plate_384.csv": {"sha256":"a89a1af9451784a64710bda925cf355e2785d05fc735063e84c5b37013fa4540","bytes":2454},
+ "data/plate_gen5.xlsx": {"sha256":"36b44307b1f74ab527d307b06c4b390c4d115cac01eb37d4bb9d5108d58373ba","bytes":7175},
+ "data/plate_softmax.csv": {"sha256":"c6b99dffc89a2d6d6845745204374f56bd3cec725ae1a8d38a94a79761d28b9c","bytes":729},
+ "data/plate_softmax_map.csv": {"sha256":"ed735084f85db8e89d35229fc85ab6bd6881fac11c2644892e6f3a74fc664de3","bytes":109},
+ "data/plate_softmax_pro.tsv": {"sha256":"c21f32cc46ce452f1920959f4b28b7feddd11c27ca5869d313d3bfe15853ff7e","bytes":1400},
+ "data/slices.csv": {"sha256":"8b5d095de01bdddd8569650ae7a6e7200f87d2adf2b89a7bf4bbe98d691914a2","bytes":81}
+}

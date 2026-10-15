@@ -1,0 +1,7 @@
+{
+ "data/make_synthetic.py": {"sha256":"472ee7a2941cbc698e5881b9453a66b20962dcfd6aa8988a896e0a7ac8e22254","bytes":4274},
+ "data/synthetic_brightfield_red.tif": {"sha256":"80d4f09393d946a4aa29413f71b61d5e41d5a8fd91a2df492a19175b83758c44","bytes":180438},
+ "data/synthetic_clonogenic.csv": {"sha256":"dbca159432237c0ee7dadb513e3de1ef944e257cc0533110665f06ea8e28c4ab","bytes":180},
+ "data/synthetic_plate.png": {"sha256":"2513661f434ab4cc7f0ae41de8de3bd805532e43207d7d3971816cbe9277f60f","bytes":275541},
+ "data/synthetic_uptake.tif": {"sha256":"bc54b7706f4e5d53fc09ea0c852de434990d1e79204b8352c3567cdd6d8a2f3c","bytes":760165}
+}

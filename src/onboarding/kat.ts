@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { KnownAnswerTest, LoadedAdapter } from "../adapters/manifest.ts";
+import { dataGaps, present, provideData, runFetchScript } from "../adapters/testdata.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 
 export interface TestOutcome {
@@ -25,6 +25,7 @@ export interface RunOptions {
   workDir?: string;
   sessionDir?: string;
   callTimeoutMs?: number;
+  data?: "fetch" | "skip";
 }
 
 type Expect = KnownAnswerTest["expect"][number];
@@ -118,38 +119,28 @@ function makeContext(workDir: string, sessionDir: string, signal: AbortSignal, b
   return ctx;
 }
 
-const OFFLINE_CODES = new Set([6, 7, 28, 35, 56]);
-
-const present = (p: string) => existsSync(p) && (!statSync(p).isDirectory() || readdirSync(p).length > 0);
-
 export function fetchData(test: KnownAnswerTest, root: string, timeoutMs = 1_800_000): Promise<{ skip?: string; error?: string }> {
   if (test.data.length && test.data.every((d) => present(join(root, d)))) return Promise.resolve({});
-  const script = join(root, test.fetch);
-  if (!existsSync(script)) return Promise.resolve({ error: `the fetch script ${test.fetch} does not exist` });
-  return new Promise((done) => {
-    execFile("bash", [script], { cwd: join(script, ".."), timeout: timeoutMs, maxBuffer: 1 << 24 }, (err, _out, stderr) => {
-      const last = String(stderr).trim().split("\n").pop() ?? "";
-      if (err) {
-        const code = typeof err.code === "number" ? err.code : -1;
-        if (OFFLINE_CODES.has(code)) return done({ skip: `the test data is not in the repository and ${test.fetch} could not download it (no network, exit code ${code}). Connect to the network and run the test again` });
-        return done({ error: `${test.fetch} failed with exit code ${code}${last ? `: ${last}` : ""}` });
-      }
-      const missing = test.data.filter((d) => !present(join(root, d)));
-      done(missing.length ? { error: `${test.fetch} finished but did not make ${missing.join(", ")}` } : {});
-    });
-  });
+  return runFetchScript(root, test.fetch, test.data, timeoutMs);
 }
 
 async function runOne(
   test: KnownAnswerTest,
   adapter: LoadedAdapter,
   byName: Map<string, Tool>,
-  opts: Required<Pick<RunOptions, "workDir" | "sessionDir" | "callTimeoutMs">>,
+  opts: Required<Pick<RunOptions, "workDir" | "sessionDir" | "callTimeoutMs">> & Pick<RunOptions, "data">,
 ): Promise<TestOutcome> {
   const started = Date.now();
   const failures: string[] = [];
   const outputs: OutputFile[] = [];
-  if (test.fetch) {
+  if (opts.data) {
+    for (const gap of dataGaps(adapter, [test])) {
+      const got = opts.data === "skip" ? { skip: "the computer does not have the test data and Cuvette did not download it" } : await provideData(adapter, gap);
+      if (got.skip) return { id: test.id, ok: true, failures, durationMs: Date.now() - started, outputs, skipped: got.skip };
+      if (got.error) return { id: test.id, ok: false, failures: [got.error], durationMs: Date.now() - started, outputs };
+    }
+  }
+  if (test.fetch && opts.data !== "skip") {
     const got = await fetchData(test, adapter.root);
     if (got.skip) return { id: test.id, ok: true, failures, durationMs: Date.now() - started, outputs, skipped: got.skip };
     if (got.error) return { id: test.id, ok: false, failures: [got.error], durationMs: Date.now() - started, outputs };
@@ -209,7 +200,7 @@ export async function runTests(adapter: LoadedAdapter, runtime: RuntimeLike, opt
   }
   for (const t of (await adapter.module()).tools ?? []) if (!byName.has(t.name)) byName.set(t.name, t);
   const base = opts.workDir ?? mkdtempSync(join(tmpdir(), "cuvette-kat-"));
-  const resolved = { workDir: base, sessionDir: opts.sessionDir ?? base, callTimeoutMs: opts.callTimeoutMs ?? 600_000 };
+  const resolved = { workDir: base, sessionDir: opts.sessionDir ?? base, callTimeoutMs: opts.callTimeoutMs ?? 600_000, data: opts.data };
   const selected = adapter.manifest.tests.filter((t) => (!opts.only || opts.only.includes(t.id)) && (opts.gui || !t.gui));
   const outcomes: TestOutcome[] = [];
   for (const t of selected) outcomes.push(await runOne(t, adapter, byName, resolved));

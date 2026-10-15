@@ -1,0 +1,13 @@
+{
+ "data/comp_complete_example.csv": {"sha256":"cd0f06384c4328025c52b4b7b157fbff3dcb128b7f30ce3db4138011193b4eaf","bytes":610},
+ "data/data1.fcs": {"sha256":"cba7812f5bbce700786d22d97cf9858c1301878aa840c64eadcd263a3a0a5508","bytes":216432},
+ "data/data_set_simple_line_100.fcs": {"sha256":"b620d2e81afafe87bca9c4c43141eda3840220614581b735cd7acd8591143595","bytes":1297},
+ "data/gml_all_gates.xml": {"sha256":"10f0aa16abe0505ce97b66b36904f7ac94f008b011a7f9f3ecea240575c3914f","bytes":26741},
+ "data/make_synthetic.py": {"sha256":"080c13064dc3e34159effafe3b09f87ba0df4a75fd2847bf245dd19dc06a2084","bytes":798},
+ "data/make_truth_counts.py": {"sha256":"5feb2b78f361e9d052d3ec4209efbcf358a1d829b7be0c033bd37eb45dae2330","bytes":399},
+ "data/single_ellipse_51_events.wsp": {"sha256":"7b5e45587bb023255bf7942d94399c2b84c286312ca078b7f3c0be8e39cba278","bytes":16528},
+ "data/synthetic_comp.fcs": {"sha256":"fc3044ad0faf7546f04bb5382a9956e8a11b9984a1a109bffb52c017f5378737","bytes":2738},
+ "data/synthetic_comp_matrix.csv": {"sha256":"c0154967f4b074664b94387146fbd540616bcea2efd9c19da3b6fa3a624363a2","bytes":22},
+ "data/test_comp_example.fcs": {"sha256":"fb33bf60546d40fa7e892c67f51681f8af59d3be818a212035c649437f00a105","bytes":773944},
+ "data/truth_counts.json": {"sha256":"53c9ca9bbce74769190edf9b6cad69cbf1ed1bcc879dd6c44c55fe6b4a182a22","bytes":1007}
+}

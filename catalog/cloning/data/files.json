@@ -1,0 +1,12 @@
+{
+ "data/3730.ab1": {"sha256":"e4663e4db40232576ccdda5b878dddb01ef80a3d1b032941ba053146ce53f77b","bytes":299987},
+ "data/ecoli_rrnb_J01695.2.fasta": {"sha256":"fcdc2fac8490ce60b15231ddf2f740982a123a42bcaf9c5e06fe7eafeffee345","bytes":7443},
+ "data/lambda.gb": {"sha256":"3c624302adeeb3c00649f549903ab781b9e75bab16069ae655833d536407367f","bytes":176721},
+ "data/pFA-KanMX4.dna": {"sha256":"73f034602def35033bb2cbaad43aec8b697f2a20f834f6192a821e203682905e","bytes":29745},
+ "data/primer3_oligotm.txt": {"sha256":"427dc1f805901a9a01a6684154d13ec79f61c6567c50b1177f9cb2fdcb77840f","bytes":3500},
+ "data/primer3_test_template.fasta": {"sha256":"0bdf6fd7231c37fe3c6c311ac05c32018330fe902694259d83f39568166c6d64","bytes":1560},
+ "data/primer3web_v4_0_0_default_settings.txt": {"sha256":"e10462e477926dfef4cec1f90a83a085a6b6579ba3c0f9e02f659be6e89e335b","bytes":4218},
+ "data/puc19.gb": {"sha256":"9498daed1c3703dd739c684a3a7bcd6770823aa4a500cf9b57cf59bbdc38f72a","bytes":8367},
+ "data/sanger_reference.fasta": {"sha256":"5749d4d4d110f6784ca915e011ec6482dc156affd0631a93ef7672143a53a245","bytes":1282},
+ "data/sars_cov_2_MN908947.3.fasta": {"sha256":"1782698e33be9ee1ef70e001793fd4016a60f4cd08a02108e26a11dfe26b28bc","bytes":30428}
+}

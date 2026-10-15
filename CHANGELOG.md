@@ -3,6 +3,16 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 15 October 2026
+
+### Smaller package
+
+- The npm package no longer contains the test data of the adapters. It is about 2.5 MB packed, from 18.5 MB.
+- The package keeps `data/SOURCES.md`, `data/files.json`, the `fetch*.sh` scripts and the data files of the self-tests.
+- `cuvette adapter check <name> --run-tests` shows the files, the source and the size of the missing test data. Then it asks before it downloads the data of that adapter only.
+- `--fetch-data` downloads without the question. A run without a terminal downloads nothing without it. If you decline, the tests that need the data do not run. This is not an error in the adapter.
+- Cuvette checks the SHA-256 sum of each download and refuses a file that does not match.
+
 ## 14 October 2026
 
 ### Slash command fixes

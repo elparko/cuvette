@@ -1,0 +1,6 @@
+{
+ "data/make_fixtures.R": {"sha256":"cfc0167ac1486c86a71d59a3b3e95de8f0063fd7e693a95d05812a188569951a","bytes":1943},
+ "data/pbc_rmst.csv": {"sha256":"f130feb4bfd4f23628ec48234e228c5bbc5af874d1e920ff1c087418c508d6ad","bytes":6559},
+ "data/rabbits_penicillin.csv": {"sha256":"a2e472689016d1b6953380f50e8660ee773fe634dce278b6e272872d4ab84221","bytes":796},
+ "data/shock_endpoints.csv": {"sha256":"c03de2344f8db0e5c912023b4f1d56f4a7e10a79b29b78fde3b1de402e466478","bytes":11174}
+}

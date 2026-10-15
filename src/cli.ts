@@ -92,8 +92,10 @@ Usage
   cuvette adapter audit <folder|name> [--model claude:<id>]
                                      ask Claude to review the files; asks first because it costs tokens
   cuvette adapter allow-code <name>  allow the code of an installed Unlisted adapter to run
-  cuvette adapter check <name|dir> [--static] [--run-tests] [--gui]
+  cuvette adapter check <name|dir> [--static] [--run-tests] [--gui] [--fetch-data]
                                      --static checks the files only. It imports no code and starts no program.
+                                     --fetch-data downloads the missing test data of this adapter only, without a question.
+                                     Without it, an interactive run asks first and a run without a terminal downloads nothing.
                                      --gui also runs the tests marked gui: true (they open a window)
   cuvette adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
                                      drive test: one plain request for each tool, run by the
@@ -249,6 +251,7 @@ const { values: o, positionals: pos } = parseArgs({
     clean: { type: "boolean" },
     cite: { type: "boolean" },
     "no-self-test": { type: "boolean" },
+    "fetch-data": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
@@ -544,7 +547,18 @@ async function main() {
         return;
       }
       if (a1 === "check") {
-        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui, static: !!o.static });
+        const fetchData = async (notice: string[]) => {
+          console.log(notice.join("\n"));
+          if (o["fetch-data"]) return true;
+          if (!process.stdin.isTTY) {
+            console.log(`Nothing was downloaded. To download this data, run the check again with --fetch-data.`);
+            return false;
+          }
+          if (/^y(es)?$/i.test((await ask(`Download this data for ${a2} only? [y/N] `)).trim())) return true;
+          console.log("Nothing was downloaded. The tests that need this data did not run. This is not an error in the adapter.");
+          return false;
+        };
+        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui, static: !!o.static, fetchData });
         for (const e of r.errors) console.log(`error: ${e}`);
         for (const w of r.warnings) console.log(`warning: ${w}`);
         for (const t of r.tests ?? []) console.log(t.skipped ? `skip ${t.id}: ${t.skipped}` : `${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);

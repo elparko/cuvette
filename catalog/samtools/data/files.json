@@ -1,0 +1,5 @@
+{
+ "data/ex1.fa": {"sha256":"b9969f5de2e8a630134fa8af6b6a9f69f540f48de9b15eaba80b6711d21b15c7","bytes":3225},
+ "data/ex1.fa.fai": {"sha256":"8f25f72e57565e0c0a18c46e06be4c82fb62966801a15bb1a7b9d7166723e925","bytes":39},
+ "data/ex1.sam.gz": {"sha256":"dc89fe1d2277324ff0de90bce457cf1579ec078a25944c8400b8a0576712993a","bytes":114565}
+}

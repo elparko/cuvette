@@ -1,0 +1,5 @@
+{
+ "data/lcms_tiny.mzML": {"sha256":"e1acdb1be29b346bfb5a8a246459fff6f4182895e320bc0300cbce70b0a0fbbc","bytes":102350},
+ "data/make_synthetic.py": {"sha256":"de90082089b31b417773b08b76df92753891524db5deab6e6aef24e4baf75fe5","bytes":1757},
+ "data/profile_tiny.mzML": {"sha256":"3b6020e4798f7934df9024ff98922896ed5f2b8fa282c05fbe983b413a8e26e8","bytes":6895}
+}

@@ -1,0 +1,7 @@
+{
+ "data/embryo_cq.csv": {"sha256":"c7ed4ae5a963939a1830c92fbd1a977b9f4cd93041541c76558d2966eafa8fcd","bytes":23231},
+ "data/embryo_dilution.csv": {"sha256":"f28aa6f541ed604a92874cc4cbe42151b28ddab6afbfe3bfabd2e32f46a4a9a8","bytes":2514},
+ "data/livak_ct.csv": {"sha256":"01983b16245ac1076193490cc56ff62e64524bbfc519fdde1b656021de0d5b6c","bytes":1004},
+ "data/livak_dilution.csv": {"sha256":"c42523ff7ba97a21f14410d16a50b302a5a97a7360d05db685581fba923eda9c","bytes":1241},
+ "data/make_fixtures.R": {"sha256":"aa8ec32f57d4494f2106726f2084e8b00d61e2bddefccc9ab73d53900ca4ad76","bytes":1322}
+}

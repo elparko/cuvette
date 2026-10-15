@@ -148,7 +148,9 @@ shortens tool results and summarizes old turns near the context limit.
 
 ### Things to try
 
-- ImageJ: `Count the cells in catalog/imagej/data/blobs.gif and give me their mean size.`
+- ImageJ: download the ImageJ sample image from https://imagej.net/ij/images/blobs.gif into a
+  folder. Start Cuvette there with `--adapter imagej`. Then ask:
+  `Count the cells in blobs.gif and give me their mean size.`
 - ImageJ trap scenario: `node bin/cuvette.js --adapter imagej` from `bench/pseudorep/data`, then
   `Are the cells in treated.png bigger than in control.png?`
 - SMILE MSI: `node bin/cuvette.js --adapter smile-msi`, then
@@ -414,14 +416,23 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 pandoc). Each catalog adapter starts as `draft`, the default status. Read an adapter, then
 approve it with `node bin/cuvette.js adapter approve <name>`. The Python adapters use virtual
 environments in `~/.cuvette/envs/`. The R adapters read the R library in `CUVETTE_R_LIBS`,
-`R_LIBS_USER` or `~/.cuvette/R-library`. Test data that a `fetch.sh` script downloads goes to
-`~/.cuvette/cache/data/`. See `docs/onboarding-queue.md`. The `run_script` tool uses
+`R_LIBS_USER` or `~/.cuvette/R-library`. See `docs/onboarding-queue.md`. The `run_script` tool uses
 `~/.cuvette/envs/science`. Its packages are in `src/tools/science-requirements.txt`.
 
 New program: `node bin/cuvette.js onboard <program> --model claude`. The agent finds the program,
 reads its help and docs, writes a draft adapter in `~/.cuvette/drafts/`, and runs the
 checker. Check an adapter with `node bin/cuvette.js adapter check <dir> --run-tests`. Approve it with
 `node bin/cuvette.js adapter approve <dir>`.
+
+The npm package does not contain the test data of the adapters (about 33 MB). It contains only the
+small files that the self-tests read. Sometimes a test needs data that the computer does not have. Then `adapter check --run-tests`
+shows the adapter name, the file names, the source and the size. It asks before it downloads the
+data of that adapter. Add `--fetch-data` to download without the question. A run
+without a terminal downloads nothing without `--fetch-data`. If you decline, the tests that need
+the data do not run. This is not an error in the adapter. The data comes from the fetch script of
+the adapter or from the public repository at https://github.com/elparko/cuvette. Cuvette checks
+the SHA-256 sum of each file. `data/SOURCES.md` in each adapter folder lists the source of each
+file.
 
 ## Benchmark
 

@@ -1,0 +1,8 @@
+{
+ "data/hmp2_metadata.tsv": {"sha256":"0dd3b50539e5cff9384fa6ca5a2bb21d40806580383dbbd24a2d82236c4b6984","bytes":108816},
+ "data/hmp2_taxonomy.tsv": {"sha256":"c923f1d9d4ce8e7297e2a2043bcb0134f697730baaf12755f0d6c42914dd54b5","bytes":788736},
+ "data/limit_metadata.csv": {"sha256":"4f7e424c4461b1ab30b5a0a04e4732caaa8dc53a1dcc5b9dbd09d374425ca80e","bytes":20838},
+ "data/limit_otutable.csv": {"sha256":"d5ea8e304cfa40917471ee081999fa222834f9405b0003fb8041cdbb711fa8bb","bytes":267055},
+ "data/selex_last400.csv": {"sha256":"43dbb70137aa3512d40bf9c6ead6fc3a5d8e96ebbe9a5537b482dd069dad62ce","bytes":19310},
+ "data/selex_metadata.csv": {"sha256":"518e14133e316b65d74a949ff1daec40c67f1aeb12a50fb2dbdf9702b2cf5cea","bytes":143}
+}

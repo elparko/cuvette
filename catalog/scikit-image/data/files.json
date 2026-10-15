@@ -1,0 +1,7 @@
+{
+ "data/blobs.gif": {"sha256":"507d168e317a6b80cd4a2e94f5ff483769779553b7d02b98cb94f790333d5271","bytes":25765},
+ "data/nuinsseg-mini/human_liver/label masks/human_liver_01.tif": {"sha256":"5f8bbd2c925df6d243fee72133045cb6977da8dbc9beee4433527266a97d9e49","bytes":557},
+ "data/nuinsseg-mini/human_liver/tissue images/human_liver_01.png": {"sha256":"7ce9befd84413bb645fdf32ed09d059b7fb776eb5636f038c639158ec984fb93","bytes":27991},
+ "data/nuinsseg-mini/mouse_spleen/label masks/mouse_spleen_01.tif": {"sha256":"cb4127fb3340f1fd7d28bfda0e16e58019768d30b66469bc8b65a0c0eb9fbaa2","bytes":1161},
+ "data/nuinsseg-mini/mouse_spleen/tissue images/mouse_spleen_01.png": {"sha256":"798e0c68a7950a4c9d3fa1d6f4335717fb755acd7aa0bcf2afe29859772e1e36","bytes":28281}
+}

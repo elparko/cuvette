@@ -1,0 +1,5 @@
+{
+ "data/ki67_crop.ome.tif": {"sha256":"45fec875feca54d3fa6b99ce501bc12a59101932368e0189a33cd36a43b55c24","bytes":31101},
+ "data/ki67_crop.png": {"sha256":"f473559b45d0df743be9eb0c14d1ae2e2ce1bd045f198eead58091f90f166a34","bytes":246477},
+ "data/prostate_thumb.png": {"sha256":"c6475aa7b0ee0b02689cab04cddc6fe61cf297ccb55378f7623cb0f0c24ef857","bytes":290955}
+}
