@@ -420,15 +420,23 @@ export class Session {
     for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
+    const replaced: string[] = [];
     try {
       const dirs = adapterDirs(cwd);
       const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
       const guarded = [cwd, place.recordDir, place.outDir].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
       const inGuarded = (path: string) => guarded.some((d) => realpathSync(path) === d || realpathSync(path).startsWith(d + sep));
       const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : dirs[name] ?? name);
+      for (const a of opts.addAdapters ?? []) {
+        try {
+          const found = findAdapter(a, cwd);
+          const before = [recorded.get(found.name), dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
+          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) replaced.push(found.name);
+        } catch {}
+      }
       adapters =
         opts.adapters ??
-        [...recorded].map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
+        [...recorded].filter(([name]) => !replaced.includes(name)).map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
           try {
             findAdapter(ref, cwd, { byName: ref === name && !dirs[name] });
             return true;
@@ -450,6 +458,7 @@ export class Session {
       if (last?.scope === "session" && last.new !== null && last.new !== undefined) kept[name] = last.new;
     }
     const s = await Session.create({ ...opts, settings: { ...kept, ...opts.settings }, cwd, place, adapters: [...adapters, ...(opts.addAdapters ?? [])], id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    for (const name of replaced) s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. This session used another folder before.`, warn: true });
     for (const [name, untrusted] of gone) {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`

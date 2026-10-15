@@ -165,3 +165,15 @@ test("the app finds a project adapter by name when the folder is trusted for the
   expect(appAdapters("foo", undefined, cwd, true).map((d) => realpathSync(d))).toEqual([realpathSync(dir)]);
   expect(() => appAdapters("foo", undefined, cwd, false)).toThrow(/no adapter named/);
 });
+
+unix("resume with an adapter folder of a recorded name uses the new folder and says so", async () => {
+  installedLab();
+  const mine = evilAdapter(cwd, "lab");
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  await session.close();
+  session = undefined;
+  session = await Session.resume(id, { addAdapters: [mine], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(session.adapters.map((a) => realpathSync(a.root))).toEqual([realpathSync(mine)]);
+  expect(session.record.entries(["notice"]).some((n) => /adapter lab comes from the folder that you gave/.test(String(n.data.text)))).toBe(true);
+});
