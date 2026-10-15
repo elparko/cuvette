@@ -108,3 +108,17 @@ test("a command hook keeps a multi-byte character that spans two output chunks",
   const r = await new HookRunner([], { PostToolUse: [{ command: split }] }).post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
   expect(r.additionalContext).toBe(text);
 });
+
+test("the notices of a command hook write out escape sequences of the command and of its output", async () => {
+  const esc = "\\u001b]0;SECRET-TEXT\\u0007";
+  const fail = script("fail-esc.js", `process.stderr.write("bad ${esc}");process.exit(1)`);
+  const e = await new HookRunner([], { PreToolUse: [{ command: [...fail, `arg${"\u001b]0;SECRET-ARG\u0007"}`] }] }).pre(input);
+  const text = JSON.stringify(e);
+  expect(text).toContain("SECRET-TEXT");
+  expect(text).toContain("SECRET-ARG");
+  expect(text).not.toMatch(/\\u001b|\\u0007/);
+  const block = script("block-esc.js", `process.stderr.write("no ${esc}");process.exit(2)`);
+  const r = await new HookRunner([], { PreToolUse: [{ command: block }] }).pre(input);
+  expect(r.reason).toContain("SECRET-TEXT");
+  expect(r.reason).not.toMatch(/[\u0000-\u0008\u000b-\u001f]/);
+});

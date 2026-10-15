@@ -8,7 +8,7 @@ import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS, settingFits, wellTyped } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
-import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
+import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, oneLine, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
 import { folderHasNoPatientData, setFolderNoPatientData } from "./phi.ts";
 
 export type Scope = "session" | "user" | "project";
@@ -294,7 +294,7 @@ export const SETTINGS: SettingDef[] = [
     },
     details: (ctx) => {
       const t = trustStatus(ctx.cwd);
-      return [`Folder: ${t.scan.folder}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : folderLines(t.scan))];
+      return [`Folder: ${oneLine(t.scan.folder)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : folderLines(t.scan))];
     },
   },
   {

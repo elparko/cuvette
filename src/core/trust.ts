@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { harnessWrite } from "./harness-writes.ts";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
 
@@ -88,6 +88,8 @@ function parse(path: string): Record<string, unknown> {
 }
 
 interface WalkState {
+  root: string;
+  top: string;
   files: Record<string, string>;
   count: number;
   incomplete: string[];
@@ -114,6 +116,16 @@ function linkHash(p: string): string {
   return sha(`link:${target}:${content}`);
 }
 
+function leavesRoot(p: string, root: string): boolean {
+  try {
+    const real = realpathSync(p);
+    const rel = relative(root, real);
+    return statSync(real).isDirectory() && (rel.startsWith("..") || isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
 function listing(dir: string, key: string, st: WalkState): void {
   const h = createHash("sha256");
   let n = 0;
@@ -135,14 +147,26 @@ function listing(dir: string, key: string, st: WalkState): void {
       }
       if (++n > MAX_LISTED) {
         st.incomplete.push(`too many files in ${relative(key, dir)}`);
-        st.files[`${relative(key, dir)} (listing)`] = "too many files";
+        st.files[`(listing) ${relative(key, dir)}`] = "too many files";
         return;
       }
-      h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? "link" : ""}\n`);
+      if (l.isSymbolicLink() && leavesRoot(p, st.root)) st.linked.push(relative(key, p));
+      h.update(`${relative(key, p)}\0${l.size}\0${l.mtimeMs}\0${l.isSymbolicLink() ? linkHash(p) : ""}\n`);
       if (l.isDirectory()) stack.push(p);
     }
   }
-  st.files[`${relative(key, dir)} (listing)`] = h.digest("hex");
+  st.files[`(listing) ${relative(key, dir)}`] = h.digest("hex");
+}
+
+function gitFolder(git: string, key: string, st: WalkState, found: string[]): void {
+  const config = join(git, "config");
+  if (existsSync(config)) st.files[relative(key, config)] = readHash(config);
+  const hooks = join(git, "hooks");
+  const l = lstatSync(hooks, { throwIfNoEntry: false });
+  if (l?.isSymbolicLink()) {
+    st.files[`(link) ${relative(key, hooks)}`] = linkHash(hooks);
+    if (statSync(hooks, { throwIfNoEntry: false })?.isDirectory()) st.linked.push(relative(key, hooks));
+  } else if (l?.isDirectory()) walk(hooks, key, st, found);
 }
 
 function walk(dir: string, key: string, st: WalkState, found: string[]): void {
@@ -150,11 +174,11 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
   try {
     names = readdirSync(dir).sort();
   } catch {
-    st.files[`${relative(key, dir)} (unreadable folder)`] = "unreadable";
+    st.files[`(unreadable folder) ${relative(key, dir)}`] = "unreadable";
     return;
   }
   for (const name of names) {
-    if (name === ".git" || skipped(dir, name)) continue;
+    if (skipped(dir, name)) continue;
     const p = join(dir, name);
     const r = relative(key, p);
     let l;
@@ -164,7 +188,7 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
       continue;
     }
     if (l.isSymbolicLink()) {
-      st.files[`${r} (link)`] = linkHash(p);
+      st.files[`(link) ${r}`] = linkHash(p);
       let folder = false;
       try {
         folder = statSync(p).isDirectory();
@@ -173,7 +197,8 @@ function walk(dir: string, key: string, st: WalkState, found: string[]): void {
       continue;
     }
     if (l.isDirectory()) {
-      if (LISTED.has(name)) listing(p, key, st);
+      if (name === ".git" && dir !== st.top) gitFolder(p, key, st, found);
+      else if (LISTED.has(name)) listing(p, key, st);
       else walk(p, key, st, found);
       continue;
     }
@@ -229,14 +254,23 @@ function safeNames(dir: string): string[] {
   }
 }
 
-const LAB_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufe00-\ufe0f\ufeff\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
+const LAB_HIDDEN = "[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\u2028\\u2029\\p{Default_Ignorable_Code_Point}]";
+const LAB_ESCAPE_LOOKALIKE = "x[0-9a-f]{2}|u[0-9a-f]{4}|u\\{[0-9A-F]{5,6}\\}";
+const LAB_CONTROL = new RegExp(`(?<!\\\\)(\\\\+)(?=${LAB_ESCAPE_LOOKALIKE}|${LAB_HIDDEN})|${LAB_HIDDEN}`, "gu");
 
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
+// The function doubles a backslash in front of text that looks like one of these escapes. Then two different texts never show the same.
 export function labDisplayText(text: string): string {
-  return text.replace(LAB_CONTROL, (c) => {
+  return text.replace(LAB_CONTROL, (c, run?: string) => {
+    if (run !== undefined) return run + run;
     const n = c.codePointAt(0)!;
     return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
   });
+}
+
+export function oneLine(text: string): string {
+  const t = labDisplayText(text);
+  return t.includes("\n") || t.includes("\\") || t.startsWith('"') ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
 }
 
 export const LAB_MAX_BYTES = 64 * 1024;
@@ -290,7 +324,7 @@ export function scanFolder(folder: string): FolderScan {
       }
       if (!st.isDirectory()) continue;
       const found: string[] = [];
-      const state: WalkState = { files, count: 0, incomplete, linked };
+      const state: WalkState = { root: realpathSync(dir), top: dir, files, count: 0, incomplete, linked };
       walk(dir, key, state, found);
       if (part === "methods") methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
     }
@@ -298,7 +332,7 @@ export function scanFolder(folder: string): FolderScan {
   if (labBytes) files[LAB_FILE] = sha(labBytes);
   else if (labBig) files[LAB_FILE] = sha(`too large ${labBig}`);
   for (const p of paths) files[relative(key, p)] = readHash(p);
-  for (const l of linked) files[`${l} (linked folder)`] = linkHash(join(key, l));
+  for (const l of linked) files[`(linked folder) ${l}`] = linkHash(join(key, l));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);
@@ -388,18 +422,18 @@ export function untrustFolder(folder: string): boolean {
 
 function changesSince(e: TrustEntry, s: FolderScan): string[] {
   const out: string[] = [];
-  for (const k of s.keys) if (!e.keys?.includes(k)) out.push(`new settings key: ${k}`);
-  for (const h of s.hooks) if (!e.hooks?.includes(h)) out.push(`new hook: ${h}`);
-  for (const a of s.adapters) if (!e.adapters?.includes(a.name)) out.push(`new adapter: ${a.name}`);
-  for (const [p, h] of Object.entries(s.files)) if (!e.files?.[p]) out.push(`new file: ${p}`);
-  else if (e.files[p] !== h) out.push(`changed file: ${p}`);
-  for (const p of Object.keys(e.files ?? {})) if (!(p in s.files)) out.push(`removed file: ${p}`);
+  for (const k of s.keys) if (!e.keys?.includes(k)) out.push(`new settings key: ${oneLine(k)}`);
+  for (const h of s.hooks) if (!e.hooks?.includes(h)) out.push(`new hook: ${oneLine(h)}`);
+  for (const a of s.adapters) if (!e.adapters?.includes(a.name)) out.push(`new adapter: ${oneLine(a.name)}`);
+  for (const [p, h] of Object.entries(s.files)) if (!e.files?.[p]) out.push(`new file: ${oneLine(p)}`);
+  else if (e.files[p] !== h) out.push(`changed file: ${oneLine(p)}`);
+  for (const p of Object.keys(e.files ?? {})) if (!(p in s.files)) out.push(`removed file: ${oneLine(p)}`);
   return out;
 }
 
 export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
-  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${p}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${r}. Cuvette cannot check the folder, so it does not trust it.`)] };
+  if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${oneLine(p)}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${oneLine(r)}. Cuvette cannot check the folder, so it does not trust it.`)] };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
   if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);
@@ -409,7 +443,7 @@ export function trustStatus(folder: string): TrustStatus {
 }
 
 export function untrustable(scan: FolderScan): string | undefined {
-  const reasons = [...scan.linked.map((p) => `the linked folder ${p}`), ...scan.incomplete];
+  const reasons = [...scan.linked.map((p) => `the linked folder ${oneLine(p)}`), ...scan.incomplete.map(oneLine)];
   return reasons.length ? `Cuvette cannot trust this folder: ${reasons.join("; ")}. Remove the link or the extra files, then try again.` : undefined;
 }
 
@@ -431,32 +465,27 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
 
 const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
 
-const show = (v: unknown) => {
-  const t = plainText(typeof v === "string" ? v : JSON.stringify(v));
-  if (t.length <= 200) return t;
-  const cut = /[\ud800-\udbff]/.test(t[198]!) ? 198 : 199;
-  return t.slice(0, cut) + "…";
-};
+const show = (v: unknown) => oneLine(typeof v === "string" ? v : JSON.stringify(v));
 
 export function folderLines(s: FolderScan, trusted = false): string[] {
   const out: string[] = [];
-  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${k}: ${show(s.values[k])}`));
+  if (s.keys.length) out.push("Settings that would change:", ...s.keys.map((k) => `  ${oneLine(k)}: ${show(s.values[k])}`));
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
-  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
-  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
-  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
-  const labPath = join(s.folder, LAB_FILE);
+  if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${oneLine(h)}`));
+  if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${oneLine(a.name)}${a.replaces ? `: replaces ${oneLine(a.replaces)}` : ""}`));
+  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${oneLine(m)}`));
+  const labPath = oneLine(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
-  if (s.labProblem) out.push(`LAB.md could not be read: ${s.labProblem}. Cuvette ignores it.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${shellQuote(s.folder)}`}`);
+  if (s.labProblem) out.push(`LAB.md could not be read: ${oneLine(s.labProblem)}. Cuvette ignores it.`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run: cuvette trust add ${labDisplayText(shellQuote(s.folder))}`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
 
 export function trustText(t: TrustStatus): string {
   return t.state === "changed"
-    ? `The Cuvette files in ${t.scan.folder} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
-    : `The folder ${t.scan.folder} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
+    ? `The Cuvette files in ${oneLine(t.scan.folder)} changed after you trusted this folder. Cuvette ignores them until you trust the folder again.`
+    : `The folder ${oneLine(t.scan.folder)} has its own Cuvette settings, hooks, adapters or lab rules (LAB.md). They can run programs on this computer or change the instructions of the agent. Cuvette ignores them until you trust the folder.`;
 }
 
 export function trustEvidence(t: TrustStatus): string {
@@ -466,7 +495,7 @@ export function trustEvidence(t: TrustStatus): string {
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${shellQuote(t.scan.folder)}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
+  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${labDisplayText(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {

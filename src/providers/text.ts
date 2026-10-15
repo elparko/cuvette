@@ -1,19 +1,19 @@
-const SPECIAL_TOKENS = /<\|[^|<>\n]{1,48}\|>|<｜[^｜<>\n]{1,48}｜>|\[\/?INST\]|<<\/?SYS>>|<\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>|\[(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\]/gi;
+const NAME = "(?:\\u200b*[^|<>\\n\\u200b]){1,48}\\u200b*";
+const NAME_WIDE = "(?:\\u200b*[^｜<>\\n\\u200b]){1,48}\\u200b*";
+const tokens = (open: (c: string) => string) => [`${open("<")}\\|${NAME}\\|>`, `${open("<")}｜${NAME_WIDE}｜>`, `${open("\\[")}\\/?INST\\]`, `${open("<")}<\\/?SYS>>`, `${open("<")}\\/?(?:start_of_turn|end_of_turn|bos|eos|s|think|tool_response)>`, `${open("\\[")}(?:TOOL_CALLS|TOOL_RESULTS|SYSTEM_PROMPT)\\]`].join("|");
+const FANGED = (c: string) => `${c}\\u200b+`;
+const MARKER_OR_FANGED = new RegExp(`${tokens((c) => c)}|${tokens(FANGED)}`, "gi");
+const FANGED_ONLY = new RegExp(tokens(FANGED), "gi");
 
 // A local model server can read a chat template marker in text as a real marker. A zero-width space after the first character makes it plain text.
+// A marker that has zero-width spaces already gets one more. A marker inside a marker gets its own. Then refang gives back the same text.
 export function defang(text: string): string {
-  return text.replace(SPECIAL_TOKENS, (m) => `${m[0]}\u200b${m.slice(1)}`);
+  return text.replace(MARKER_OR_FANGED, (m) => `${m[0]}\u200b${defang(m.slice(1))}`);
 }
-
-const MARKER_AT = new RegExp(SPECIAL_TOKENS.source, "iy");
 
 // The model copies a marker with its zero-width space into a tool call. The tool must get the marker as it is in the file.
 export function refang(text: string): string {
-  return text.replace(/([<[])\u200b/g, (m, c: string, at: number, whole: string) => {
-    MARKER_AT.lastIndex = 0;
-    const rest = c + whole.slice(at + 2, at + 80);
-    return MARKER_AT.test(rest) ? c : m;
-  });
+  return text.replace(FANGED_ONLY, (m) => m[0] + refang(m.slice(2)));
 }
 
 export function refangDeep<T>(v: T): T {
@@ -31,15 +31,22 @@ export function defangDeep<T>(v: T): T {
 }
 
 export function wrapperText(text: string): string {
-  return defang(text.replace(/<(\s*\/?\s*)(tool_result|tool_call|tool_response)/gi, "<$1_$2"));
+  return defang(text.replace(/<(\s*(?:\/\s*)?)(tool_result|tool_call|tool_response)/gi, "<$1_$2"));
 }
 
 export function splitThink(raw: string): { text: string; thinking: string } {
   const thoughts: string[] = [];
-  let text = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
-    thoughts.push(t.trim());
-    return "";
-  });
+  let text = "";
+  let at = 0;
+  for (;;) {
+    const from = raw.indexOf("<think>", at);
+    const to = from < 0 ? -1 : raw.indexOf("</think>", from + 7);
+    if (to < 0) break;
+    text += raw.slice(at, from);
+    thoughts.push(raw.slice(from + 7, to).trim());
+    at = to + 8;
+  }
+  text += raw.slice(at);
   const open = text.indexOf("<think>");
   if (open >= 0) {
     thoughts.push(text.slice(open + 7).trim());
@@ -93,13 +100,37 @@ export class ThinkSplitter {
   }
 }
 
+function stackObjects(s: string): { start: number; end: number }[] {
+  const stack: number[] = [];
+  const pairs: { start: number; end: number }[] = [];
+  let inStr = false;
+  for (let j = 0; j < s.length; j++) {
+    const c = s[j];
+    if (inStr) {
+      if (c === "\\") j++;
+      else if (c === '"') inStr = false;
+    } else if (c === '"' && stack.length) inStr = true;
+    else if (c === "{") stack.push(j);
+    else if (c === "}" && stack.length) pairs.push({ start: stack.pop()!, end: j + 1 });
+  }
+  const found: { start: number; end: number }[] = [];
+  let last = 0;
+  for (const p of pairs.sort((x, y) => x.start - y.start)) {
+    if (p.start < last) continue;
+    found.push(p);
+    last = p.end;
+  }
+  return found;
+}
+
 function balancedObjects(s: string): { start: number; end: number }[] {
   const found: { start: number; end: number }[] = [];
+  let budget = 8 * s.length + 10_000;
   for (let i = 0; i < s.length; i++) {
     if (s[i] !== "{") continue;
     let depth = 0;
     let inStr = false;
-    for (let j = i; j < s.length; j++) {
+    for (let j = i; j < s.length && budget-- > 0; j++) {
       const c = s[j];
       if (inStr) {
         if (c === "\\") j++;
@@ -116,11 +147,8 @@ function balancedObjects(s: string): { start: number; end: number }[] {
   return found;
 }
 
-export function extractTextToolCall(
-  text: string,
-  toolNames: string[],
-): { name: string; args: Record<string, unknown>; rest: string } | null {
-  for (const { start, end } of balancedObjects(text)) {
+function callIn(text: string, spans: { start: number; end: number }[], toolNames: string[]): { name: string; args: Record<string, unknown>; rest: string } | null {
+  for (const { start, end } of spans) {
     let obj: any;
     try {
       obj = JSON.parse(text.slice(start, end));
@@ -144,6 +172,13 @@ export function extractTextToolCall(
     return { name: obj.name, args, rest };
   }
   return null;
+}
+
+export function extractTextToolCall(
+  text: string,
+  toolNames: string[],
+): { name: string; args: Record<string, unknown>; rest: string } | null {
+  return callIn(text, stackObjects(text), toolNames) ?? callIn(text, balancedObjects(text), toolNames);
 }
 
 export function lastCallNumber(messages: { parts: { type: string; id?: string }[] }[]): number {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { closeSync, openSync, readSync, realpathSync, statSync } from "node:fs";
+import { closeSync, openSync, readSync, realpathSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 export function hashBytes(path: string, from = 0, limit = Infinity): string {
@@ -19,13 +19,9 @@ export function hashBytes(path: string, from = 0, limit = Infinity): string {
   return h.digest("hex");
 }
 
-const BIG = 5_000_000;
-
 export function fileHash(path: string): string {
   try {
-    const size = statSync(path).size;
-    if (size <= BIG) return hashBytes(path);
-    return `${size}:${hashBytes(path, 0, 1 << 20)}:${hashBytes(path, size - (1 << 20), 1 << 20)}`;
+    return hashBytes(path);
   } catch {
     return "";
   }
