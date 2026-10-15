@@ -210,8 +210,7 @@ for (const platform of ["win32", "darwin"]) {
   });
 }
 
-test("write_file keeps the letter case of a path on Linux", async () => {
-  if (realPlatform === "darwin" || realPlatform === "win32") return;
+test.skipIf(realPlatform === "darwin" || realPlatform === "win32")("write_file keeps the letter case of a path on Linux", async () => {
   const project = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-generic-case-")));
   mkdirSync(join(project, ".cuvette"));
   mkdirSync(join(project, "hooks"));

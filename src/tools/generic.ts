@@ -11,7 +11,7 @@ import { guardCommand, settingsScope } from "./run_script.ts";
 const foldCase = (p: string) => (process.platform === "win32" || process.platform === "darwin" ? p.toLowerCase() : p);
 
 const below = (root: string, p: string) => {
-  const rel = relative(foldCase(root), foldCase(p));
+  const rel = relative(root, p);
   return !!rel && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
 };
 
@@ -65,16 +65,17 @@ function inRecordFolder(p: string): boolean {
 }
 
 function guarded(target: string, dirs: Dirs): boolean {
-  const inside = (root: string, p: string) => foldCase(p) === foldCase(root) || below(root, p);
+  const under = (root: string, p: string) => below(foldCase(root), foldCase(p));
+  const inside = (root: string, p: string) => foldCase(p) === foldCase(root) || under(root, p);
   const record = realish(dirs.sessionDir);
   const work = realish(dirs.workDir);
-  const legacy = below(record, work);
+  const legacy = under(record, work);
   for (const t of [realish(target), resolve(target)]) {
     if (inside(record, t) && !(legacy && inside(work, t))) return true;
     if (inRecordFolder(t)) return true;
   }
   for (const [t, w, project] of [[realish(target), work, dirs.projectDir && realish(dirs.projectDir)], [resolve(target), resolve(dirs.workDir), dirs.projectDir && resolve(dirs.projectDir)]] as const) {
-    if (below(w, t) || !project || !below(project, t)) continue;
+    if (under(w, t) || !project || !under(project, t)) continue;
     const parts = relative(project, t).split(/[\\/]/);
     if (GUARDED_NAMES.has(parts[0]!.toLowerCase()) || (parts.length === 1 && parts[0]!.toLowerCase() === "lab.md")) return true;
   }
