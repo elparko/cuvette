@@ -457,6 +457,12 @@ accepts or picks another. If the scientist gives the decision to the agent, the 
 and the record shows an agent choice. In a headless run, the answers file can set it, such as
 `"adapter": "biostats"`. `--adapter` names the adapters before the start, with no card. With `--resume`, it adds them to the recorded adapters. A name is an installed or catalog adapter. To load a folder, write `./folder` or an absolute path.
 
+A resumed session does not load a recorded adapter folder from the record. This rule protects you from a record that another person made.
+The exceptions are an installed or catalog adapter name and a folder that a trusted project folder covers.
+The notice names the folder. To load it, run `cuvette resume <id> --adapter <folder>`.
+The commands `cuvette eln push` and `cuvette eln link` also take `--adapter <folder>`.
+The app has no card for this. Start it with `cuvette app --resume <id> --adapter <folder>`.
+
 After a load, the record has an `adapter` entry with the name, the adapter version, the program
 version, the reason and who chose it. Setup-stage decisions of the new adapter get their defaults,
 or the values from the setup and answers files, in a new `setup` entry. New tools go to the end of

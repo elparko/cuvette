@@ -82,7 +82,7 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   session = undefined;
   session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual([]);
-  expect(session.record.entries(["notice"]).some((n) => /the adapter evil from .* before.*does not load it/.test(String(n.data.text)))).toBe(true);
+  expect(session.record.entries(["notice"]).map((n) => String(n.data.text))).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run: cuvette resume ${id} --adapter ${dir}`);
 });
 
 unix("resume does not load an adapter from a recorded path outside the project and names the path in a notice", async () => {
@@ -98,7 +98,7 @@ unix("resume does not load an adapter from a recorded path outside the project a
     expect(session.adapters.map((a) => a.name)).toEqual([]);
     const text = session.record.entries(["notice"]).map((n) => String(n.data.text)).find((t) => t.includes("evil"));
     expect(text).toContain(dir);
-    expect(text).toContain("--adapter");
+    expect(text).toContain(`Cuvette did not load the adapter folder ${dir} from the record. Run: cuvette resume ${id} --adapter ${dir}`);
     await session.close();
     session = undefined;
     session = await Session.resume(id, { addAdapters: [dir], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });

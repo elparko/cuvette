@@ -489,7 +489,7 @@ export class Session {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? `The session loaded the adapter ${name} from ${stray} before. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
+        ? `Cuvette did not load the adapter folder ${stray} from the record. Run: cuvette resume ${id} --adapter ${stray}`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
