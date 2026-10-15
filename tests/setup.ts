@@ -7,8 +7,10 @@ import { readOldEnv } from "../src/core/old-names.ts";
 readOldEnv();
 process.env.CUVETTE_CARD_GUARD_MS = "0";
 
-const tempRoot = mkdtempSync(join(realpathSync(tmpdir()), "cuvette-test-"));
+const tempRoot = mkdtempSync(join(realpathSync.native(tmpdir()), "cuvette-test-"));
 process.env.TMPDIR = tempRoot;
+process.env.TEMP = tempRoot;
+process.env.TMP = tempRoot;
 process.env.CUVETTE_SPEND_FILE = join(tempRoot, "spend.jsonl");
 afterAll(() => {
   try {
