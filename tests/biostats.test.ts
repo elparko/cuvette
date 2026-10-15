@@ -171,4 +171,11 @@ describe.skipIf(!existsSync(PY))("biostats exclusions and coding", () => {
     const r = call("inspect_table", { path: p });
     expect(r.metrics!.n_placeholder_cells).toBeUndefined();
   });
+
+  test.each(["ga_biostats", "ga_anova"])("%s keeps an ID column with a leading zero and a 17-digit barcode column as text", (mod) => {
+    const p = write("ids.csv", "id,barcode,y\n007,12345678901234567,1\n008,12345678901234568,2\n-,12345678901234569,3\n");
+    const code = `import json, sys\nsys.path.insert(0, ${JSON.stringify(DIR)})\nimport ${mod} as b\nf = b._typed(sys.argv[1], "utf-8")\nprint(json.dumps([[str(v) for v in f[c]] for c in ["id", "barcode"]]))`;
+    const out = execFileSync(PY, ["-c", code, p], { encoding: "utf8", env: { ...process.env, PYTHONWARNINGS: "ignore" } });
+    expect(JSON.parse(out.trim().split("\n").at(-1)!)).toEqual([["007", "008", "nan"], ["12345678901234567", "12345678901234568", "12345678901234569"]]);
+  });
 });
