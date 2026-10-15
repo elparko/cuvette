@@ -43,6 +43,11 @@ export function runs(n: number): number {
 }
 
 export function msFor(f: () => void): number {
+  if (process.platform === "win32") {
+    const start = performance.now();
+    f();
+    return performance.now() - start;
+  }
   const t = process.cpuUsage();
   f();
   const d = process.cpuUsage(t);
