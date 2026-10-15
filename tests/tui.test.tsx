@@ -576,8 +576,8 @@ describe("API key", () => {
       await until(() => h.all().includes("Claude API key"));
       await type(h, "\t");
       await until(() => h.all().includes("Cuvette found no ant login"));
-      mkdirSync(join(cfg, "credentials"));
-      writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+      mkdirSync(join(cfg, "configs"));
+      writeFileSync(join(cfg, "configs", "default.json"), "{}");
       await type(h, "\t");
       await until(() => h.all().includes("Cuvette found your ant auth login"));
       await until(() => h.last().includes("Ask for an analysis step"));
