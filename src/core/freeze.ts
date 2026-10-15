@@ -8,7 +8,7 @@ export const NO_REASON = "No reason given";
 export const AFTER_RESULT = "Changed after the result was seen";
 export const NO_DEVIATIONS = "None. The analysis followed the frozen plan.";
 
-export type DeviationKind = "step" | "method" | "setting" | "exclusion" | "definition" | "program";
+export type DeviationKind = "step" | "method" | "setting" | "exclusion" | "definition" | "program" | "section";
 
 export interface PlanChange {
   kind: DeviationKind;
@@ -111,6 +111,8 @@ export function setDeviationReason(record: AnalysisRecord, id: number, reason: s
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const isEmpty = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length);
+const SECTION_LABEL = { question: "Question", data: "Data", outputs: "Outputs", checks: "Checks", pilot: "Pilot", out_of_scope: "Out of scope" } as const;
 const text = (v: unknown) => (v === undefined || v === null || v === "" ? "none" : typeof v === "string" ? v : JSON.stringify(v));
 
 export function planChanges(from: AnalysisPlan, to: AnalysisPlan, opts: { settings?: boolean } = {}): PlanChange[] {
@@ -143,6 +145,11 @@ export function planChanges(from: AnalysisPlan, to: AnalysisPlan, opts: { settin
   for (const g of to.programs ?? []) {
     const old = from.programs?.find((x) => same(x.part, g.part));
     if (old && old.adapter !== g.adapter) out.push({ kind: "program", what: `Program for ${g.part || "the analysis"}`, from: old.adapter, to: g.adapter });
+  }
+  for (const k of Object.keys(SECTION_LABEL) as (keyof typeof SECTION_LABEL)[]) {
+    const was = isEmpty(from[k]) ? "none" : text(from[k]);
+    const now = isEmpty(to[k]) ? "none" : text(to[k]);
+    if (was !== now) out.push({ kind: "section", what: `${SECTION_LABEL[k]} of the plan`, from: was, to: now });
   }
   return out;
 }

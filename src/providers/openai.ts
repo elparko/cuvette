@@ -190,7 +190,7 @@ export class OpenAIProvider implements Provider {
         if (res.reply) return res.reply;
         const err = await this.httpError(res.r, body);
         if (err !== "again") throw err;
-        if (again > 2) throw new ProviderError("The model server refused the request.");
+        if (again > 3) throw new ProviderError("The model server refused the request.");
       }
     } catch (e) {
       throw this.failure(e, idle.signal);

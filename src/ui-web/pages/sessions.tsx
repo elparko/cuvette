@@ -78,9 +78,11 @@ export function useSessions(page: Page, boots: number, idle = true) {
 
 export type Sessions = ReturnType<typeof useSessions>;
 
+const ACTION = "min-h-8 rounded-md px-2 py-1 text-xs text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring";
+
 const STATUS_TONE: Record<string, "mag" | "info" | "ok" | "default"> = { "waiting for you": "mag", running: "info", answered: "ok" };
 
-export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; onRemove?: (id: string) => void; compact?: boolean; label?: string }) {
+export function SessionGrid({ list, onOpen, onRename, onRemove, compact, label = "Sessions" }: { list: SessionCard[]; onOpen: (id: string) => void; onRename?: (s: SessionCard) => void; onRemove?: (s: SessionCard) => void; compact?: boolean; label?: string }) {
   const rove = useRoving(list.filter((s) => !s.moved).map((s) => s.id));
   return (
     <ul aria-label={label} ref={rove.ref} onKeyDown={rove.onKeyDown} onFocus={rove.onFocus} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -112,10 +114,19 @@ export function SessionGrid({ list, onOpen, onRemove, compact, label = "Sessions
               </span>
             </div>
           </button>
-          {s.moved && onRemove && (
-            <button type="button" onClick={() => onRemove(s.id)} className="self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Remove ${s.title} from the list`}>
-              Remove from the list
-            </button>
+          {(onRename || onRemove) && (
+            <div className="flex flex-wrap gap-1">
+              {onRename && (
+                <button type="button" onClick={() => onRename(s)} className={ACTION} aria-label={`Rename ${s.title}`}>
+                  Rename
+                </button>
+              )}
+              {onRemove && (
+                <button type="button" onClick={() => onRemove(s)} className={ACTION} aria-label={`Remove ${s.title} from the list`}>
+                  Remove from the list
+                </button>
+              )}
+            </div>
           )}
         </li>
       ))}

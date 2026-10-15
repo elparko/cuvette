@@ -31,6 +31,7 @@ export interface CommandCtx {
   clear(): void;
   quit(): void;
   keys?(): string;
+  web?: boolean;
   outputs(): OutputRef[];
   toggleDetails(): boolean;
   startWindow(): Promise<string>;
@@ -1008,7 +1009,8 @@ const base: Command[] = [
     run(_, ctx) {
       const list = listSessions().slice(0, 10);
       const text = list.length ? list.map((s) => sessionLine(s)).join("\n") : "No past sessions.";
-      ctx.print(`${text}\n\nTo continue one, quit and run: cuvette resume`, "Sessions");
+      const how = ctx.web ? "To continue one, open the Sessions page." : "To continue one, quit and run: cuvette resume";
+      ctx.print(`${text}\n\n${how}`, "Sessions");
     },
   },
   {

@@ -13,7 +13,7 @@ type Step =
   | { t: "path"; text: string }
   | { t: "add"; text: string }
   | { t: "plan"; plan: Plan; sel: number; path?: string }
-  | { t: "busy"; text: string; lines: string[] };
+  | { t: "busy"; text: string; lines: string[]; stop?: boolean };
 
 const COLOR: Record<string, string | undefined> = { installed: "green", custom: "green", found: "green", missing: "red", old: "yellow", none: undefined };
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -27,6 +27,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
   const [msg, setMsg] = useState<{ text: string; color?: string }>();
   const max = useContext(CardRows);
   const alive = useRef(true);
+  const stopper = useRef<AbortController | undefined>(undefined);
 
   const load = async (only?: string[]) => {
     setChecking(true);
@@ -58,7 +59,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
   const plan = async (action: Action, path?: string) => {
     if (!row) return;
     setStep({ t: "busy", text: action === "path" ? "Checking the path..." : "Preparing...", lines: [] });
-    const r = await planFor(row.name, action, { ...hooks, path });
+    const r = await planFor(row.name, action, { ...hooks, path }).catch((e: Error) => ({ plan: undefined, error: e.message }));
     if (!alive.current) return;
     if (!r.plan) {
       setStep({ t: "list" });
@@ -70,11 +71,15 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
 
   const run = async (p: Plan, confirmed: boolean) => {
     const lines: string[] = [];
-    setStep({ t: "busy", text: `${p.title}...`, lines });
-    const r = await runFor(p, "terminal", { ...hooks, record: props.record, confirmed, onLine: (l) => {
+    const stop = p.action === "install" || p.action === "update";
+    const ctl = new AbortController();
+    stopper.current = stop ? ctl : undefined;
+    setStep({ t: "busy", text: `${p.title}...`, lines, stop });
+    const r = await runFor(p, "terminal", { ...hooks, record: props.record, confirmed, signal: ctl.signal, onLine: (l) => {
       lines.push(l);
-      if (alive.current) setStep({ t: "busy", text: `${p.title}...`, lines: [...lines] });
-    } });
+      if (alive.current) setStep({ t: "busy", text: `${p.title}...`, lines: [...lines], stop });
+    } }).catch((e: Error) => ({ ok: false, text: e.message, rows: undefined }));
+    stopper.current = undefined;
     if (!alive.current) return;
     setStep({ t: "list" });
     setMsg({ text: r.text, color: r.ok ? "green" : "red" });
@@ -111,7 +116,11 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
   };
 
   useInput((ch, key) => {
-    if (step.t === "path" || step.t === "busy" || step.t === "add") return;
+    if (step.t === "busy") {
+      if (key.escape) stopper.current?.abort();
+      return;
+    }
+    if (step.t === "path" || step.t === "add") return;
     const up = key.upArrow || key.leftArrow, down = key.downArrow || key.rightArrow;
     if (step.t === "list") {
       if (key.escape) return props.onClose();
@@ -268,6 +277,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
             {"  " + l}
           </Text>
         ))}
+        {step.stop ? <Text dimColor>Esc stops the install. Part of it can stay on this computer.</Text> : null}
       </Box>
     ) : null;
 

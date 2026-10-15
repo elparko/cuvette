@@ -204,6 +204,17 @@ describe("file set checks", () => {
     expect(b.text).toContain("14 images 16-bit, 2 images 8-bit");
   });
 
+  test("bit depth is compared only between files of the same type", () => {
+    const files = [1, 2, 3].map((i) => ({ rel: `A/f_0${i}_red.tif`, size: 1000, bits: 16 })).concat([1, 2, 3].map((i) => ({ rel: `A/f_0${i}_overlay.png`, size: 1000, bits: 8 })));
+    const c = checkFiles(files, "/data");
+    expect(item(c, "bit_depth")).toBeUndefined();
+  });
+
+  test("a bit depth difference inside one file type is still found", () => {
+    const files = [{ rel: "A/f_01_red.tif", size: 1000, bits: 16 }, { rel: "A/f_02_red.tif", size: 1000, bits: 16 }, { rel: "A/f_03_red.tif", size: 1000, bits: 8 }, { rel: "A/f_01_overlay.png", size: 1000, bits: 8 }];
+    expect(item(checkFiles(files, "/data"), "bit_depth").files).toEqual(["A/f_03_red.tif"]);
+  });
+
   test("the channel token comes off the field name", () => {
     expect(channelOf("Set 1_01_red")).toEqual({ channel: "red", field: "Set 1_01" });
     expect(channelOf("img-DAPI-3")).toEqual({ channel: "dapi", field: "img-3" });

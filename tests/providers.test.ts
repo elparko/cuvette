@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -731,6 +731,18 @@ describe("ollama", () => {
     await expect(showModel("x", undefined, 50)).rejects.toThrow(/did not answer in 0.05 s/);
   });
 
+  test("showModel gives a ProviderError if the body stalls after the time limit", async () => {
+    vi.stubGlobal("fetch", (_u: string, init: { signal: AbortSignal }) => {
+      const body = new ReadableStream({
+        start(c) {
+          init.signal.addEventListener("abort", () => c.error(init.signal.reason));
+        },
+      });
+      return Promise.resolve(new Response(body, { status: 200 }));
+    });
+    await expect(showModel("x", undefined, 50)).rejects.toThrow(ProviderError);
+  });
+
   test("showModel stops if the caller aborts, and the error is the abort", async () => {
     hang();
     const stop = new AbortController();
@@ -1301,6 +1313,22 @@ describe("the output cap name of the openai provider", () => {
     expect(bodies).toHaveLength(4);
   });
 
+  test("four refusals in a row still end in a good reply", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (_u: string, init: { body: string }) => {
+      const b = JSON.parse(init.body);
+      bodies.push(b);
+      if (b.stream_options) return new Response(JSON.stringify({ error: { message: "Unrecognized request argument supplied: stream_options" } }), { status: 400 });
+      if ("max_completion_tokens" in b) return refuse("max_completion_tokens");
+      if ("reasoning_effort" in b) return refuse("reasoning_effort");
+      if (b.stream) return new Response(JSON.stringify({ error: { message: "streaming is not supported" } }), { status: 400 });
+      return ok();
+    });
+    const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "low" });
+    expect(await p.complete("S", "Q", undefined, { maxTokens: 8000 })).toBe("No findings.");
+    expect(bodies).toHaveLength(5);
+  });
+
   test("a chat or o1-mini model gets no reasoning_effort, and a 400 that names it makes one retry without it", async () => {
     for (const model of ["gpt-5-chat-latest", "o1-mini"]) {
       const bodies = capture([ok()]);
@@ -1324,5 +1352,21 @@ describe("the output cap name of the openai provider", () => {
     await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toBeInstanceOf(CutReplyError);
     await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toMatchObject({ text: '{"severity":"info","message":"A"}' });
     expect(await p.complete("S", "Q")).toContain("severity");
+  });
+});
+
+describe("the Claude client without an API key", () => {
+  test("it is rebuilt after ant auth login, because the SDK reads the login only when it builds a client", () => {
+    const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+    vi.stubEnv("CUVETTE_HOME", mkdtempSync(join(tmpdir(), "cuvette-home-")));
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "");
+    vi.stubEnv("ANTHROPIC_CONFIG_DIR", cfg);
+    const p: any = new ClaudeProvider("claude-opus-5-5");
+    const before = p.client;
+    expect(p.client).toBe(before);
+    mkdirSync(join(cfg, "configs"), { recursive: true });
+    writeFileSync(join(cfg, "configs", "default.json"), "{}");
+    expect(p.client).not.toBe(before);
   });
 });

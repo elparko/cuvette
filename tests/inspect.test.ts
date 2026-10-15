@@ -67,6 +67,21 @@ test("a multi-page TIFF with the axes IYX keeps the pages as channels", async ()
   expect(insp.summary).not.toContain("planes");
 });
 
+test("a multi-page TIFF with 70 pages shows 64 channels and warns", async () => {
+  const insp = await inspectData(tiff("iyx70.tif", "IYX", [70, 16, 16]), join(root, "out"));
+  expect(insp.summary).toContain("has 64 channels");
+  expect(insp.summary).toContain("Cuvette showed the first 64.");
+});
+
+test("a float image with NaN gives statistics and a NaN count", async () => {
+  const p = join(root, "nan.tif");
+  execFileSync(scriptPython(), ["-I", "-c", "import sys, numpy, tifffile; a = numpy.linspace(0, 1, 64 * 64, dtype='float32').reshape(64, 64) ** 8; a[:8] = numpy.nan; tifffile.imwrite(sys.argv[1], a)", p]);
+  const insp = await inspectData(p, join(root, "out"));
+  expect(insp.ok).toBe(true);
+  expect(insp.summary).toContain("Channel 1 has 512 NaN values (12.5 percent of the pixels).");
+  expect(insp.summary).toContain("1 channel: fluorescence");
+});
+
 test("a TIFF with an axis that Cuvette cannot keep warns, and the summary makes no claim about a nuclear stain", async () => {
   const insp = await inspectData(tiff("icyx.tif", "ICYX", [4, 2, 32, 32]), join(root, "out"));
   expect(insp.summary).toContain("The file has 4 planes on the axis I. Cuvette read only the first plane of this axis.");

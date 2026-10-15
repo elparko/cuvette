@@ -59,7 +59,8 @@ run_tool(function() {
   d$plate <- if (is.null(plate_col)) "1" else as.character(df[[plate_col]])
   d$well <- if (is.null(well_col) || !well_col %in% names(df)) as.character(d$row) else as.character(df[[well_col]])
   d$dilution <- if (is.null(dil_col)) dilution else numeric_column(df, dil_col, "dilution_col")
-  d$dilution[!is.finite(d$dilution)] <- dilution
+  d$blank_dilution <- !is.finite(d$dilution)
+  d$dilution[d$blank_dilution] <- dilution
   d$nominal <- if (is.null(nominal_col)) NA_real_ else numeric_column(df, nominal_col, "nominal_col")
   d$type <- as.character(df[[type_col]])
   if (!any(d$kind == "standard")) fail(sprintf("no standard rows: type_col '%s' has the values %s. Standards need the value standard (or std, cal, calibrator).", type_col, paste(head(unique(df[[type_col]]), 8), collapse = ", ")))
@@ -70,6 +71,9 @@ run_tool(function() {
     n_excluded <- sum(hit)
     d <- d[!hit, ]
   } else n_excluded <- 0L
+
+  no_dilution <- d$row[d$blank_dilution & d$kind == "sample"]
+  if (length(no_dilution)) fail(sprintf("dilution_col '%s' is blank in the sample rows %s. Fill in the dilution factor (1 for a sample that is not diluted), or remove the column and set dilution.", dil_col, paste(head(no_dilution, 10), collapse = ", ")))
 
   plates <- unique(d$plate)
   std_rows <- list(); smp_rows <- list(); metrics <- list(); curves <- list()

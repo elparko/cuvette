@@ -150,3 +150,28 @@ test("the plan hash is escaped in the deviation HTML", () => {
   expect(html).not.toContain("<img");
   expect(html).toContain("&lt;img");
 });
+
+test("planChanges lists a change in the data, outputs, checks, pilot, question and out-of-scope sections", () => {
+  const from = { steps: [], question: "q", outputs: ["A"], checks: [{ check: "c" }] } as AnalysisPlan;
+  const to = { steps: [], question: "q2", data: { files: ["x"] }, outputs: ["B"], checks: [], pilot: { sample: "S1" }, out_of_scope: ["z"] } as AnalysisPlan;
+  expect(planChanges(from, to).map((c) => c.what)).toEqual(["Question of the plan", "Data of the plan", "Outputs of the plan", "Checks of the plan", "Pilot of the plan", "Out of scope of the plan"]);
+  expect(planChanges(from, { ...from, outputs: [...from.outputs!] })).toEqual([]);
+  expect(planChanges({ steps: [] }, { steps: [], outputs: [] })).toEqual([]);
+});
+
+test("after approval, a plan call that changes only the outputs needs a reason and writes a deviation", async () => {
+  const outputs = { name: "plan", args: { outputs: ["A table of the counts"] } };
+  const s = await start([CLARIFY, { calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { calls: [outputs] }, { calls: [{ name: "plan", args: { ...outputs.args, reason: "The scientist needs the table." } }] }, { text: "Blurred." }, { text: "Blurred." }]);
+  await s.send("Blur a.tif");
+  const results = s.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan").slice(-2);
+  expect(String(results[0]!.data.error)).toMatch(/^Give the reason for this change/);
+  expect(results[1]!.data.ok).toBe(true);
+  expect(deviations(s.record)).toEqual([expect.objectContaining({ kind: "section", what: "Outputs of the plan", to: '["A table of the counts"]', reason: "The scientist needs the table." })]);
+});
+
+test("a decision change that the scientist asked for in chat is listed as a deviation after the freeze", async () => {
+  const s = await start([CLARIFY, { calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred." }, { text: "Blurred." }]);
+  await s.send("Blur a.tif");
+  s.decisions.change("min_size", 9, { by: "human", reason: 'the scientist asked: "use 9"' });
+  expect(deviations(s.record)).toEqual([expect.objectContaining({ kind: "setting", what: "Smallest particle", from: "5", to: "9", reason: 'the scientist asked: "use 9"' })]);
+});

@@ -301,6 +301,22 @@ test.skipIf(process.platform === "win32")("cuvette app stops on SIGTERM and exit
   }
 }, 60_000);
 
+test.skipIf(process.platform === "win32")("cuvette app stops on SIGHUP and exits with code 0", async () => {
+  const h = ptyHome();
+  const child = spawn(process.execPath, [CUVETTE, "app", "--no-open"], { cwd: join(h, "proj"), env: cleanEnv(h, { ANTHROPIC_API_KEY: "sk-ant-test" }), stdio: ["ignore", "pipe", "ignore"] });
+  try {
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+    for (let i = 0; i < 300 && !out.includes("Cuvette app:"); i++) await new Promise((r) => setTimeout(r, 100));
+    expect(out).toContain("Cuvette app:");
+    child.kill("SIGHUP");
+    expect(await exit).toBe(0);
+  } finally {
+    child.kill("SIGKILL");
+  }
+}, 60_000);
+
 describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-terminal", () => {
   let ollama: Server;
   let url = "";

@@ -502,7 +502,9 @@ export async function planAction(r: ProgramRow, action: Action, opts: { path?: s
   }
 }
 
-function defaultExec(command: string, onLine: (line: string) => void, signal?: AbortSignal): Promise<number | null> {
+const EXIT_GRACE_MS = 500;
+
+export function defaultExec(command: string, onLine: (line: string) => void, signal?: AbortSignal): Promise<number | null> {
   const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
   return new Promise((done) => {
     if (signal?.aborted) return done(null);
@@ -513,19 +515,33 @@ function defaultExec(command: string, onLine: (line: string) => void, signal?: A
         process.kill(-child.pid!, sig);
       } catch {}
     };
+    const forced = () => kill("SIGKILL");
     let hard: NodeJS.Timeout | undefined;
-    const stop = () => {
-      kill("SIGTERM");
-      hard = setTimeout(() => kill("SIGKILL"), 5000);
-      hard.unref();
-    };
-    signal?.addEventListener("abort", stop, { once: true });
-    child.on("error", (e) => (onLine(e.message), done(null)));
-    child.on("close", (code) => {
+    let grace: NodeJS.Timeout | undefined;
+    let ended = false;
+    const end = (code: number | null) => {
+      if (ended) return;
+      ended = true;
       signal?.removeEventListener("abort", stop);
+      process.removeListener("exit", forced);
       clearTimeout(hard);
+      clearTimeout(grace);
+      child.stdout.destroy();
+      child.stderr.destroy();
       done(code);
+    };
+    function stop() {
+      kill("SIGTERM");
+      process.once("exit", forced);
+      hard = setTimeout(forced, 5000);
+      hard.unref();
+    }
+    signal?.addEventListener("abort", stop, { once: true });
+    child.on("error", (e) => (onLine(e.message), end(null)));
+    child.on("exit", (code) => {
+      grace = setTimeout(() => end(code), EXIT_GRACE_MS);
     });
+    child.on("close", end);
   });
 }
 
@@ -696,7 +712,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
       const root = manifests(opts)[plan.name]?.root;
       if (!root) return done(false, `No adapter ${plan.name}.`);
       confirmCode(root);
-      return done(true, `${plan.name}: the code may run. The permission ends when the files change.`);
+      return done(true, `${plan.name}: the code can run. The permission ends when the files change.`);
     }
     case "approve": {
       const root = manifests(opts)[plan.name]?.root;
