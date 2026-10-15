@@ -511,11 +511,18 @@ describe("ollama", () => {
     expect(await p.complete("SYS", "review", undefined, { maxTokens: 50 })).toBe("");
   });
 
+  test("a reply cut by the output limit fails when the caller asks for it", async () => {
+    stubOllama(() => ndjson([{ message: { content: '{"severity":"info","message":"A"}\n' } }, { done: true, done_reason: "length" }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    await expect(p.complete("SYS", "review", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toBeInstanceOf(CutReplyError);
+    expect(await p.complete("SYS", "review")).toContain("severity");
+  });
+
   test("complete sends the output cap as num_predict", async () => {
     const seen = stubOllama(() => ndjson([{ message: { content: "No findings." } }, { done: true }]));
     const p = await makeProvider("ollama:qwen3:8b");
-    await p.complete("SYS", "review", undefined, { maxTokens: 3000 });
-    expect(seen.find((x) => x.url.endsWith("/api/chat"))!.body.options.num_predict).toBe(3000);
+    await p.complete("SYS", "review", undefined, { maxTokens: 8000 });
+    expect(seen.find((x) => x.url.endsWith("/api/chat"))!.body.options.num_predict).toBe(8000);
   });
 
   test("a review reply that repeats itself is stopped as well", async () => {
@@ -1170,7 +1177,7 @@ describe("the output cap name of the openai provider", () => {
     for (const model of ["o3-mini", "gpt-5", "gpt-5-mini"]) {
       const bodies = capture([ok()]);
       await (await makeProvider(`openai:https://api.openai.com/v1|${model}`)).complete("S", "Q", undefined, { maxTokens: 3000 });
-      expect(bodies[0].max_completion_tokens).toBe(3000);
+      expect(bodies[0].max_completion_tokens).toBe(16000);
       expect("max_tokens" in bodies[0]).toBe(false);
     }
   });
@@ -1199,6 +1206,44 @@ describe("the output cap name of the openai provider", () => {
     const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5");
     await p.complete("S", "Q", undefined, { maxTokens: 3000 });
     expect(bodies).toHaveLength(2);
-    expect(bodies[1].max_tokens).toBe(3000);
+    expect(bodies[1].max_tokens).toBe(16000);
+  });
+
+  test("a context overflow error that names both keys is not retried with the other key", async () => {
+    const overflow = new Response(JSON.stringify({ error: { message: "This model's maximum context length is 8192 tokens. However, you requested 9000 tokens (max_tokens 3000; max_completion_tokens none). Reduce the length." } }), { status: 400 });
+    const bodies = capture([overflow]);
+    const p = await makeProvider("openai:https://api.example.org/v1|custom");
+    const err = await p.complete("S", "Q", undefined, { maxTokens: 3000 }).catch((e) => e);
+    expect(bodies).toHaveLength(1);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.overflow).toBe(true);
+  });
+
+  test("the key is swapped once, not back and forth", async () => {
+    const bodies = capture([refuse("max_tokens"), refuse("max_completion_tokens")]);
+    const p = await makeProvider("openai:https://api.example.org/v1|custom");
+    await p.complete("S", "Q", undefined, { maxTokens: 3000 }).catch(() => {});
+    expect(bodies).toHaveLength(2);
+  });
+
+  test("a reasoning model gets reasoning_effort and a cap of 16000, a local model gets neither", async () => {
+    let bodies = capture([ok()]);
+    await (await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "low" })).complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect(bodies[0].reasoning_effort).toBe("low");
+    expect(bodies[0].max_completion_tokens).toBe(16000);
+    bodies = capture([ok()]);
+    await (await makeProvider("openai:https://api.openai.com/v1|o3-mini", { effort: "max" })).complete("S", "Q", undefined, { effort: "low", maxTokens: 8000 });
+    expect(bodies[0].reasoning_effort).toBe("low");
+    bodies = capture([ok()]);
+    await (await makeProvider("openai:http://localhost:1234/v1|qwen3", { effort: "low" })).complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect("reasoning_effort" in bodies[0]).toBe(false);
+    expect(bodies[0].max_tokens).toBe(8000);
+  });
+
+  test("a reply cut by the output limit fails when the caller asks for it", async () => {
+    capture([new Response(JSON.stringify({ choices: [{ message: { content: '{"severity":"info","message":"A"}' }, finish_reason: "length" }] }), { status: 200, headers: { "content-type": "application/json" } })]);
+    const p = await makeProvider("openai:http://localhost:1234/v1|m");
+    await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toBeInstanceOf(CutReplyError);
+    expect(await p.complete("S", "Q")).toContain("severity");
   });
 });

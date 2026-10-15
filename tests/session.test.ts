@@ -3621,11 +3621,11 @@ test("a correction that still replies to the referee after one more request keep
   const { provider, complete, answer } = await correctionTurn([
     { text: "Counting finished." },
     { text: "The referee is right. The count found 64 particles." },
-    { text: "As noted above, the count found 64 particles." },
+    { text: "You are right. The count found 64 particles." },
   ]);
   expect(provider.requests).toHaveLength(4);
   expect(answer).toContain("Counting finished.");
-  expect(answer).not.toMatch(/referee|As noted above/);
+  expect(answer).not.toMatch(/referee|You are right/);
   expect(complete).toHaveBeenCalledTimes(1);
   expect(session!.record.entries(["notice"]).some((e) => /reads like a reply to the review, so the harness kept the first answer/.test(String(e.data.text)))).toBe(true);
   expect(session!.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
@@ -3650,4 +3650,17 @@ test("a referee that says No findings. makes the review done with zero findings"
   await session.send("Count the particles");
   expect(session.reviewState).toBe("done");
   expect(session.record.entries(["review"]).at(-1)!.data.findings).toEqual([]);
+});
+
+test("a manual review with an empty referee reply keeps the rule findings and gives the failure text", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The treated cells are significantly larger." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { headless: true, reviseOnFindings: false } });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("go");
+  const list = await session.review();
+  expect(list.some((f) => f.check === "significance_without_test")).toBe(true);
+  expect(list.every((f) => f.source === "rule")).toBe(true);
+  expect(session.reviewFailure).toBe("The review gave no text. The answer is not checked.");
+  expect(list.length).toBeGreaterThan(0);
 });

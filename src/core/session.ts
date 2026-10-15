@@ -1458,6 +1458,7 @@ export class Session {
   private turnStartedAt = 0;
   reviewState: "done" | "stopped" | "failed" | "none" = "none";
   reviewFindings = 0;
+  reviewFailure?: string;
 
   private appendReview(answer: number, state: "done" | "stopped" | "failed" | "off", findings: string[], extra: Record<string, unknown> = {}): void {
     this.record.append("review", { answer, state, findings, ...extra });
@@ -4649,8 +4650,15 @@ export class Session {
     const claims = checkAnswer(answer, this.record.liveView());
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
+    this.reviewFailure = undefined;
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
-    if (this.refereeProvider && !this.refereeBlocked()) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+    if (this.refereeProvider && !this.refereeBlocked()) {
+      try {
+        for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));
+      } catch (e) {
+        this.reviewFailure = e instanceof EmptyReview ? e.message : `The referee did not run: ${(e as Error).message}`;
+      }
+    }
     return out;
   }
 

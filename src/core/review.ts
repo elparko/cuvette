@@ -528,17 +528,17 @@ export function parseReferee(raw: string): FindingIn[] {
 }
 
 export const REFEREE_EFFORT = "low";
-export const REFEREE_MAX_TOKENS = 3000;
+export const REFEREE_MAX_TOKENS = 8000;
 
-const REPLY_ANYWHERE = /\breferee\b|\bas noted above\b/i;
-const REPLY_FIRST_LINE = /\b(?:the|this) findings?\b|\bfinding \d|\breviewer\b|\bthe review\b|\bas noted above\b|\byou are right\b|\bi agree\b|^\s*\d+[.)]\s*correct,/i;
+const ADDRESSES_REVIEWER = /\bas the referee noted\b|\bthe referee\b|\byou are right\b|\bi agree with the finding\b/i;
+const STOP_WORDS = new Set("the and for are was were with that this from not has have had its but all any can will would should does did than then into onto over under about after before also each which while there their they them what when where who whom whose why how".split(" "));
 
 const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 
 function quotesFinding(line: string, finding: string): boolean {
-  const need = wordsOf(finding);
-  if (!need.length) return false;
-  const have = wordsOf(line);
+  const need = wordsOf(finding).filter((w) => !STOP_WORDS.has(w));
+  if (need.length < 5) return false;
+  const have = wordsOf(line).filter((w) => !STOP_WORDS.has(w));
   let at = 0;
   let hit = 0;
   for (const w of need) {
@@ -548,14 +548,14 @@ function quotesFinding(line: string, finding: string): boolean {
       at = next + 1;
     }
   }
-  return hit >= need.length * 0.6;
+  return hit >= 5 && hit >= need.length * 0.6;
 }
 
 export function readsLikeReply(answer: string, findings: string[]): boolean {
-  if (REPLY_ANYWHERE.test(answer) || /\bthe review found\b/i.test(answer.slice(0, 120))) return true;
-  if (!/^\s*\d+[.)]\s/.test(answer)) return false;
-  const first = answer.trim().split("\n")[0]!;
-  return REPLY_FIRST_LINE.test(first) || findings.some((m) => quotesFinding(first, m));
+  const first = answer.trim().split("\n")[0] ?? "";
+  if (ADDRESSES_REVIEWER.test(first)) return true;
+  if (!/^\d+[.)]\s/.test(first)) return false;
+  return /\bas noted above\b/i.test(first) || findings.some((m) => quotesFinding(first, m));
 }
 
 export class EmptyReview extends Error {

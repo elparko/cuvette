@@ -402,30 +402,31 @@ test("a p value in the text of a read_file result does not count as a test", asy
 });
 
 describe("an answer that reads like a reply to the referee", () => {
-  const found = ["The missing weight is in row S15, and the answer does not say which row.", "The group sizes are not in the answer."];
+  const found = ["The missing weight is in row S15 and the answer does not say which row.", "The group sizes are not in the answer.", "Mean CRP has no source."];
   test("a numbered first line that quotes a finding is a reply", () => {
     expect(readsLikeReply("1. The missing weight is in row S15, and the answer does not say which row.", found)).toBe(true);
   });
-  test("a numbered first line that names the finding or the referee is a reply", () => {
-    expect(readsLikeReply("1. The finding is right: the weight is missing.", found)).toBe(true);
-    expect(readsLikeReply("1. You are right. The weight is missing.", found)).toBe(true);
-    expect(readsLikeReply("1. Correct, the weight is missing.", found)).toBe(true);
+  test("a first line that addresses the referee is a reply", () => {
+    expect(readsLikeReply("As the referee noted, the weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("The referee is right. The mean is 21 g.", found)).toBe(true);
+    expect(readsLikeReply("You are right. The weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("I agree with the finding. The weight is missing.", found)).toBe(true);
+  });
+  test("as noted above counts only after a numbered item", () => {
+    expect(readsLikeReply("1. As noted above, the weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("As noted above, the mean is 21 g.", found)).toBe(false);
   });
   test("a legitimate numbered answer that shares words with a finding is not a reply", () => {
     expect(readsLikeReply("1. Group sizes: 8 and 9\n2. Missing weight: row S15", found)).toBe(false);
     expect(readsLikeReply("1. The missing weight is row S15. The group sizes are 8 and 9.", found)).toBe(false);
+    expect(readsLikeReply("1. The findings support the hypothesis.", found)).toBe(false);
   });
-  test("an answer about a systematic review is not a reply", () => {
+  test("an answer about a review is not a reply", () => {
+    expect(readsLikeReply("The review found 12 eligible trials.", found)).toBe(false);
     expect(readsLikeReply("1. The systematic review of 12 trials found a lower risk.", found)).toBe(false);
-    expect(readsLikeReply("The systematic review found a lower risk (12 trials).", found)).toBe(false);
   });
-  test("the review found counts only at the start of the answer", () => {
-    expect(readsLikeReply("The review found a problem. The mean is 21 g.", [])).toBe(true);
-    expect(readsLikeReply(`${"The mean is 21 g. ".repeat(10)}The review found nothing else.`, [])).toBe(false);
-  });
-  test("the words referee and as noted above are a reply", () => {
-    expect(readsLikeReply("The referee is right. The mean is 21 g.", [])).toBe(true);
-    expect(readsLikeReply("As noted above, the mean is 21 g.", [])).toBe(true);
+  test("a short finding is never quoted", () => {
+    expect(readsLikeReply("1. Mean CRP has no source.", found)).toBe(false);
   });
   test("an answer that starts with the result is not a reply", () => {
     expect(readsLikeReply("The mean weight is 21 g (n = 17). One animal has no weight.", found)).toBe(false);
@@ -445,7 +446,7 @@ describe("a referee reply with no text", () => {
   test("the prompt asks for that exact line", () => {
     expect(refereePrompt(ctx(makeRecord(seed), "a")).system).toContain("No findings.");
   });
-  test("the output cap is 3000 tokens", () => {
-    expect(REFEREE_MAX_TOKENS).toBe(3000);
+  test("the output cap is 8000 tokens", () => {
+    expect(REFEREE_MAX_TOKENS).toBe(8000);
   });
 });

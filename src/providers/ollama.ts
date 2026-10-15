@@ -1,6 +1,6 @@
 import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
-import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, splitThink, wrapperText } from "./text.ts";
 import { RETRIES, errorBody, longFetch, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
@@ -359,7 +359,7 @@ export class OllamaProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal, opts?: { maxTokens?: number }): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { failIfCut?: boolean; maxTokens?: number }): Promise<string> {
     const body: Record<string, unknown> = {
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: text }],
@@ -381,9 +381,11 @@ export class OllamaProvider implements Provider {
       let checkAt = 3000;
       let looped = false;
       let finished = false;
+      let cut = false;
       await this.readLines(res, idle, (j) => {
         if (typeof j.message?.content === "string") content += j.message.content;
         if (j.done) finished = true;
+        if (j.done_reason === "length") cut = true;
         if (content.length >= checkAt) {
           checkAt = content.length + 1000;
           if (repeatStart(content) !== null) looped = true;
@@ -392,6 +394,7 @@ export class OllamaProvider implements Provider {
       });
       if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
       if (looped) content = cutRepeat(content);
+      if (cut && opts?.failIfCut) throw new CutReplyError("The reply hit the output limit and was cut short.");
       return splitThink(content).text;
     } finally {
       idle.stop();
