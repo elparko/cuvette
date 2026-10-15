@@ -203,7 +203,7 @@ for pat, send in steps:
         break
 read(1.5)
 code = None
-end = time.time() + 30
+end = time.time() + 10
 while time.time() < end:
     p, st = os.waitpid(pid, os.WNOHANG)
     if p:
