@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
-import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
@@ -257,7 +257,7 @@ export class ClaudeProvider implements Provider {
     return result;
   }
 
-  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string }): Promise<string> {
+  async complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean }): Promise<string> {
     const params = {
       model: this.model,
       max_tokens: 16000,
@@ -272,6 +272,7 @@ export class ClaudeProvider implements Provider {
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
       if (!this.fixedClient) recordSpend(this.model, usageOf(u, false));
+      if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.");
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
       throw mapError(e, this.model);

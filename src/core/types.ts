@@ -143,7 +143,7 @@ export interface StepResult {
 export interface Provider {
   info: ModelInfo;
   step(req: StepRequest): Promise<StepResult>;
-  complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string }): Promise<string>;
+  complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean }): Promise<string>;
   countTokens?(req: Omit<StepRequest, "signal" | "onDelta">): Promise<number>;
 }
 
@@ -152,6 +152,8 @@ export class ProviderError extends Error {
     super(message);
   }
 }
+
+export class CutReplyError extends ProviderError {}
 
 export const CONTEXT_OVERFLOW =
   /prompt is too long|maximum context length is|context_length_exceeded|exceeds? (?:the )?(?:available |maximum )?context (?:size|length|window)|longer than the maximum model length|too many input tokens(?! per)/i;

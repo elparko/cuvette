@@ -1,4 +1,4 @@
-import type { Message, Part, Provider, ToolSchema } from "./types.ts";
+import { CutReplyError, type Message, type Part, type Provider, type ToolSchema } from "./types.ts";
 
 const SUMMARY_SYSTEM = `You summarize the older part of an analysis session so that the analysis can continue with less context. You can get a previous summary too. Then update it: keep the facts that are still true, remove old facts, and add the new events.
 Write plain text, short lines, under these headings. Leave out a heading only if it is empty.
@@ -164,11 +164,21 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const old = messages.slice(start, end).filter((_, i) => i + start !== r);
   if (!old.length) return null;
   const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).replace(/\n## (Current plan|Decisions|Mode|Pilot|Folders)\n[\s\S]*$/, "").trim() : "";
-  const room = Math.max(4000, Math.floor(contextWindow * 3.5 * 0.6) - SUMMARY_SYSTEM.length - prev.length);
   const all = transcriptText(old);
-  const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${tailText(all, room)}` : all;
-  const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${text}`;
-  const summary = await provider.complete(SUMMARY_SYSTEM, input, signal);
+  const ask = (size: number, again: boolean) => {
+    const room = Math.max(4000, Math.floor(size) - SUMMARY_SYSTEM.length - prev.length);
+    const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${tailText(all, room)}` : all;
+    const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${text}${again ? "\n\nThe first summary was cut at the output limit. Write a much shorter summary." : ""}`;
+    return provider.complete(SUMMARY_SYSTEM, input, signal, { failIfCut: true });
+  };
+  const size = contextWindow * 3.5 * 0.6;
+  let summary: string;
+  try {
+    summary = await ask(size, false);
+  } catch (e) {
+    if (!(e instanceof CutReplyError)) throw e;
+    summary = await ask(size / 2, true);
+  }
   return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: fillPointers(dropThinking(messages.slice(end)), resultTexts(old, () => true)) };
 }
 

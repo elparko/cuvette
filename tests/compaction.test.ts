@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import { CutReplyError } from "../src/core/types.ts";
 import { dropThinking, elideOld, estimateTokens, headText, pointerText, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { Session } from "../src/core/session.ts";
@@ -59,6 +60,29 @@ test("summarizing inside one turn keeps the request and the recent window, and p
   const callIds = next.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
   const resultIds = next.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_result" ? [p.callId] : [])));
   expect(callIds).toEqual(resultIds);
+});
+
+test("a summary that hit the output limit is asked again once with a shorter request, then it fails", async () => {
+  const h = oneLongTurn(6);
+  const inputs: string[] = [];
+  const cut = (answers: (string | "cut")[]) => {
+    const provider = new FakeProvider({ steps: [], complete: "x" });
+    (provider as { complete: (s: string, t: string, g: undefined, o?: { failIfCut?: boolean }) => Promise<string> }).complete = async (_s, text, _g, opts) => {
+      inputs.push(text);
+      const a = answers.shift()!;
+      if (a === "cut" && opts?.failIfCut) throw new CutReplyError("cut");
+      return a;
+    };
+    return provider;
+  };
+  const res = await summarizeOld(h, cut(["cut", "short summary"]), 10, undefined, h[0]);
+  expect(res!.summary).toBe("short summary");
+  expect(inputs).toHaveLength(2);
+  expect(inputs[1]).toContain("Write a much shorter summary.");
+  expect(inputs[0]).not.toContain("Write a much shorter summary.");
+  inputs.length = 0;
+  await expect(summarizeOld(h, cut(["cut", "cut"]), 10, undefined, h[0])).rejects.toBeInstanceOf(CutReplyError);
+  expect(inputs).toHaveLength(2);
 });
 
 test("a second summary updates the first one", async () => {

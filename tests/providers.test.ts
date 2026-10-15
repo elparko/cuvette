@@ -5,7 +5,7 @@ import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
-import { CONTEXT_OVERFLOW, ProviderError } from "../src/core/types.ts";
+import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { DEFAULTS } from "../src/core/config.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -116,6 +116,14 @@ describe("claude", () => {
     } finally {
       server.close();
     }
+  });
+
+  test("complete fails when the reply hit the output limit and the caller asks for it", async () => {
+    const cutMsg = () => claudeMsg([{ type: "text", text: "half a summ" }], "max_tokens");
+    const { client } = fakeClient([cutMsg(), cutMsg()]);
+    const p = new ClaudeProvider("claude-opus-5-5", { client });
+    await expect(p.complete("S", "T", undefined, { failIfCut: true })).rejects.toBeInstanceOf(CutReplyError);
+    expect(await p.complete("S", "T")).toBe("half a summ");
   });
 
   test("request shape: adaptive thinking, effort, cache control, no tool_choice", async () => {
