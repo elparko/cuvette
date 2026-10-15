@@ -76,7 +76,11 @@ test("/programs lists the programs by field and turns an adapter off after a con
   await key(h, "\r");
   await until(() => h.last().includes("Turn off"));
   expect(h.last()).toContain("Remove");
-  for (let i = 0; i < 6 && !/▸ Turn off/.test(h.last()); i++) await key(h, DOWN);
+  for (let i = 0; i < 6 && !/▸ Turn off/.test(h.last()); i++) {
+    const before = h.last();
+    await key(h, DOWN);
+    await until(() => h.last() !== before);
+  }
   await key(h, "\r");
   await until(() => h.last().includes("Nothing changes before you confirm"));
   expect(h.last()).toContain("no session can load it");
