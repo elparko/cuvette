@@ -24,6 +24,7 @@ STAIN_VECTORS = {
     "ruifrok_hdab": ([0.65, 0.70, 0.29], [0.27, 0.57, 0.78]),
     "qupath_hdab": ([0.651, 0.701, 0.29], [0.269, 0.568, 0.778]),
 }
+MISSING_TEXT = {"", "NA", "N/A", "n/a", "NaN", "nan", "null", "NULL", "Null"}
 MAX_PIXELS = 40_000_000
 X_NAMES = ["centroid x µm", "centroid x um", "centroid x px", "centroid_x", "x"]
 Y_NAMES = ["centroid y µm", "centroid y um", "centroid y px", "centroid_y", "y"]
@@ -89,6 +90,10 @@ def _read_table(path, what="cell table"):
     sep = "\t" if head.count("\t") > head.count(",") else ","
     try:
         df = pd.read_csv(path, sep=sep, encoding=enc, encoding_errors="replace")
+        raw = pd.read_csv(path, sep=sep, encoding=enc, encoding_errors="replace", dtype=str, keep_default_na=False)
+        for column in df.columns:
+            if df[column].dtype == object:
+                df[column] = raw[column].where(~raw[column].str.strip().isin(MISSING_TEXT), np.nan)
     except Exception as e:
         _fail("cannot read the %s %s as a table: %s" % (what, path, e))
     if df.empty:
