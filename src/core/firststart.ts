@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { ollamaHost } from "./ollama-host.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { KEY_GUIDE } from "./keyhelp.ts";
@@ -38,7 +39,7 @@ export interface FirstStartState {
 
 export async function ollamaState(ctx: Ctx = {}): Promise<OllamaState> {
   const env = ctx.env ?? process.env;
-  const host = (env.OLLAMA_HOST || "http://localhost:11434").replace(/\/$/, "");
+  const host = ollamaHost(env);
   try {
     const res = await (ctx.fetch ?? fetch)(`${host}/api/tags`, { signal: AbortSignal.timeout(1500) });
     if (!res.ok) return { reachable: false, models: [] };

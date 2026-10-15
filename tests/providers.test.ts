@@ -10,6 +10,7 @@ import { ClaudeProvider } from "../src/providers/claude.ts";
 import { DEFAULTS } from "../src/core/config.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
+import { showModel } from "../src/providers/ollama.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 import { keySafe, parseArgs } from "../src/providers/openai.ts";
 import { retryReason } from "../src/providers/retry.ts";
@@ -716,6 +717,28 @@ describe("ollama", () => {
     expect(seen.filter((s) => s.url.endsWith("/api/chat"))).toHaveLength(4);
   });
 
+  test("OLLAMA_HOST with no scheme and no port uses port 11434", async () => {
+    vi.stubEnv("OLLAMA_HOST", "127.0.0.1");
+    const seen = stubOllama(() => json({}));
+    await makeProvider("ollama:x");
+    expect(seen[0].url).toBe("http://127.0.0.1:11434/api/show");
+  });
+
+  const hang = () => vi.stubGlobal("fetch", (_u: string, init: { signal: AbortSignal }) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason))));
+
+  test("showModel stops with a clear message if Ollama does not answer", async () => {
+    hang();
+    await expect(showModel("x", undefined, 50)).rejects.toThrow(/did not answer in 0.05 s/);
+  });
+
+  test("showModel stops if the caller aborts, and the error is the abort", async () => {
+    hang();
+    const stop = new AbortController();
+    const p = showModel("x", stop.signal);
+    stop.abort(new Error("stopped by caller"));
+    await expect(p).rejects.toThrow("stopped by caller");
+  });
+
   test("OLLAMA_HOST overrides the address", async () => {
     vi.stubEnv("OLLAMA_HOST", "10.0.0.5:9999");
     const seen = stubOllama(() => json({}));
@@ -1255,6 +1278,27 @@ describe("the output cap name of the openai provider", () => {
     await (await makeProvider("openai:http://localhost:1234/v1|qwen3", { effort: "low" })).complete("S", "Q", undefined, { maxTokens: 8000 });
     expect("reasoning_effort" in bodies[0]).toBe(false);
     expect(bodies[0].max_tokens).toBe(8000);
+  });
+
+  test("effort auto sends no reasoning_effort", async () => {
+    const bodies = capture([ok()]);
+    await (await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "auto" })).complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect("reasoning_effort" in bodies[0]).toBe(false);
+  });
+
+  test("three refusals in a row still end in a good reply", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (_u: string, init: { body: string }) => {
+      const b = JSON.parse(init.body);
+      bodies.push(b);
+      if (b.stream_options) return new Response(JSON.stringify({ error: { message: "Unrecognized request argument supplied: stream_options" } }), { status: 400 });
+      if ("max_completion_tokens" in b) return refuse("max_completion_tokens");
+      if ("reasoning_effort" in b) return refuse("reasoning_effort");
+      return ok();
+    });
+    const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "low" });
+    expect(await p.complete("S", "Q", undefined, { maxTokens: 8000 })).toBe("No findings.");
+    expect(bodies).toHaveLength(4);
   });
 
   test("a chat or o1-mini model gets no reasoning_effort, and a 400 that names it makes one retry without it", async () => {

@@ -18,6 +18,7 @@ interface FirstStart {
   recommended: string;
   sample: string;
   keyGuide: { title: string; intro: string; steps: string[]; notes: string[] };
+  keyAntLogin: string;
 }
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
@@ -127,6 +128,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
         {choice === "claude" && (
           <div className="mt-4">
             <p className="mb-2 text-[13px] text-muted-foreground">Paste your key. The app checks it with Anthropic, then saves it in a file that only your user can read.</p>
+            {fs && <p className="mb-2 text-[13px] text-muted-foreground">{fs.keyAntLogin}</p>}
             <div className="flex flex-wrap gap-2">
               <div className="relative min-w-[min(220px,100%)] flex-1">
                 <KeyRoundIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -202,9 +204,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
           </p>
         )}
         {!done && (
-          <Button variant="ghost" size="sm" className="mt-3" onClick={() => {
-              void call("api/leave-setup", {}).catch(() => {});
-              ctx.go("start");
+          <Button variant="ghost" size="sm" className="mt-3" onClick={async () => {
+              if (await post("api/leave-setup", {})) ctx.go("start");
             }}>
             Leave setup
           </Button>

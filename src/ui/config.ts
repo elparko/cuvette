@@ -18,7 +18,7 @@ export const RESET = "Reset to default";
 
 export const SCOPE_BUTTON: Record<Scope, string> = { session: "This session", user: "Me (all projects)", project: "This project" };
 const SAVED_FOR: Record<Scope, string> = { session: "Saved for this session.", user: "Saved for me (all projects).", project: "Saved for this project." };
-const BADGE: Record<string, string> = { default: "Default", user: "User", project: "Project", session: "This session", env: "Environment" };
+const BADGE: Record<string, string> = { default: "Default", user: "User", project: "Project", session: "This session", env: "Environment", ant: "ant login" };
 
 export function settingRows(ctx: SettingCtx, busy: boolean): SettingRow[] {
   return describe(ctx).map((r) => ({ ...r, locked: !!(r.def.lockedInTurn && busy) }));
@@ -131,7 +131,7 @@ export function spendBar(s: { pct?: number }, width = 20): string {
 }
 
 export function secretState(r: SettingRow): string {
-  return r.source === "env" ? "set by environment" : r.value === "saved" ? "saved" : "not set";
+  return r.source === "env" ? "set by environment" : r.source === "ant" ? "signed in with ant auth login" : r.value === "saved" ? "saved" : "not set";
 }
 
 export async function saveSetting(ctx: SettingCtx, def: SettingDef, value: string, scope: Scope, confirmed = false): Promise<{ text: string; color: string; confirm?: boolean }> {

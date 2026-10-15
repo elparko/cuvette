@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, uptime } from "node:os";
 import { dirname, join } from "node:path";
+import { ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { accessOf, codeTools, isCodeTool, saveAccess } from "../src/adapters/access.ts";
 import { adapterIndex, formatIndex } from "../src/adapters/catalog.ts";
@@ -391,6 +392,93 @@ describe("the browser app", () => {
     const third = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
     expect(third.job).not.toBe(first.job);
     release();
+  });
+});
+
+describe("a long install that throws", () => {
+  test("the job ends as failed with the message, and a new install can start", async () => {
+    const s = new FakeSession();
+    const append = vi.spyOn(s.record, "append").mockImplementationOnce(() => {
+      throw new Error("disk full");
+    });
+    app = await startApp({ session: s, env: {}, programs: { ...fakes(), exec: async () => 0 } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const first = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const stream = await fetch(`${base}api/programs/progress?job=${first.job}&t=${app.token}`).then((r) => r.text());
+    expect(stream).toMatch(/"done":true,"ok":false,"text":"The install did not finish: disk full/);
+    append.mockRestore();
+    const second = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    expect(second.job).not.toBe(first.job);
+  });
+
+  test("an error after the job is done does not change a good result", async () => {
+    let release = () => {};
+    const exec = vi.fn(async (_c: string, line: (l: string) => void) => {
+      line("go");
+      await new Promise<void>((r) => (release = r));
+      return 0;
+    });
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const abort = new AbortController();
+    const live = await fetch(`${base}api/programs/progress?job=${job.job}&t=${app.token}`, { signal: abort.signal });
+    const reader = live.body!.getReader();
+    await reader.read();
+    const realEnd = ServerResponse.prototype.end;
+    let thrown = 0;
+    const end = vi.spyOn(ServerResponse.prototype, "end").mockImplementation(function (this: ServerResponse, ...a: unknown[]) {
+      if (!thrown) {
+        thrown++;
+        throw new Error("socket gone");
+      }
+      return (realEnd as (...x: unknown[]) => ServerResponse).apply(this, a);
+    } as never);
+    release();
+    await vi.waitFor(() => expect(thrown).toBe(1));
+    abort.abort();
+    await reader.cancel().catch(() => {});
+    const stream = await fetch(`${base}api/programs/progress?job=${job.job}&t=${app.token}`).then((r) => r.text());
+    end.mockRestore();
+    expect(stream).toContain('"done":true,"ok":true,"text":"Installed zeta."');
+  });
+
+  test("an error when a stream ends does not keep the job in the list: the delete is still scheduled", async () => {
+    let release = () => {};
+    const exec = vi.fn(async (_c: string, line: (l: string) => void) => {
+      line("go");
+      await new Promise<void>((r) => (release = r));
+      return 0;
+    });
+    app = await startApp({ session: new FakeSession(), env: {}, programs: { ...fakes(), exec } });
+    const base = app.url.split("?")[0]!;
+    const post = (p: string, body: unknown) => fetch(`${base}${p}?t=${app!.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
+    const abort = new AbortController();
+    const live = await fetch(`${base}api/programs/progress?job=${job.job}&t=${app.token}`, { signal: abort.signal });
+    const reader = live.body!.getReader();
+    await reader.read();
+    const realEnd = ServerResponse.prototype.end;
+    let thrown = 0;
+    const end = vi.spyOn(ServerResponse.prototype, "end").mockImplementation(function (this: ServerResponse, ...a: unknown[]) {
+      if (!thrown) {
+        thrown++;
+        throw new Error("socket gone");
+      }
+      return (realEnd as (...x: unknown[]) => ServerResponse).apply(this, a);
+    } as never);
+    const delays: unknown[] = [];
+    const realSet = globalThis.setTimeout;
+    const timer = vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => (delays.push(ms), realSet(fn, ms, ...rest))) as never);
+    release();
+    await vi.waitFor(() => expect(thrown).toBe(1));
+    await vi.waitFor(() => expect(delays).toContain(600_000));
+    timer.mockRestore();
+    abort.abort();
+    await reader.cancel().catch(() => {});
+    end.mockRestore();
   });
 });
 

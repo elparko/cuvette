@@ -47,15 +47,21 @@ export function indexPath(): string {
   return join(cuvetteHome(), "sessions-index.json");
 }
 
+const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+
+const rowDir = (path = indexPath()) => join(dirname(path), "sessions-index");
+
 const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+function toRow(r: any): IndexRow | undefined {
+  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id || typeof r.folder !== "string" || !r.folder) return undefined;
+  return { ...r, id: r.id, project: text(r.project) ?? "", folder: r.folder, title: text(r.title) ?? "", date: text(r.date) ?? "", name: text(r.name), custom: text(r.custom), description: text(r.description) };
+}
 
 function parseIndex(json: string): { rows: IndexRow[]; dropped: number } {
   const data: unknown = JSON.parse(json);
   if (!Array.isArray(data)) throw new Error("the session index is not a list");
-  const rows = data.flatMap((r): IndexRow[] => {
-    if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id || typeof r.folder !== "string" || !r.folder) return [];
-    return [{ ...r, id: r.id, project: text(r.project) ?? "", folder: r.folder, title: text(r.title) ?? "", date: text(r.date) ?? "", name: text(r.name), custom: text(r.custom), description: text(r.description) }];
-  });
+  const rows = data.flatMap((r) => toRow(r) ?? []);
   return { rows, dropped: data.length - rows.length };
 }
 
@@ -63,7 +69,29 @@ export function indexRows(json: string): IndexRow[] {
   return parseIndex(json).rows;
 }
 
-export function readIndex(path = indexPath()): IndexRow[] {
+function parseRowFile(json: string, id: string): IndexRow | null | undefined {
+  try {
+    const data = JSON.parse(json);
+    if (!data || typeof data !== "object" || data.id !== id) return undefined;
+    if (data.removed === true) return null;
+    return toRow(data);
+  } catch {
+    return undefined;
+  }
+}
+
+const missing = (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT";
+
+function readRowFile(file: string, id: string): IndexRow | null | undefined {
+  try {
+    return parseRowFile(readFileSync(file, "utf8"), id);
+  } catch (e) {
+    if (missing(e)) return undefined;
+    throw e;
+  }
+}
+
+function readOldIndex(path: string): IndexRow[] {
   try {
     return indexRows(readFileSync(path, "utf8"));
   } catch {
@@ -71,30 +99,67 @@ export function readIndex(path = indexPath()): IndexRow[] {
   }
 }
 
-// The write keeps a damaged index next to the new one. Then no row of the damaged file goes away.
-function writeIndex(rows: IndexRow[]): void {
-  const path = indexPath();
-  mkdirSync(dirname(path), { recursive: true });
-  if (existsSync(path)) {
-    let damaged = true;
-    try {
-      damaged = parseIndex(readFileSync(path, "utf8")).dropped > 0;
-    } catch {}
-    if (damaged) renameSync(path, `${path}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
+function readRowFolder(dir: string): Map<string, IndexRow | null> {
+  const out = new Map<string, IndexRow | null>();
+  let names: string[] = [];
+  try {
+    names = readdirSync(dir).sort();
+  } catch {
+    return out;
   }
-  const tmp = `${path}.${process.pid}.tmp`;
-  harnessWrite(path, () => {
-    writeFileSync(tmp, JSON.stringify(rows, null, 1));
-    renameSync(tmp, path);
+  for (const name of names) {
+    const id = name.slice(0, -".json".length);
+    if (!name.endsWith(".json") || !SAFE_ID.test(id)) continue;
+    try {
+      const row = readRowFile(join(dir, name), id);
+      if (row !== undefined) out.set(id, row);
+    } catch {}
+  }
+  return out;
+}
+
+export function readIndex(path = indexPath()): IndexRow[] {
+  const mine = readRowFolder(rowDir(path));
+  const old = readOldIndex(path).filter((r) => !mine.has(r.id));
+  return [...old, ...[...mine.values()].filter((r): r is IndexRow => !!r)];
+}
+
+function findRow(id: string): { row?: IndexRow; inOld: boolean } {
+  const mine = readRowFile(join(rowDir(), `${id}.json`), id);
+  const old = readOldIndex(indexPath()).find((r) => r.id === id);
+  return { row: mine === null ? undefined : (mine ?? old), inOld: !!old };
+}
+
+// A row file with bad JSON or a wrong id moves aside before the new row replaces it. Then no row goes away.
+function writeRow(id: string, body: object): void {
+  const dir = rowDir();
+  const file = join(dir, `${id}.json`);
+  mkdirSync(dir, { recursive: true });
+  let damaged = false;
+  try {
+    damaged = parseRowFile(readFileSync(file, "utf8"), id) === undefined;
+  } catch (e) {
+    if (!missing(e)) throw e;
+  }
+  if (damaged) {
+    try {
+      renameSync(file, `${file}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
+    } catch (e) {
+      if (!missing(e)) throw e;
+    }
+  }
+  const tmp = `${file}.${process.pid}.${randomBytes(3).toString("hex")}.tmp`;
+  harnessWrite(file, () => {
+    writeFileSync(tmp, JSON.stringify(body, null, 1));
+    renameSync(tmp, file);
   });
 }
 
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
-  if (p.legacy) return;
-  const all = readIndex();
-  const old = all.find((r) => r.id === p.id);
+  if (p.legacy || !SAFE_ID.test(p.id)) return;
+  const old = findRow(p.id).row;
   const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
-  writeIndex([...all.filter((r) => r.id !== p.id), row]);
+  writeRow(p.id, row);
 }
 
 export function cutText(s: string, n: number): string {
@@ -103,18 +168,22 @@ export function cutText(s: string, n: number): string {
 }
 
 export function renameIndexRow(id: string, custom: string): boolean {
-  const rows = readIndex();
-  const row = rows.find((r) => r.id === id);
+  if (!SAFE_ID.test(id)) return false;
+  const row = findRow(id).row;
   if (!row) return false;
-  row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
-  writeIndex(rows);
+  writeRow(id, { ...row, custom: cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined });
   return true;
 }
 
 export function removeIndexRow(id: string): boolean {
-  const rows = readIndex();
-  if (!rows.some((r) => r.id === id)) return false;
-  writeIndex(rows.filter((r) => r.id !== id));
+  if (!SAFE_ID.test(id)) return false;
+  const { row, inOld } = findRow(id);
+  if (!row) return false;
+  if (inOld) writeRow(id, { id, removed: true });
+  else {
+    const file = join(rowDir(), `${id}.json`);
+    harnessWrite(file, () => rmSync(file, { force: true }));
+  }
   return true;
 }
 
@@ -198,7 +267,10 @@ export function discardPlace(p: Place): void {
     if (readdirSync(p.outDir).some((n) => n !== ".record")) return;
     rmSync(p.outDir, { recursive: true, force: true });
   } catch {}
-  if (!existsSync(p.outDir)) removeIndexRow(p.id);
+  if (existsSync(p.outDir)) return;
+  try {
+    removeIndexRow(p.id);
+  } catch {}
 }
 
 const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

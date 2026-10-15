@@ -10,6 +10,7 @@ import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
 import { isCredentialsFile, noClaudeCredentials } from "../core/credentials.ts";
+import { KEY_ANT_LOGIN } from "../ui/cards.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
@@ -47,6 +48,15 @@ export function appAdapters(name: string | undefined, flags: string[] | undefine
   } finally {
     if (trust) endTrustOnce(cwd);
   }
+}
+
+const JOB_STOP_WAIT_MS = 6000;
+export const APP_CLOSE_LIMIT_MS = JOB_STOP_WAIT_MS + 14_000;
+
+export async function stopApp(close: () => Promise<unknown>, limitMs = APP_CLOSE_LIMIT_MS) {
+  process.once("SIGINT", () => process.exit(130));
+  process.once("SIGTERM", () => process.exit(143));
+  await Promise.race([close(), new Promise((r) => setTimeout(r, limitMs).unref())]);
 }
 
 export interface AppOptions {
@@ -231,6 +241,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     for (const c of idle) push(c, `data: ${JSON.stringify(msg)}\n\n`);
   };
 
+  const needsSetup = () => (opts.model ? needsFirstSetup(opts.model, env) : needsFirstStart(fsCtx()));
+
   const detach = async () => {
     const c = current;
     if (!c) return;
@@ -251,6 +263,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const quit = async (): Promise<string | void> => {
     if (current && !current.owned) return TERMINAL_QUIT;
     await detach();
+    if (needsSetup()) leftSetup = false;
     broadcastIdle({ t: "switch" });
     opts.onQuit?.();
   };
@@ -372,7 +385,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         session: c ? c.view.header() : null,
         opening: !!opening,
         error: lastError,
-        setup: !c && !leftSetup && (opts.model ? needsFirstSetup(opts.model, env) : needsFirstStart(fsCtx())),
+        setup: !c && !leftSetup && needsSetup(),
         model: model(),
         folder: opts.folder ? resolve(opts.folder) : "",
         start: resolve(opts.folder ?? opts.start ?? homedir()),
@@ -473,7 +486,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       leftSetup = true;
       return send(res, 200, { ok: true });
     }
-    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
+    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, keyAntLogin: KEY_ANT_LOGIN, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
     if (p === "/api/firststart/claude") {
       const r = await chooseClaude(String(body.key ?? ""), { ...fsCtx(), check: opts.checkKey });
       if (r.ok) recordSetting(c?.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
@@ -541,13 +554,21 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         if (job.lines.length > JOB_LINES) job.lines.splice(0, job.lines.length - JOB_LINES);
         jobSend(job, { line });
       };
-      job.ended = runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal }).then((d) => {
-        job.done = { ok: d.ok, text: d.text };
-        jobSend(job, { done: true, ...job.done });
-        for (const x of job.subs) x.end();
+      const finish = (done: { ok: boolean; text: string }) => {
+        if (job.done) return;
+        job.done = done;
+        jobSend(job, { done: true, ...done });
+        for (const x of job.subs) {
+          try {
+            x.end();
+          } catch {}
+        }
         job.subs.clear();
         setTimeout(() => jobs.delete(id), 600_000).unref();
-      });
+      };
+      job.ended = runFor(r.plan, "app", { ...run, onLine, signal: job.abort.signal })
+        .then((d) => finish({ ok: d.ok, text: d.text }))
+        .catch((e: Error) => finish({ ok: false, text: `The ${r.plan!.action} did not finish: ${e.message}` }));
       return send(res, 200, { job: id });
     }
     if (p === "/api/programs/stop") {
@@ -652,7 +673,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       // An install runs in its own process group, so Ctrl+C in the terminal does not stop it. Stop it here, and let it release its lock.
       const open = [...jobs.values()].filter((j) => !j.done);
       for (const j of open) j.abort.abort();
-      if (open.length) await Promise.race([Promise.all(open.map((j) => j.ended?.catch(() => {}))), new Promise((r) => setTimeout(r, 6000).unref())]);
+      if (open.length) await Promise.race([Promise.all(open.map((j) => j.ended?.catch(() => {}))), new Promise((r) => setTimeout(r, JOB_STOP_WAIT_MS).unref())]);
       await detach();
       for (const c of idle) c.end();
       server.close();

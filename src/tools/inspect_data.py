@@ -22,24 +22,45 @@ def plane_list(path):
             arr = s.asarray()
             axes = s.axes
             ij = tf.imagej_metadata or {}
+            n_series = len(tf.series)
         labels = ij.get("Labels") if isinstance(ij.get("Labels"), list) else None
-        while arr.ndim > 3 or (arr.ndim == 3 and axes[0] not in "CS" and axes[-1] not in "CS"):
-            arr = arr.max(axis=0) if axes[0] in "ZTQ" else arr[0]
-            axes = axes[1:]
+        warnings = []
+        notes = []
+        if n_series > 1:
+            warnings.append("The file has %d image series. Cuvette read only the first series." % n_series)
+        while arr.ndim > 2:
+            if arr.ndim == 3 and any(a in "CS" for a in axes):
+                break
+            z = next((k for k, a in enumerate(axes) if a in "ZTQ"), None)
+            if z is not None:
+                notes.append("The file has %d planes on the axis %s. Cuvette used the maximum projection of this axis." % (arr.shape[z], axes[z]))
+                arr = arr.max(axis=z)
+                axes = axes[:z] + axes[z + 1:]
+                continue
+            if arr.ndim == 3:
+                break
+            k = next((k for k, a in enumerate(axes) if a not in "CSYX"), 0)
+            warnings.append("The file has %d planes on the axis %s. Cuvette read only the first plane of this axis." % (arr.shape[k], axes[k]))
+            arr = np.take(arr, 0, axis=k)
+            axes = axes[:k] + axes[k + 1:]
         if arr.ndim == 2:
-            return [arr], False, labels, str(arr.dtype)
-        if axes[-1] in "CS" and arr.shape[-1] <= 4:
+            return [arr], False, labels, str(arr.dtype), warnings, notes
+        p = next((k for k, a in enumerate(axes) if a in "CS"), None)
+        if p is None:
+            p = next(k for k, a in enumerate(axes) if a not in "YX")
+        if p == arr.ndim - 1 and arr.shape[-1] <= 4:
             rgb = arr.shape[-1] in (3, 4) and axes[-1] == "S"
-            return [arr[..., i] for i in range(3 if rgb else arr.shape[-1])], rgb, labels, str(arr.dtype)
-        return [arr[i] for i in range(arr.shape[0])], False, labels, str(arr.dtype)
+            return [arr[..., i] for i in range(3 if rgb else arr.shape[-1])], rgb, labels, str(arr.dtype), warnings, notes
+        arr = np.moveaxis(arr, p, 0)
+        return [arr[i] for i in range(arr.shape[0])], False, labels, str(arr.dtype), warnings, notes
     from PIL import Image
 
     im = Image.open(path)
     if im.mode in ("RGB", "RGBA", "P", "CMYK"):
         arr = np.asarray(im.convert("RGB"))
-        return [arr[..., i] for i in range(3)], True, None, str(arr.dtype)
+        return [arr[..., i] for i in range(3)], True, None, str(arr.dtype), [], []
     arr = np.asarray(im)
-    return [arr], False, None, str(arr.dtype)
+    return [arr], False, None, str(arr.dtype), [], []
 
 
 def full_range(planes, dtype):
@@ -102,7 +123,7 @@ def preview(planes, rgb, out_dir, name):
 
 
 def describe_image(path, out_dir):
-    planes, rgb, labels, dtype = plane_list(path)
+    planes, rgb, labels, dtype, warnings, notes = plane_list(path)
     full = full_range(planes, dtype)
     stem = os.path.splitext(os.path.basename(path))[0]
     m = TOKEN.search(stem)
@@ -119,7 +140,7 @@ def describe_image(path, out_dir):
         prev = preview(planes, rgb, out_dir, stem)
     except Exception:
         prev = None
-    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": np.dtype(dtype).itemsize * 8 if dtype.startswith("float") else int(round(np.log2(full + 1))), "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
+    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": np.dtype(dtype).itemsize * 8, "warnings": warnings, "notes": notes, "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
 
 
 def image_phrase(d):
@@ -175,14 +196,15 @@ def inspect_folder(root, out_dir):
         by_field.setdefault(key, []).append((tok or "", f))
     tokens = sorted({t for v in by_field.values() for t, _ in v if t}, key=str.lower)
     sample = []
+    unreadable = []
     if by_field:
         first = sorted(by_field)[0]
         for _, f in sorted(by_field[first], key=lambda x: x[0].lower())[:4]:
             try:
                 sample.append(describe_image(f, out_dir))
-            except Exception:
-                pass
-    return {"kind": "folder", "groups": groups, "n_files": len(files), "n_images": len(images), "n_fields": len(by_field), "tokens": tokens, "sample": sample, "tables": [os.path.relpath(t, root) for t in tables[:10]], "n_tables": len(tables)}
+            except Exception as e:
+                unreadable.append("Cuvette could not read the image %s: %s" % (os.path.basename(f), e))
+    return {"kind": "folder", "warnings": unreadable, "groups": groups, "n_files": len(files), "n_images": len(images), "n_fields": len(by_field), "tokens": tokens, "sample": sample, "tables": [os.path.relpath(t, root) for t in tables[:10]], "n_tables": len(tables)}
 
 
 def inspect_table(path, out_dir):
@@ -214,7 +236,10 @@ def inspect_table(path, out_dir):
         if not num and 1 < s.nunique() <= 12:
             col["values"] = {str(k): int(v) for k, v in s.value_counts().items()}
         if num and s.notna().any():
-            col["range"] = [float(s.min()), float(s.max())]
+            finite = s.astype(float)
+            finite = finite[np.isfinite(finite)]
+            if len(finite):
+                col["range"] = [float(finite.min()), float(finite.max())]
         cols.append(col)
     return {"kind": "table", "rows": int(len(frame)), "columns": cols, "read_table": r.get("summary"), "head": frame.head(5).astype(str).values.tolist()}
 
@@ -256,9 +281,21 @@ def summary(d, path):
                 out.append("Column %s has the values %s." % (c["name"], ", ".join("%s (%d)" % kv for kv in list(c["values"].items())[:12])))
     else:
         out.append("%s is a file of %d bytes." % (name, d["size"]))
-    if d["images_seen"] and "blue" not in d["colors"] and (d["colors"] or "fluorescence" not in d["kinds"]):
+    for w in dict.fromkeys(w for i in (d["sample"] + [d] if d["kind"] == "folder" else [d]) for k in ("warnings", "notes") for w in i.get(k, [])):
+        out.append(w)
+    if d["images_seen"] and not d["dropped"] and "blue" not in d["colors"] and (d["colors"] or "fluorescence" not in d["kinds"]):
         out.append("There is no nuclear stain (no blue channel, and no DAPI or Hoechst in the names).")
     return " ".join(out)
+
+
+def clean(x):
+    if isinstance(x, float):
+        return x if np.isfinite(x) else None
+    if isinstance(x, dict):
+        return {k: clean(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [clean(v) for v in x]
+    return x
 
 
 def main():
@@ -290,10 +327,11 @@ def main():
     d["colors"] = sorted({c["color"] for i in imgs for c in i["channels"] if c.get("color")} | {COLOR_WORDS[t.lower()] for t in tokens if t.lower() in COLOR_WORDS})
     d["kinds"] = sorted({c["kind"] for i in imgs for c in i["channels"]})
     d["images_seen"] = bool(imgs)
+    d["dropped"] = any(i.get("warnings") for i in imgs) or bool(d.get("warnings"))
     d["previews"] = [i["preview"] for i in imgs if i.get("preview")]
     d["summary"] = summary(d, path)
     d["ok"] = True
-    print(json.dumps(d, default=str))
+    print(json.dumps(clean(d), default=str))
 
 
 main()

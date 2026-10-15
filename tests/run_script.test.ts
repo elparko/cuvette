@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { globEre, literalEre } from "../src/core/trust.ts";
 import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
@@ -334,6 +335,99 @@ test("write steps lock a hook script of the project", () => {
   expect(settingsScope(l.dirs).files).toContain(join(l.project, "guard.sh"));
 });
 
+test("write steps lock the folder of a hook script and the folder of a hook glob", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "hooks"), { recursive: true });
+  mkdirSync(join(l.project, "empty"), { recursive: true });
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "./hooks/guard.sh"] }, { command: ["sh", "-c", "empty/*.sh"] }] } }));
+  writeFileSync(join(l.project, "hooks", "guard.sh"), "exit 0\n");
+  const steps = writeSteps(l.dirs);
+  const locked = steps.filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toEqual(expect.arrayContaining([join(l.project, "hooks"), join(l.project, "empty")]));
+  expect(writeRules(steps)).toContain(`(deny file-write* (subpath "${join(l.project, "hooks")}"))`);
+  expect(bwrapCommand(["tool"], steps).join(" ")).toContain(`--ro-bind ${join(l.project, "hooks")} ${join(l.project, "hooks")}`);
+});
+
+test("a hook script in the project root locks the file only, so other project folders and an output folder inside the project stay writable", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "results"));
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "check.py"] }, { command: ["sh", "-c", "./guard.sh"] }] } }));
+  writeFileSync(join(l.project, "check.py"), "pass\n");
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  const dirs = { ...l.dirs, outputDir: join(l.project, "results") };
+  const steps = writeSteps(dirs);
+  const locked = steps.filter((x) => !x.allow && !x.fixed).map((x) => x.path);
+  expect(locked).toEqual(expect.arrayContaining([join(l.project, "check.py"), join(l.project, "guard.sh")]));
+  expect(locked).not.toContain(l.project);
+  const covers = (path: string) => locked.some((p) => path === p || path.startsWith(`${p}/`));
+  expect(covers(dirs.outputDir)).toBe(false);
+  expect(covers(join(l.project, "data"))).toBe(false);
+  expect(covers(l.out)).toBe(false);
+  const rules = writeRules(steps);
+  expect(rules).not.toContain(`(deny file-write* (subpath "${l.project}"))`);
+  expect(rules).toContain(`(deny file-write* (subpath "${join(l.project, "check.py")}"))`);
+  const bwrap = bwrapCommand(["tool"], steps).join(" ");
+  expect(bwrap).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "check.py")} ${join(l.project, "check.py")}`);
+});
+
+test("a hook glob in the project root denies new files that match the glob, and keeps the other project folders writable (bwrap cannot deny a new file by pattern, so it locks the existing matches only)", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "results"));
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "./*.sh"] }] } }));
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  const steps = writeSteps({ ...l.dirs, outputDir: join(l.project, "results") });
+  const rules = writeRules(steps);
+  expect(rules).toContain(`(deny file-write* (regex #"^${l.project.replace(/[^\w/-]/g, ".")}/[^/]*[.]sh$"))`);
+  expect(rules).not.toContain(`(deny file-write* (subpath "${l.project}"))`);
+  const bwrap = bwrapCommand(["tool"], steps).join(" ");
+  expect(bwrap).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "guard.sh")} ${join(l.project, "guard.sh")}`);
+  expect(bwrap).not.toContain(join(l.project, "notes.txt"));
+});
+
+test("bwrap ro-binds only regular files for a root glob, never a folder that the glob matches", () => {
+  const l = layout();
+  mkdirSync(join(l.project, "results"));
+  writeFileSync(join(l.project, "res.sh"), "x");
+  const step = (g: string) => [{ path: l.project, allow: false, pattern: `^${literalEre(l.project)}/${globEre(g)}$` }];
+  const bwrap = bwrapCommand(["tool"], step("res*")).join(" ");
+  expect(bwrap).toContain(`--ro-bind ${join(l.project, "res.sh")} ${join(l.project, "res.sh")}`);
+  expect(bwrap).not.toContain(`--ro-bind ${join(l.project, "results")} `);
+  const all = bwrapCommand(["tool"], step("*")).join(" ");
+  expect(all).not.toContain(`--ro-bind ${join(l.project, "cuvette")} `);
+  expect(all).not.toContain(`--ro-bind ${l.out} `);
+});
+
+test("bwrap knows xdigit, blank, cntrl, graph and print, and locks every file for an unknown class", () => {
+  const l = layout();
+  for (const n of ["hookA.sh", "hookZ.sh", "other.txt"]) writeFileSync(join(l.project, n), "x");
+  const bind = (g: string) => bwrapCommand(["tool"], [{ path: l.project, allow: false, pattern: `^${literalEre(l.project)}/${globEre(g)}$` }]).join(" ");
+  const has = (b: string, n: string) => b.includes(`--ro-bind ${join(l.project, n)} `);
+  const hex = bind("hook[[:xdigit:]].sh");
+  expect(has(hex, "hookA.sh")).toBe(true);
+  expect(has(hex, "hookZ.sh")).toBe(false);
+  const print = bind("hook[[:print:]].sh");
+  expect(has(print, "hookZ.sh")).toBe(true);
+  expect(has(print, "other.txt")).toBe(false);
+  const unknown = bind("hook[[:nosuch:]].sh");
+  for (const n of ["hookA.sh", "hookZ.sh", "other.txt"]) expect(has(unknown, n)).toBe(true);
+  expect(has(unknown, "cuvette")).toBe(false);
+});
+
+test("Linux wrap: a hook glob in the project root locks only the existing matches, so the work folder and new files stay writable", () => {
+  const l = layout();
+  writeFileSync(l.settings, JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "./*.sh"] }] } }));
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  writeFileSync(join(l.project, "keep.txt"), "x");
+  const dirs = { ...l.dirs, workDir: l.project };
+  const b = linuxWrap("bwrap", ["true"], { network: false, writable: [l.project], cred: join(l.project, "none.json"), steps: writeSteps(dirs) }).join(" ");
+  expect(b).toContain(`--ro-bind ${join(l.project, "guard.sh")} ${join(l.project, "guard.sh")}`);
+  expect(b).not.toContain(`--ro-bind ${l.project} ${l.project} `);
+  expect(b).not.toContain(join(l.project, "keep.txt"));
+  expect(b).toContain(`--bind ${l.project} ${l.project}`);
+});
+
 test("write steps open a work folder that is inside the record folder, and lock the record folders inside it again", () => {
   const record = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-legacy-")));
   const work = join(record, "work");
@@ -471,6 +565,21 @@ test.skipIf(!sandboxWorks)("a script cannot write the record or the settings, an
   expect([l.ownLog, l.otherLog, l.settings, join(l.out, ".record", "meta.json")].map((p) => readFileSync(p, "utf8"))).toEqual(before);
   expect(existsSync(join(l.project, ".ga"))).toBe(false);
   expect(logged).toEqual([]);
+});
+
+test.skipIf(!sandboxWorks)("a script cannot plant a file that a hook glob in the project root matches, and can write other files there", async () => {
+  const l = layout();
+  writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "./*.sh"] }] } }));
+  writeFileSync(join(l.project, "guard.sh"), "exit 0\n");
+  const tool = runScriptTool(l.dirs, { network: false });
+  const run = (code: string) =>
+    tool.execute({ purpose: "Test", does: "Runs a test.", code }, { session: "s", callId: "c", workDir: l.out, sessionDir: l.dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) });
+  const planted = await run(`open(${JSON.stringify(join(l.project, "evil.sh"))}, 'w').write('x')`);
+  expect(planted.ok).toBe(false);
+  expect(existsSync(join(l.project, "evil.sh"))).toBe(false);
+  const other = await run(`open(${JSON.stringify(join(l.project, "notes.txt"))}, 'w').write('x')`);
+  expect(other.ok).toBe(true);
+  expect(existsSync(join(l.project, "notes.txt"))).toBe(true);
 });
 
 test.skipIf(!sandboxWorks)("a script still writes its results in the work folder, the project folder and folders named .record or .ga deeper in the tree", async () => {

@@ -1,9 +1,9 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { UI_DIST } from "../src/server/app.ts";
+import { ensureUiBuild } from "./ui-dist.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const ROOT = join(__dirname, "..");
@@ -44,7 +44,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     })()`);
 
   beforeAll(async () => {
-    if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+    ensureUiBuild();
     const home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
     const data = mkdtempSync(join(tmpdir(), "cuvette-data-"));
     writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");
@@ -651,6 +651,20 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Leave setup").click()`);
     expect(await until(page, `!document.querySelector("main").textContent.includes("Welcome to Cuvette")`)).toBe(true);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart"))`);
+    await goPage("Analysis");
+  });
+
+  test("first start: Leave setup stays on the page and shows a message if the call fails", async () => {
+    await page.eval(`(() => {
+      window.__mocks.push({ part: "api/leave-setup", reply: () => ({ status: 500, body: { error: "The app did not answer." } }) });
+      window.__mocks.push({ part: "api/firststart", reply: () => ({ body: { needed: true, hasKey: false, model: "claude", ollama: { reachable: false, models: [] }, choices: [{ id: "claude", label: "Use Claude", help: "" }, { id: "local", label: "Use a local model", help: "" }], recommended: "qwen3:8b", sample: "/tmp/Cuvette sample", keyGuide: { title: "", intro: "", steps: [], notes: [] } } }) });
+      window.cuvetteApp.show("setup");
+    })()`);
+    expect(await until(page, `[...document.querySelectorAll("main button")].some((b) => b.textContent === "Leave setup")`)).toBe(true);
+    await page.eval(`[...document.querySelectorAll("main button")].find((b) => b.textContent === "Leave setup").click()`);
+    expect(await until(page, `document.querySelector("[data-sonner-toast]")?.textContent.includes("The app did not answer.")`)).toBe(true);
+    expect(await page.eval(`[...document.querySelectorAll("main button")].some((b) => b.textContent === "Leave setup")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/firststart") && m.part !== "api/leave-setup")`);
     await goPage("Analysis");
   });
 

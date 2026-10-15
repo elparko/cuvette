@@ -1,9 +1,9 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { UI_DIST } from "../src/server/app.ts";
+import { ensureUiBuild } from "./ui-dist.ts";
 import { cardHtml } from "../src/server/app-html.ts";
 import { CARD_CTX, CARD_FIXTURES, ITEM_FIXTURES, ITEM_LIVE_FIXTURE, STATUS_FIXTURE } from "./a11y-cards.ts";
 import { contrastFindings, focusOrder, installAudit, layoutFindings, motionFindings, namesFindings, structureFindings, targetFindings, type Finding } from "./a11y-audit.ts";
@@ -129,7 +129,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
   };
 
   beforeAll(async () => {
-    if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+    ensureUiBuild();
     home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
     data = mkdtempSync(join(tmpdir(), "cuvette-data-"));
     dirs.push(home, data);

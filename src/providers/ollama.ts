@@ -1,3 +1,4 @@
+import { ollamaHost } from "../core/ollama-host.ts";
 import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
@@ -41,11 +42,7 @@ export interface OllamaOpts {
   retries?: number;
 }
 
-export function ollamaHost(): string {
-  const h = process.env.OLLAMA_HOST || "http://localhost:11434";
-  const withScheme = /^https?:\/\//.test(h) ? h : `http://${h}`;
-  return withScheme.replace(/\/+$/, "");
-}
+export { ollamaHost };
 
 export function parseParamSize(s: string | undefined): number | null {
   const m = /([\d.]+)\s*([KMBT])/i.exec(s ?? "");
@@ -61,17 +58,22 @@ export interface OllamaShow {
   contextLength: number | null;
 }
 
-export async function showModel(model: string, signal?: AbortSignal): Promise<OllamaShow> {
+const SHOW_TIMEOUT_MS = 10_000;
+
+export async function showModel(model: string, signal?: AbortSignal, timeoutMs = SHOW_TIMEOUT_MS): Promise<OllamaShow> {
   const host = ollamaHost();
+  const limit = AbortSignal.timeout(timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${host}/api/show`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model }),
-      signal,
+      signal: signal ? AbortSignal.any([signal, limit]) : limit,
     });
-  } catch {
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    if (limit.aborted) throw new ProviderError(`Ollama at ${host} did not answer in ${timeoutMs / 1000} s.`);
     throw new ProviderError(`Cannot reach Ollama at ${host}. Start it with \`ollama serve\`.`);
   }
   if (res.status === 404) throw new ProviderError(`Ollama has no model ${model}. Run \`ollama pull ${model}\`.`);

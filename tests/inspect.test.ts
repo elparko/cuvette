@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, expect, test } from "vitest";
@@ -46,6 +46,66 @@ test("a 0-to-1 float image is floating point, not 10-bit", async () => {
   execFileSync(scriptPython(), ["-I", "-c", "import sys, numpy, tifffile; tifffile.imwrite(sys.argv[1], numpy.linspace(0, 1, 64 * 64, dtype='float32').reshape(64, 64))", p]);
   const insp = await inspectData(p, join(root, "out"));
   expect(insp.summary).toContain("Size 64 x 64, 32-bit floating point.");
+});
+
+const tiff = (name: string, axes: string, shape: number[], extra = "") => {
+  const p = join(root, name);
+  execFileSync(scriptPython(), ["-I", "-c", `import sys, numpy, tifffile; a = (numpy.random.default_rng(1).random(${JSON.stringify(shape)}) * 500).astype('uint16'); tifffile.imwrite(sys.argv[1], a, metadata={'axes': '${axes}'}${extra})`, p]);
+  return p;
+};
+
+test("a TIFF with the axes CZYX keeps the channels, and a uint16 image with a low maximum is 16-bit", async () => {
+  const insp = await inspectData(tiff("czyx.ome.tif", "CZYX", [3, 2, 32, 32], ", ome=True"), join(root, "out"));
+  expect(insp.summary).toContain("has 3 channels");
+  expect(insp.summary).toContain("16-bit.");
+  expect(insp.summary).not.toContain("10-bit");
+});
+
+test("a multi-page TIFF with the axes IYX keeps the pages as channels", async () => {
+  const insp = await inspectData(tiff("iyx.tif", "IYX", [3, 32, 32]), join(root, "out"));
+  expect(insp.summary).toContain("has 3 channels");
+  expect(insp.summary).not.toContain("planes");
+});
+
+test("a TIFF with an axis that Cuvette cannot keep warns, and the summary makes no claim about a nuclear stain", async () => {
+  const insp = await inspectData(tiff("icyx.tif", "ICYX", [4, 2, 32, 32]), join(root, "out"));
+  expect(insp.summary).toContain("The file has 4 planes on the axis I. Cuvette read only the first plane of this axis.");
+  expect(insp.summary).not.toContain("no nuclear stain");
+});
+
+test("a table column with infinity or NaN still gives a readable inspection and a range of the finite values", async () => {
+  const p = join(root, "inf.csv");
+  writeFileSync(p, "x,y\n1,inf\n3,-inf\n,2\n5,4\n");
+  const insp = await inspectData(p, join(root, "out"));
+  expect(insp.ok).toBe(true);
+  expect(insp.summary).toContain("inf.csv: 4 rows, 2 columns");
+  const cols = (insp as unknown as { columns: { name: string; range?: number[] }[] }).columns;
+  expect(cols.find((c) => c.name === "x")!.range).toEqual([1, 5]);
+  expect(cols.find((c) => c.name === "y")!.range).toEqual([2, 4]);
+});
+
+test("a TIFF with more than one series warns that only the first series was read", async () => {
+  const p = join(root, "series.tif");
+  execFileSync(scriptPython(), ["-I", "-c", "import sys, numpy, tifffile; tifffile.imwrite(sys.argv[1], numpy.ones((32, 32), 'uint16') * 100); tifffile.imwrite(sys.argv[1], numpy.ones((16, 16, 3), 'uint8'), append=True)", p]);
+  const insp = await inspectData(p, join(root, "out"));
+  expect(insp.summary).toContain("The file has 2 image series. Cuvette read only the first series.");
+  expect(insp.summary).not.toContain("no nuclear stain");
+});
+
+test("a maximum projection over a Z axis shows a warning", async () => {
+  const insp = await inspectData(tiff("zyx.tif", "ZYX", [3, 32, 32]), join(root, "out"));
+  expect(insp.summary).toContain("The file has 3 planes on the axis Z. Cuvette used the maximum projection of this axis.");
+});
+
+test("an image in a folder that cannot be read gives a warning and no claim about a nuclear stain", async () => {
+  const dir = join(root, "broken");
+  mkdirSync(dir, { recursive: true });
+  execFileSync(scriptPython(), ["-I", "-c", "import sys, numpy, PIL.Image as I; I.fromarray((numpy.random.default_rng(1).random((32, 32)) * 255).astype('uint8')).save(sys.argv[1])", join(dir, "a_CH1.png")]);
+  writeFileSync(join(dir, "a_CH2.png"), "this is not an image");
+  const insp = await inspectData(dir, join(root, "out"));
+  expect(insp.ok).toBe(true);
+  expect(insp.summary).toContain("Cuvette could not read the image a_CH2.png");
+  expect(insp.summary).not.toContain("no nuclear stain");
 });
 
 test("a CSV in Windows-1252 reads", async () => {
