@@ -7,7 +7,7 @@ import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
-import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
+import { CLAUDE_MODELS, CUVETTE_MODEL, listModels, makeProvider } from "../src/providers/index.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -477,7 +477,7 @@ describe("ollama", () => {
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("refused");
     });
-    expect(await listModels()).toEqual(CLAUDE_MODELS);
+    expect(await listModels()).toEqual([...CLAUDE_MODELS, CUVETTE_MODEL]);
   });
 });
 

@@ -257,7 +257,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     expect(await visible("spinner")).toEqual(["animations"]);
     expect(await visible("zzzz")).toEqual([]);
     expect(await page.eval(`!document.querySelector("#settingsbody .cfg-none").classList.contains("hidden")`)).toBe(true);
-    expect((await visible("")).length).toBe(3);
+    expect((await visible("")).length).toBe(4);
   });
 
   test("a click asks where to save, saves, and shows the source", async () => {

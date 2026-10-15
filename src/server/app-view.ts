@@ -117,7 +117,7 @@ export class WebView {
 
   header(): Record<string, unknown> {
     const s = this.session;
-    return { id: s.id, folder: s.cwd ?? "", folderLine: s.folderLine ?? "", model: s.model.model, programs: s.adapterInfo.map((a) => a.title || a.name), details: this.details };
+    return { id: s.id, folder: s.cwd ?? "", folderLine: s.folderLine ?? "", model: s.model.model, provider: s.model.provider, programs: s.adapterInfo.map((a) => a.title || a.name), details: this.details };
   }
 
   statusMsg(): Record<string, unknown> {

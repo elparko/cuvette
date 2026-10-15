@@ -2,15 +2,22 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
+import { accountStatus, createAccount, CUVETTE_NOTICE } from "./account.ts";
 import { KEY_GUIDE } from "./keyhelp.ts";
-import { claudeKey, keyProblem, saveClaudeKey } from "./credentials.ts";
+import { claudeKey, cuvetteToken, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
 
-export type ModelChoice = "claude" | "local";
+export type ModelChoice = "claude" | "cuvette" | "local";
 
 export const CHOICES: { id: ModelChoice; label: string; help: string }[] = [
   { id: "claude", label: "Use Claude (needs an API key)", help: "Claude does the analysis. You pay Anthropic for each request. No key yet? Choose this, then ask for help to get a key." },
   { id: "local", label: "Use a local model (Ollama, free, runs on this Mac)", help: "A model on this Mac does the analysis. Nothing leaves the Mac. Small models make more mistakes than Claude." },
+];
+
+export const APP_CHOICES: { id: ModelChoice; label: string; help: string }[] = [
+  CHOICES[0]!,
+  { id: "cuvette", label: "Pay Cuvette for inference", help: `You pay Cuvette with Cuvette credit. You need no API key. ${CUVETTE_NOTICE}` },
+  CHOICES[1]!,
 ];
 
 export const RECOMMENDED_LOCAL = "qwen3:8b";
@@ -74,6 +81,14 @@ export async function chooseClaude(key: string, ctx: Ctx & { check?: (key: strin
   const path = saveClaudeKey(k);
   await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", "claude", "user");
   return { ok: true, text: `${r.text} Saved the key to ${path}. The model is Claude.` };
+}
+
+export async function chooseCuvette(ctx: Ctx = {}): Promise<{ ok: boolean; text: string; balanceUsd: number }> {
+  const env = ctx.env ?? process.env;
+  if (cuvetteToken(env).from === "none") await createAccount({ env, fetch: ctx.fetch });
+  const s = await accountStatus({ env, fetch: ctx.fetch });
+  await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", "cuvette", "user");
+  return { ok: true, text: "The Cuvette account is ready. The model is Claude, paid through Cuvette.", balanceUsd: s.balanceUsd };
 }
 
 export async function chooseLocal(model: string | undefined, ctx: Ctx = {}): Promise<{ ok: boolean; text: string; model: string }> {

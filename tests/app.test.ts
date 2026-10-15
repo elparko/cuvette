@@ -205,7 +205,7 @@ describe("the app server", () => {
     app = await startApp({ env: {}, model: "claude", start: home, doctor, fetch: noOllama, checkKey: async () => ({ ok: false, text: "The key was refused." }), makeSession: async () => new FakeSession() });
     const c = client(app);
     const fs = await (await c.post("api/firststart", {})).json();
-    expect(fs.choices.map((x: { id: string }) => x.id)).toEqual(["claude", "local"]);
+    expect(fs.choices.map((x: { id: string }) => x.id)).toEqual(["claude", "cuvette", "local"]);
     expect(fs.ollama.reachable).toBe(false);
     const bad = await c.post("api/firststart/claude", { key: "sk-ant-api03-" + "x".repeat(90) });
     expect(bad.status).toBe(400);

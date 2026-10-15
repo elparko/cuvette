@@ -2,6 +2,7 @@ import { InfoTip } from "../components/info-tip.tsx";
 import { CheckIcon, CloudIcon, CpuIcon, KeyRoundIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App.tsx";
+import { CuvetteAccount } from "../components/cuvette-account.tsx";
 import { DoctorView } from "../components/doctor.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardContent } from "../components/ui/card.tsx";
@@ -102,7 +103,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               className={cn("flex flex-col gap-1 rounded-xl border bg-card p-3.5 text-left transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 focus-visible:ring-[3px] focus-visible:ring-ring/40", choice === c.id && "border-accent-brand ring-[3px] ring-ring/20")}
             >
               <span className="flex items-center gap-2 font-medium">
-                {c.id === "claude" ? <CloudIcon className="size-4" /> : <CpuIcon className="size-4" />}
+                {c.id === "local" ? <CpuIcon className="size-4" /> : <CloudIcon className="size-4" />}
                 {c.label}
                 <InfoTip label={`About ${c.label}`}>{c.help}</InfoTip>
               </span>
@@ -129,6 +130,11 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               </div>
               <Button onClick={saveKey}>Save the key</Button>
             </div>
+          </div>
+        )}
+        {choice === "cuvette" && (
+          <div className="mt-4">
+            <CuvetteAccount createLabel="Make my Cuvette account" onCreated={after} />
           </div>
         )}
         {choice === "claude" && fs && (

@@ -59,6 +59,7 @@ import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, stepStat
 import { scriptPython } from "../tools/run_script.ts";
 import {
   ProviderError,
+  usesAnthropicApi,
   type Args,
   type StepResult,
   type Entry,
@@ -1144,7 +1145,8 @@ export class Session {
     const had = lastTitle(all);
     if (!changedAnalysis(all.slice(turnStart)) && (had || !all.some((e) => e.kind === "assistant" && e.data.final))) return;
     try {
-      const p = this.provider.info.provider === "claude" ? await makeProvider("claude:claude-haiku-5-5", { effort: "low" }) : this.provider;
+      const kind = this.provider.info.provider;
+      const p = usesAnthropicApi(kind) ? await makeProvider(`${kind}:claude-haiku-5-5`, { effort: "low" }) : this.provider;
       const t = await describeSession(p, this.record, AbortSignal.timeout(60_000));
       if (!t || (had && had.title === t.title && had.description === t.description)) return;
       this.record.append("title", { ...t });
@@ -1843,7 +1845,7 @@ export class Session {
 
   private render(tool: Tool, o: ToolOutput): { text: string; images?: string[] } {
     const adapter = this.adapterOf(tool);
-    const cloud = this.provider.info.provider === "claude";
+    const cloud = usesAnthropicApi(this.provider.info.provider);
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;

@@ -1,10 +1,11 @@
 import { homedir } from "node:os";
 import { relative } from "node:path";
-import { removeClaudeKey, removeElabftw } from "../core/credentials.ts";
+import { removeClaudeKey, removeCuvetteToken, removeElabftw } from "../core/credentials.ts";
 import { canReset, changeSetting, describe, resetSetting, settingsPath, show, type Scope, type SettingCtx, type SettingDef, type SettingRow } from "../core/settings.ts";
 import { budgetUsd, modelPrice, monthStart, totalSpend } from "../core/spend.ts";
 import { DEFAULT_CLAUDE_MODEL } from "../providers/claude.ts";
-import { CLAUDE_MODELS } from "../providers/index.ts";
+import { CLAUDE_MODELS, CUVETTE_MODEL } from "../providers/index.ts";
+import { usesAnthropicSpec } from "../core/types.ts";
 
 export type Editor =
   | { t: "message"; text: string; color?: string }
@@ -96,9 +97,9 @@ export function rowHelp(r: SettingRow): string {
 export function modelNote(spec: string): string {
   if (spec === "same" || spec === "none" || spec === "not set") return "";
   if (spec.startsWith("ollama:") || /^openai:https?:\/\/(localhost|127\.0\.0\.1)/.test(spec)) return "free, on this Mac";
-  if (spec !== "claude" && !spec.startsWith("claude:")) return "";
-  const p = modelPrice(spec === "claude" ? DEFAULT_CLAUDE_MODEL : spec);
-  return p ? `$${p.input} in, $${p.output} out per million tokens` : "";
+  if (!usesAnthropicSpec(spec)) return "";
+  const p = modelPrice(/^(claude|cuvette)$/.test(spec) ? `${spec}:${DEFAULT_CLAUDE_MODEL}` : spec);
+  return p && !spec.startsWith("cuvette") ? `$${p.input} in, $${p.output} out per million tokens` : "";
 }
 
 export function briefHelp(d: SettingDef): string {
@@ -107,6 +108,7 @@ export function briefHelp(d: SettingDef): string {
 
 export function choiceLabel(def: SettingDef, choice: string): string {
   if (def.name !== "model" && def.name !== "referee") return choice;
+  if (choice === "cuvette") return CUVETTE_MODEL.label;
   const m = CLAUDE_MODELS.find((x) => x.spec === choice || (choice === "claude" && x.spec === `claude:${DEFAULT_CLAUDE_MODEL}`));
   if (m) return choice === "claude" ? `Default Claude model (${m.label.replace(" (default)", "")})` : m.label.replace(" (default)", "");
   return choice === "same" ? "Same as the analysis model" : choice === "none" ? "No check" : choice;
@@ -159,8 +161,9 @@ export async function resetRow(ctx: SettingCtx, def: SettingDef): Promise<{ text
 
 export function removeSecret(ctx: SettingCtx, def: SettingDef): { text: string; color: string } {
   const env = ctx.env ?? process.env;
+  if (def.name === "cuvette_account" && env.CUVETTE_TOKEN) return { text: "CUVETTE_TOKEN in the shell sets the token. Remove it there.", color: "red" };
   if (def.name === "claude_key" && env.ANTHROPIC_API_KEY) return { text: "ANTHROPIC_API_KEY in the shell sets the key. Remove it there.", color: "red" };
-  const done = def.name === "claude_key" ? removeClaudeKey() : def.name === "elabftw_key" ? removeElabftw() : false;
+  const done = def.name === "claude_key" ? removeClaudeKey() : def.name === "cuvette_account" ? removeCuvetteToken() : def.name === "elabftw_key" ? removeElabftw() : false;
   if (!done) return { text: `${def.label} is not set.`, color: "red" };
   ctx.session?.record.append("setting", { name: def.name, scope: "user", change: "removed" });
   return { text: `Removed the ${def.label}.`, color: "green" };
