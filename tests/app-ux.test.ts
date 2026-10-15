@@ -488,12 +488,14 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.go(url);
     expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
     await wait(600);
+    const room = `(() => { const e = document.querySelector('[role="log"]').parentElement; return e.scrollHeight - e.clientHeight; })() > 400`;
+    expect(await until(page, room)).toBe(true);
     expect(await page.eval<number>(gap)).toBeLessThan(5);
     await page.eval(`(() => { const e = document.querySelector('[role="log"]').parentElement; e.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, bubbles: true })); e.scrollTop -= 400; })()`);
     await wait(300);
     await page.eval(`document.querySelector('[role="log"]').appendChild(document.createElement("p")).textContent = "more"`);
     await wait(300);
-    expect(await page.eval<number>(gap)).toBeGreaterThan(300);
+    expect(await until(page, `${gap} > 300`)).toBe(true);
     await page.size(390, 844);
     await wait(300);
     const r = await page.eval<{ bottom: number; clamp: string }>(`({ bottom: document.querySelector("#msg").closest("form").getBoundingClientRect().bottom, clamp: getComputedStyle(document.querySelector('[role="status"] span.flex-1')).webkitLineClamp })`);
