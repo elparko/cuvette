@@ -2502,7 +2502,7 @@ export class Session {
         ok: output.ok,
         error: output.error === undefined ? undefined : hideKeys(output.error).text,
         summary: hideKeys(summary).text,
-        text: hideKeys(output.text ?? "").text.slice(0, 4000),
+        text: hideKeys(output.text ?? "").text.slice(0, Math.max(this.settings.maxResultChars, 4000)),
         metrics: output.metrics,
         table: output.table,
         images: images.map((o) => o.sha),

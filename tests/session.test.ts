@@ -3430,3 +3430,15 @@ test("a notice tells the scientist when the version check no longer finds the pr
   const text = session.record.entries(["notice"]).map((e) => String(e.data.text)).join("\n");
   expect(text).toContain("did not find Fiji at /Applications/Fiji.app: not found");
 });
+
+test("a number in the late part of a long script output is a measured claim, not unsourced", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+  const code = "save_table('t', [{'a': 1}])\nprint('x' * 9000)\nprint('late total 7342.5')";
+  const args = { purpose: "Total", does: "Saves a table and prints a long text and the total.", code };
+  const answer = "The late total is 7342.5.";
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args }] }, { text: answer }, { text: answer }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, permissionMode: "bypass" } });
+  await session.send("total");
+  const claims = (session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string }[] }).claims;
+  expect(claims.find((c) => c.value === 7342.5)?.label).toBe("measured");
+});
