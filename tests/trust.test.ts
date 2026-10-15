@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, longLabRefusal, scanFolder, shellQuote, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { commandText, folderLines, longLabRefusal, scanFolder, shellQuote, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustedNotice, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -1069,7 +1069,34 @@ describe("shellQuote", () => {
     expect(shellQuote("/tmp/lab-1/data.v2")).toBe("/tmp/lab-1/data.v2");
   });
 
-  test.skipIf(process.platform !== "win32")("double quotes without escapes on Windows", () => {
-    expect(shellQuote("C:\\My Folder\\lab")).toBe('"C:\\My Folder\\lab"');
+  describe("on Windows", () => {
+    const real = process.platform;
+    beforeEach(() => void Object.defineProperty(process, "platform", { value: "win32" }));
+    afterEach(() => void Object.defineProperty(process, "platform", { value: real }));
+
+    test("a plain path stays bare", () => {
+      expect(shellQuote("C:\\Users\\lab\\data.v2")).toBe("C:\\Users\\lab\\data.v2");
+    });
+
+    test("single quotes keep % $ and a backtick literal in PowerShell, and a single quote is doubled", () => {
+      expect(shellQuote("C:\\My Folder\\lab")).toBe("'C:\\My Folder\\lab'");
+      expect(shellQuote("C:\\100%\\$env\\a`b")).toBe("'C:\\100%\\$env\\a`b'");
+      expect(shellQuote("C:\\o'brien")).toBe("'C:\\o''brien'");
+      expect(shellQuote("C:\\a\u2019b")).toBe("'C:\\a\u2019\u2019b'");
+    });
+  });
+
+  test("the notice shows a path with text like an escape exactly", () => {
+    const real = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const folder = "C:\\xab\\u1234";
+      const text = untrustedNotice({ state: "none", scan: { folder, linked: [], incomplete: [] } as never, changes: [] } as never);
+      expect(text).toContain(`cuvette trust add ${folder}.`);
+      expect(text).toContain(`in ${folder}:`);
+      expect(commandText("C:\\xab\\u1234 \x1b")).toBe("C:\\xab\\u1234 \\x1b");
+    } finally {
+      Object.defineProperty(process, "platform", { value: real });
+    }
   });
 });

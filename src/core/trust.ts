@@ -652,17 +652,24 @@ const LAB_CONTROL = new RegExp(`(?<!\\\\)(\\\\+)(?=${LAB_ESCAPE_LOOKALIKE}|${LAB
 
 // The trust card and the system prompt use this one text, so the scientist reads what the model gets.
 // The function doubles a backslash in front of text that looks like one of these escapes. Then two different texts never show the same.
+const escapeHidden = (c: string) => {
+  const n = c.codePointAt(0)!;
+  return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
+};
+
 export function labDisplayText(text: string): string {
-  return text.replace(LAB_CONTROL, (c, run?: string) => {
-    if (run !== undefined) return run + run;
-    const n = c.codePointAt(0)!;
-    return n < 256 ? `\\x${n.toString(16).padStart(2, "0")}` : n < 0x10000 ? `\\u${n.toString(16).padStart(4, "0")}` : `\\u{${n.toString(16).toUpperCase()}}`;
-  });
+  return text.replace(LAB_CONTROL, (c, run?: string) => (run !== undefined ? run + run : escapeHidden(c)));
 }
 
+const HIDDEN_ONLY = new RegExp(LAB_HIDDEN, "gu");
+
+// A command in a notice keeps each backslash as it is. Only a hidden character shows as an escape.
+export const commandText = (text: string) => text.replace(HIDDEN_ONLY, escapeHidden);
+
 export function oneLine(text: string): string {
-  const t = labDisplayText(text);
-  return t !== text || t.includes("\n") || t.startsWith('"') ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
+  const hidden = new RegExp(LAB_HIDDEN, "u").test(text);
+  if (!hidden && !text.includes("\n") && !text.startsWith('"')) return text;
+  return `"${labDisplayText(text).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
 }
 
 export const LAB_MAX_BYTES = 64 * 1024;
@@ -870,7 +877,10 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   }
 }
 
-export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : process.platform === "win32" ? `"${p}"` : `'${p.replace(/'/g, `'\\''`)}'`);
+export const shellQuote = (p: string) =>
+  process.platform === "win32"
+    ? /^[\w.\\:/-]+$/.test(p) ? p : `'${p.replace(/['\u2018\u2019\u201a\u201b]/g, (q) => q + q)}'`
+    : /^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`;
 
 const show = (v: unknown) => oneLine(typeof v === "string" ? v : JSON.stringify(v));
 
@@ -885,13 +895,13 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
   const labPath = oneLine(join(s.folder, LAB_FILE));
   if (s.labBig) out.push(`LAB.md is too large (${s.labBig} bytes, the limit is ${LAB_MAX_BYTES}). Cuvette does not read it. Read the file at ${labPath}.`);
   if (s.labProblem) out.push(`Cuvette cannot read LAB.md: ${oneLine(s.labProblem)}. Cuvette ignores it. Fix the file, then start the session again.`);
-  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run in a terminal: cuvette trust add ${labDisplayText(shellQuote(s.folder))}. Then start the session again.`}`);
+  if (s.lab && labLong(s)) out.push(`Lab rules in LAB.md: ${s.lab.split("\n").length} lines, ${s.lab.length} characters. This is too long to show here. Read the file at ${labPath}.${trusted ? "" : ` Then run in a terminal: cuvette trust add ${commandText(shellQuote(s.folder))}. Then start the session again.`}`);
   else if (s.lab) out.push("Lab rules in LAB.md (they go into the instructions of the agent):", ...s.lab.split("\n").map((l) => `  ${l}`));
   return out.map(plainText);
 }
 
 export function longLabRefusal(s: FolderScan): string {
-  return `Cuvette gives no one-step trust to a LAB.md that is too long for the card. Read the file at ${oneLine(join(s.folder, LAB_FILE))}. Then run in a terminal: cuvette trust add ${labDisplayText(shellQuote(s.folder))}. Then start the session again.`;
+  return `Cuvette gives no one-step trust to a LAB.md that is too long for the card. Read the file at ${oneLine(join(s.folder, LAB_FILE))}. Then run in a terminal: cuvette trust add ${commandText(shellQuote(s.folder))}. Then start the session again.`;
 }
 
 export function trustText(t: TrustStatus): string {
@@ -915,7 +925,7 @@ export function untrustedNotice(t: TrustStatus): string {
     const { why, fix } = blockers(t.scan);
     return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder has ${why}, so Cuvette cannot trust it. ${fix} Then start the session again.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
   }
-  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${labDisplayText(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
+  return `Cuvette ignored the settings, hooks and adapters in ${oneLine(t.scan.folder)}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${commandText(shellQuote(t.scan.folder))}.${t.scan.lab ? " Cuvette also ignored LAB.md." : ""}`;
 }
 
 export function stateLabel(t: TrustStatus): string {
