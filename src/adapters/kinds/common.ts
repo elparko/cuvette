@@ -91,7 +91,7 @@ function inProjectFolder(root: string): boolean {
 
 export function childEnv(c: KindContext, extra: Record<string, string> = {}): Record<string, string> {
   const env = withoutSecrets(process.env);
-  const ok = envAllowed(c);
+  const ok = envAllowed(c.adapter.manifest);
   for (const [k, v] of Object.entries(c.adapter.manifest.connection.env)) env[k] = expand(v, c.ph, ok);
   env.CUVETTE_WORK_DIR = c.dirs.workDir;
   env.CUVETTE_SESSION_DIR = c.dirs.sessionDir;
@@ -103,9 +103,16 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   return addOldEnv({ ...env, ...extra });
 }
 
-export function envAllowed(c: KindContext): (name: string) => boolean {
-  const declared = new Set(c.adapter.manifest.connection.pass_env);
-  return (name) => declared.has(name) && name in withoutSecrets({ [name]: "" });
+const SAFE_ENV = /^(HOME|USER|PATH|TMPDIR|LANG|LC_ALL|SHELL|DISPLAY|JAVA_HOME|R_HOME|CONDA_PREFIX|XDG_\w+)$/;
+const SAFE_ENV_WINDOWS = /^(USERPROFILE|APPDATA|LOCALAPPDATA|TEMP)$/;
+
+export function safeEnvName(name: string, platform: NodeJS.Platform = process.platform): boolean {
+  return SAFE_ENV.test(name) || (platform === "win32" && SAFE_ENV_WINDOWS.test(name));
+}
+
+export function envAllowed(m: { connection: { pass_env: string[] } }): (name: string) => boolean {
+  const declared = new Set(m.connection.pass_env);
+  return (name) => (safeEnvName(name) || declared.has(name)) && name in withoutSecrets({ [name]: "" });
 }
 
 export function expand(s: string, ph: Record<string, string>, allow?: (name: string) => boolean): string {
@@ -678,11 +685,11 @@ export async function killWithChildren(pid: number | undefined): Promise<void> {
 const stoppedGroups = new Set<number>();
 let exitHandler = false;
 
-function killGroup(pid: number): void {
+export function killGroup(pid: number, fallback = true): void {
   try {
     process.kill(-pid, "SIGKILL");
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ESRCH") return;
+    if (!fallback || (e as NodeJS.ErrnoException).code === "ESRCH") return;
     try {
       process.kill(pid, "SIGKILL");
     } catch {}
@@ -697,7 +704,7 @@ export async function killAll(pid: number | undefined): Promise<void> {
   }
   if (!exitHandler) {
     exitHandler = true;
-    process.on("exit", () => stoppedGroups.forEach(killGroup));
+    process.on("exit", () => stoppedGroups.forEach((p) => killGroup(p)));
   }
   stoppedGroups.add(pid);
   let kids: number[] = [];
@@ -762,7 +769,7 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
     }
     child.on("error", (e) => finish({ error: e.message }));
     child.on("exit", (code) => {
-      killTree(child.pid);
+      if (child.pid && process.platform !== "win32") killGroup(child.pid, false);
       setTimeout(() => {
         child.stdout?.destroy();
         child.stderr?.destroy();
@@ -775,7 +782,7 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
 
 export const EXIT_GRACE_MS = 2000;
 
-const SECRET_ENV = /key|token|secret|password|passwd|credential|^ssh_auth_sock$|^database_url$|_pass$/i;
+const SECRET_ENV = /key|token|secret|password|passwd|credential|^database_url$|_pass$/i;
 
 export function withoutSecrets(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {};
@@ -864,7 +871,7 @@ export function defTool(c: KindContext, def: ToolDef, run: (a: { args: Args; ctx
 
 export function scopeFor(c: KindContext, def: ToolDef, args: Args, call: CallDir): Scope {
   const child = c.adapter.manifest.connection.kind !== "http" && c.adapter.manifest.connection.kind !== "mcp";
-  return { ph: c.ph, args, outputs: call.outputs, declared: new Set(Object.keys(def.params)), envOk: child ? envAllowed(c) : undefined };
+  return { ph: c.ph, args, outputs: call.outputs, declared: new Set(Object.keys(def.params)), envOk: child ? envAllowed(c.adapter.manifest) : undefined };
 }
 
 export function makeRuntime(c: KindContext, parts: {
@@ -878,7 +885,7 @@ export function makeRuntime(c: KindContext, parts: {
   let closed = false;
   let interpreter: string[] = [];
   try {
-    interpreter = c.adapter.manifest.connection.interpreter.map((a) => expand(a, c.ph, envAllowed(c)));
+    interpreter = c.adapter.manifest.connection.interpreter.map((a) => expand(a, c.ph, envAllowed(c.adapter.manifest)));
   } catch {}
   return {
     adapter: c.adapter,

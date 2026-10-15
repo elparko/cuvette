@@ -1,13 +1,13 @@
 import { basename } from "node:path";
 import type { ToolDef } from "../manifest.ts";
-import { buildOutput, childEnv, commandLine, defTool, expand, inflight, integrityError, makeRuntime, processFailure, renderArgv, runProcess, scopeFor, type CallDir, type KindContext } from "./common.ts";
+import { buildOutput, childEnv, commandLine, defTool, envAllowed, expand, inflight, integrityError, makeRuntime, processFailure, renderArgv, runProcess, scopeFor, type CallDir, type KindContext } from "./common.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import { guardCommand } from "../../tools/run_script.ts";
 import type { Args, ToolContext, ToolOutput } from "../../core/types.ts";
 
 export async function runArgv(c: KindContext, def: ToolDef, args: Args, call: CallDir, argv: string[], signal: AbortSignal, extraEnv: Record<string, string> = {}, route = commandLine(argv)): Promise<ToolOutput> {
   const conn = c.adapter.manifest.connection;
-  const cwd = conn.cwd ? expand(conn.cwd, c.ph) : call.dir;
+  const cwd = conn.cwd ? expand(conn.cwd, c.ph, envAllowed(c.adapter.manifest)) : call.dir;
   const outEnv: Record<string, string> = {};
   for (const [k, p] of Object.entries(call.outputs)) outEnv[`CUVETTE_OUTPUT_${k.toUpperCase().replace(/\W/g, "_")}`] = p;
   const env = childEnv(c, { ...outEnv, CUVETTE_CALL_DIR: call.dir, ...extraEnv });

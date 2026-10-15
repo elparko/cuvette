@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { checkText, type SteIssue } from "../core/ste.ts";
 import { ROOT } from "../root.ts";
+import { envAllowed } from "../adapters/kinds/common.ts";
 
 export type Severity = "error" | "warning";
 
@@ -62,6 +63,7 @@ export const RULES: Record<string, { severity: Severity; rule: string }> = {
   "decision-type": { severity: "error", rule: "Each decision has choices or an explicit kind." },
   "decision-default": { severity: "error", rule: "Each decision has a default, or the scientist owns it, so the harness asks." },
   "decision-help": { severity: "error", rule: "Each decision has a plain help text." },
+  "env-name": { severity: "warning", rule: "{env:NAME} in a child process adapter names a safe variable, such as HOME or PATH, or a name listed in connection.pass_env. A name that looks like a secret is never resolved." },
   "text-style": { severity: "warning", rule: "Descriptions, decision help, STANDARDS.md and skills follow ASD-STE100: short sentences, active voice, approved words, must for a requirement." },
   "advice-limits": { severity: "warning", rule: 'A description does not give advice as an absolute ("Use X for Y", "for every") without the cases where it is wrong.' },
   "approval-code": { severity: "error", rule: "A tool that runs code that the model writes sets approval: true." },
@@ -465,6 +467,16 @@ function steMessage(issues: SteIssue[], file: boolean): string {
   return `${issues.length} text rule problem${issues.length === 1 ? "" : "s"}. ${shown.join(" ")}${more}`;
 }
 
+function lintEnvNames(a: LoadedAdapter, out: Finding[]): void {
+  const m = a.manifest;
+  if (m.connection.kind === "http" || m.connection.kind === "mcp") return;
+  const { locate: _locate, tests: _tests, ...rest } = m;
+  const allow = envAllowed(m);
+  const bad = new Set<string>();
+  for (const [, name] of JSON.stringify(rest).matchAll(/\{env:([^{}"]+)\}/g)) if (!allow(name)) bad.add(name);
+  for (const name of bad) add(out, "env-name", `{env:${name}}`, `the name ${name} is not a safe variable and is not in connection.pass_env, so {env:${name}} gives an empty text. Add ${name} to connection.pass_env. A name that looks like a secret cannot be added.`);
+}
+
 export function lint(input: LintInput): Finding[] {
   const { adapter: a, raw, tools } = input;
   const m = a.manifest;
@@ -591,6 +603,7 @@ export function lint(input: LintInput): Finding[] {
     const issues = checkText(piece.text);
     if (issues.length) add(out, "text-style", piece.where, steMessage(issues, piece.file));
   }
+  lintEnvNames(a, out);
   lintData(a, out);
   return out;
 }

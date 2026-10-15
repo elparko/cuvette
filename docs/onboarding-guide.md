@@ -70,6 +70,7 @@ Decisions:
 - Give each decision `choices` or an explicit `kind`. [decision-type]
 - Give a default, or let the scientist own the decision so that the harness asks. [decision-default]
 - Write a plain help text of one or two sentences. [decision-help]
+- In a child process adapter, {env:NAME} must name a safe variable, such as HOME, or a name in connection.pass_env. A secret name never resolves. [env-name]
 - Write descriptions, decision help, STANDARDS.md and skills in ASD-STE100 Simplified Technical English. Instructions have 20 words or fewer, descriptions 25 or fewer. Use the active voice and "must" for a requirement. [text-style]
 - Link each decision to a tool argument. A decision with no link changes nothing.
 - Write sensitivity `compare` entries as result paths: `metrics.n_peaks`. [sensitivity-compare]

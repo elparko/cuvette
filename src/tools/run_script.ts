@@ -13,7 +13,7 @@ import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandb
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
 import { ereToRegExp, globEre, hookScriptScan, LAB_FILE, literalEre } from "../core/trust.ts";
-import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, killGroup, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
 export function scriptPython(): string {
@@ -566,7 +566,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
           done(null);
         });
         child.on("exit", (c) => {
-          killTree(child.pid);
+          if (child.pid && process.platform !== "win32") killGroup(child.pid, false);
           setTimeout(() => {
             child.stdout!.destroy();
             child.stderr!.destroy();
