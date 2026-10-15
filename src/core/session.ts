@@ -1155,8 +1155,10 @@ export class Session {
     text = this.withoutKeys(text);
     this.busy = true;
     this.endedBy = "stopped";
-    this.turnStartedAt = Date.now();
+    this.turnStartedAt = performance.now();
     this.answerReadyMs = undefined;
+    this.reviewState = "none";
+    this.reviewFindings = 0;
     this.turnMs = undefined;
     this.abort = new AbortController();
     const signal = this.abort.signal;
@@ -1201,9 +1203,9 @@ export class Session {
       for (let step = 0; step < this.settings.maxSteps; step++) {
         if (!(await this.phiGate(signal))) {
           this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
-          return "";
+          return this.stoppedText();
         }
-        if (!(await this.budgetGate(signal))) return "";
+        if (!(await this.budgetGate(signal))) return this.stoppedText();
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.stepWithRecovery(forceAnswer, signal);
@@ -1370,21 +1372,21 @@ export class Session {
         if (this.stopTurn) {
           this.stopTurn = false;
           this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
-          return "";
+          return this.stoppedText();
         }
         if (this.endTurn) {
           this.record.append("notice", { text: this.endTurn });
           this.endTurn = undefined;
-          return "";
+          return this.stoppedText();
         }
         if (signal.aborted) {
           this.record.append("notice", { text: "Stopped. The results so far are kept.", warn: true });
-          return "";
+          return this.stoppedText();
         }
       }
       this.record.append("notice", { text: `Paused after ${this.settings.maxSteps} steps. Type "continue" to go on.`, warn: true });
       this.endedBy = "max_steps";
-      return "";
+      return this.stoppedText();
     } catch (e) {
       const msg = signal.aborted && this.cutReply ? "Stopped. The reply above is not complete." : signal.aborted ? "Stopped." : e instanceof ProviderError ? e.message : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg, warn: true } : { message: msg });
@@ -1393,7 +1395,7 @@ export class Session {
       if (this.draft) return this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.");
       return "";
     } finally {
-      this.turnMs = Date.now() - this.turnStartedAt;
+      this.turnMs = Math.round(performance.now() - this.turnStartedAt);
       if (this.planning) this.endPlanning();
       this.waitedQids.clear();
       this.laterQids.clear();
@@ -1417,10 +1419,18 @@ export class Session {
   answerReadyMs?: number;
   turnMs?: number;
   private turnStartedAt = 0;
+  reviewState: "done" | "stopped" | "failed" | "none" = "none";
+  reviewFindings = 0;
+
+  private appendReview(answer: number, state: "done" | "stopped" | "failed" | "off", findings: string[], extra: Record<string, unknown> = {}): void {
+    this.record.append("review", { answer, state, findings, ...extra });
+    this.reviewState = state === "off" ? "none" : state;
+    this.reviewFindings = findings.length;
+  }
 
   private markAnswerReady(): void {
     if (this.answerReadyMs !== undefined) return;
-    this.answerReadyMs = Date.now() - this.turnStartedAt;
+    this.answerReadyMs = Math.round(performance.now() - this.turnStartedAt);
     this.record.append("answer_ready", { at: new Date().toISOString(), elapsedMs: this.answerReadyMs });
   }
 
@@ -1958,12 +1968,14 @@ export class Session {
 
   private draft?: { answer: string; annotated: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number; entry: number };
 
+  private stoppedText(): string {
+    return this.draft ? this.keepDraft("The turn stopped during the correction. The first answer stays, with the problems that the review found.") : "";
+  }
+
   private keepDraft(note: string): string {
     const d = this.draft!;
     this.draft = undefined;
     this.record.append("notice", { text: note });
-    const findings = d.found.map(({ f, source }) => this.findings.add(f, source).fid);
-    this.record.append("review", { answer: d.entry, state: "done", findings, kept: true });
     this.lastAnswer = d.answer;
     return d.annotated;
   }
@@ -2026,6 +2038,8 @@ export class Session {
     }
     this.draft = undefined;
     if (first && errors.length && !revised && this.settings.reviseOnFindings && !signal.aborted) {
+      const firstFindings = found.map(({ f, source }) => this.findings.add(f, source).fid);
+      this.appendReview(first.id, state, firstFindings, { corrected: true });
       this.draft = { answer, annotated: first.annotated, claims, found, errors: errors.length, measured: measured(claims), entry: first.id };
       this.record.append("notice", { text: `Review found ${errors.length} problem(s) in the answer above:\n${errors.map((x) => `- ${x.f.message}`).join("\n")}\nThe first answer stays. The agent revises the answer and marks the new one as the correction.` });
       return {
@@ -2037,11 +2051,11 @@ export class Session {
     let shown = first;
     if (!shown) {
       const p = this.presentation(answer, claims);
-      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, findings, settings: p.settings, results: p.results });
+      const entry = this.record.append("assistant", { text: p.shown, annotated: p.annotated, final: true, corrects: correcting!.entry, settings: p.settings, results: p.results });
       this.lastAnswer = answer;
       shown = { id: entry.id, annotated: p.annotated };
     }
-    this.record.append("review", { answer: shown.id, state, findings });
+    this.appendReview(shown.id, state, findings);
     this.offerChecklist();
     return { text: shown.annotated };
   }
