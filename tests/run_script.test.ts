@@ -1075,7 +1075,7 @@ test("settings scope locks LAB.md of the project", () => {
   expect(scope.files).toContain(join(l.project, "LAB.md"));
 });
 
-test("a root glob pattern deny is followed by an allow for the work folder, for Seatbelt only", () => {
+test.skipIf(process.platform === "win32")("a root glob pattern deny is followed by an allow for the work folder, for Seatbelt only", () => {
   const l = layout();
   writeFileSync(l.settings, JSON.stringify({ hooks: { PreToolUse: [{ command: ["sh", "-c", "python3 **/*.py"] }] } }));
   writeFileSync(join(l.project, "check.py"), "pass\n");
@@ -1088,7 +1088,7 @@ test("a root glob pattern deny is followed by an allow for the work folder, for 
   expect(bwrapCommand(["tool"], steps).join(" ")).not.toContain(`--bind ${l.out} ${l.out}`);
 });
 
-test("a closing bracket in the project path does not stop the bwrap lock of a pattern match", () => {
+test.skipIf(process.platform === "win32")("a closing bracket in the project path does not stop the bwrap lock of a pattern match", () => {
   const project = join(realpathSync(mkdtempSync(join(tmpdir(), "cuvette-br-"))), "a]b");
   mkdirSync(project);
   writeFileSync(join(project, "note.txt"), "x");
