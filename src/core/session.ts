@@ -448,10 +448,9 @@ export class Session {
           const recordedPath = recorded.get(found.name);
           const before = [recordedPath && existsSync(recordedPath) && known.has(realpathSync(recordedPath)) ? recordedPath : undefined, dirs[found.name]].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
           const sameRecorded = !!recordedPath && existsSync(recordedPath) && realpathSync(recordedPath) === realpathSync(found.root);
-          const strayRecorded = sameRecorded && !before.includes(realpathSync(found.root));
-          if (recorded.has(found.name) && (strayRecorded || (!sameRecorded && !before.includes(realpathSync(found.root))))) {
+          if (recorded.has(found.name) && !before.includes(realpathSync(found.root))) {
             replaced.push(found.name);
-            if (strayRecorded) sameFolder.add(found.name);
+            if (sameRecorded) sameFolder.add(found.name);
           }
         } catch {}
       }
