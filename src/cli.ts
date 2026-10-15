@@ -642,13 +642,13 @@ async function main() {
       }
       const folder = resolve(a2 ?? ".");
       if (a1 === "add") {
-        if (!existsSync(folder)) return fail(`No folder ${folder}.`);
+        if (!existsSync(folder)) return fail(`No folder ${tr.oneLine(folder)}.`);
         const t = tr.trustStatus(folder);
         tr.trustFolder(folder);
         console.log([`Trusted ${tr.oneLine(t.scan.folder)}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan, true))].join("\n"));
         return;
       }
-      if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.folderKey(folder)} is not trusted now.` : `${tr.folderKey(folder)} was not in the list.`);
+      if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.oneLine(tr.folderKey(folder))} is not trusted now.` : `${tr.oneLine(tr.folderKey(folder))} was not in the list.`);
       if (a1 === "show") {
         const t = tr.trustStatus(folder);
         return console.log([`${tr.oneLine(t.scan.folder)}: ${tr.stateLabel(t)}`, ...(t.state === "none" ? [] : tr.folderLines(t.scan)), ...t.changes.map((c) => `  ${c}`)].join("\n"));

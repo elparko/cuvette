@@ -1,10 +1,11 @@
 import { cutText } from "./places.ts";
+import { oneLine } from "./trust.ts";
 
 export const REFUSERS = new Set(["path rule", "write rule", "integrity check"]);
 
 const shown = (path: string) => {
   const text = path.length > 200 ? `${cutText(path, 200)}...` : path;
-  return text.replace(/[\r\n\t]+/g, " ");
+  return oneLine(text);
 };
 
 export function pathRefusalReason(place: "private" | "link", path: string): string {

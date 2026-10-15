@@ -10,7 +10,7 @@ import { loadSettings } from "../src/core/config.ts";
 import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
-import { folderLines, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { folderLines, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -601,3 +601,42 @@ test("a hook command inside an escape sequence shows its text, written out, in e
   expect(card!.evidence).not.toMatch(raw);
   expect(card!.text).not.toMatch(raw);
 });
+
+const CONTROL = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u202a-\u202e]/;
+
+test.skipIf(process.platform === "win32")("the text for a folder that cannot be trusted writes out a control code in a link name", async () => {
+  project(".cuvette", { ...hook("ran") });
+  mkdirSync(join(cwd, ".cuvette", "adapters"), { recursive: true });
+  symlinkSync(mkdtempSync(join(tmpdir(), "cuvette-evil-")), join(cwd, ".cuvette", "adapters", "ev\u202e\nil"));
+  session = await start(true);
+  const card = await session.askTrust();
+  expect(card?.options.map((o) => o.value)).toEqual(["no"]);
+  const status = trustStatus(cwd);
+  expect(status.scan.linked.some((l) => l.includes("\u202e"))).toBe(true);
+  for (const text of [card?.text ?? "", card?.evidence ?? "", session.trustNotice ?? "", trustText(status)]) expect(text).not.toMatch(CONTROL);
+  expect(card?.text).toContain(String.raw`ev\\u202e\nil`);
+  expect(session.trustNotice).toContain(String.raw`ev\\u202e\nil`);
+});
+
+test("the refusal for a long LAB.md writes out a control code in the folder name", () => {
+  const scan = { ...scanFolder(cwd), folder: `${cwd}/a\u202eb\nc` };
+  const text = longLabRefusal(scan);
+  expect(text).not.toMatch(CONTROL);
+  expect(text).toContain(String.raw`a\\u202eb\nc`);
+});
+
+test("a method file under the hooks folder of a nested .git folder is not a method", () => {
+  project(".cuvette", {});
+  const hooks = join(cwd, ".cuvette", "methods", "x", ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  writeFileSync(join(hooks, "fake.json"), "{}");
+  mkdirSync(join(cwd, ".cuvette", "methods"), { recursive: true });
+  writeFileSync(join(cwd, ".cuvette", "methods", "real.json"), "{}");
+  expect(scanFolder(cwd).methods).toEqual(["real"]);
+});
+
+test.skipIf(process.platform === "win32")("trust remove writes out a control code in the folder name", async () => {
+  const out = await cli(["trust", "remove", join(cwd, "a\u202eb\nc")]);
+  expect(out.stdout).not.toMatch(CONTROL);
+  expect(out.stdout).toContain(String.raw`a\\u202eb\nc" was not in the list.`);
+}, 120000);

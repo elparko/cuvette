@@ -166,7 +166,7 @@ function gitFolder(git: string, key: string, st: WalkState, found: string[]): vo
   if (l?.isSymbolicLink()) {
     st.files[`(link) ${relative(key, hooks)}`] = linkHash(hooks);
     if (statSync(hooks, { throwIfNoEntry: false })?.isDirectory()) st.linked.push(relative(key, hooks));
-  } else if (l?.isDirectory()) walk(hooks, key, st, found);
+  } else if (l?.isDirectory()) walk(hooks, key, st, []);
 }
 
 function walk(dir: string, key: string, st: WalkState, found: string[]): void {
@@ -445,7 +445,7 @@ export function trustStatus(folder: string): TrustStatus {
 export const cannotTrust = (s: FolderScan) => s.linked.length > 0 || s.incomplete.length > 0;
 
 function blockers(s: FolderScan): { why: string; fix: string } {
-  const why = [...s.linked.map((p) => `a linked folder (${p})`), ...s.incomplete].join("; ");
+  const why = [...s.linked.map((p) => `a linked folder (${oneLine(p)})`), ...s.incomplete.map(oneLine)].join("; ");
   const fix = [s.linked.length ? "Replace each link with a copy of the folder." : "", s.incomplete.length ? "Remove the extra files." : ""].filter(Boolean).join(" ");
   return { why, fix };
 }
@@ -491,7 +491,7 @@ export function folderLines(s: FolderScan, trusted = false): string[] {
 }
 
 export function longLabRefusal(s: FolderScan): string {
-  return `Cuvette gives no one-step trust to a LAB.md that is too long for the card. Read the file at ${join(s.folder, LAB_FILE)}. Then run in a terminal: cuvette trust add ${shellQuote(s.folder)}. Then start the session again.`;
+  return `Cuvette gives no one-step trust to a LAB.md that is too long for the card. Read the file at ${oneLine(join(s.folder, LAB_FILE))}. Then run in a terminal: cuvette trust add ${labDisplayText(shellQuote(s.folder))}. Then start the session again.`;
 }
 
 export function trustText(t: TrustStatus): string {

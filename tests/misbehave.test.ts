@@ -1146,3 +1146,10 @@ test("the notice names the path that Cuvette refused, also when the allowed path
   expect(String(entries[0]!.data.reason)).toContain(`The agent tried to use ${secret}.`);
   expect(String(entries[0]!.data.reason)).not.toContain(cwd);
 });
+
+test("the refusal text writes out a control code and a line break in a path", async () => {
+  const { pathRefusalReason, writeRefusalReason } = await import("../src/core/refusals.ts");
+  const hidden = /[\u0000-\u001f\u007f-\u009f\u2028\u202a-\u202e]/;
+  for (const text of [pathRefusalReason("private", "/a/\u001b[2J\u202e/b\nc"), pathRefusalReason("link", "/a/\u0007/b"), writeRefusalReason("/a/\u2028b", false)]) expect(text).not.toMatch(hidden);
+  expect(pathRefusalReason("private", "/a/\u202e/b\nc")).toContain(String.raw`"/a/\\u202e/b\nc"`);
+});

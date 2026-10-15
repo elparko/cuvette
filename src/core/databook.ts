@@ -580,7 +580,7 @@ function sectionChecks(w: Writer, p: Part, level: number): void {
   }));
   if (devs.length) w.table("Deviations from the recorded settings.", ["Tool", "Argument", "Recorded value", "Asked for", "Used", "What happened"], devs);
   const blocked = p.record.entries(["blocked"]);
-  if (blocked.length) w.add(`<p>The harness held back or blocked ${plural(blocked.length, "call")}:</p><ul>${blocked.map((e) => `<li>${esc(str(e.data.tool))}: ${esc(str(e.data.reason))}</li>`).join("")}</ul>`);
+  if (blocked.length) w.add(`<p>The harness withheld or blocked ${plural(blocked.length, "call")}:</p><ul>${blocked.map((e) => `<li>${esc(str(e.data.tool))}: ${esc(str(e.data.reason))}</li>`).join("")}</ul>`);
   const stale = stepStatus(p.record).filter((x) => !x.current);
   if (stale.length) w.add(`<p>These steps are out of date:</p><ul>${stale.map((x) => `<li>${stepLink(p, x.step)}: ${esc(x.reasons.map((r) => r.text).join(" "))}</li>`).join("")}</ul>`);
   const changes = reruns(p.record);

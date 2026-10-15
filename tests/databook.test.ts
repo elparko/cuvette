@@ -66,6 +66,14 @@ const book = (records: AnalysisRecord[]) => buildDatabook({ records, project: "/
 const titles = (b: ReturnType<typeof book>) => b.toc.map((t) => t.title);
 
 describe("databook", () => {
+  it("names the blocked calls with the word withheld", () => {
+    const r = session();
+    r.append("blocked", { tool: "read_file", reason: "waiting for the scientist: choose" });
+    const b = book([r]);
+    expect(b.html).toContain("The harness withheld or blocked 2 calls:");
+    expect(b.html).not.toContain("held back");
+  });
+
   it("puts the sections in the fixed order", () => {
     const r = session();
     addPilot(r);
