@@ -642,8 +642,40 @@ describe("linking", () => {
     const info = (await (await call(env, "/v1/account", { headers: { authorization: `Bearer ${token}` } })).res.json()) as any;
     expect(info.identities).toEqual([{ provider: "github", email: null }, { provider: "google", email: "ada@gmail.test" }]);
     const ex = await exchange(env, r.code!, r.verifier);
-    expect(((await ex.res.json()) as any).account_id).toBe(account_id);
+    expect(ex.res.status).toBe(200);
+    expect(await ex.res.json()).toEqual({ linked: true, account_id });
+    expect(env.fake.rows("SELECT * FROM devices")).toHaveLength(1);
     expect(env.fake.rows("SELECT * FROM auth_links")).toHaveLength(0);
+  });
+
+  it("answers a taken sign-in on the paste page with the same text and no code", async () => {
+    const env = makeEnv();
+    const first = await login(env, { provider: "github", githubUser: { id: 1001 } });
+    const keys = await makeKeys();
+    const second = await login(env, { keys, claims: (n) => claimsFor("google", n, { sub: "owner-two" }) });
+    expect(second.account_id).not.toBe(first.account_id);
+    const { res } = await call(env, "/v1/auth/link", post(second.token, await linkBody({ provider: "github", port: "paste" })));
+    const link = new URL(((await res.json()) as any).url).searchParams.get("link")!;
+    const r = await signIn(env, { provider: "github", githubUser: { id: 1001 }, link, port: "paste" });
+    expect(r.callback!.status).toBe(400);
+    expect(await r.callback!.text()).toContain("This sign-in belongs to another Cuvette account.");
+    expect(env.fake.rows("SELECT * FROM auth_codes")).toHaveLength(0);
+  });
+
+  it("makes no device for a link code and a device for a normal sign-in code", async () => {
+    const { env, token } = await accountWithToken();
+    const before = env.fake.rows("SELECT * FROM devices").length;
+    const { res } = await call(env, "/v1/auth/link", post(token, await linkBody()));
+    const link = new URL(((await res.json()) as any).url).searchParams.get("link")!;
+    const r = await signIn(env, { provider: "github", link, port: "52000", state: "link_state-0123456789" });
+    const ex = (await exchange(env, r.code!, r.verifier)).res;
+    expect(await ex.json()).not.toHaveProperty("token");
+    expect(env.fake.rows("SELECT * FROM devices")).toHaveLength(before);
+    const plain = await signIn(env, { provider: "github" });
+    const body = (await (await exchange(env, plain.code!, plain.verifier)).res.json()) as any;
+    expect(body).toHaveProperty("token");
+    expect(body).toHaveProperty("device_id");
+    expect(env.fake.rows("SELECT * FROM devices")).toHaveLength(before + 1);
   });
 
   it("links nothing when the sign-in belongs to another account", async () => {
@@ -655,9 +687,12 @@ describe("linking", () => {
     const { res } = await call(env, "/v1/auth/link", post(second.token, await linkBody({ provider: "github" })));
     const link = new URL(((await res.json()) as any).url).searchParams.get("link")!;
     const r = await signIn(env, { provider: "github", githubUser: { id: 1001 }, link, port: "52000", state: "link_state-0123456789" });
-    expect(r.callback!.status).toBe(409);
-    expect(r.callback!.headers.get("location")).toBeNull();
-    expect(await r.callback!.text()).toContain("This sign-in belongs to another Cuvette account.");
+    expect(r.callback!.status).toBe(302);
+    const target = new URL(r.callback!.headers.get("location")!);
+    expect(target.origin).toBe("http://127.0.0.1:52000");
+    expect(target.searchParams.get("error")).toBe("account_taken");
+    expect(target.searchParams.get("state")).toBe("link_state-0123456789");
+    expect(target.searchParams.get("code")).toBeNull();
     expect(env.fake.rows("SELECT * FROM identities WHERE account_id = ?", second.account_id)).toHaveLength(1);
     expect(env.fake.row<any>("SELECT account_id FROM identities WHERE provider = 'github'").account_id).toBe(first.account_id);
     expect(env.fake.rows("SELECT * FROM auth_codes")).toHaveLength(0);

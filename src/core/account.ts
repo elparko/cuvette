@@ -11,6 +11,7 @@ export const SUSPENDED = "Cuvette suspended this account. Ask Cuvette support fo
 export const NO_PLAN = "Your account has no plan. Choose a plan in Settings, or run `cuvette account plan standard`.";
 export const ALREADY_SUBSCRIBED = "You already have a plan. Use Manage billing to cancel it. Run `cuvette account plan <id>` to change it.";
 export const HOSTED_OFF = "Cuvette hosted is not open yet.";
+export const ACCOUNT_TAKEN = "This sign-in belongs to another Cuvette account. Sign out and sign in with it, or use a different sign-in.";
 export const BAD_CODE = "The sign-in code is not valid, or it expired. Sign in again.";
 
 export const PLAN_IDS = ["basic", "standard", "lab", "lab_plus"] as const;

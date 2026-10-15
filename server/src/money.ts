@@ -61,18 +61,21 @@ interface HeldRow {
   session_id: string | null;
 }
 
-async function debit(env: Env, hold: HeldRow, charge: number, status: string, model: string | null, t: Tokens, now: number) {
+const STATEMENTS_PER_HOLD = 4;
+
+function settleStatements(env: Env, hold: HeldRow, charge: number, status: string, model: string | null, t: Tokens, now: number): D1PreparedStatement[] {
   const live = hold.started_at > now - LIVE_HOLD_MS;
   const amount = live ? charge : hold.amount_usd;
   const effective = `CASE WHEN a.sub_status IN ${SERVING} AND a.allowance_resets_at > ?2 THEN MAX(a.allowance_remaining_usd, 0) ELSE 0 END`;
   const topups = "COALESCE((SELECT SUM(t.remaining_usd) FROM topups t WHERE t.account_id = a.id AND t.expires_at > ?2 AND t.remaining_usd > 0), 0)";
   const db = env.DB;
-  return db.batch([
+  const held = "EXISTS (SELECT 1 FROM holds WHERE request_id = ?1)";
+  return [
     db
       .prepare(
         `INSERT INTO usage (request_id, account_id, session_id, model, status, input_tokens, output_tokens, cache_read_tokens, cache_write_5m_tokens, cache_write_1h_tokens, cost_usd, topup_cost_usd, at)
          SELECT ?1, a.id, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, MIN(MAX(0, ?11 - ${effective}), ${topups}), ?12
-         FROM accounts a WHERE a.id = ?13`,
+         FROM accounts a WHERE a.id = ?13 AND ${held}`,
       )
       .bind(hold.request_id, now, hold.session_id, model ?? hold.model, live ? status : "expired", t.input, t.output, t.cacheRead, t.cacheWrite5m, t.cacheWrite1h, amount, new Date(now).toISOString(), hold.account_id),
     db
@@ -83,26 +86,28 @@ async function debit(env: Env, hold: HeldRow, charge: number, status: string, mo
            FROM topups t WHERE t.account_id = (SELECT account_id FROM spent) AND t.expires_at > ?2 AND t.remaining_usd > 0
          )
          UPDATE topups SET remaining_usd = MAX(0, remaining_usd - MIN(remaining_usd, MAX(0, (SELECT need FROM spent) - (SELECT prior FROM live WHERE live.id = topups.id))))
-         WHERE id IN (SELECT id FROM live) AND (SELECT need FROM spent) > 0`,
+         WHERE id IN (SELECT id FROM live) AND (SELECT need FROM spent) > 0 AND ${held}`,
       )
       .bind(hold.request_id, now),
     db
-      .prepare("UPDATE accounts SET allowance_remaining_usd = allowance_remaining_usd - (SELECT cost_usd - topup_cost_usd FROM usage WHERE request_id = ?1) WHERE id = (SELECT account_id FROM usage WHERE request_id = ?1)")
+      .prepare(`UPDATE accounts SET allowance_remaining_usd = allowance_remaining_usd - (SELECT cost_usd - topup_cost_usd FROM usage WHERE request_id = ?1) WHERE id = (SELECT account_id FROM usage WHERE request_id = ?1) AND ${held}`)
       .bind(hold.request_id),
-  ]);
+    db.prepare("DELETE FROM holds WHERE request_id = ?1").bind(hold.request_id),
+  ];
 }
 
 export const NO_TOKENS: Tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
 
 export async function settle(env: Env, requestId: string, charge: number, model: string | null, status: string, t: Tokens): Promise<void> {
-  const { results } = await env.DB.prepare("DELETE FROM holds WHERE request_id = ?1 RETURNING *").bind(requestId).all<HeldRow>();
-  if (results[0]) await debit(env, results[0], charge, status, model, t, Date.now());
+  const hold = await env.DB.prepare("SELECT * FROM holds WHERE request_id = ?1").bind(requestId).first<HeldRow>();
+  if (hold) await env.DB.batch(settleStatements(env, hold, charge, status, model, t, Date.now()));
 }
 
 export async function expireHolds(env: Env, accountId: string, now: number): Promise<boolean> {
-  const { results } = await env.DB.prepare("DELETE FROM holds WHERE account_id = ?1 AND started_at <= ?2 RETURNING *").bind(accountId, now - LIVE_HOLD_MS).all<HeldRow>();
-  for (const h of results) await debit(env, h, 0, "expired", null, NO_TOKENS, now);
-  return results.length > 0;
+  const { results } = await env.DB.prepare("SELECT * FROM holds WHERE account_id = ?1 AND started_at <= ?2").bind(accountId, now - LIVE_HOLD_MS).all<HeldRow>();
+  if (!results.length) return false;
+  const done = await env.DB.batch(results.flatMap((h) => settleStatements(env, h, 0, "expired", null, NO_TOKENS, now)));
+  return done.some((r, i) => i % STATEMENTS_PER_HOLD === STATEMENTS_PER_HOLD - 1 && r.meta.changes > 0);
 }
 
 export async function lazyReset(env: Env, cfg: PlansConfig, a: Account, now: number): Promise<boolean> {

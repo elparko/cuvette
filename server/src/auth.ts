@@ -105,6 +105,7 @@ interface StateRow {
 
 function finish(row: StateRow, result: { code: string } | { error: string }): Response {
   if (row.port === "paste") {
+    if ("error" in result && result.error === "account_taken") return html(400, "Not linked", ["This sign-in belongs to another Cuvette account."]);
     if ("error" in result) return html(400, "Sign-in failed", ["Close this page and start the sign-in again."]);
     return html(200, "Your Cuvette code", [result.code, "Paste this code only into a terminal that you started."]);
   }
@@ -163,9 +164,9 @@ export async function authCallback(req: Request, env: Env, providerId: string): 
     return finish(row, { error: "sign_in_failed" });
   }
   const account = await accountFor(env, provider, identity.subject, identity.email, row.link_account_id);
-  if (account === "taken") return html(409, "Not linked", ["This sign-in belongs to another Cuvette account."]);
+  if (account === "taken") return finish(row, { error: "account_taken" });
   const one = randomToken(32);
-  await env.DB.prepare("INSERT INTO auth_codes (code_hash, account_id, challenge, expires_at) VALUES (?1, ?2, ?3, ?4)").bind(await sha256Hex(one), account, row.challenge, now + CODE_TTL_MS).run();
+  await env.DB.prepare("INSERT INTO auth_codes (code_hash, account_id, challenge, linked, expires_at) VALUES (?1, ?2, ?3, ?4, ?5)").bind(await sha256Hex(one), account, row.challenge, row.link_account_id ? 1 : 0, now + CODE_TTL_MS).run();
   return finish(row, { code: one });
 }
 
@@ -187,8 +188,9 @@ export async function authToken(req: Request, env: Env): Promise<Response> {
   const { code, verifier, device_name } = body ?? {};
   if (typeof code !== "string" || code.length < 20 || code.length > 128 || !B64URL.test(code)) return invalid();
   if (typeof verifier !== "string" || verifier.length < 43 || verifier.length > 128 || !B64URL.test(verifier)) return invalid();
-  const row = await env.DB.prepare("DELETE FROM auth_codes WHERE code_hash = ?1 AND expires_at > ?2 RETURNING account_id, challenge").bind(await sha256Hex(code), Date.now()).first<{ account_id: string; challenge: string }>();
+  const row = await env.DB.prepare("DELETE FROM auth_codes WHERE code_hash = ?1 AND expires_at > ?2 RETURNING account_id, challenge, linked").bind(await sha256Hex(code), Date.now()).first<{ account_id: string; challenge: string; linked: number }>();
   if (!row || !(await safeEqual(await s256(verifier), row.challenge))) return invalid();
+  if (row.linked) return reply(200, { linked: true, account_id: row.account_id });
   const name = typeof device_name === "string" ? device_name.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80) : "";
   const deviceId = `dev_${randomToken(12)}`;
   const token = `cuv_${randomToken(32)}`;

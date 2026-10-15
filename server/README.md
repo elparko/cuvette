@@ -17,7 +17,7 @@ Hosted mode is off at launch. Set `HOSTED_ENABLED` to `"true"` to open it. See "
 | `GET /v1/pricing` | none | Plans, top-up, model prices, the list of what the server records. This route works while hosted mode is off. |
 | `GET /v1/auth/start` | none | Redirects to the sign-in provider. See "Sign-in". |
 | `GET /v1/auth/callback/<provider>` | none | Receives the answer of the provider. Redirects to the app. |
-| `POST /v1/auth/token` | none | Body `{code, verifier, device_name}`. Answer `{token, device_id, account_id}`. The limit is 10 calls each minute for each IP address. |
+| `POST /v1/auth/token` | none | Body `{code, verifier, device_name}`. Answer `{token, device_id, account_id}`. For a code from a link flow the answer is `{linked: true, account_id}` and the server makes no device. The limit is 10 calls each minute for each IP address. |
 | `POST /v1/auth/link` | token | Body `{provider, port, challenge, state}`. Answer `{url}`. Adds a sign-in provider to the account. |
 | `POST /v1/auth/logout` | token | 204. Revokes the device that makes the call. |
 | `GET /v1/devices` | token | `{devices: [{id, name, created_at, last_used_at, current}]}` |
@@ -95,8 +95,10 @@ Rules for the checks:
 The server never links two sign-ins by email.
 To add a provider, a signed-in app calls `POST /v1/auth/link`. The answer has a start address with a link id that works once for 5 minutes.
 The address has no device token.
-If the pair (provider, subject) belongs to another account, the callback page shows "This sign-in belongs to another Cuvette account." and links nothing.
-After a link, the app gets a code as for a sign-in. Its exchange makes one new device on the same account.
+If the pair (provider, subject) belongs to another account, the server links nothing.
+The callback redirects to the app with `error=account_taken` and the state. On the paste page, it shows "This sign-in belongs to another Cuvette account."
+After a link, the app gets a code as for a sign-in. The exchange of this code answers `{linked: true, account_id}` and makes no device.
+The app keeps its current device token.
 
 ## Plans and allowance
 
@@ -441,7 +443,7 @@ vLLM reports cached prompt tokens in `prompt_tokens_details.cached_tokens` only 
 - `usage`: one row for each request, with session id, token counts, cost, the part paid from a top-up, and status.
 - `stripe_events`: the id of each Stripe event that the server applied.
 - `card_trials`: the card fingerprint of each trial and the account that used it.
-- `auth_states`, `auth_codes`, `auth_links`: sign-in state, one-time codes and link ids. The server deletes expired rows.
+- `auth_states`, `auth_codes`, `auth_links`: sign-in state, one-time codes and link ids. A code has a `linked` flag that is 1 for a link flow. The server deletes expired rows.
 - `auth_token_calls`: count of `POST /v1/auth/token` calls for each IP hash and minute.
 - `count_tokens_calls`: count of `count_tokens` calls for each account and minute.
 

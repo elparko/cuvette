@@ -184,3 +184,5 @@ CREATE TABLE auth_token_calls (
   count INTEGER NOT NULL,
   PRIMARY KEY (ip_hash, minute)
 );
+
+ALTER TABLE auth_codes ADD COLUMN linked INTEGER NOT NULL DEFAULT 0;

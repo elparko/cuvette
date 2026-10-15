@@ -206,7 +206,7 @@ describe("hosted mode on", () => {
       saveCuvetteToken("cuv_old");
       const s = server({
         "/v1/auth/link": () => json(200, { url: "https://api.cuvette.ai/v1/auth/start?provider=github&link=abc" }),
-        "/v1/auth/token": () => json(200, { token: "cuv_new", device_id: "dev_2", account_id: "acc_1" }),
+        "/v1/auth/token": () => json(200, { linked: true, account_id: "acc_1" }),
         "/v1/account": () => json(200, ACCOUNT),
       });
       const c = await start(env, s.fn);
@@ -217,8 +217,23 @@ describe("hosted mode on", () => {
       const { challenge, state } = s.calls[0]!.body;
       expect(challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect((await fetch(`${c.base}/auth/cuvette?code=abc&state=${state}`)).status).toBe(200);
-      expect(cuvetteToken({}).token).toBe("cuv_new");
+      expect(cuvetteToken({}).token).toBe("cuv_old");
+      expect(s.calls.at(-1)).toMatchObject({ path: "/v1/account", auth: "Bearer cuv_old" });
       expect(savedModel({ cwd: home, env: {} })).toBe("claude");
+    });
+
+    test("add a sign-in method: a sign-in of another account shows the account_taken text and keeps the token", async () => {
+      saveCuvetteToken("cuv_old");
+      const s = server({ "/v1/auth/link": () => json(200, { url: "https://api.cuvette.ai/v1/auth/start?provider=github&link=abc" }), "/v1/account": () => json(200, ACCOUNT) });
+      const c = await start(env, s.fn);
+      await c.post("api/cuvette/link", { provider: "github" });
+      const { state } = s.calls[0]!.body;
+      const r = await fetch(`${c.base}/auth/cuvette?error=account_taken&state=${state}`);
+      expect(r.status).toBe(400);
+      expect(await r.text()).toContain("This sign-in belongs to another Cuvette account. Sign out and sign in with it, or use a different sign-in.");
+      expect((await (await c.post("api/cuvette", {})).json()).error).toBe("This sign-in belongs to another Cuvette account. Sign out and sign in with it, or use a different sign-in.");
+      expect(s.calls.some((x) => x.path === "/v1/auth/token")).toBe(false);
+      expect(cuvetteToken({}).token).toBe("cuv_old");
     });
 
     test("add a sign-in method: a server refusal shows its text", async () => {

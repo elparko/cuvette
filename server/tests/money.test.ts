@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPlans } from "../src/plans.ts";
-import { expireHolds, reserve } from "../src/money.ts";
+import { NO_TOKENS, expireHolds, reserve, settle } from "../src/money.ts";
 import { DAY, SONNET, TEST_PLANS, addAccount, addHold, addTopup, addUsage, balanceOf, call, chatBody, heldStream, heldTotal, holdsOf, makeEnv, mockFetch, post, reserveFor, messageDelta, messageStart, sse, topupsOf, type TestEnv } from "./helpers.ts";
 
 afterEach(() => {
@@ -810,5 +810,61 @@ describe("allowance reset", () => {
     jsonUpstream(10, 10);
     await ask(env, a.token);
     expect(topupsOf(env, a.id)).toBe(4);
+  });
+});
+
+describe("atomic settle", () => {
+  const tokens = { input: 1000, output: 1000, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
+
+  it("debits once when two settles for the same hold run at the same time", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    const t = addTopup(env, a.id, 5);
+    addHold(env, a.id, 1, Date.now(), "r1");
+    await Promise.all([settle(env, "r1", 0.25, SONNET, "ok", tokens), settle(env, "r1", 0.25, SONNET, "ok", tokens)]);
+    expect(balanceOf(env, a.id)).toBe(4.75);
+    expect(topupsOf(env, a.id)).toBe(5);
+    expect(env.fake.rows("SELECT * FROM usage WHERE request_id = 'r1'")).toHaveLength(1);
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
+    expect(t).toBeTruthy();
+  });
+
+  it("debits nothing when expireHolds already settled the hold that settle read", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    addHold(env, a.id, 2, Date.now() - 20 * 60_000, "old");
+    await Promise.all([expireHolds(env, a.id, Date.now()), settle(env, "old", 0.5, SONNET, "ok", tokens)]);
+    expect(balanceOf(env, a.id)).toBe(3);
+    expect(env.fake.rows("SELECT * FROM usage WHERE request_id = 'old'")).toHaveLength(1);
+  });
+
+  it("debits the top-up once when a second settle runs after the first", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 0, { plan: "none" });
+    addTopup(env, a.id, 5);
+    addHold(env, a.id, 1, Date.now(), "r2");
+    await settle(env, "r2", 0.25, SONNET, "ok", tokens);
+    await settle(env, "r2", 0.25, SONNET, "ok", tokens);
+    expect(topupsOf(env, a.id)).toBe(4.75);
+  });
+
+  it("keeps the hold when the debit fails", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    addHold(env, a.id, 1, Date.now(), "r3");
+    env.fake.sqlite.exec("CREATE TRIGGER fail_usage BEFORE INSERT ON usage BEGIN SELECT RAISE(ABORT, 'stop'); END");
+    await expect(settle(env, "r3", 0.25, SONNET, "ok", tokens)).rejects.toThrow();
+    expect(env.fake.rows("SELECT * FROM holds WHERE request_id = 'r3'")).toHaveLength(1);
+    expect(balanceOf(env, a.id)).toBe(5);
+  });
+
+  it("keeps the hold of expireHolds when the debit fails", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 5);
+    addHold(env, a.id, 2, Date.now() - 20 * 60_000, "old");
+    env.fake.sqlite.exec("CREATE TRIGGER fail_usage BEFORE INSERT ON usage BEGIN SELECT RAISE(ABORT, 'stop'); END");
+    await expect(expireHolds(env, a.id, Date.now())).rejects.toThrow();
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(1);
+    expect(NO_TOKENS.input).toBe(0);
   });
 });

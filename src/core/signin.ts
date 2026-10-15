@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { hostname } from "node:os";
-import { AccountError, BAD_CODE, getAccount, hostedError, linkUrl, type AccountCtx, type AccountInfo } from "./account.ts";
+import { ACCOUNT_TAKEN, AccountError, BAD_CODE, getAccount, hostedError, linkUrl, type AccountCtx, type AccountInfo } from "./account.ts";
 import { cuvetteToken, cuvetteUrl, saveCuvetteToken } from "./credentials.ts";
 
 export const PROVIDERS = [
@@ -14,7 +14,7 @@ export const PROVIDERS = [
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-export const SIGN_IN_ERRORS = { access_denied: "You stopped the sign-in.", sign_in_failed: "The sign-in did not finish. Try again." } as const;
+export const SIGN_IN_ERRORS = { access_denied: "You stopped the sign-in.", sign_in_failed: "The sign-in did not finish. Try again.", account_taken: ACCOUNT_TAKEN } as const;
 
 export const signInErrorText = (value: string | null | undefined): string | undefined =>
   value ? (SIGN_IN_ERRORS as Record<string, string>)[value] ?? SIGN_IN_ERRORS.sign_in_failed : undefined;
@@ -45,7 +45,7 @@ export function startUrl(env: Record<string, string | undefined>, o: { provider:
 
 export const deviceName = (kind: "app" | "command line"): string => `${hostname()} (${kind})`;
 
-export async function redeemCode(ctx: AccountCtx, o: { code: string; verifier: string; device: string }): Promise<{ accountId: string; deviceId: string }> {
+export async function redeemCode(ctx: AccountCtx, o: { code: string; verifier: string; device: string }): Promise<{ accountId: string; deviceId?: string; linked?: true }> {
   const env = ctx.env ?? process.env;
   let res: Response;
   try {
@@ -61,8 +61,9 @@ export async function redeemCode(ctx: AccountCtx, o: { code: string; verifier: s
     const body = await res.json().catch(() => undefined);
     throw new AccountError(hostedError(res.status, body, res.headers.get("retry-after"))?.text ?? (res.status === 400 ? BAD_CODE : `The Cuvette server returned HTTP ${res.status}.`));
   }
-  const j = (await res.json()) as { token: string; device_id: string; account_id: string };
-  saveCuvetteToken(j.token);
+  const j = (await res.json()) as { token?: string; device_id?: string; account_id: string; linked?: boolean };
+  if (j.linked) return { accountId: j.account_id, linked: true };
+  saveCuvetteToken(j.token!);
   return { accountId: j.account_id, deviceId: j.device_id };
 }
 

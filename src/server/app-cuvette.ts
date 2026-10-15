@@ -136,7 +136,8 @@ export function cuvetteApi(o: CuvetteApiOptions) {
       if (!code) return html(false, 400);
       try {
         await redeemCode(ctx(), { code, verifier: p.verifier, device: deviceName("app") });
-        if (!p.link) await chooseCuvette(modelCtx(), { onlyIfNoKey: !p.use });
+        if (p.link) await getAccount(ctx());
+        else await chooseCuvette(modelCtx(), { onlyIfNoKey: !p.use });
         lastError = "";
         return html(true, 200);
       } catch (e) {

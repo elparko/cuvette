@@ -85,6 +85,15 @@ describe("redeem a code", () => {
   });
 });
 
+describe("redeem a link code", () => {
+  test("keeps the current token and makes no device", async () => {
+    saveCuvetteToken("cuv_old");
+    const fn = (async () => json(200, { linked: true, account_id: "acc_1" })) as unknown as typeof fetch;
+    expect(await redeemCode({ fetch: fn }, { code: "c1", verifier: "v1", device: "Mac (app)" })).toEqual({ accountId: "acc_1", linked: true });
+    expect(cuvetteToken({}).token).toBe("cuv_old");
+  });
+});
+
 describe("the one-time listener", () => {
   test("takes the code from a request with the right state, then closes", async () => {
     const l = await listenForCode("state-1");
@@ -111,6 +120,15 @@ describe("the one-time listener", () => {
     const e = await done;
     expect(e).toBeInstanceOf(AccountError);
     expect(e.message).toBe("You stopped the sign-in.");
+  });
+
+  test("an account_taken redirect ends the wait with the text for it", async () => {
+    const l = await listenForCode("state-1");
+    const done = l.wait().catch((e) => e);
+    const r = await fetch(`http://127.0.0.1:${l.port}/auth/cuvette?error=account_taken&state=state-1`);
+    expect(r.status).toBe(400);
+    expect(await r.text()).toContain("This sign-in belongs to another Cuvette account.");
+    expect((await done).message).toBe("This sign-in belongs to another Cuvette account. Sign out and sign in with it, or use a different sign-in.");
   });
 
   test("a sign_in_failed redirect, and an unknown error value, end the wait with the failed text", async () => {
@@ -209,7 +227,7 @@ describe("sign in from a terminal", () => {
     const fn = (async (url: string, init?: RequestInit) => {
       calls.push({ url, auth: new Headers(init?.headers).get("authorization"), body: init?.body ? JSON.parse(String(init.body)) : undefined });
       if (url.endsWith("/v1/auth/link")) return json(200, { url: "https://api.cuvette.ai/v1/auth/start?provider=github&link=abc" });
-      if (url.endsWith("/v1/auth/token")) return json(200, { token: "cuv_new", device_id: "d", account_id: "acc_1" });
+      if (url.endsWith("/v1/auth/token")) return json(200, { linked: true, account_id: "acc_1" });
       return json(200, ACCOUNT);
     }) as unknown as typeof fetch;
     let opened = "";
@@ -229,7 +247,7 @@ describe("sign in from a terminal", () => {
     expect(calls[0]).toMatchObject({ url: "https://api.cuvette.ai/v1/auth/link", auth: "Bearer cuv_old" });
     expect(calls[0]!.body).toMatchObject({ provider: "github", challenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) });
     expect(info.account_id).toBe("acc_1");
-    expect(cuvetteToken({}).token).toBe("cuv_new");
+    expect(cuvetteToken({}).token).toBe("cuv_old");
     expect(said[0]).toContain("link=abc");
   });
 
