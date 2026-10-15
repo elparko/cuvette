@@ -442,6 +442,19 @@ describe("ollama", () => {
     expect(seen.filter((x) => x.url.endsWith("/api/chat"))).toHaveLength(1);
   });
 
+  test("a review reply that is cut inside a think block gives no text", async () => {
+    stubOllama(() => ndjson([{ message: { content: "<think>I check the" } }, { message: { content: " claims and" } }, { done: true }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    expect(await p.complete("SYS", "review", undefined, { maxTokens: 50 })).toBe("");
+  });
+
+  test("complete sends the output cap as num_predict", async () => {
+    const seen = stubOllama(() => ndjson([{ message: { content: "No findings." } }, { done: true }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    await p.complete("SYS", "review", undefined, { maxTokens: 3000 });
+    expect(seen.find((x) => x.url.endsWith("/api/chat"))!.body.options.num_predict).toBe(3000);
+  });
+
   test("a review reply that repeats itself is stopped as well", async () => {
     const finding = '{"check": "referee", "message": "The answer does not report the Leiden resolution (0.7) in the cluster count statement, and it does not report the number of neighbors (10)."},\n';
     stubOllama(() => ndjson([{ message: { content: "[\n" } }, ...Array.from({ length: 40 }, () => ({ message: { content: finding } })), { done: true }]));
@@ -1040,5 +1053,54 @@ describe("agent loop fixes, round eight", () => {
     p.stream = false;
     const r = await p.step(req([user("q")], { knownTools: ["old_tool"] }));
     expect(r.message.parts.find((x: any) => x.type === "tool_call")).toMatchObject({ name: "old_tool", args: { x: 2 } });
+  });
+});
+
+describe("the output cap name of the openai provider", () => {
+  function capture(replies: Response[]) {
+    const bodies: any[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return replies[Math.min(bodies.length - 1, replies.length - 1)]!.clone();
+    });
+    return bodies;
+  }
+  const ok = () => new Response(JSON.stringify({ choices: [{ message: { content: "No findings." }, finish_reason: "stop" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  const refuse = (name: string) => new Response(JSON.stringify({ error: { message: `Unsupported parameter: '${name}' is not supported with this model.` } }), { status: 400 });
+
+  test("api.openai.com models that start with o or gpt-5 get max_completion_tokens", async () => {
+    for (const model of ["o3-mini", "gpt-5", "gpt-5-mini"]) {
+      const bodies = capture([ok()]);
+      await (await makeProvider(`openai:https://api.openai.com/v1|${model}`)).complete("S", "Q", undefined, { maxTokens: 3000 });
+      expect(bodies[0].max_completion_tokens).toBe(3000);
+      expect("max_tokens" in bodies[0]).toBe(false);
+    }
+  });
+
+  test("other models and other servers get max_tokens", async () => {
+    for (const spec of ["openai:https://api.openai.com/v1|gpt-4o", "openai:http://localhost:1234/v1|o3-mini", "openai:https://api.example.org/v1|gpt-5"]) {
+      const bodies = capture([ok()]);
+      await (await makeProvider(spec)).complete("S", "Q", undefined, { maxTokens: 3000 });
+      expect(bodies[0].max_tokens).toBe(3000);
+      expect("max_completion_tokens" in bodies[0]).toBe(false);
+    }
+  });
+
+  test("a 400 that names max_tokens makes one retry with max_completion_tokens", async () => {
+    const bodies = capture([refuse("max_tokens"), ok()]);
+    const p = await makeProvider("openai:https://api.example.org/v1|custom");
+    expect(await p.complete("S", "Q", undefined, { maxTokens: 3000 })).toBe("No findings.");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].max_tokens).toBe(3000);
+    expect(bodies[1].max_completion_tokens).toBe(3000);
+    expect("max_tokens" in bodies[1]).toBe(false);
+  });
+
+  test("a 400 that names max_completion_tokens makes one retry with max_tokens", async () => {
+    const bodies = capture([refuse("max_completion_tokens"), ok()]);
+    const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5");
+    await p.complete("S", "Q", undefined, { maxTokens: 3000 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].max_tokens).toBe(3000);
   });
 });

@@ -3630,3 +3630,24 @@ test("a correction that still replies to the referee after one more request keep
   expect(session!.record.entries(["notice"]).some((e) => /reads like a reply to the review, so the harness kept the first answer/.test(String(e.data.text)))).toBe(true);
   expect(session!.record.entries(["assistant"]).filter((e) => e.data.final)).toHaveLength(1);
 });
+
+test("a referee that gives no text makes the review fail, with a notice", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "" });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  expect(session.reviewState).toBe("failed");
+  expect(session.record.entries(["notice"]).map((e) => e.data.text)).toContain("The review gave no text. The answer is not checked.");
+  expect(session.record.entries(["review"]).at(-1)!.data.state).toBe("failed");
+});
+
+test("a referee that says No findings. makes the review done with zero findings", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif" } }] }, { text: "The count found 64 particles with the Default method (step 1)." }]);
+  const referee = new FakeProvider({ steps: [], complete: "No findings." });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles");
+  expect(session.reviewState).toBe("done");
+  expect(session.record.entries(["review"]).at(-1)!.data.findings).toEqual([]);
+});

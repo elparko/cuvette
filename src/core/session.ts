@@ -62,7 +62,7 @@ import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
 import { fillFromMethod, loadMethod, methodFrom, methodNote, resumeMethodAllowed, saveMethod, type Method } from "./methods.ts";
 import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
-import { Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
+import { EmptyReview, Findings, logText, readsLikeReply, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
 import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
@@ -2086,7 +2086,7 @@ export class Session {
         state = "done";
       } catch (e) {
         state = signal.aborted ? "stopped" : "failed";
-        this.record.append("notice", { text: `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
+        this.record.append("notice", { text: e instanceof EmptyReview && !signal.aborted ? e.message : `The referee did not run: ${signal.aborted ? "the scientist stopped the turn." : (e as Error).message}` });
       }
       this.bus.emit({ type: "status", state: "thinking" });
     } else if (this.refereeProvider && signal.aborted) state = "stopped";

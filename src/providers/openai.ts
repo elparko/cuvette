@@ -67,12 +67,14 @@ export class OpenAIProvider implements Provider {
   private stream = true;
   private usageOption = true;
   private noUsageNoted = false;
+  private capKey: "max_tokens" | "max_completion_tokens";
 
   constructor(baseUrl: string, readonly model: string, opts: OpenAIOpts = {}) {
     this.base = baseUrl.replace(/\/+$/, "");
     this.info = { provider: "openai", model, contextWindow: opts.numCtx ?? 32768, vision: false, small: true, local: localUrl(this.base) };
     this.sleep = opts.sleep;
     this.retries = opts.retries ?? RETRIES;
+    this.capKey = /^https:\/\/api\.openai\.com(?:[/:]|$)/i.test(this.base) && /^(o\d|gpt-5)/i.test(model) ? "max_completion_tokens" : "max_tokens";
   }
 
   toNative(system: string, messages: Message[]): unknown[] {
@@ -126,6 +128,11 @@ export class OpenAIProvider implements Provider {
       this.usageOption = false;
       return "again";
     }
+    const sent = "max_tokens" in body ? "max_tokens" : "max_completion_tokens" in body ? "max_completion_tokens" : undefined;
+    if (res.status === 400 && sent && /max_tokens|max_completion_tokens/i.test(text)) {
+      this.capKey = sent === "max_tokens" ? "max_completion_tokens" : "max_tokens";
+      return "again";
+    }
     if (res.status === 400 && body.stream && NO_STREAM.test(text)) {
       this.stream = false;
       return "again";
@@ -144,7 +151,7 @@ export class OpenAIProvider implements Provider {
 
   private body(messages: unknown[], tools: StepRequest["tools"], maxTokens?: number): Record<string, unknown> {
     const body: Record<string, unknown> = { model: this.model, messages, stream: this.stream };
-    if (maxTokens) body.max_tokens = maxTokens;
+    if (maxTokens) body[this.capKey] = maxTokens;
     if (this.stream && this.usageOption) body.stream_options = { include_usage: true };
     if (tools.length) body.tools = tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
     return body;

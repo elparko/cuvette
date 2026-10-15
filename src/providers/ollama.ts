@@ -2,7 +2,7 @@ import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
-import { ThinkSplitter, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
+import { ThinkSplitter, splitThink, defang, defangDeep, extractTextToolCall, lastCallNumber, promptedToolsText, wrapperText } from "./text.ts";
 import { RETRIES, errorBody, noRetry, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { parseArgs } from "./openai.ts";
@@ -397,7 +397,7 @@ export class OllamaProvider implements Provider {
       });
       if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
       if (looped) content = cutRepeat(content);
-      return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      return splitThink(content).text;
     } finally {
       idle.stop();
     }

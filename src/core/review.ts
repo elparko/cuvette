@@ -467,7 +467,7 @@ Write your report as JSON lines. One finding for each line, with no other text:
 Cite the log entry numbers (the number after #) that support each finding.
 Report only problems. Do not write a finding for a check that passed.
 Write at most five findings. Write each finding on one line, with one sentence in the message. Write the most severe first.
-If you find nothing, write [].`;
+If you find nothing, write exactly this line: No findings.`;
 
 export function refereePrompt(ctx: ReviewContext): { system: string; text: string } {
   const textChecks = ctx.adapters.flatMap((a) => a.manifest.checks.filter((c) => !c.rule && c.text.trim()).map((c) => `- ${c.id}: ${c.text.trim()}`));
@@ -528,19 +528,45 @@ export function parseReferee(raw: string): FindingIn[] {
 }
 
 export const REFEREE_EFFORT = "low";
-export const REFEREE_MAX_TOKENS = 1500;
+export const REFEREE_MAX_TOKENS = 3000;
 
-const REPLY_WORDS = /\breferee\b|\bthe review found\b|\bas noted above\b/i;
+const REPLY_ANYWHERE = /\breferee\b|\bas noted above\b/i;
+const REPLY_FIRST_LINE = /\b(?:the|this) findings?\b|\bfinding \d|\breviewer\b|\bthe review\b|\bas noted above\b|\byou are right\b|\bi agree\b|^\s*\d+[.)]\s*correct,/i;
+
+const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+function quotesFinding(line: string, finding: string): boolean {
+  const need = wordsOf(finding);
+  if (!need.length) return false;
+  const have = wordsOf(line);
+  let at = 0;
+  let hit = 0;
+  for (const w of need) {
+    const next = have.indexOf(w, at);
+    if (next >= 0) {
+      hit++;
+      at = next + 1;
+    }
+  }
+  return hit >= need.length * 0.6;
+}
 
 export function readsLikeReply(answer: string, findings: string[]): boolean {
-  if (REPLY_WORDS.test(answer)) return true;
+  if (REPLY_ANYWHERE.test(answer) || /\bthe review found\b/i.test(answer.slice(0, 120))) return true;
   if (!/^\s*\d+[.)]\s/.test(answer)) return false;
-  const words = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []);
-  const head = words(answer.slice(0, 400));
-  return findings.some((m) => [...words(m)].filter((w) => head.has(w)).length >= 2);
+  const first = answer.trim().split("\n")[0]!;
+  return REPLY_FIRST_LINE.test(first) || findings.some((m) => quotesFinding(first, m));
+}
+
+export class EmptyReview extends Error {
+  constructor() {
+    super("The review gave no text. The answer is not checked.");
+  }
 }
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS }));
+  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS });
+  if (!raw.trim()) throw new EmptyReview();
+  return parseReferee(raw);
 }
