@@ -1,4 +1,5 @@
-export const AMOUNTS_USD = [10, 25, 50];
+import { hex } from "./util.ts";
+
 export const TOLERANCE_SECONDS = 300;
 
 const enc = new TextEncoder();
@@ -6,10 +7,6 @@ const enc = new TextEncoder();
 function hexBytes(hex: string): Uint8Array | undefined {
   if (!/^([0-9a-f]{2})+$/i.test(hex)) return undefined;
   return Uint8Array.from(hex.match(/../g)!, (h) => parseInt(h, 16));
-}
-
-export function hex(bytes: ArrayBuffer): string {
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function hmacKey(secret: string, usage: "sign" | "verify"): Promise<CryptoKey> {
@@ -51,24 +48,28 @@ export async function verifySignature(secret: string, header: string | null, raw
   return ok;
 }
 
-export async function createCheckout(secretKey: string, accountId: string, amountUsd: number, siteUrl: string): Promise<string> {
-  const form = new URLSearchParams({
-    mode: "payment",
-    client_reference_id: accountId,
-    success_url: `${siteUrl}/account?checkout=done`,
-    cancel_url: `${siteUrl}/account?checkout=cancelled`,
-    "line_items[0][quantity]": "1",
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": String(amountUsd * 100),
-    "line_items[0][price_data][product_data][name]": `Cuvette inference credit, $${amountUsd}`,
-  });
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: { authorization: `Bearer ${secretKey}`, "content-type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  });
-  if (!res.ok) throw new Error(`Stripe answered HTTP ${res.status}`);
-  const session = (await res.json()) as { url?: string };
-  if (!session.url) throw new Error("Stripe sent no checkout URL");
-  return session.url;
+export class StripeError extends Error {
+  constructor(readonly status: number, readonly code: string) {
+    super(`Stripe answered HTTP ${status} ${code}`);
+  }
+}
+
+export async function stripeCall(secretKey: string, method: "GET" | "POST", path: string, params: Record<string, string> = {}, idempotencyKey?: string): Promise<any> {
+  const query = new URLSearchParams(params).toString();
+  const headers: Record<string, string> = { authorization: `Bearer ${secretKey}` };
+  if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
+  const init: RequestInit = { method, headers };
+  if (method === "POST") {
+    headers["content-type"] = "application/x-www-form-urlencoded";
+    init.body = query;
+  }
+  const res = await fetch(`https://api.stripe.com/v1${path}${method === "GET" && query ? `?${query}` : ""}`, init);
+  if (!res.ok) {
+    let code = "";
+    try {
+      code = String(((await res.json()) as any)?.error?.code ?? "");
+    } catch {}
+    throw new StripeError(res.status, code);
+  }
+  return res.json();
 }

@@ -27,7 +27,7 @@ describe("POST /v1/messages/count_tokens", () => {
     expect(JSON.parse(calls[0]!.body)).toEqual(body);
     expect(balanceOf(env, acct.id)).toBe(5);
     expect(env.fake.rows("SELECT * FROM usage")).toHaveLength(0);
-    expect(env.fake.rows("SELECT * FROM in_flight")).toHaveLength(0);
+    expect(env.fake.rows("SELECT * FROM holds")).toHaveLength(0);
   });
 
   it("works with a balance of zero", async () => {
