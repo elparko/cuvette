@@ -115,6 +115,23 @@ test("a hook script in the project root is part of the trust hash", () => {
   expect(t.changes).toEqual(["changed file: (hook script) hook.sh"]);
 });
 
+test("a hook script is found behind env, uv run, npx tsx and options with values", () => {
+  project(".ga", {
+    hooks: {
+      SessionStart: [
+        { command: ["env", "A=1", "bash", "env-hook.sh"] },
+        { command: ["uv", "run", "uv-hook.py"] },
+        { command: ["npx", "tsx", "tsx-hook.ts"] },
+        { command: ["node", "--require", "preload.js", "node-hook.js"] },
+        { command: ["sh", "-c", "env X=1 ./shell-hook.sh --quick"] },
+      ],
+    },
+  });
+  for (const f of ["env-hook.sh", "uv-hook.py", "tsx-hook.ts", "preload.js", "node-hook.js", "shell-hook.sh"]) writeFileSync(join(cwd, f), "x");
+  const keys = Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)"));
+  expect(keys.sort()).toEqual(["env-hook.sh", "uv-hook.py", "tsx-hook.ts", "preload.js", "node-hook.js", "shell-hook.sh"].sort().map((f) => `(hook script) ${f}`));
+});
+
 test("a hook command that names a file outside the project adds no file to the trust hash", () => {
   project(".ga", { hooks: { SessionStart: [{ command: ["sh", "/etc/hosts"] }, { command: ["sh", "../outside.sh"] }] } });
   expect(Object.keys(scanFolder(cwd).files).filter((f) => f.startsWith("(hook script)"))).toEqual([]);

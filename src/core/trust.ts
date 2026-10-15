@@ -240,20 +240,18 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
   return out;
 }
 
-const INTERPRETER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell)(\.exe)?$/i;
+const PATH_LIKE = /[\\/]|^\.|\.\w+$/;
 
 function scriptWords(argv: string[]): string[] {
   const out = argv.length ? [argv[0]!] : [];
-  if (!INTERPRETER.test(basename(argv[0] ?? ""))) return out;
-  for (let i = 1; i < argv.length; i++) {
-    const a = argv[i]!;
-    if (/^-\w*c$/.test(a)) {
-      for (const part of String(argv[i + 1] ?? "").split(/&&|\|\||[;|\n]/)) out.push(...scriptWords(part.split(/\s+/).filter(Boolean).map((w) => w.replace(/^["']|["']$/g, ""))));
-      break;
-    }
-    if (a.startsWith("-")) continue;
-    out.push(a);
-    break;
+  const take = (word: string) => {
+    const bare = word.replace(/^["']|["']$/g, "");
+    for (const w of [bare, bare.slice(bare.indexOf("=") + 1)]) if (w && PATH_LIKE.test(w)) out.push(w);
+  };
+  for (const arg of argv) {
+    if (/\s/.test(arg)) {
+      for (const part of arg.split(/&&|\|\||[;|\n]/)) for (const w of part.split(/\s+/).filter(Boolean)) take(w);
+    } else take(arg);
   }
   return out;
 }
