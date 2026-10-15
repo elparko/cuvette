@@ -2,7 +2,7 @@ import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, Networ
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { IMAGE_PASTE_HELP, pastedImageOnly } from "../lib/drop.ts";
-import { patchCards } from "../lib/cards.ts";
+import { cardTakesFocus, patchCards } from "../lib/cards.ts";
 import { onTableCopy } from "../lib/table-copy.ts";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
@@ -284,7 +284,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (keptHere) return;
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
-    const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
+    const free = cardTakesFocus(a, document.body, box);
     if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
       card.focus({ preventScroll: true });

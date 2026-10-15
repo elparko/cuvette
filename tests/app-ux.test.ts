@@ -99,14 +99,14 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`document.activeElement.blur()`);
   });
 
-  test("a new question card does not take the focus from a header button", async () => {
-    const notes = `document.querySelector('header button[aria-label$="the status notes"]')`;
-    await page.eval(`${notes}.focus()`);
+  test("a new question card does not take the focus from the empty message box", async () => {
+    await setText("#msg", "");
+    await page.eval(`document.querySelector("#msg").focus()`);
     const t = new URL(url).searchParams.get("t");
     await page.eval(`fetch("api/send?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ text: "Compare the groups" }) })`);
     expect(await until(page, `document.querySelector("[data-card] .opts .btn")`)).toBe(true);
     await wait(200);
-    expect(await page.eval(`document.activeElement === ${notes}`)).toBe(true);
+    expect(await page.eval(`document.activeElement === document.querySelector("#msg")`)).toBe(true);
   });
 
   test("a new question card takes the focus when the focus is on its old card, and ignores keys for 400 ms", async () => {

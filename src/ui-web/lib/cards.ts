@@ -29,3 +29,5 @@ export function patchCards(box: HTMLElement, html: string, seen: Map<string, str
   }
   return kept_;
 }
+
+export const cardTakesFocus = (active: Element | null, body: Element, cards: Element | null) => !active || active === body || !!cards?.contains(active);
