@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeAll, expect, test } from "vitest";
+import { afterEach, beforeAll, expect, test } from "vitest";
 import type { Tool, ToolContext } from "../src/core/types.ts";
 import { genericTools, insideWorkDir } from "../src/tools/generic.ts";
 import { integrityError, integrityReason, withoutSecrets } from "../src/adapters/kinds/common.ts";
@@ -187,4 +187,37 @@ test("write_file refuses a hook script of the project and the folder of a hook s
   expect(readFileSync(join(project, "hooks", "check.py"), "utf8")).toBe("pass\n");
   expect(existsSync(join(project, "hooks", "new.py"))).toBe(false);
   expect((await write.execute({ name: join(project, "results", "t.csv"), text: "a" }, c)).ok).toBe(true);
+});
+
+const realPlatform = process.platform;
+afterEach(() => void Object.defineProperty(process, "platform", { value: realPlatform }));
+
+for (const platform of ["win32", "darwin"]) {
+  test(`write_file refuses a hook script, its folder and LAB.md with other letter case on ${platform}`, async () => {
+    const project = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-generic-case-")));
+    mkdirSync(join(project, ".cuvette"));
+    mkdirSync(join(project, "hooks"));
+    writeFileSync(join(project, "hooks", "check.py"), "pass\n");
+    writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "hooks/check.py"] }] } }));
+    const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;
+    const c = { ...ctx(), log: () => {} } as unknown as ToolContext;
+    Object.defineProperty(process, "platform", { value: platform });
+    for (const name of ["HOOKS/CHECK.PY", "Hooks/new.py", "LAB.MD"]) {
+      const r = await write.execute({ name: join(project, name), text: "evil" }, c);
+      expect(r, name).toMatchObject({ ok: false, error: expect.stringMatching(/belongs to the record or to the settings/) });
+    }
+    expect(readFileSync(join(project, "hooks", "check.py"), "utf8")).toBe("pass\n");
+  });
+}
+
+test("write_file keeps the letter case of a path on Linux", async () => {
+  if (realPlatform === "darwin" || realPlatform === "win32") return;
+  const project = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-generic-case-")));
+  mkdirSync(join(project, ".cuvette"));
+  mkdirSync(join(project, "hooks"));
+  writeFileSync(join(project, "hooks", "check.py"), "pass\n");
+  writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "hooks/check.py"] }] } }));
+  const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;
+  const c = { ...ctx(), log: () => {} } as unknown as ToolContext;
+  expect((await write.execute({ name: join(project, "HOOKS", "new.py"), text: "ok" }, c)).ok).toBe(true);
 });

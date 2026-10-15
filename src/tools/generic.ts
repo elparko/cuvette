@@ -8,8 +8,10 @@ import { isCredentialsFile } from "../core/credentials.ts";
 import { writeRefusalReason } from "../core/refusals.ts";
 import { guardCommand, settingsScope } from "./run_script.ts";
 
+const foldCase = (p: string) => (process.platform === "win32" || process.platform === "darwin" ? p.toLowerCase() : p);
+
 const below = (root: string, p: string) => {
-  const rel = relative(root, p);
+  const rel = relative(foldCase(root), foldCase(p));
   return !!rel && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
 };
 
@@ -63,7 +65,7 @@ function inRecordFolder(p: string): boolean {
 }
 
 function guarded(target: string, dirs: Dirs): boolean {
-  const inside = (root: string, p: string) => p === root || below(root, p);
+  const inside = (root: string, p: string) => foldCase(p) === foldCase(root) || below(root, p);
   const record = realish(dirs.sessionDir);
   const work = realish(dirs.workDir);
   const legacy = below(record, work);
