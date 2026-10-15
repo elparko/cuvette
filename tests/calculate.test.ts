@@ -57,3 +57,15 @@ test("a function with the wrong number of arguments is an error", () => {
   expect(() => evaluate("round(1, 2, 3)")).toThrow(/takes 1 to 2/);
   expect(() => evaluate("mean()")).toThrow(/takes 1 or more/);
 });
+
+test("round moves a half away from zero, as Excel does", () => {
+  expect(evaluate("round(0.285, 2)")).toBe(0.29);
+  expect(evaluate("round(-2.5)")).toBe(-3);
+  expect(evaluate("round(2.5)")).toBe(3);
+  expect(evaluate("round(1.005, 2)")).toBe(1.01);
+  expect(evaluate("round(-0.285, 2)")).toBe(-0.29);
+  expect(evaluate("round(1234.5, -2)")).toBe(1200);
+  expect(evaluate("round(0.0000001234, 8)")).toBe(1.2e-7);
+  expect(evaluate("round(0, 2)")).toBe(0);
+  expect(calculateTool().description).toContain("away from zero");
+});

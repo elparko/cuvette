@@ -10,8 +10,12 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   log2: (x) => Math.log2(num(x)),
   exp: (x) => Math.exp(num(x)),
   round: (x, n = 0) => {
-    const f = 10 ** num(n);
-    return Math.round(num(x) * f) / f;
+    const digits = num(n);
+    const value = num(x);
+    const [mantissa, exponent = "0"] = String(Math.abs(value)).split("e");
+    const shifted = Math.round(Number(`${mantissa}e${Number(exponent) + digits}`));
+    const [m2, e2 = "0"] = String(shifted).split("e");
+    return Math.sign(value) * Number(`${m2}e${Number(e2) - digits}`);
   },
   sum: (...a) => flat(a).reduce((s, x) => s + x, 0),
   mean: (...a) => {
@@ -168,7 +172,7 @@ export function calculateTool(): Tool {
     description:
       "Do arithmetic on numbers from tool results. Use it for each ratio, difference, percent change, mean or error that you report and that no tool reported; do not do arithmetic in your answer. If a tool result already has the value, report that value and do not compute it again. mae, rmse and r2 take one pair of numbers for each sample or image, not the totals. " +
       "Write one expression per item, for example \"ratio(412, 450)\", \"pct_change(46, 50)\", \"mae([48,10],[50,10])\", \"r2([1,2,3],[1,2,4])\". " +
-      "Operators: + - * / ^ and brackets. Lists: [1, 2, 3]. Functions: " + Object.keys(FUNCS).join(", ") + ".",
+      "Operators: + - * / ^ and brackets. Lists: [1, 2, 3]. round(x, n) rounds a half away from zero, as Excel does: round(0.285, 2) is 0.29 and round(-2.5) is -3. Functions: " + Object.keys(FUNCS).join(", ") + ".",
     inputSchema: {
       type: "object",
       properties: {
