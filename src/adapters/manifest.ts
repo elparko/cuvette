@@ -51,6 +51,7 @@ const Connection = z.strictObject({
   transport: z.enum(["stdio", "http"]).default("stdio"),
   command: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).default({}),
+  pass_env: z.array(z.string()).default([]),
   cwd: z.string().default(""),
   url: z.string().default(""),
   interpreter: z.array(z.string()).default([]),

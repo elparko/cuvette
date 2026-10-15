@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { writeRules, bwrapCommand, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
+import { writeRules, bwrapCommand, openFileRules, openFiles, describeLimits, fingerprint, guardCommand, settingsScope, linuxWrap, recordFolders, runScriptTool, scriptPython, withoutBootFrames, writeSteps } from "../src/tools/run_script.ts";
 import { globEre, literalEre } from "../src/core/trust.ts";
 import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
@@ -26,6 +26,22 @@ function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = asy
   };
   return { tool, run, dirs };
 }
+
+test("the sandbox denies the read of open.json in every record folder, for Seatbelt and bubblewrap", () => {
+  const work = join(root, "open-work");
+  const session = join(root, "open-session");
+  mkdirSync(work, { recursive: true });
+  mkdirSync(session, { recursive: true });
+  const lock = join(session, "open.json");
+  writeFileSync(lock, "{}");
+  const files = openFiles({ workDir: work, sessionDir: session });
+  expect(files).toContain(lock);
+  expect(openFileRules(files)).toContain(`(deny file-read* file-write* (literal "${lock}")`);
+  expect(openFileRules([])).toBe("");
+  const b = linuxWrap("bwrap", ["true"], { network: false, writable: [session], cred: join(root, "none.json"), open: files }).join(" ");
+  expect(b).toContain(`--ro-bind /dev/null ${lock}`);
+  expect(bwrapCommand(["true"], [], files).join(" ")).toContain(`--ro-bind /dev/null ${lock}`);
+});
 
 test("tool shape and plain limits text", () => {
   const { tool } = setup();
@@ -121,6 +137,26 @@ test("timeout kills the script", async () => {
   expect(r).toMatchObject({ ok: false, error: "the script timed out after 1 s" });
   expect(Date.now() - t0).toBeLessThan(8000);
 });
+
+test.skipIf(process.platform === "win32")("a background child of the script is gone 2 s after the script exits", async () => {
+  const { run } = setup();
+  const r = await run("import subprocess\np = subprocess.Popen(['sleep', '60'])\nprint(p.pid)");
+  const pid = Number(r.text?.trim());
+  expect(pid).toBeGreaterThan(1);
+  const end = Date.now() + 2000;
+  const alive = () => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  while (alive() && Date.now() < end) await new Promise((x) => setTimeout(x, 50));
+  const left = alive();
+  if (left) process.kill(pid, "SIGKILL");
+  expect(left).toBe(false);
+}, 20_000);
 
 test("abort signal stops the script", async () => {
   const { run } = setup();

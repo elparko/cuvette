@@ -13,7 +13,7 @@ import { agentRules, BLIND_REASON, blindPolicy, canonical, sandboxDenials, sandb
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
 import { ereToRegExp, globEre, hookScriptScan, LAB_FILE, literalEre } from "../core/trust.ts";
-import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, EXIT_GRACE_MS, fileKind, integrityError, integrityReason, killAll, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { credentialsPath } from "../core/credentials.ts";
 
 export function scriptPython(): string {
@@ -180,13 +180,22 @@ export function describeLimits(network: boolean, state: SandboxState = sandbox, 
   return `The script runs as your user account. The operating system does not limit it on Windows. ${open}`;
 }
 
-export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string; held?: string[]; steps?: WriteStep[] }): string[] {
+export function openFiles(dirs: Dirs): string[] {
+  return recordFolders(dirs).map((d) => join(d, "open.json"));
+}
+
+export function openFileRules(files: string[]): string {
+  return files.length ? `(deny file-read* file-write* ${files.map((p) => `(literal ${sbString(p)})`).join("")})` : "";
+}
+
+export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string; held?: string[]; steps?: WriteStep[]; open?: string[] }): string[] {
   const hide = existsSync(o.cred) ? [...new Set([o.cred, realpathSync(o.cred)])] : [];
   if (state === "bwrap") {
     const binds = [...new Set(o.writable.filter((p) => existsSync(p)))].flatMap((p) => ["--bind", p, p]);
     const held = [...new Set((o.held ?? []).filter((p) => existsSync(p)).flatMap((p) => [p, realpathSync(p)]))].flatMap((p) => (statSync(p).isDirectory() ? ["--tmpfs", p] : ["--ro-bind", "/dev/null", p]));
     const locks = bwrapLocks(o.steps ?? []);
-    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...locks, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
+    const open = (o.open ?? []).filter((p) => existsSync(p));
+    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...locks, ...[...hide, ...open].flatMap((p) => ["--ro-bind", "/dev/null", p]), ...held, ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
   }
   if (state === "unshare") {
     const flags = o.network ? "-rm" : "-rmn";
@@ -372,8 +381,8 @@ function programExists(cmd: string | undefined, cwd: string, env: Record<string,
   return (env.PATH ?? "").split(delimiter).some((d) => d && existsSync(resolve(cwd, d, cmd)));
 }
 
-export function bwrapCommand(argv: string[], steps: WriteStep[]): string[] {
-  return ["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), "--die-with-parent", "--", ...argv];
+export function bwrapCommand(argv: string[], steps: WriteStep[], open: string[] = []): string[] {
+  return ["bwrap", "--bind", "/", "/", "--dev-bind", "/dev", "/dev", "--proc", "/proc", ...bwrapLocks(steps), ...open.filter((p) => existsSync(p)).flatMap((p) => ["--ro-bind", "/dev/null", p]), "--die-with-parent", "--", ...argv];
 }
 
 export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string; env?: Record<string, string | undefined>; adapterRoot?: string } = {}): Promise<{ argv: string[]; changed(): string[] }> {
@@ -382,13 +391,13 @@ export async function guardCommand(argv: string[], dirs: Dirs, o: { cwd?: string
   const guard = fingerprint(dirs, true);
   if (!programExists(argv[0], o.cwd ?? process.cwd(), o.env ?? process.env)) return { argv, changed: guard.changed };
   const blind = blindPolicy();
-  if (process.platform === "darwin" && sandbox === "on") return { argv: ["/usr/bin/sandbox-exec", "-p", `(version 1)(allow default)${writeRules(steps)}${blind ? sandboxReadRules(agentRules(blind)) : ""}`, ...argv], changed: guard.changed };
-  if (process.platform === "linux" && sandbox === "bwrap") return { argv: bwrapCommand(argv, steps), changed: guard.changed };
+  if (process.platform === "darwin" && sandbox === "on") return { argv: ["/usr/bin/sandbox-exec", "-p", `(version 1)(allow default)${writeRules(steps)}${openFileRules(openFiles(dirs))}${blind ? sandboxReadRules(agentRules(blind)) : ""}`, ...argv], changed: guard.changed };
+  if (process.platform === "linux" && sandbox === "bwrap") return { argv: bwrapCommand(argv, steps, openFiles(dirs)), changed: guard.changed };
   return { argv, changed: guard.changed };
 }
 
-function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = [], steps: WriteStep[] = []): string[] {
-  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), held, steps, writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
+function wrap(argv: string[], workDir: string, network: boolean, project?: string, held: string[] = [], steps: WriteStep[] = [], open: string[] = []): string[] {
+  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), held, steps, open, writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
@@ -398,7 +407,7 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
     const cred = credentialsPath();
     const credPaths = [cred, ...(existsSync(cred) ? [realpathSync.native(cred)] : [])];
     const secrets = `(deny file-read* file-write* ${credPaths.map((p) => `(literal ${sbString(p)})`).join("")})`;
-    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${writeRules(steps)}${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
+    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${writeRules(steps)}${secrets}${openFileRules(open)}${blind ? sandboxReadRules(agentRules(blind)) : ""}${heldReadRules(held)}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
   return argv;
@@ -502,7 +511,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(join(scriptDir, "cuvette.mplstyle"), STYLE_FILE);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
-      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? [], writeSteps(dirs));
+      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir, dirs.heldBack?.() ?? [], writeSteps(dirs), openFiles(dirs));
       const guard = fingerprint(dirs, true);
 
       const child = spawn(argv[0], argv.slice(1), {
@@ -557,6 +566,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
           done(null);
         });
         child.on("exit", (c) => {
+          killTree(child.pid);
           setTimeout(() => {
             child.stdout!.destroy();
             child.stderr!.destroy();

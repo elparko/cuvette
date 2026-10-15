@@ -90,9 +90,9 @@ function inProjectFolder(root: string): boolean {
 }
 
 export function childEnv(c: KindContext, extra: Record<string, string> = {}): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-  for (const [k, v] of Object.entries(c.adapter.manifest.connection.env)) env[k] = expand(v, c.ph);
+  const env = withoutSecrets(process.env);
+  const ok = envAllowed(c);
+  for (const [k, v] of Object.entries(c.adapter.manifest.connection.env)) env[k] = expand(v, c.ph, ok);
   env.CUVETTE_WORK_DIR = c.dirs.workDir;
   env.CUVETTE_SESSION_DIR = c.dirs.sessionDir;
   env.CUVETTE_ADAPTER_DIR = c.adapter.root;
@@ -103,9 +103,14 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   return addOldEnv({ ...env, ...extra });
 }
 
-export function expand(s: string, ph: Record<string, string>): string {
+export function envAllowed(c: KindContext): (name: string) => boolean {
+  const declared = new Set(c.adapter.manifest.connection.pass_env);
+  return (name) => declared.has(name) && name in withoutSecrets({ [name]: "" });
+}
+
+export function expand(s: string, ph: Record<string, string>, allow?: (name: string) => boolean): string {
   return s.replace(/\{(env:[^{}]+|[a-z_]+)\}/g, (all, name: string) => {
-    if (name.startsWith("env:")) return process.env[name.slice(4)] ?? "";
+    if (name.startsWith("env:")) return allow && !allow(name.slice(4)) ? "" : process.env[name.slice(4)] ?? "";
     if (name === "program_path" && !ph.program_path) throw new Error("the program was not found. Set locate.env, locate.paths or locate.which in the adapter");
     return name in ph ? ph[name] : all;
   });
@@ -116,6 +121,7 @@ export interface Scope {
   args: Args;
   outputs: Record<string, string>;
   declared: Set<string>;
+  envOk?: (name: string) => boolean;
 }
 
 export function lookup(obj: unknown, path: string): unknown {
@@ -142,7 +148,7 @@ function resolveName(name: string, s: Scope): { value: string | undefined; absen
     const p = s.outputs[name.slice(7)];
     return p === undefined ? undefined : { value: p, absent: false };
   }
-  if (name.startsWith("env:") || name in s.ph) return { value: expand(`{${name}}`, s.ph), absent: false };
+  if (name.startsWith("env:") || name in s.ph) return { value: expand(`{${name}}`, s.ph, s.envOk), absent: false };
   const v = lookup(s.args, name);
   if (v !== undefined) return { value: scalar(v), absent: false };
   if (s.declared.has(name.split(".")[0])) return { value: undefined, absent: true };
@@ -736,7 +742,7 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
     };
     const timer = o.timeoutMs ? setTimeout(() => {
       timedOut = true;
-      killTree(child.pid);
+      void killAll(child.pid);
     }, o.timeoutMs) : undefined;
     const onAbort = () => {
       aborted = true;
@@ -756,6 +762,7 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
     }
     child.on("error", (e) => finish({ error: e.message }));
     child.on("exit", (code) => {
+      killTree(child.pid);
       setTimeout(() => {
         child.stdout?.destroy();
         child.stderr?.destroy();
@@ -768,7 +775,7 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
 
 export const EXIT_GRACE_MS = 2000;
 
-const SECRET_ENV = /key|token|secret|password|passwd|credential/i;
+const SECRET_ENV = /key|token|secret|password|passwd|credential|^ssh_auth_sock$|^database_url$|_pass$/i;
 
 export function withoutSecrets(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {};
@@ -856,7 +863,8 @@ export function defTool(c: KindContext, def: ToolDef, run: (a: { args: Args; ctx
 }
 
 export function scopeFor(c: KindContext, def: ToolDef, args: Args, call: CallDir): Scope {
-  return { ph: c.ph, args, outputs: call.outputs, declared: new Set(Object.keys(def.params)) };
+  const child = c.adapter.manifest.connection.kind !== "http" && c.adapter.manifest.connection.kind !== "mcp";
+  return { ph: c.ph, args, outputs: call.outputs, declared: new Set(Object.keys(def.params)), envOk: child ? envAllowed(c) : undefined };
 }
 
 export function makeRuntime(c: KindContext, parts: {
@@ -870,7 +878,7 @@ export function makeRuntime(c: KindContext, parts: {
   let closed = false;
   let interpreter: string[] = [];
   try {
-    interpreter = c.adapter.manifest.connection.interpreter.map((a) => expand(a, c.ph));
+    interpreter = c.adapter.manifest.connection.interpreter.map((a) => expand(a, c.ph, envAllowed(c)));
   } catch {}
   return {
     adapter: c.adapter,

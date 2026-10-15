@@ -15,7 +15,7 @@ import { saveIndexRow } from "../src/core/places.ts";
 import { interruptTarget } from "../src/adapters/kinds/python.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
-import { parseCsv, parseKeyValue, readFields, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
+import { parseCsv, parseKeyValue, readFields, renderArgv, runProcess, solidPng, tablePreview, validateArgs, withoutSecrets } from "../src/adapters/kinds/common.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-kinds-"));
 const started: AdapterRuntime[] = [];
@@ -126,6 +126,33 @@ test("cli: safe argv, route, summary, validation", async () => {
   expect(await run("argv", { text: "q", mode: "c" })).toMatchObject({ ok: false, error: expect.stringMatching(/one of/) });
   expect(await run("argv", { text: "q", n: 99 })).toMatchObject({ ok: false, error: expect.stringMatching(/at most 9/) });
   expect(await run("argv", {})).toMatchObject({ ok: false });
+});
+
+test("a cli adapter child gets no secret variable, and {env:NAME} resolves only a declared name that is not a secret", async () => {
+  const set = { ANTHROPIC_API_KEY: "k1", SSH_AUTH_SOCK: "/s", DATABASE_URL: "db", DB_PASS: "p", CUVETTE_TEST_PLAIN: "plain", CUVETTE_TEST_OTHER: "other", CUVETTE_TEST_DECLARED_TOKEN: "tok" };
+  Object.assign(process.env, set);
+  try {
+    const code = "const k=['ANTHROPIC_API_KEY','SSH_AUTH_SOCK','DATABASE_URL','DB_PASS','CUVETTE_TEST_PLAIN','CUVETTE_TEST_OTHER','CUVETTE_TEST_DECLARED_TOKEN','A','B','C','D'];console.log(JSON.stringify({env:Object.fromEntries(k.map((x)=>[x,process.env[x]??null])),argv:process.argv.slice(1)}))";
+    const yaml = `${head("cli", `  pass_env: [CUVETTE_TEST_PLAIN, CUVETTE_TEST_DECLARED_TOKEN]\n  env: { A: "{env:CUVETTE_TEST_PLAIN}", B: "{env:CUVETTE_TEST_OTHER}", C: "{env:CUVETTE_TEST_DECLARED_TOKEN}", D: "{env:ANTHROPIC_API_KEY}" }\n`)}tools:
+  - name: show
+    description: Print the environment.
+    command: ["{node}", "-e", ${JSON.stringify(code)}, "{env:CUVETTE_TEST_PLAIN}", "{env:CUVETTE_TEST_OTHER}", "{env:CUVETTE_TEST_DECLARED_TOKEN}"]
+    parse: json
+`;
+    const { run } = await start(adapter(yaml));
+    const r = await run("show");
+    expect(r.ok).toBe(true);
+    const d = r.data as { env: Record<string, string | null>; argv: string[] };
+    expect(d.env).toEqual({ ANTHROPIC_API_KEY: null, SSH_AUTH_SOCK: null, DATABASE_URL: null, DB_PASS: null, CUVETTE_TEST_PLAIN: "plain", CUVETTE_TEST_OTHER: "other", CUVETTE_TEST_DECLARED_TOKEN: null, A: "plain", B: "", C: "", D: "" });
+    expect(d.argv).toEqual(["plain", "", ""]);
+  } finally {
+    for (const k of Object.keys(set)) delete process.env[k];
+  }
+});
+
+test("withoutSecrets removes the ssh agent socket, database URLs and names that end in _PASS", () => {
+  const out = withoutSecrets({ SSH_AUTH_SOCK: "a", DATABASE_URL: "b", DB_PASS: "c", MY_PASS: "d", PASSENGER: "e", PATH: "f" });
+  expect(out).toEqual({ PASSENGER: "e", PATH: "f" });
 });
 
 test("cli: failures", async () => {
@@ -494,6 +521,33 @@ def fine(): return {"ok": True, "metrics": {"n": 3}}
   expect(q).toMatchObject({ ok: false, error: "The fit did not converge", summary: "quiet failed: The fit did not converge." });
   expect((await run("fine")).summary).toBe("Fine tool finished. n=3.");
 }, 60000);
+
+test.skipIf(process.platform === "win32")("runProcess kills a background child of the group after a normal exit, and a child in a new session after a timeout", async () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const gone = async (pid: number) => {
+    const end = Date.now() + 2000;
+    while (alive(pid) && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
+    return !alive(pid);
+  };
+  const bg = await runProcess(["/bin/sh", "-c", "sleep 60 >/dev/null 2>&1 & echo $!"], { timeoutMs: 10_000 });
+  const bgPid = Number(bg.stdout.trim());
+  expect(bg.code).toBe(0);
+  expect(await gone(bgPid)).toBe(true);
+  const code = "const c=require('child_process').spawn('sleep',['60'],{stdio:'ignore',detached:true});console.log(c.pid);c.unref();setTimeout(()=>{},60000);";
+  const to = await runProcess([process.execPath, "-e", code], { timeoutMs: 1000 });
+  expect(to.timedOut).toBe(true);
+  const sessionPid = Number(to.stdout.trim());
+  const ok = await gone(sessionPid);
+  if (!ok) process.kill(sessionPid, "SIGKILL");
+  expect(ok).toBe(true);
+}, 20_000);
 
 test.skipIf(process.platform === "win32")("runProcess returns after the program exits, also if a child keeps the output open", async () => {
   const code = "const c=require('child_process').spawn('sleep',['30'],{stdio:'inherit',detached:true});console.log(c.pid);c.unref();";
