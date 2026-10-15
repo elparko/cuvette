@@ -48,6 +48,31 @@ test("a 0-to-1 float image is floating point, not 10-bit", async () => {
   expect(insp.summary).toContain("Size 64 x 64, 32-bit floating point.");
 });
 
+const tiff = (name: string, axes: string, shape: number[], extra = "") => {
+  const p = join(root, name);
+  execFileSync(scriptPython(), ["-I", "-c", `import sys, numpy, tifffile; a = (numpy.random.default_rng(1).random(${JSON.stringify(shape)}) * 500).astype('uint16'); tifffile.imwrite(sys.argv[1], a, metadata={'axes': '${axes}'}${extra})`, p]);
+  return p;
+};
+
+test("a TIFF with the axes CZYX keeps the channels, and a uint16 image with a low maximum is 16-bit", async () => {
+  const insp = await inspectData(tiff("czyx.ome.tif", "CZYX", [3, 2, 32, 32], ", ome=True"), join(root, "out"));
+  expect(insp.summary).toContain("has 3 channels");
+  expect(insp.summary).toContain("16-bit.");
+  expect(insp.summary).not.toContain("10-bit");
+});
+
+test("a multi-page TIFF with the axes IYX keeps the pages as channels", async () => {
+  const insp = await inspectData(tiff("iyx.tif", "IYX", [3, 32, 32]), join(root, "out"));
+  expect(insp.summary).toContain("has 3 channels");
+  expect(insp.summary).not.toContain("planes");
+});
+
+test("a TIFF with an axis that Cuvette cannot keep warns, and the summary makes no claim about a nuclear stain", async () => {
+  const insp = await inspectData(tiff("icyx.tif", "ICYX", [4, 2, 32, 32]), join(root, "out"));
+  expect(insp.summary).toContain("The file has 4 planes on the axis I. Cuvette read only the first plane of this axis.");
+  expect(insp.summary).not.toContain("no nuclear stain");
+});
+
 test("a CSV in Windows-1252 reads", async () => {
   const p = join(root, "latin.csv");
   writeFileSync(p, Buffer.from("group,dose\nµM low,1\ncafé,2\n", "latin1"));

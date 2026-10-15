@@ -296,7 +296,9 @@ export function parseCsv(text: string, sep = ",", notes?: CsvNotes): string[][] 
 }
 
 // An integer with more than 15 digits, such as a barcode, changes in a double. It stays text.
+// A value that is not finite as a number, and an integer with a capital E exponent such as the ID 5E3, stay text too.
 function exact(v: string): boolean {
+  if (!Number.isFinite(Number(v)) || /^\s*\d+E/.test(v)) return false;
   return /[.eE]/.test(v) || v.replace(/\D/g, "").length <= 15;
 }
 
