@@ -2741,7 +2741,7 @@ export class Session {
       return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
     });
     const home = [cuvetteHome(), realPath(cuvetteHome())];
-    const private_ = home.flatMap((h) => [join(h, "sessions"), join(h, "projects")]);
+    const private_ = home.flatMap((h) => [join(h, "sessions"), join(h, "projects"), join(h, "sessions-index")]);
     const indexed = (p: string) => home.some((h) => dirname(p) === h && basename(p).startsWith("sessions-index.json"));
     const ownRecord = realPath(this.dir).toLowerCase();
     const recordOf = (p: string) => {
