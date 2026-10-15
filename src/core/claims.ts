@@ -344,7 +344,9 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const last = record.entries(["assistant"]).at(-1);
   const answerEntry = last && last.data.text === text ? last.id : undefined;
   const unsourced = claims.filter((c) => c.label === "unsourced").length;
-  record.append("claim_check", { answerEntry, claims, unsourced });
+  const lastCheck = record.entries?.(["claim_check"]).at(-1)?.data;
+  const same = lastCheck && lastCheck.answerEntry === answerEntry && lastCheck.unsourced === unsourced && JSON.stringify(lastCheck.claims) === JSON.stringify(claims);
+  if (!same) record.append("claim_check", { answerEntry, claims, unsourced });
   return claims;
 }
 

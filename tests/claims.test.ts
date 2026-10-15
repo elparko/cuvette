@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -269,6 +269,22 @@ describe("checkAnswer inputs and small counts", () => {
     r.addNode({ entry: e.id, adapter: "", adapterVersion: "", programVersion: "", tool: "run_script", args: { code }, decisions: {}, codeHash: "", inputHashes: [], outputs, result: { ok: true, metrics: {} }, parents: [], summary: "", model: "m", manualRoute: "", fidelity: "none" });
     return r;
   }
+
+  test("the same answer checked again adds no claim_check entry, and a changed result adds one", () => {
+    const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-claims-")), "s1");
+    r.append("assistant", { text: "The mean is 7.5.", final: true });
+    checkAnswer("The mean is 7.5.", r);
+    const before = readFileSync(join(r.dir, "log.jsonl"), "utf8");
+    checkAnswer("The mean is 7.5.", r);
+    checkAnswer("The mean is 7.5.", r);
+    expect(r.entries(["claim_check"])).toHaveLength(1);
+    expect(readFileSync(join(r.dir, "log.jsonl"), "utf8")).toBe(before);
+    const e = r.append("tool_result", { tool: "t", ok: true, text: "done" });
+    r.addNode({ entry: e.id, adapter: "", adapterVersion: "", programVersion: "", tool: "t", args: {}, decisions: {}, codeHash: "", inputHashes: [], outputs: [], result: { ok: true, metrics: { mean: 7.5 } }, parents: [], summary: "", model: "m", manualRoute: "", fidelity: "exact" });
+    checkAnswer("The mean is 7.5.", r);
+    checkAnswer("The mean is 7.5.", r);
+    expect(r.entries(["claim_check"])).toHaveLength(2);
+  });
 
   test("a number that a script wrote to its output file is sourced with no read_file", () => {
     const r = scriptRun("import csv\npower = 0.8\nopen('power.csv','w').write(f'power,min_effect\\n{power},1.62\\n')", { "power.csv": "power,min_effect\n0.8,1.62\n" });
