@@ -23,15 +23,24 @@ export const CORRECTIONS = ["holm", "benjamini_hochberg", "not_part_of_analysis"
 
 const EXACT = /^(p|pvalue|p_value|pval|p_val)$/i;
 const SUFFIX = /(^|_)(p|pvalue|p_value)$/i;
-const NOT_A_TEST = /^(levene|ph_|shapiro|normality|bartlett|min_)|_(levene|shapiro|bartlett)/i;
+const NOT_A_TEST = /^(levene|ph_|shapiro|normality|bartlett|mauchly|min_)|_(levene|shapiro|bartlett|mauchly)|adjust/i;
+const TERM = /^p_(.+)$/i;
 const PATHISH = /\.(csv|tsv|txt|xlsx?|parquet|h5ad|fcs|json)$/i;
 
 export function pValueOf(metrics: Record<string, unknown> | undefined): number | undefined {
   if (!metrics) return undefined;
   const ok = (k: string) => typeof metrics[k] === "number" && (metrics[k] as number) >= 0 && (metrics[k] as number) <= 1;
   const keys = Object.keys(metrics).filter((k) => ok(k) && !NOT_A_TEST.test(k));
-  const key = keys.find((k) => EXACT.test(k)) ?? keys.find((k) => SUFFIX.test(k));
+  const key = keys.find((k) => EXACT.test(k)) ?? keys.find((k) => SUFFIX.test(k)) ?? keys.find((k) => k === "p_reported");
   return key === undefined ? undefined : (metrics[key] as number);
+}
+
+export function termPValuesOf(metrics: Record<string, unknown> | undefined): { term: string; p: number }[] {
+  if (!metrics || pValueOf(metrics) !== undefined) return [];
+  return Object.entries(metrics).flatMap(([k, v]) => {
+    const term = TERM.exec(k)?.[1];
+    return term && typeof v === "number" && v >= 0 && v <= 1 && !NOT_A_TEST.test(k) ? [{ term: term.replace(/_x_/g, " x ").replace(/_/g, " "), p: v }] : [];
+  });
 }
 
 function sourceOf(n: Node): string {
@@ -63,12 +72,13 @@ export function collectTests(record: AnalysisRecord): TestEntry[] {
     const step = steps.get(n.id);
     if (!step || record.replacedBy?.(n.id) || n.tool === "adjust_pvalues") continue;
     const result = n.result as { metrics?: Record<string, unknown>; data?: { test?: unknown } } | undefined;
-    const p = pValueOf(result?.metrics);
-    if (p === undefined) continue;
+    const single = pValueOf(result?.metrics);
+    const found = single !== undefined ? [{ term: "", p: single }] : termPValuesOf(result?.metrics);
+    if (!found.length) continue;
     const source = sourceOf(n);
     const name = typeof result?.data?.test === "string" && result.data.test ? result.data.test : n.tool.replace(/_/g, " ");
     const family = mode === "one_family" ? "all tests" : mode === "separate" ? `step ${step}` : source ? basename(source) : "no data file";
-    out.push({ node: n.id, step, test: name, tool: n.tool, source, p, family });
+    for (const f of found) out.push({ node: n.id, step, test: f.term ? `${name}: ${f.term}` : name, tool: n.tool, source, p: f.p, family });
   }
   return out;
 }
@@ -99,15 +109,15 @@ export function benjaminiHochberg(ps: number[]): number[] {
 
 export function testRows(record: AnalysisRecord): TestRow[] {
   const tests = collectTests(record);
-  const rows = new Map<string, TestRow>();
+  const rows = new Map<TestEntry, TestRow>();
   for (const family of new Set(tests.map((t) => t.family))) {
     const group = tests.filter((t) => t.family === family);
     const ps = group.map((t) => t.p);
     const h = holm(ps);
     const b = benjaminiHochberg(ps);
-    group.forEach((t, i) => rows.set(t.node, { ...t, size: group.length, holm: h[i], bh: b[i] }));
+    group.forEach((t, i) => rows.set(t, { ...t, size: group.length, holm: h[i], bh: b[i] }));
   }
-  return tests.map((t) => rows.get(t.node)!);
+  return tests.map((t) => rows.get(t)!);
 }
 
 const shortP = (p: number) => (p < 0.0001 ? p.toExponential(1) : String(Number(p.toPrecision(3))));

@@ -89,6 +89,17 @@ describe("collecting tests", () => {
     expect(collectTests(recordWith([n]))).toEqual([]);
   });
 
+  test("a repeated-measures ANOVA counts its ANOVA p value and not the sphericity p value", () => {
+    const n = { id: "n1", tool: "anova_repeated", args: { path: "/d/rm.csv" }, inputFiles: [{ path: "/d/rm.csv" }], result: { metrics: { p_uncorrected: 0.001, p_gg: 0.004, p_reported: 0.004, mauchly_W: 0.8, mauchly_p: 0.62 } } };
+    expect(collectTests(recordWith([n])).map((t) => t.p)).toEqual([0.004]);
+  });
+
+  test("each term of a factorial ANOVA is one test of the family", () => {
+    const n = { id: "n1", tool: "anova_factorial", args: { path: "/d/f.csv" }, inputFiles: [{ path: "/d/f.csv" }], result: { metrics: { F_drug: 9, p_drug: 0.01, p_dose: 0.03, p_drug_x_dose: 0.2, levene_p: 0.5 }, data: { test: "two-way ANOVA" } } };
+    const rows = testRows(recordWith([n]));
+    expect(rows.map((r) => [r.test, r.p, r.size])).toEqual([["two-way ANOVA: drug", 0.01, 3], ["two-way ANOVA: dose", 0.03, 3], ["two-way ANOVA: drug x dose", 0.2, 3]]);
+  });
+
   test("latestValue reads setup and decision entries", () => {
     const e = [
       { id: 1, kind: "setup", data: { values: { test_correction: "holm" } } },
