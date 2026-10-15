@@ -350,6 +350,7 @@ interface Walk {
   count: number;
   exceeded: boolean;
   outside: string[];
+  inLinks: string[];
 }
 
 function isExec(p: string): boolean {
@@ -370,7 +371,7 @@ function escapes(p: string, realKey: string): boolean {
 }
 
 function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, realKey: string): Walk {
-  const out: Walk = { files: [], count: 0, exceeded: false, outside: [] };
+  const out: Walk = { files: [], count: 0, exceeded: false, outside: [], inLinks: [] };
   let entries = 0;
   const visit = (d: string, depth: number) => {
     let names: string[];
@@ -395,6 +396,7 @@ function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, rea
       }
       if (l.isSymbolicLink()) {
         if (escapes(p, realKey)) out.outside.push(relative(key, p));
+        else out.inLinks.push(p);
         continue;
       }
       if (l.isDirectory()) {
@@ -489,19 +491,21 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
   const all = commands.map((c) => ({ argv: c, tokens: tokens(c, key), dynamic: DYNAMIC.test(c.join(" ")) }));
   const named: string[] = [];
   for (const c of all) for (const t of c.tokens) for (const b of t.base) named.push(resolve(b, t.word.replace(/[*?[\]{}].*$/, "")));
-  const roots = [outputRoot(key, userOutputFolder() ?? "cuvette")];
-  for (const l of layers) {
-    const v = typeof l.output_folder === "string" ? l.output_folder.trim() : "";
-    if (!v || isAbsolute(v) || /[\\/]/.test(v) || v === "." || v === "..") continue;
-    const root = resolve(key, v);
-    if (!named.some((n) => n === root || n.startsWith(root + sep))) roots.push(root);
+  const roots = [resolve(key, "cuvette")];
+  const userRoots: string[] = [];
+  const userValue = userOutputFolder();
+  if (userValue && !isAbsolute(userValue) && !userValue.split(/[\\/]/).includes("..") && resolve(key, userValue) !== key) {
+    const root = resolve(key, userValue);
+    if (!named.some((n) => n === root || n.startsWith(root + sep))) userRoots.push(root);
   }
+  const namedSet = new Set(named);
   const skip = (rel: string) => {
     const abs = resolve(key, rel);
     const parts = rel.split(sep);
     if (parts.some((part) => SKIPPED_DIR.test(part))) return true;
     if (parts[0] === ".git" && parts[1] !== "hooks") return true;
-    return roots.some((r) => abs === r || abs.startsWith(r + sep));
+    if (roots.some((r) => abs === r || abs.startsWith(r + sep))) return true;
+    return !namedSet.has(abs) && userRoots.some((r) => abs === r || abs.startsWith(r + sep));
   };
   const own = (d: string) => d !== key && !skip(relative(key, d));
   const link = (rel: string, real: string) => {
@@ -559,7 +563,17 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           const re = globRegex(relative(key, path).split(sep).join("/"));
           let matches = 0;
           const w = walkFiles(prefix, skip, key, realKey);
-          for (const f of w.files) {
+          if (w.exceeded) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
+          for (const o of w.outside) {
+            if (!re.test(o.split(sep).join("/"))) continue;
+            result.linked.push(o);
+            try {
+              result.linkText[o] = realpathSync(resolve(key, o));
+            } catch {
+              result.linkText[o] = "unreadable";
+            }
+          }
+          for (const f of [...w.files, ...w.inLinks]) {
             if (matches >= GLOB_CAP) break;
             if (re.test(relative(key, f).split(sep).join("/"))) {
               matches++;
@@ -570,7 +584,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           continue;
         }
         let target = path;
-        if (!existsSync(target) && t.allowed) {
+        if (!existsSync(target)) {
           const ext = NODE_EXT.find((e) => existsSync(path + e));
           if (ext) target = path + ext;
         }
