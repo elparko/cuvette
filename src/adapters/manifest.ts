@@ -438,8 +438,9 @@ export function findAdapter(nameOrPath: string, cwd = process.cwd(), opts: { byN
     if (!Object.hasOwn(dirs, nameOrPath)) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
     return loadAdapter(dirs[nameOrPath]);
   }
-  const inProject = [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
-  if (existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
+  const pathForm = isAbsolute(nameOrPath) || /[\\/]/.test(nameOrPath) || nameOrPath.startsWith(".");
+  const inProject = pathForm && [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
+  if (pathForm && existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
   if (inProject) nameOrPath = basename(resolve(nameOrPath));
   const dirs = adapterDirs(cwd);
   const dir = dirs[nameOrPath];

@@ -420,15 +420,16 @@ export class Session {
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
     try {
-      const known = new Set(Object.values(adapterDirs(cwd)).map((d) => realpathSync(d)));
+      const dirs = adapterDirs(cwd);
+      const known = new Set(Object.values(dirs).map((d) => realpathSync(d)));
       const guarded = [cwd, place.recordDir, place.outDir].filter((d): d is string => !!d && existsSync(d)).map((d) => realpathSync(d));
       const inGuarded = (path: string) => guarded.some((d) => realpathSync(path) === d || realpathSync(path).startsWith(d + sep));
-      const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : name);
+      const refOf = (name: string, path?: string) => (path && existsSync(path) && (known.has(realpathSync(path)) || !inGuarded(path)) ? path : dirs[name] ?? name);
       adapters =
         opts.adapters ??
         [...recorded].map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
           try {
-            findAdapter(ref, cwd, { byName: ref === name });
+            findAdapter(ref, cwd, { byName: ref === name && !dirs[name] });
             return true;
           } catch (e) {
             if (!(e as Error).message.startsWith("no adapter named")) throw e;

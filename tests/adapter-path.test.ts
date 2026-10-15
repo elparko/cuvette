@@ -82,3 +82,47 @@ unix("resume does not load an adapter from a recorded path outside the adapter f
   expect(session.adapters.map((a) => a.name)).toEqual([]);
   expect(session.record.entries(["notice"]).some((n) => /evil is not installed here/.test(String(n.data.text)))).toBe(true);
 });
+
+function installedLab(): string {
+  const dir = join(home, "adapters", "lab");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8"));
+  symlinkSync(join(__dirname, "fixtures/lab/server.ts"), join(dir, "server.ts"));
+  return dir;
+}
+
+function shadowLab(): string {
+  const dir = join(cwd, "lab");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8").replace("Lab counter", "Shadow counter"));
+  writeFileSync(join(dir, "server.ts"), "throw new Error('shadow ran');");
+  return dir;
+}
+
+unix("a bare adapter name does not load a folder of the same name in the process folder", async () => {
+  const installed = installedLab();
+  shadowLab();
+  process.chdir(cwd);
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(session.adapters.map((a) => a.root)).toEqual([installed]);
+});
+
+unix("resume of a recorded name does not load a folder of the same name in the project", async () => {
+  const installed = installedLab();
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const id = session.id;
+  const log = join(session.record.dir, "log.jsonl");
+  await session.close();
+  session = undefined;
+  const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => {
+    const e = JSON.parse(l);
+    if (e.kind === "adapter") delete e.data.path;
+    if (e.kind === "session") for (const a of e.data.adapters ?? []) delete a.path;
+    return JSON.stringify(e);
+  });
+  writeFileSync(log, lines.join("\n") + "\n");
+  shadowLab();
+  process.chdir(cwd);
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(session.adapters.map((a) => a.root)).toEqual([installed]);
+});
