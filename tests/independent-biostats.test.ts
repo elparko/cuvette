@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { openAdapter, programOf, rJson, type OpenAdapter } from "./independent.ts";
+import { CATALOG, openAdapter, programOf, pyJson, rJson, type OpenAdapter } from "./independent.ts";
 
 const python = await programOf("biostats");
 const rscript = await programOf("vegan");
@@ -243,5 +243,30 @@ describe.skipIf(!python)("biostats chi-square effect size", () => {
     const plain = await stats.run("chi_square_test", { counts, correction: false });
     expect(yates.metrics.chi2).toBeLessThan(plain.metrics.chi2);
     close(yates.metrics.cramers_v, plain.metrics.cramers_v);
+  });
+});
+
+describe.skipIf(!python)("biostats p value adjustment with a missing p value", () => {
+  test("a missing p value is not a test and keeps its place in the output", { timeout: slow }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-biostats-adjust-"));
+    try {
+      const out = await pyJson<{ n_tests: number; adjusted: (number | null)[] }>(
+        python!,
+        `import os, sys, math
+sys.path.insert(0, ${JSON.stringify(join(CATALOG, "biostats"))})
+os.chdir(${JSON.stringify(dir)})
+import ga_biostats
+r = ga_biostats.adjust_pvalues([0.01, 0.02, float("nan"), 0.04], "holm")
+print(json.dumps({"n_tests": r["metrics"]["n_tests"], "adjusted": [None if v is None else v for v in [row[1] for row in r["table"]["rows"]]]}))`,
+        dir,
+      );
+      expect(out.n_tests).toBe(3);
+      close(out.adjusted[0]!, 0.03);
+      close(out.adjusted[1]!, 0.04);
+      expect(out.adjusted[2]).toBeNull();
+      close(out.adjusted[3]!, 0.04);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

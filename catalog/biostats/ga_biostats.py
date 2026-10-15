@@ -305,12 +305,18 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
 def adjust_pvalues(pvalues, method="holm", alpha=0.05):
     from statsmodels.stats.multitest import multipletests
     p = np.asarray(pvalues, dtype=float)
-    reject, adjusted, _, _ = multipletests(p, alpha=alpha, method=method)
+    valid = ~np.isnan(p)
+    adjusted = np.full(len(p), np.nan)
+    reject = np.zeros(len(p), dtype=bool)
+    if valid.any():
+        reject[valid], adjusted[valid], _, _ = multipletests(p[valid], alpha=alpha, method=method)
     frame = pd.DataFrame({"p_raw": p, "p_adjusted": adjusted, "reject": reject})
+    skipped = int((~valid).sum())
+    note = " %d missing p-values were left out of the count." % skipped if skipped else ""
     return {
         "ok": True,
-        "summary": "%s correction of %d p-values at alpha %g: %d rejected." % (method, len(p), alpha, int(reject.sum())),
-        "metrics": _metrics({"n_tests": len(p), "n_rejected": int(reject.sum())}),
+        "summary": "%s correction of %d p-values at alpha %g: %d rejected.%s" % (method, int(valid.sum()), alpha, int(reject.sum()), note),
+        "metrics": _metrics({"n_tests": int(valid.sum()), "n_rejected": int(reject.sum())}),
         "table": _table(frame, "adjusted_p"),
     }
 
