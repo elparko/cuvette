@@ -35,7 +35,15 @@ const LOCK = "open.json";
 const START_SLACK_MS = 5000;
 
 export function processStart(pid: number): number | undefined {
-  if (process.platform === "win32") return undefined;
+  if (process.platform === "win32") {
+    try {
+      const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `[DateTimeOffset]::new((Get-Process -Id ${Math.trunc(pid)}).StartTime).ToUnixTimeMilliseconds()`], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"], windowsHide: true }).trim();
+      const t = Number(out);
+      return Number.isFinite(t) && t > 0 ? t : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   try {
     const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", timeout: 3000, env: { ...process.env, LC_ALL: "C" }, stdio: ["ignore", "pipe", "ignore"] }).trim();
     const t = Date.parse(out);
