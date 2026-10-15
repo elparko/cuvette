@@ -4780,9 +4780,9 @@ export class Session {
     this.interrupt();
     await this.titling?.catch(() => {});
     await this.starting.catch(() => {});
-    this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
     if (this.record.entries().every((e) => e.kind === "session" || e.kind === "notice")) discardPlace(this.place);
+    this.releaseLock();
   }
 }
 

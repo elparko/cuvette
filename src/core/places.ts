@@ -196,7 +196,9 @@ export function discardPlace(p: Place): void {
   try {
     if (readdirSync(p.outDir).some((n) => n !== ".record")) return;
     rmSync(p.outDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    if (existsSync(p.outDir)) return;
+  }
   removeIndexRow(p.id);
 }
 

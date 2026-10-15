@@ -1,12 +1,24 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vitest";
-import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { COPY_LIMIT_BYTES, discardPlace, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { trustFolder } from "../src/core/trust.ts";
+
+const lockAtDiscard: boolean[] = [];
+vi.mock("../src/core/places.ts", async (original) => {
+  const real = await original<typeof import("../src/core/places.ts")>();
+  return {
+    ...real,
+    discardPlace: (p: import("../src/core/places.ts").Place) => {
+      lockAtDiscard.push(existsSync(join(p.recordDir, "open.json")));
+      real.discardPlace(p);
+    },
+  };
+});
 
 let session: Session | undefined;
 let home = "";
@@ -252,4 +264,28 @@ test("a session with a request keeps its folder and index row after it closes", 
   session = undefined;
   expect(readIndex().map((r) => r.id)).toEqual([id]);
   expect(findPlace(id, { cwd })?.id).toBe(id);
+});
+
+test("a close holds the session lock while it removes the empty folder", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  lockAtDiscard.length = 0;
+  await session.close();
+  session = undefined;
+  expect(lockAtDiscard).toEqual([true]);
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("the index row stays when the empty folder cannot be removed", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const place = findPlace(session.id, { cwd })!;
+  const parent = join(place.outDir, "..");
+  chmodSync(parent, 0o500);
+  try {
+    expect(() => discardPlace(place)).not.toThrow();
+    expect(existsSync(place.outDir)).toBe(true);
+    expect(readIndex().map((r) => r.id)).toEqual([session.id]);
+  } finally {
+    chmodSync(parent, 0o700);
+  }
 });
