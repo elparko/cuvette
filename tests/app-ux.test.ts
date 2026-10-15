@@ -125,6 +125,27 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.eval(`Date.now = window.__realNow`);
   });
 
+  test("the old page ignores card keys for 400 ms after a card opens and keeps the focus in the message box", async () => {
+    await page.go(`${url}&ui=old`);
+    expect(await until(page, `document.querySelector("#cards [data-card]")`)).toBe(true);
+    await page.eval(MOCK);
+    await page.eval(`window.__mocks.push({ part: "api/", reply: () => ({ body: { ok: true } }) }); window.__calls = []`);
+    const card = `document.querySelector("#cards [data-card]")`;
+    await page.eval(`${card}.tabIndex = -1; ${card}.focus(); cardAt = Date.now()`);
+    const enter = () => page.eval(`${card}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
+    const acts = () => page.eval<number>(`window.__calls.filter((c) => c.url.includes("api/") && c.body).length`);
+    await enter();
+    expect(await acts()).toBe(0);
+    await page.eval(`cardAt -= 500`);
+    await enter();
+    expect(await until(page, `window.__calls.some((c) => c.url.includes("api/") && c.body)`)).toBe(true);
+    await page.eval(`document.querySelector("#msg").focus(); cardEl = null; focusCard()`);
+    expect(await page.eval(`document.activeElement === document.querySelector("#msg")`)).toBe(true);
+    await page.go(url);
+    expect(await until(page, `document.querySelector('[data-card][data-type="question"]')`)).toBe(true);
+    await page.eval(MOCK);
+  });
+
   test("card keys: Enter on a focused card button is that button, arrows move the focus, Enter in Other answers", async () => {
     const q = `document.querySelector('[data-card][data-type="question"]')`;
     const key = (k: string) => page.eval<boolean>(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
