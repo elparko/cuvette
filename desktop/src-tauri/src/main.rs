@@ -55,8 +55,16 @@ fn decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+fn from_core(window: &WebviewWindow) -> Result<(), String> {
+    match window.url() {
+        Ok(url) if is_core(window.app_handle(), &url) => Ok(()),
+        _ => Err("The Cuvette core is not running.".into()),
+    }
+}
+
 #[tauri::command]
 async fn choose_folder(window: WebviewWindow, start: Option<String>) -> Option<String> {
+    from_core(&window).ok()?;
     let mut d = window.dialog().file().set_parent(&window).set_title("Choose the folder with your data");
     if let Some(s) = start.filter(|s| Path::new(s).is_dir()) {
         d = d.set_directory(s);
@@ -66,17 +74,20 @@ async fn choose_folder(window: WebviewWindow, start: Option<String>) -> Option<S
 }
 
 #[tauri::command]
-fn reveal(app: AppHandle, path: String) -> Result<(), String> {
+fn reveal(app: AppHandle, window: WebviewWindow, path: String) -> Result<(), String> {
+    from_core(&window)?;
     app.opener().reveal_item_in_dir(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+fn notify(app: AppHandle, window: WebviewWindow, title: String, body: String) -> Result<(), String> {
+    from_core(&window)?;
     app.notification().builder().title(title).body(body).show().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn save_file(window: WebviewWindow, request: Request<'_>) -> Result<Option<String>, String> {
+    from_core(&window)?;
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err("The file data is missing.".into());
     };

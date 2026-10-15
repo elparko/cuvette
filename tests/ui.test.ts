@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { ALWAYS_SCOPE, NO_ALWAYS, cardFromEvent, cardId, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { ALWAYS_SCOPE, NO_ALWAYS, cardFromEvent, cardId, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, respondPermission, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { failureText, problemOf } from "../src/ui/commands.ts";
@@ -53,6 +53,23 @@ describe("the always allow choice", () => {
   test("shows the scope in the card text for other tools", () => {
     expect(view("run_script").always).toBe(true);
     expect(view("run_script").touches).toContain("Always allow: this session only.");
+  });
+});
+
+describe("the always allow answer", () => {
+  const sent = (tool: string) => {
+    const calls: unknown[][] = [];
+    const session = { respondPermission: (...a: unknown[]) => calls.push(a) } as never;
+    respondPermission(session, { t: "permission", rid: "r1", tool, args: {}, touches: "files" }, { ok: true, always: true });
+    return calls[0];
+  };
+
+  test("does not reach the session for run_command", () => {
+    expect(sent("run_command")).toEqual(["r1", true]);
+  });
+
+  test("reaches the session for run_script", () => {
+    expect(sent("run_script")).toEqual(["r1", true, "", true]);
   });
 });
 

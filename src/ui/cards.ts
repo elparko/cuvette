@@ -156,7 +156,7 @@ export type PermissionChoice = { ok: true; always?: boolean } | { ok: false; not
 
 export function respondPermission(session: SessionLike, card: Extract<Card, { t: "permission" }>, c: PermissionChoice): void {
   if ("stop" in c) return session.interrupt();
-  if (c.ok) session.respondPermission(card.rid, true, ...((c.always ? ["", true] : []) as [string?, boolean?]));
+  if (c.ok) session.respondPermission(card.rid, true, ...((c.always && !NO_ALWAYS.has(card.tool) ? ["", true] : []) as [string?, boolean?]));
   else session.respondPermission(card.rid, false, c.note);
 }
 

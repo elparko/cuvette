@@ -1,6 +1,7 @@
 name: release
 
 # The secret NPM_TOKEN must exist in the repository settings.
+# The jobs run in this order: check, desktop, publish. The publish job does not start if the desktop build fails.
 # The desktop build is unsigned until a signing certificate exists.
 # A tag that starts with v starts this workflow. Example: v0.1.0.
 
@@ -9,7 +10,26 @@ on:
     tags: ["v*"]
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Check that the tag matches the versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          for file in package.json desktop/src-tauri/tauri.conf.json; do
+            version=$(node -p "require('./$file').version")
+            if [ "$version" != "$tag" ]; then
+              echo "::error::The tag is $GITHUB_REF_NAME but $file has version $version. Make them equal."
+              exit 1
+            fi
+          done
+
   publish:
+    needs: desktop
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,19 +41,13 @@ jobs:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
-      - name: Check that the tag matches the versions
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          for file in package.json desktop/src-tauri/tauri.conf.json; do
-            version=$(node -p "require('./$file').version")
-            if [ "$version" != "$tag" ]; then
-              echo "::error::The tag is $GITHUB_REF_NAME but $file has version $version. Make them equal."
-              exit 1
-            fi
-          done
       - run: npm ci
       - run: npm run ui:build
       - run: npm run build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: disk-image
+          path: desktop-image
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:
@@ -41,15 +55,15 @@ jobs:
       - name: Create the release
         run: |
           tarball=$(npm pack --silent)
-          gh release create "$GITHUB_REF_NAME" "$tarball" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release create "$GITHUB_REF_NAME" "$tarball" desktop-image/*.dmg --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   desktop:
-    needs: publish
+    needs: check
     runs-on: macos-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -69,7 +83,8 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - run: npm ci
       - run: npm run desktop:build
-      - name: Upload the disk image
-        run: gh release upload "$GITHUB_REF_NAME" desktop/build/*.dmg
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: disk-image
+          path: desktop/build/*.dmg
+          if-no-files-found: error

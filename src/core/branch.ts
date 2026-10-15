@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, linkSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { branchPlace, inProject, placeAt, type Place } from "./places.ts";
-import { AnalysisRecord } from "./record.ts";
+import { AnalysisRecord, isTempOrDamaged } from "./record.ts";
 import { changeCell, currentNodes, num, numbersOf } from "./status.ts";
 
 export interface BranchSource {
@@ -50,7 +50,7 @@ export function branchSession(s: BranchSource, name: string, upTo?: number): { p
   writeFileSync(join(child.recordDir, "log.jsonl"), lines.length ? lines.join("\n") + "\n" : "", { mode: 0o600 });
   const rec = openRecord(child);
   for (const f of existsSync(s.record.blobDir) ? readdirSync(s.record.blobDir) : []) {
-    if (f.startsWith(".tmp-") || f.includes(".damaged-")) continue;
+    if (isTempOrDamaged(f)) continue;
     const from = join(s.record.blobDir, f);
     const to = join(rec.blobDir, f);
     if (existsSync(to)) continue;
