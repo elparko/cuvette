@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -116,6 +116,28 @@ describe("claude", () => {
       expect(rows[0]!.usd).toBeCloseTo((1000 * 4 + 20) / 1e6, 9);
     } finally {
       server.close();
+    }
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a spend record that cannot be written keeps the reply", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-spend-ro-"));
+    chmodSync(dir, 0o500);
+    vi.stubEnv("CUVETTE_SPEND_FILE", join(dir, "sub", "spend.jsonl"));
+    const server = createServer((_rq, rs) => {
+      rs.writeHead(200, { "content-type": "application/json" });
+      rs.end(JSON.stringify({ id: "m", type: "message", role: "assistant", model: "claude-opus-5-5", content: [{ type: "text", text: "kept" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 5, output_tokens: 5 } }));
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    vi.stubEnv("ANTHROPIC_BASE_URL", `http://127.0.0.1:${(server.address() as { port: number }).port}`);
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const p = new ClaudeProvider("claude-opus-5-5", { apiKey: "sk-ant-api03-" + "x".repeat(90), sleep: async () => {} });
+      expect(await p.complete("S", "T")).toBe("kept");
+      expect(write.mock.calls.some((c) => String(c[0]).includes("spend record"))).toBe(true);
+    } finally {
+      write.mockRestore();
+      server.close();
+      chmodSync(dir, 0o700);
     }
   });
 
@@ -786,7 +808,9 @@ describe("openai", () => {
   });
 
   test("the key goes only over https or to this computer, and a key in a server error is removed", async () => {
-    expect(keySafe("https://api.example.org/v1")).toBe(true);
+    expect(keySafe("https://api.openai.com/v1")).toBe(true);
+    expect(keySafe("https://api.example.org/v1")).toBe(false);
+    expect(keySafe("https://10.evil.example.com/v1")).toBe(false);
     expect(keySafe("http://localhost:1234/v1")).toBe(true);
     expect(keySafe("http://192.168.1.5:8000/v1")).toBe(false);
     vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
@@ -799,9 +823,50 @@ describe("openai", () => {
     const e = await lan.step(req([user("q")])).catch((x: Error) => x);
     expect(headers.authorization).toBeUndefined();
     expect((e as Error).message).not.toContain("sk-test-0123456789abcdef0123");
-    const remote = await makeProvider("openai:https://api.example.org/v1|m");
+    const other = await makeProvider("openai:https://api.example.org/v1|m");
+    await other.step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBeUndefined();
+    const remote = await makeProvider("openai:https://api.openai.com/v1|m");
     await remote.step(req([user("q")])).catch(() => {});
     expect(headers.authorization).toBe("Bearer sk-test-0123456789abcdef0123");
+  });
+
+  test("a host in the openai_key_hosts user setting gets the key, and a host outside it does not", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
+    const home = mkdtempSync(join(tmpdir(), "cuvette-keyhosts-"));
+    vi.stubEnv("CUVETTE_HOME", home);
+    writeFileSync(join(home, "settings.json"), JSON.stringify({ openai_key_hosts: ["Models.Azure-Test.example"] }));
+    expect(keySafe("https://models.azure-test.example/v1")).toBe(true);
+    expect(keySafe("http://models.azure-test.example/v1")).toBe(false);
+    expect(keySafe("https://other.azure-test.example/v1")).toBe(false);
+    const project = mkdtempSync(join(tmpdir(), "cuvette-keyhosts-proj-"));
+    mkdirSync(join(project, ".cuvette"));
+    writeFileSync(join(project, ".cuvette", "settings.json"), JSON.stringify({ openai_key_hosts: ["evil.example"] }));
+    expect(keySafe("https://evil.example/v1")).toBe(false);
+    let headers: Record<string, string> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: any) => {
+      headers = init.headers;
+      return new Response("{}", { status: 400 });
+    });
+    await (await makeProvider("openai:https://models.azure-test.example/v1|m")).step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBe("Bearer sk-test-0123456789abcdef0123");
+    await (await makeProvider("openai:https://other.azure-test.example/v1|m")).step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBeUndefined();
+  });
+
+  test("a key that is not sent gives one notice", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 400 }));
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const p = await makeProvider("openai:https://models.notice-test.example/v1|m");
+      await p.step(req([user("q")])).catch(() => {});
+      await p.step(req([user("q")])).catch(() => {});
+      const told = write.mock.calls.filter((c) => String(c[0]).includes("did not send OPENAI_API_KEY"));
+      expect(told).toHaveLength(1);
+    } finally {
+      write.mockRestore();
+    }
   });
 
   test("chat completions with tool calls, bad JSON, reasoning, auth header", async () => {

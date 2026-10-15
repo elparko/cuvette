@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { harnessWrite } from "./harness-writes.ts";
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { ensureHome } from "./atomic.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { plainText } from "./plain.ts";
 import { outputRoot } from "./places.ts";
@@ -901,7 +902,7 @@ function writeTrusted(list: TrustEntry[]): void {
   const data = readUser();
   if (list.length) data.trusted_folders = list;
   else delete data.trusted_folders;
-  mkdirSync(dirname(userFile()), { recursive: true });
+  ensureHome();
   harnessWrite(userFile(), () => writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n"));
 }
 

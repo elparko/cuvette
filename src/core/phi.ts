@@ -1,6 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { ensureHome } from "./atomic.ts";
 import { harnessWrite } from "./harness-writes.ts";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { assertUserFileSound, folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
@@ -267,6 +268,7 @@ function delimited(text: string): { columns: string[]; rows: string[][]; lines: 
   const rows: string[][] = [];
   const at: number[] = [];
   const quotes = (l: string) => l.split('"').length - 1;
+  let afterBlank = false;
   for (let i = start + 1; i < lines.length; i++) {
     const first = i;
     let l = lines[i]!;
@@ -282,7 +284,12 @@ function delimited(text: string): { columns: string[]; rows: string[][]; lines: 
       l = lines[i]!;
       r = splitRow(l, d);
     }
-    if (!l.trim() || Math.abs(r.length - columns.length) > 1) break;
+    if (!l.trim()) {
+      afterBlank = true;
+      continue;
+    }
+    if (afterBlank && (!l.includes(d) || l.startsWith("Note: "))) break;
+    if (Math.abs(r.length - columns.length) > 1) continue;
     rows.push(r);
     at.push(first + 1);
   }
@@ -509,10 +516,18 @@ export function isCloud(info: Pick<ModelInfo, "provider"> & { local?: boolean })
   return info.local === false || (info.local === undefined && info.provider === "claude");
 }
 
+function privateAddress(h: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (!m) return false;
+  const [a, b, c, d] = m.slice(1).map(Number) as [number, number, number, number];
+  if ([a, b, c, d].some((n) => n > 255)) return false;
+  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
 export function localUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname;
-    return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1" || h === "[::1]" || h === "::" || h === "[::]" || h.endsWith(".local") || /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h);
+    return h === "localhost" || h === "0.0.0.0" || h === "::1" || h === "[::1]" || h === "::" || h === "[::]" || h.endsWith(".local") || privateAddress(h);
   } catch {
     return false;
   }
@@ -550,7 +565,7 @@ export function setFolderNoPatientData(folder: string, on: boolean): void {
   if (on) list.push(k);
   if (list.length) data[NO_PHI_KEY] = list;
   else delete data[NO_PHI_KEY];
-  mkdirSync(dirname(userFile()), { recursive: true });
+  ensureHome();
   harnessWrite(userFile(), () => writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n"));
 }
 
