@@ -20,6 +20,7 @@
  "data/synthetic_ctl2.fcs": {"sha256":"29f34e539fb0017480791fcda5dd654788a06e5e7b8cd24bbf98ead0cbd8b5f5","bytes":32625},
  "data/synthetic_ctl3.fcs": {"sha256":"9faf8d29bfddd9956dc0ced532a892ed324d1ef54c752c676c162ce08037d885","bytes":32625},
  "data/synthetic_design.csv": {"sha256":"c9d90dc9d94d51371990097f4c3f865327be04f4de749e97e25ccb20b3c037e6","bytes":127},
+ "data/synthetic_design_without_trt3.csv": {"sha256":"4404bbef7291985905e59b1d4ecbce07289193b87934f5da48c23a772c41427b","bytes":108},
  "data/synthetic_trt1.fcs": {"sha256":"681ccfe0e996295b5569c665213c40e70fb6a244422abbfc82e7a7ba1a6eba79","bytes":32625},
  "data/synthetic_trt2.fcs": {"sha256":"700c7d0eb40a46159c1cc21c0b62a24b925a516d372725b410a108fa8a2dcc46","bytes":32625},
  "data/synthetic_trt3.fcs": {"sha256":"0bb1b5b0386a07484cac42ef3ee085746e3179f47dafb72d4eaba86b8883dfd2","bytes":32625},
