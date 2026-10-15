@@ -229,6 +229,11 @@ describe("fuzz: the trust card", () => {
     expect(oneLine("plain text")).toBe("plain text");
   });
 
+  test("a Windows path with backslashes shows with no quotes and no doubled backslashes", () => {
+    expect(oneLine("C:\\Users\\lab\\data")).toBe("C:\\Users\\lab\\data");
+    expect(oneLine("C:\\lab\\a\nb")).toBe('"C:\\\\lab\\\\a\\nb"');
+  });
+
   test("a hook, a setting value, a method or an adapter with hidden text shows that text, written out", () => {
     const r = new Rng(45001);
     for (let i = 0; i < runs(80); i++) {

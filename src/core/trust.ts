@@ -662,7 +662,7 @@ export function labDisplayText(text: string): string {
 
 export function oneLine(text: string): string {
   const t = labDisplayText(text);
-  return t.includes("\n") || t.includes("\\") || t.startsWith('"') ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
+  return t !== text || t.includes("\n") || t.startsWith('"') ? `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"` : t;
 }
 
 export const LAB_MAX_BYTES = 64 * 1024;
