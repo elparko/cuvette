@@ -115,16 +115,17 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
 export const ENV_KEY_WARNING = "This shell also has ANTHROPIC_API_KEY. Cuvette uses that one first.";
 
 export function antLogin(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.ANTHROPIC_AUTH_TOKEN) return true;
   const root = env.ANTHROPIC_CONFIG_DIR || (process.platform === "win32" ? (env.APPDATA ? join(env.APPDATA, "Anthropic") : env.USERPROFILE ? join(env.USERPROFILE, "AppData", "Roaming", "Anthropic") : "") : env.XDG_CONFIG_HOME ? join(env.XDG_CONFIG_HOME, "anthropic") : env.HOME ? join(env.HOME, ".config", "anthropic") : "");
-  if (!root) return false;
   let profile = env.ANTHROPIC_PROFILE;
-  if (!profile) {
+  if (!profile && root) {
     try {
       profile = readFileSync(join(root, "active_config"), "utf8").trim();
     } catch {}
   }
   profile ||= "default";
-  return /^[\w.-]+$/.test(profile) && existsSync(join(root, "credentials", `${profile}.json`));
+  if (root && /^[\w.-]+$/.test(profile) && existsSync(join(root, "configs", `${profile}.json`))) return true;
+  return !!(env.ANTHROPIC_FEDERATION_RULE_ID && env.ANTHROPIC_ORGANIZATION_ID);
 }
 
 function write(values: Record<string, unknown>): string {

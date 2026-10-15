@@ -638,3 +638,8 @@ test("the Masker with more than 1000 values gives the same text as with few valu
 test("localUrl treats 0.0.0.0 as local", () => {
   expect(localUrl("http://0.0.0.0:11434")).toBe(true);
 });
+
+test("localUrl treats the IPv6 any address as local", () => {
+  expect(localUrl("http://[::]:11434")).toBe(true);
+  expect(localUrl("http://[::1]:11434")).toBe(true);
+});

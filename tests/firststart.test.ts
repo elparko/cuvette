@@ -94,8 +94,11 @@ test("a login from ant auth login counts as a credential, so the first start is 
   const env = { ANTHROPIC_CONFIG_DIR: cfg };
   expect(antLogin(env)).toBe(false);
   expect(needsFirstStart({ cwd, env })).toBe(true);
+  mkdirSync(join(cfg, "configs"), { recursive: true });
   mkdirSync(join(cfg, "credentials"), { recursive: true });
   writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(antLogin(env)).toBe(false);
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   expect(antLogin(env)).toBe(true);
   expect(needsFirstStart({ cwd, env })).toBe(false);
   expect(needsFirstSetup("claude", env)).toBe(false);
@@ -103,10 +106,19 @@ test("a login from ant auth login counts as a credential, so the first start is 
   expect(antLogin({ ...env, ANTHROPIC_PROFILE: "work" })).toBe(false);
   writeFileSync(join(cfg, "active_config"), "work\n");
   expect(antLogin(env)).toBe(false);
-  writeFileSync(join(cfg, "credentials", "work.json"), "{}");
+  writeFileSync(join(cfg, "configs", "work.json"), "{}");
   expect(antLogin(env)).toBe(true);
   expect(antLogin({ ...env, ANTHROPIC_PROFILE: "../x" })).toBe(false);
   expect(needsFirstStart({ cwd, env: { ...env, ANTHROPIC_PROFILE: "other" } })).toBe(true);
+});
+
+test("antLogin also accepts ANTHROPIC_AUTH_TOKEN and environment federation, as the SDK does", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  const env = { ANTHROPIC_CONFIG_DIR: cfg };
+  expect(antLogin(env)).toBe(false);
+  expect(antLogin({ ...env, ANTHROPIC_AUTH_TOKEN: "tok" })).toBe(true);
+  expect(antLogin({ ...env, ANTHROPIC_FEDERATION_RULE_ID: "r" })).toBe(false);
+  expect(antLogin({ ...env, ANTHROPIC_FEDERATION_RULE_ID: "r", ANTHROPIC_ORGANIZATION_ID: "o" })).toBe(true);
 });
 
 test("choose Claude warns when ANTHROPIC_API_KEY is set, because that key wins", async () => {
@@ -121,7 +133,7 @@ test("the key card does not show for a user of ant auth login", () => {
   const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-card-"));
   const session = { model: { provider: "claude" }, questions: { open: () => [] } } as never;
   expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg }).map((c) => c.t)).toEqual(["key"]);
-  mkdirSync(join(cfg, "credentials"), { recursive: true });
-  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  mkdirSync(join(cfg, "configs"), { recursive: true });
+  writeFileSync(join(cfg, "configs", "default.json"), "{}");
   expect(startCards(session, { ANTHROPIC_CONFIG_DIR: cfg })).toEqual([]);
 });

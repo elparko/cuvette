@@ -72,6 +72,8 @@ run_tool(function() {
   g <- if (is.null(group_col)) rep("all", nrow(df)) else as.character(df[[group_col]])
   ok <- is.finite(x) & is.finite(y) & x >= 0
   dropped <- sum(!ok)
+  negative <- sum(is.finite(x) & is.finite(y) & x < 0)
+  empty <- dropped - negative
   d <- data.frame(x = x[ok], y = y[ok], g = g[ok], stringsAsFactors = FALSE)
   groups <- unique(d$g)
   rows <- list(); fits <- list(); metrics <- list(); warns <- character()
@@ -140,7 +142,8 @@ run_tool(function() {
   per <- paste(sprintf("%s: %s %.4g%s (%g%% CI %.4g to %.4g), Hill slope %.3g, bottom %.4g, top %.4g", res$group, name, res$ic50, u, 100 * (1 - alpha), res$ci_low, res$ci_high, res$hill_slope, res$bottom, res$top), collapse = "; ")
   emit(list(
     ok = TRUE,
-    summary = sprintf("%s fit, %s %s, %s CI, weighting %s. %s%s%s", model, ic50_type, name, ci, weighting, per,
+    summary = sprintf("%s fit, %s %s, %s CI, weighting %s. %s%s%s%s", model, ic50_type, name, ci, weighting, per,
+      if (dropped) sprintf(". Rows left out: %d (%d with a negative dose, %d with a missing dose or response)", dropped, negative, empty) else "",
       if (!is.null(test)) sprintf(". Shared %s test: F %.3g on %d and %d df, p %.3g", name, test$F, test$df1, test$df2, test$p) else "",
       if (length(warns)) paste0(". Warnings: ", paste(warns, collapse = "; ")) else ""),
     metrics = metrics,

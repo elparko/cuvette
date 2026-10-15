@@ -12,13 +12,22 @@ EIGHT = np.ones((3, 3), dtype=int)
 _loaded = {}
 
 
-def _read(path):
+def _read(path, notes=None):
     p = Path(path)
     if not p.is_file():
         raise FileNotFoundError("file not found: %s" % path)
     if p.suffix.lower() in (".tif", ".tiff"):
-        img = np.squeeze(tifffile.imread(str(p)))
+        with tifffile.TiffFile(str(p)) as tf:
+            series = tf.series[0]
+            img, axes = series.asarray(), series.axes
+        keep = [i for i, n in enumerate(img.shape) if n > 1]
+        axes = "".join(axes[i] for i in keep) if len(axes) == img.ndim else ""
+        img = img.reshape([img.shape[i] for i in keep])
         if img.ndim == 3 and img.shape[0] <= 4 < img.shape[-1]:
+            if axes[:1] in ("Z", "T", "R", "L", "H"):
+                raise ValueError("%s is a stack of %d planes (axes %s). The tool segments one 2D image with up to 4 channels. Give one plane, or a projection of the stack" % (path, img.shape[0], axes))
+            if axes[:1] != "C" and notes is not None:
+                notes.append("The file has %d planes and no axes information. The tool read them as %d channels. If they are z planes or time points, give one plane or a projection." % (img.shape[0], img.shape[0]))
             img = np.moveaxis(img, 0, -1)
         if img.ndim > 3 or (img.ndim == 3 and img.shape[-1] > 4):
             raise ValueError("%s has shape %s. The tool segments one 2D image with up to 4 channels. Give one plane, or a projection of the stack" % (path, img.shape))
@@ -123,6 +132,10 @@ def _run(img, model_type, cell_diameter, flow_threshold, cellprob_threshold, min
     return mk, n_border
 
 
+def _save_labels(path, lab):
+    tifffile.imwrite(path, lab.astype(np.uint16 if lab.max() <= np.iinfo(np.uint16).max else np.uint32))
+
+
 def _outline_png(path, img, lab):
     from scipy.ndimage import binary_dilation
 
@@ -165,12 +178,11 @@ def _describe_folder(path):
 def inspect_image(path):
     if Path(path).is_dir():
         return _describe_folder(path)
-    img = _read(path)
+    warnings = []
+    img = _read(path, warnings)
     ext = Path(path).suffix.lower()
     channels = 1 if img.ndim == 2 else img.shape[-1]
-    maxv = np.iinfo(img.dtype).max if img.dtype.kind in "ui" else float(img.max())
-    sat = float((img == maxv).mean()) if img.dtype.kind in "ui" else 0.0
-    warnings = []
+    sat = float((img == img.max()).mean()) if img.dtype.kind in "ui" and img.max() > img.min() else 0.0
     if ext in (".jpg", ".jpeg"):
         warnings.append("JPEG files lose pixel values. Do not use them for measurement.")
     if sat > 0.01:
@@ -211,7 +223,8 @@ def segment_cells(
 ):
     if Path(path).is_dir():
         return _segment_folder(path, pattern, only_listed_in, truth_folder, truth_match, model_type, cell_diameter, flow_threshold, cellprob_threshold, min_cell_size, exclude_border_cells, use_gpu)
-    img = _read(path)
+    notes = []
+    img = _read(path, notes)
     lab, n_border = _run(img, model_type, cell_diameter, flow_threshold, cellprob_threshold, min_cell_size, exclude_border_cells, use_gpu)
     from scipy.ndimage import center_of_mass
 
@@ -221,7 +234,7 @@ def segment_cells(
     cents = center_of_mass(lab > 0, lab, ids) if len(ids) else []
     stem = Path(path).stem
     lpath, cpath, ppath = os.path.abspath(stem + "_masks.tif"), os.path.abspath(stem + "_cells.csv"), os.path.abspath(stem + "_outlines.png")
-    tifffile.imwrite(lpath, lab.astype(np.uint16))
+    _save_labels(lpath, lab)
     _outline_png(ppath, img, lab)
     cols = ["label", "area_px", "centroid_y", "centroid_x"]
     rows = [[int(i), int(a), round(float(c[0]), 2), round(float(c[1]), 2)] for i, a, c in zip(ids, areas, cents)]
@@ -239,7 +252,7 @@ def segment_cells(
         metrics["mean_area_calibrated"] = metrics["mean_area_px"] * scale
     return {
         "ok": True,
-        "summary": "%d cells with the %s model; mean area %.1f px" % (n, model_type, metrics["mean_area_px"]),
+        "summary": "%d cells with the %s model; mean area %.1f px%s" % (n, model_type, metrics["mean_area_px"], "".join(". " + note for note in notes)),
         "metrics": metrics,
         "outputs": [
             {"path": lpath, "kind": "image", "name": "label image"},
@@ -248,7 +261,7 @@ def segment_cells(
         ],
         "table": _table(cpath, cols, rows),
         "label_image": lpath,
-        "data": {"area_unit": "calibrated unit squared" if calibrated else "pixel", "calibrated": calibrated, "model": model_type},
+        "data": {"area_unit": "calibrated unit squared" if calibrated else "pixel", "calibrated": calibrated, "model": model_type, "warnings": notes},
     }
 
 

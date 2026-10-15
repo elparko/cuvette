@@ -54,7 +54,7 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
       ) : !shown.length ? (
         <p className="text-muted-foreground">No session matches.</p>
       ) : (
-        <SessionGrid list={shown} onOpen={(id) => sessions.open(id, ctx.opened)} onRemove={(id) => void sessions.remove(id)} />
+        <SessionGrid list={shown} onOpen={(id) => sessions.open(id, ctx.opened)} onRename={ctx.renameSession} onRemove={ctx.removeSession} />
       )}
     </div>
   );

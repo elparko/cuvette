@@ -170,6 +170,12 @@ describe("sample sheet edge cases", () => {
     expect(s.rows.map((r) => r.sample)).toEqual(["m1", "row 3", "m3"]);
   });
 
+  test("row numbers use the real line numbers when the table has lines", () => {
+    const s = sheetFromTable({ columns: ["mouse", "group"], rows: [["m1", "A"], ["", "A"], ["m1", "A"]], lines: [2, 5, 7] }, "x.csv")!;
+    expect(s.rows.map((r) => r.sample)).toEqual(["m1", "row 5"]);
+    expect(s.rows.map((r) => r.path)).toEqual(["x.csv rows 2, 7", "x.csv row 5"]);
+  });
+
   test("readSheet reads tabs, a UTF-16 file and an exact column name before a prefix", () => {
     const dir = mkdtempSync(join(tmpdir(), "ga-sheet-"));
     const p = join(dir, "samples.csv");

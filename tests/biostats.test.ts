@@ -151,4 +151,31 @@ describe.skipIf(!existsSync(PY))("biostats exclusions and coding", () => {
     expect(r.metrics!.n_dropped).toBe(2);
     expect(r.summary).toMatch(/Dropped 2 rows with a missing value/);
   });
+  test("a numeric column with the placeholders - ? and . stays numeric and the count is reported", () => {
+    const p = write("ph.csv", "g,y,x,w\na,1.1,2.0,3\na,-,2.5,4\na,1.3,?,5\na,1.0,3.1,6\nb,2.2,.,7\nb,2.4,4.0,8\nb,2.1,4.2,9\nb,2.6,5.0,10\n");
+    const t = call("compare_two_groups", { path: p, outcome: "y", group: "g" });
+    expect(t.ok).toBe(true);
+    expect(t.metrics!.n_placeholder_cells).toBe(3);
+    expect(t.summary).toMatch(/3 cells in numeric columns hold a placeholder/);
+    const o = call("fit_ols", { path: p, formula: "y ~ x" });
+    expect(o.ok).toBe(true);
+    expect(o.summary).toMatch(/x 0\.578/);
+    expect(o.summary).not.toMatch(/x\[/);
+    const a = call("kruskal_dunn", { path: p, outcome: "y", group: "g", p_adjust: "none" }, "ga_anova");
+    expect(a.ok).toBe(true);
+    expect(a.metrics!.n_placeholder_cells).toBe(3);
+  });
+
+  test("a text column with a placeholder stays text", () => {
+    const p = write("ph2.csv", "g,y\na,1\na,2\nb,3\nb,-\nb,x\n");
+    const r = call("inspect_table", { path: p });
+    expect(r.metrics!.n_placeholder_cells).toBeUndefined();
+  });
+
+  test.each(["ga_biostats", "ga_anova"])("%s keeps an ID column with a leading zero and a 17-digit barcode column as text", (mod) => {
+    const p = write("ids.csv", "id,barcode,y\n007,12345678901234567,1\n008,12345678901234568,2\n-,12345678901234569,3\n");
+    const code = `import json, sys\nsys.path.insert(0, ${JSON.stringify(DIR)})\nimport ${mod} as b\nf = b._typed(sys.argv[1], "utf-8")\nprint(json.dumps([[str(v) for v in f[c]] for c in ["id", "barcode"]]))`;
+    const out = execFileSync(PY, ["-c", code, p], { encoding: "utf8", env: { ...process.env, PYTHONWARNINGS: "ignore" } });
+    expect(JSON.parse(out.trim().split("\n").at(-1)!)).toEqual([["007", "008", "nan"], ["12345678901234567", "12345678901234568", "12345678901234569"]]);
+  });
 });

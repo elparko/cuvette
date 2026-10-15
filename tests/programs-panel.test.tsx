@@ -105,3 +105,55 @@ test("install shows the command, runs after Enter, and prints the progress", asy
   await until(() => h.last().includes("Installed zeta."));
   expect(readLog(home).at(-1)).toMatchObject({ action: "install", adapter: "zeta", ok: true });
 });
+
+test("a failure while an install runs shows the message and leaves the busy step", async () => {
+  const exec = vi.fn(async () => {
+    throw new Error("EACCES: permission denied");
+  });
+  const { h } = await open(exec);
+  await key(h, "\r");
+  await until(() => h.last().includes("Install"));
+  await key(h, "\r");
+  await until(() => h.last().includes("Command: uv venv"));
+  await key(h, "\r");
+  await until(() => h.last().includes("EACCES: permission denied"));
+  expect(h.last()).toContain("Enter actions");
+});
+
+test("Esc stops an install that runs, and the screen says so", async () => {
+  const exec = vi.fn((_c: string, line: (l: string) => void, signal?: AbortSignal) => {
+    line("Resolved 9 packages");
+    return new Promise<number | null>((done) => signal?.addEventListener("abort", () => done(null)));
+  });
+  const { h } = await open(exec);
+  await key(h, "\r");
+  await until(() => h.last().includes("Install"));
+  await key(h, "\r");
+  await until(() => h.last().includes("Command: uv venv"));
+  await key(h, "\r");
+  await until(() => h.last().includes("Resolved 9 packages"));
+  expect(h.last()).toContain("Esc stops the install");
+  await key(h, "\x1b");
+  await until(() => h.last().includes("You stopped the install"));
+  expect(h.last()).toContain("Enter actions");
+  expect(readLog(home).at(-1)).toMatchObject({ action: "install", adapter: "zeta", ok: false, stopped: true });
+});
+
+test("a failure while the plan is prepared shows the message and returns to the list", async () => {
+  const base = hooks(vi.fn(async () => 0));
+  let armed = false;
+  const h = makeHarness(120, 60);
+  const s = new FakeSession({ delayMs: 0 });
+  live = { h, done: runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {}, programs: { ...base, find: (n: string) => { if (armed) throw new Error("EACCES: no access to PATH"); return base.find!(n); } } }) };
+  await sleep(100);
+  await key(h, "/programs");
+  await key(h, "\r");
+  await until(() => h.last().includes("Enter actions") && h.last().includes("2.0 KB"));
+  armed = true;
+  await key(h, "\r");
+  await until(() => h.last().includes("Install"));
+  await key(h, "\r");
+  await until(() => h.last().includes("EACCES: no access to PATH") || h.last().includes("Command: uv venv"));
+  expect(h.last()).toContain("EACCES: no access to PATH");
+  expect(h.last()).toContain("Enter actions");
+});

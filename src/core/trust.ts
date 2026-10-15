@@ -107,11 +107,26 @@ function readHash(p: string): string {
 }
 
 function scriptHash(p: string): string {
+  let size = 0;
+  let mtime = 0;
   try {
-    const st = statSync(p);
-    if (st.size > SCRIPT_SIZE_CAP) return sha(`large:${st.size}:${st.mtimeMs}`);
+    ({ size, mtimeMs: mtime } = statSync(p));
   } catch {}
-  return readHash(p);
+  if (size <= SCRIPT_SIZE_CAP) return readHash(p);
+  try {
+    const fd = openSync(p, "r");
+    try {
+      const head = Buffer.alloc(SCRIPT_EDGE);
+      const tail = Buffer.alloc(SCRIPT_EDGE);
+      readSync(fd, head, 0, SCRIPT_EDGE, 0);
+      readSync(fd, tail, 0, SCRIPT_EDGE, size - SCRIPT_EDGE);
+      return sha(`large:${size}:${mtime}:${sha(head)}:${sha(tail)}`);
+    } finally {
+      closeSync(fd);
+    }
+  } catch (e) {
+    return `unreadable:${(e as NodeJS.ErrnoException).code ?? "error"}`;
+  }
 }
 
 function linkHash(p: string): string {
@@ -259,7 +274,8 @@ const VOLATILE_DIR = /^(logs?|state|caches?|\.cache|tmp|temp|__pycache__)$/i;
 const SKIPPED_DIR = /^(node_modules|\.venv|\.record)$/i;
 const FOLDER_FILE_LIMIT = 50;
 const SCRIPT_FOLDER_LIMIT = 200;
-const SCRIPT_SIZE_CAP = 2 * 1024 * 1024;
+const SCRIPT_SIZE_CAP = 64 * 1024 * 1024;
+const SCRIPT_EDGE = 1024 * 1024;
 
 function moduleFiles(name: string): string[] {
   const parts = name.split(".");
@@ -427,34 +443,6 @@ function codeFolder(dir: string, skip: (rel: string) => boolean, key: string, re
   return r.files.filter((f) => FOLDER_EXT.test(f) || MANIFEST.test(f));
 }
 
-function globRegex(pattern: string): RegExp {
-  let re = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const c = pattern[i]!;
-    if (c === "*") {
-      if (pattern[i + 1] === "*") {
-        if (pattern[i + 2] === "/") {
-          re += "(?:.*/)?";
-          i += 2;
-        } else {
-          re += ".*";
-          i++;
-        }
-      } else re += "[^/]*";
-    } else if (c === "?") re += "[^/]";
-    else if (c === "{") re += "(?:";
-    else if (c === "}") re += ")";
-    else if (c === ",") re += pattern.slice(0, i).split("{").length > pattern.slice(0, i).split("}").length ? "|" : ",";
-    else if (c === "[" || c === "]") re += c;
-    else re += c.replace(/[.+^$()|\\]/g, "\\$&");
-  }
-  try {
-    return new RegExp(`^${re}$`);
-  } catch {
-    return /^$/;
-  }
-}
-
 const NON_ASCII = /[^\x00-\x7f]/;
 const ANY_NAME = "[^/]+";
 const plain = (c: string) => (/[\w/\-]/.test(c) ? c : /[.+$()|{}*?[\]]/.test(c) ? `[${c}]` : NON_ASCII.test(c) ? ANY_NAME : ".");
@@ -473,7 +461,7 @@ function bracketEnd(pattern: string, start: number): number {
   return j < pattern.length ? j : -1;
 }
 
-export function globEre(pattern: string): string {
+export function globEre(pattern: string, single = false): string {
   let re = "";
   let depth = 0;
   for (let i = 0; i < pattern.length; i++) {
@@ -483,13 +471,13 @@ export function globEre(pattern: string): string {
         re += pattern[i + 2] === "/" ? "(.*/)?" : ".*";
         i += pattern[i + 2] === "/" ? 2 : 1;
       } else re += "[^/]*";
-    } else if (c === "?") re += ANY_NAME;
+    } else if (c === "?") re += single ? "[^/]" : ANY_NAME;
     else if (c === "[") {
       const end = bracketEnd(pattern, i);
       if (end < 0) re += plain(c);
       else {
         const body = pattern.slice(i + 1, end).replace(/^!/, "^").replace(/[\\"]/g, "");
-        re += NON_ASCII.test(body) || body.startsWith("^") ? ANY_NAME : `[${body}]`;
+        re += NON_ASCII.test(body) || body.startsWith("^") ? (single ? "[^/]" : ANY_NAME) : `[${body}]`;
         i = end;
       }
     } else if (c === "{") {
@@ -503,6 +491,54 @@ export function globEre(pattern: string): string {
   }
   return joinRuns(re + ")".repeat(depth));
 }
+
+const POSIX_CLASSES: Record<string, string> = { space: "\\s", digit: "\\d", alpha: "a-zA-Z", alnum: "a-zA-Z0-9", upper: "A-Z", lower: "a-z", punct: "!-/:-@\\[-`{-~", xdigit: "0-9a-fA-F", blank: " \\t", cntrl: "\\x00-\\x1f\\x7f", graph: "!-~", print: " -~" };
+
+export function ereToRegExp(ere: string): RegExp {
+  let re = "";
+  let unknown = false;
+  for (let i = 0; i < ere.length; i++) {
+    if (ere[i] !== "[") {
+      re += ere[i];
+      continue;
+    }
+    let j = i + 1;
+    let body = "";
+    if (ere[j] === "^") {
+      body = "^";
+      j++;
+    }
+    if (ere[j] === "]") {
+      body += "\\]";
+      j++;
+    }
+    while (j < ere.length && ere[j] !== "]") {
+      const close = ere[j] === "[" && ere[j + 1] === ":" ? ere.indexOf(":]", j + 2) : -1;
+      if (close >= 0) {
+        const name = ere.slice(j + 2, close);
+        if (Object.hasOwn(POSIX_CLASSES, name)) body += POSIX_CLASSES[name];
+        else unknown = true;
+        j = close + 2;
+      } else {
+        body += ere[j] === "[" || ere[j] === "\\" ? `\\${ere[j]}` : ere[j];
+        j++;
+      }
+    }
+    if (j >= ere.length) re += "\\[";
+    else {
+      re += `[${body}]`;
+      i = j;
+    }
+  }
+  if (unknown) return /./;
+  try {
+    return new RegExp(re);
+  } catch {
+    return /^$/;
+  }
+}
+
+export const globMatcher = (pattern: string) => ereToRegExp(`^${globEre(pattern, true)}$`);
 
 const hasGlob = (w: string) => /[*?[\]{}]/.test(w);
 const globPrefix = (base: string, word: string) => resolve(base, word.split(/[/\\]/).filter((_, i, a) => !a.slice(0, i + 1).some(hasGlob)).join("/"));
@@ -661,7 +697,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           const rel = relative(key, path);
           if (rel.startsWith("..") || isAbsolute(rel)) continue;
           const prefix = globPrefix(base, t.word);
-          const re = globRegex(relative(key, path).split(sep).join("/"));
+          const re = globMatcher(relative(key, path).split(sep).join("/"));
           let matches = 0;
           const w = walkFiles(prefix, skip, key, realKey, true);
           const runs = t.allowed || c.dynamic;
@@ -869,17 +905,24 @@ function writeTrusted(list: TrustEntry[]): void {
   harnessWrite(userFile(), () => writeFileSync(userFile(), JSON.stringify(data, null, 2) + "\n"));
 }
 
-const once = new Map<string, number>();
+const once = new Map<string, { n: number; hash: string }>();
 
 export function trustOnce(folder: string): void {
   const k = folderKey(folder);
-  once.set(k, (once.get(k) ?? 0) + 1);
+  once.set(k, { n: (once.get(k)?.n ?? 0) + 1, hash: scanFolder(k).hash });
+}
+
+function refreshOnce(folder: string): void {
+  const k = folderKey(folder);
+  const e = once.get(k);
+  if (e) once.set(k, { ...e, hash: scanFolder(k).hash });
 }
 
 export function endTrustOnce(folder: string): void {
   const k = folderKey(folder);
-  const n = (once.get(k) ?? 0) - 1;
-  if (n > 0) once.set(k, n);
+  const e = once.get(k);
+  if (!e) return;
+  if (e.n > 1) once.set(k, { ...e, n: e.n - 1 });
   else once.delete(k);
 }
 
@@ -916,7 +959,7 @@ export function trustStatus(folder: string): TrustStatus {
   const scan = scanFolder(folder);
   if (scan.linked.length || scan.incomplete.length) return { state: "changed", scan, changes: [...scan.linked.map((p) => `The project cannot be trusted while it has a linked folder: ${oneLine(p)}. Replace the link with a copy of the folder.`), ...scan.incomplete.map((r) => `${oneLine(r)}. Cuvette cannot check the folder, so it does not trust it.`)] };
   if (!needsTrust(scan)) return { state: "none", scan, changes: [] };
-  if (once.has(scan.folder)) return { state: "once", scan, changes: [] };
+  if (once.get(scan.folder)?.hash === scan.hash) return { state: "once", scan, changes: [] };
   const e = trustedFolders().find((x) => x.path === scan.folder);
   if (!e) return { state: "new", scan, changes: [] };
   if (e.hash === scan.hash) return { state: "trusted", scan, changes: [] };
@@ -949,7 +992,7 @@ export function afterProjectWrite(folder: string, before: TrustState): void {
   if (before === "trusted" || before === "none") {
     const s = scanFolder(folder);
     if (needsTrust(s)) trustFolder(folder);
-  }
+  } else if (before === "once") refreshOnce(folder);
 }
 
 export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`);
