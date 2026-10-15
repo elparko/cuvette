@@ -54,6 +54,14 @@ Release 0.1.1 includes all changes since 12 October.
 - `inspect_data` keeps the channel axis of a TIFF file, warns if it drops planes, and shows the bit depth of the dtype.
 - A table cell that is not finite stays text, and the column stays a number column. An ID such as `5E3` stays text.
 
+### Windows
+
+- A folder path with a backslash shows with no quotes in the trust card, `trust list`, the refusal notices and the LAB.md card.
+- An exported script imports the replay module with a file URL, so Node on Windows can run it.
+- An install of a program does not run on Windows. The message gives the download link of the program.
+- A session lock from a process that ended no longer blocks the session. Cuvette reads the start time of the process with PowerShell. If the lock stays, the message names the file to delete.
+- The output of a script uses one new line. Before, a Windows script gave a carriage return and a new line.
+
 ### Record guard and tests
 
 - `write_file` refuses a path in a `.Record` folder if a `.record` folder with a record is beside it. `run_script` compares `.record` without letter case.
