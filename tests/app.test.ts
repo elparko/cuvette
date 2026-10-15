@@ -288,6 +288,22 @@ describe("the app server", () => {
     expect(st.setup).toBe(claudeKey({}).from === "none");
   });
 
+  test("after the user leaves setup, the state says not setup, also while the session opens", async () => {
+    let finish: () => void = () => {};
+    const gate = new Promise<void>((r) => (finish = r));
+    app = await startApp({ env: {}, model: "claude", start: home, makeSession: async () => (await gate, new FakeSession()) });
+    const c = client(app);
+    const needs = claudeKey({}).from === "none";
+    expect((await (await c.get("api/state")).json()).setup).toBe(needs);
+    expect((await c.post("api/leave-setup", {})).status).toBe(200);
+    expect((await c.post("api/open", { folder: home })).status).toBe(200);
+    for (let i = 0; i < 1000 && !(await (await c.get("api/state")).json()).opening; i++) await new Promise((r) => setTimeout(r, 30));
+    const st = await (await c.get("api/state")).json();
+    expect(st.opening).toBe(true);
+    expect(st.setup).toBe(false);
+    finish();
+  });
+
   test("the setup page uses the first-start choices and the doctor checks", async () => {
     const doctor = async () => [
       { id: "node", group: "Needed to start" as const, name: "Node", status: "ok" as const, detail: "version 24" },

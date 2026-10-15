@@ -758,6 +758,7 @@ document.addEventListener("click", async (e) => {
   const pg = t.closest("[data-page-go]");
   if (pg && pg.dataset.progStart) progStart = pg.dataset.progStart;
   if (pg) {
+    if (pg.closest("#p-setup")) await post("api/leave-setup", {});
     if (state.folder && pg.closest("#samplepanel")) { await post("api/open", { folder: state.folder }); page = "session"; setTimeout(boot, 300); }
     else show(pg.dataset.pageGo);
     return;

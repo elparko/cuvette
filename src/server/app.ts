@@ -211,6 +211,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   let opening: Promise<void> | undefined;
   let lastOpen = { key: "", at: 0 };
   let lastError = "";
+  let leftSetup = false;
   const idle = new Set<ServerResponse>();
   let port = 0;
 
@@ -371,7 +372,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         session: c ? c.view.header() : null,
         opening: !!opening,
         error: lastError,
-        setup: !c && (opts.model ? needsFirstSetup(opts.model, env) : needsFirstStart(fsCtx())),
+        setup: !c && !leftSetup && (opts.model ? needsFirstSetup(opts.model, env) : needsFirstStart(fsCtx())),
         model: model(),
         folder: opts.folder ? resolve(opts.folder) : "",
         start: resolve(opts.folder ?? opts.start ?? homedir()),
@@ -466,6 +467,10 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         void open({ folder: f, adapter });
       } else return send(res, 400, { error: "Give a folder or a session." });
       lastOpen = { key, at: Date.now() };
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/leave-setup") {
+      leftSetup = true;
       return send(res, 200, { ok: true });
     }
     if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
