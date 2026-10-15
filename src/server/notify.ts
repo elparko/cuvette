@@ -2,11 +2,10 @@ import type { Question } from "../core/types.ts";
 
 const reported = new Set<string>();
 
-export function setWindowUrl(_url: string | undefined): void {}
-
 function allowed(raw: string): boolean {
   try {
     const u = new URL(raw);
+    if (u.username || u.password) return false;
     if (u.protocol === "https:") return true;
     return u.protocol === "http:" && (u.hostname === "127.0.0.1" || u.hostname === "localhost");
   } catch {
@@ -14,12 +13,21 @@ function allowed(raw: string): boolean {
   }
 }
 
+function hostOf(raw: string): string {
+  try {
+    return new URL(raw).host;
+  } catch {
+    return "an address that is not valid";
+  }
+}
+
 export function ntfyNotifier(topicUrl: string): (q: Question) => Promise<void> {
   return async (q) => {
     if (!allowed(topicUrl)) {
+      const host = hostOf(topicUrl);
       if (!reported.has(topicUrl)) {
         reported.add(topicUrl);
-        console.error(`Cuvette does not use the notify address ${topicUrl}. Use an https address, or http on 127.0.0.1 or localhost. Cuvette sends no notice.`);
+        console.error(`Cuvette does not use the notify address on ${host}. Use an https address, or http on 127.0.0.1 or localhost. Cuvette sends no notice.`);
       }
       return;
     }

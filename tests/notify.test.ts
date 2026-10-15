@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
-import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
+import { ntfyNotifier } from "../src/server/notify.ts";
 
 interface Post {
   method?: string;
@@ -35,10 +35,8 @@ afterAll(() => new Promise<void>((ok) => server.close(() => ok())));
 beforeEach(() => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-notify-"));
   posts = [];
-  setWindowUrl(undefined);
 });
 afterEach(async () => {
-  setWindowUrl(undefined);
   await session?.close();
   session = undefined;
 });
@@ -72,19 +70,9 @@ test("a blocking scientist-owned decision posts the question to the ntfy topic",
   expect(p.headers.title).toBe("A question waits for you");
   expect(p.headers.click).toBeUndefined();
   expect(p.body.split("\n")[0]).toBe(open[0].title);
+  expect(p.body).not.toContain("?t=");
   expect(p.body).toContain(open[0].text);
   expect(open[0].title).toMatch(/Threshold method/i);
-});
-
-test("the post never carries the window address", async () => {
-  setWindowUrl("http://127.0.0.1:4500/?t=abc");
-  const s = await blockedSession();
-  await s.send("Count the particles");
-  for (let i = 0; i < 1500 && posts.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
-  expect(posts).toHaveLength(1);
-  expect(posts[0].headers.click).toBeUndefined();
-  expect(posts[0].body).not.toContain("?t=");
-  expect(posts[0].body).not.toContain("4500");
 });
 
 test("a plain http address that is not local gets no post and one report", async () => {
@@ -97,7 +85,25 @@ test("a plain http address that is not local gets no post and one report", async
     await send(q);
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(err).toHaveBeenCalledTimes(1);
-    expect(String(err.mock.calls[0][0])).toContain("http://ntfy.example.org/topic-once");
+    expect(String(err.mock.calls[0][0])).toContain("ntfy.example.org");
+    expect(String(err.mock.calls[0][0])).not.toContain("topic-once");
+  } finally {
+    err.mockRestore();
+    fetchSpy.mockRestore();
+  }
+});
+
+test("an address with a user name or password gets no post and one report", async () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  try {
+    const send = ntfyNotifier("https://user:secret@ntfy.example.org/topic-cred");
+    const q = { qid: "q1", title: "T", text: "Body" } as never;
+    await send(q);
+    await send(q);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).not.toContain("secret");
   } finally {
     err.mockRestore();
     fetchSpy.mockRestore();

@@ -11,7 +11,6 @@ import { REFUSERS } from "../core/refusals.ts";
 import { planView } from "../core/plan.ts";
 import { parseRoute, shortReason, trail } from "../core/trail.ts";
 import { panelHtml } from "./panel-page.ts";
-import { setWindowUrl } from "./notify.ts";
 import { pageHtml } from "./page.ts";
 
 export interface WindowSession {
@@ -411,13 +410,11 @@ export async function startWindow(
   });
   const { port } = server.address() as AddressInfo;
   const url = `http://127.0.0.1:${port}/?t=${token}`;
-  setWindowUrl(url);
 
   return {
     url,
     close() {
       routes.close();
-      setWindowUrl(undefined);
       server.close();
       server.closeAllConnections();
     },

@@ -483,6 +483,9 @@ fn main() {
                     if core.child.lock().unwrap().is_none() {
                         return;
                     }
+                    if let Some(c) = core.child.lock().unwrap().as_mut() {
+                        let _ = c.try_wait();
+                    }
                     *core.port.lock().unwrap() = None;
                     *core.ready.lock().unwrap() = false;
                     *core.stopped.lock().unwrap() = Some("The Cuvette core stopped. Close the window and start Cuvette again.".into());
