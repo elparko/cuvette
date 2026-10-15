@@ -150,6 +150,14 @@ test("the budget setting is read by the spend check, and CUVETTE_BUDGET_USD wins
   await expect(changeSetting({ cwd, env: {} }, "budgetUsd", "-3", "user")).rejects.toThrow(/above 0/);
 });
 
+test("the Claude API key setting says that an ant auth login is signed in", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  mkdirSync(join(cfg, "credentials"));
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key")).toMatchObject({ value: "signed in with ant auth login", source: "ant" });
+  expect(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: join(cfg, "none") } }), "claude_key")).toMatchObject({ value: "not set" });
+});
+
 test("secrets never show and the record keeps only that they changed", async () => {
   saveClaudeKey(KEY);
   saveElabftw("https://elab.example.org", "elab-secret-key-1234567");

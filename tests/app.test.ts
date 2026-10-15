@@ -3,11 +3,11 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
-import { startApp, type AppHandle } from "../src/server/app.ts";
+import { APP_CLOSE_LIMIT_MS, startApp, type AppHandle } from "../src/server/app.ts";
 import { cardHtml, decisionsHtml, itemHtml, resultsHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
 import { WebView } from "../src/server/app-view.ts";
-import { planInit, sheetRows, type Card } from "../src/ui/cards.ts";
+import { KEY_ANT_LOGIN, planInit, sheetRows, type Card } from "../src/ui/cards.ts";
 import { CARDS, COMMANDS } from "../src/ui/parity.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { until } from "../src/tui/testing.ts";
@@ -302,6 +302,25 @@ describe("the app server", () => {
     expect(st.opening).toBe(true);
     expect(st.setup).toBe(false);
     finish();
+  });
+
+  test("setup comes back after the session closes with no key", async () => {
+    app = await startApp({ env: {}, model: "claude", start: home, makeSession: async () => new FakeSession() });
+    const c = client(app);
+    const needs = claudeKey({}).from === "none";
+    await c.post("api/leave-setup", {});
+    await c.post("api/open", { folder: home });
+    for (let i = 0; i < 300 && !(await (await c.get("api/state")).json()).session; i++) await new Promise((r) => setTimeout(r, 20));
+    expect((await (await c.get("api/state")).json()).setup).toBe(false);
+    await c.post("api/close", {});
+    expect((await (await c.get("api/state")).json()).setup).toBe(needs);
+  });
+
+  test("the first-start answer has the ant auth login line, and the CLI waits longer than the install stop", async () => {
+    app = await startApp({ env: {}, model: "claude", start: home, makeSession: async () => new FakeSession() });
+    const fs = await (await client(app).post("api/firststart", {})).json();
+    expect(fs.keyAntLogin).toBe(KEY_ANT_LOGIN);
+    expect(APP_CLOSE_LIMIT_MS).toBeGreaterThan(6000);
   });
 
   test("the setup page uses the first-start choices and the doctor checks", async () => {
