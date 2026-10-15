@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, linkSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { cutText, discardPlace, readIndex, readRowMarks, type IndexRow } from "./places.ts";
@@ -124,6 +124,23 @@ interface Parsed {
   worked: boolean;
 }
 
+export const LOG_READ_LIMIT = 256 * 1024 * 1024;
+const LOG_EDGE = 1024 * 1024;
+
+function readLog(log: string, size: number): string {
+  if (size <= LOG_READ_LIMIT) return readFileSync(log, "utf8");
+  const fd = openSync(log, "r");
+  try {
+    const part = (at: number) => {
+      const buf = Buffer.alloc(LOG_EDGE);
+      return buf.subarray(0, readSync(fd, buf, 0, LOG_EDGE, at)).toString("utf8");
+    };
+    return `${part(0)}\n${part(size - LOG_EDGE)}`;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 const parsed = new Map<string, { mtime: number; size: number; ino: number; p: Parsed }>();
 
 function parseLog(log: string): Parsed {
@@ -140,7 +157,7 @@ function parseLog(log: string): Parsed {
   let planOpen = false;
   let lastFinal = false;
   let worked = false;
-  for (const l of readFileSync(log, "utf8").replace(/^\uFEFF/, "").split("\n")) {
+  for (const l of readLog(log, st.size).replace(/^\uFEFF/, "").split("\n")) {
     if (!l) continue;
     let e: any;
     try {

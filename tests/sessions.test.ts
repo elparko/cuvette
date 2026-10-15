@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -394,4 +394,18 @@ test("a session in the old sessions folder can be renamed and removed from the l
     if (old === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = old;
   }
+});
+
+test("a log over the string limit does not break the list; the first and last megabyte give the info", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-big-"));
+  const dir = join(h, "sessions", "20261009-100000-dddd");
+  mkdirSync(dir, { recursive: true });
+  const log = join(dir, "log.jsonl");
+  const head = [{ id: 1, kind: "session", data: { cwd: "/lab/big", adapters: [], model: "m" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }];
+  writeFileSync(log, head.map((l) => JSON.stringify(l)).join("\n") + "\n");
+  truncateSync(log, 600 * 1024 * 1024);
+  appendFileSync(log, "\n" + JSON.stringify({ id: 3, kind: "assistant", data: { text: "Done.", final: true } }) + "\n");
+  const list = listSessions(h);
+  expect(list.map((s) => s.id)).toEqual(["20261009-100000-dddd"]);
+  expect(list[0]).toMatchObject({ cwd: "/lab/big", ask: "Count the cells", status: "answered" });
 });

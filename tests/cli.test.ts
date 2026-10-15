@@ -317,6 +317,28 @@ test.skipIf(process.platform === "win32")("cuvette app stops on SIGHUP and exits
   }
 }, 60_000);
 
+for (const how of ["throw", "reject"])
+  test.skipIf(process.platform === "win32")(`cuvette app prints one line, stops, and exits with code 70 after an uncaught ${how}`, async () => {
+    const h = ptyHome();
+    const boom = join(root, `boom-${how}.mjs`);
+    writeFileSync(boom, `process.on("SIGUSR2", () => setImmediate(() => { ${how === "throw" ? 'throw new Error("boom")' : 'Promise.reject(new Error("boom"))'}; }));\n`);
+    const child = spawn(process.execPath, ["--import", boom, CUVETTE, "app", "--no-open"], { cwd: join(h, "proj"), env: cleanEnv(h, { ANTHROPIC_API_KEY: "sk-ant-test" }), stdio: ["ignore", "pipe", "pipe"] });
+    try {
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (err += d));
+      const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+      for (let i = 0; i < 300 && !out.includes("Cuvette app:"); i++) await new Promise((r) => setTimeout(r, 100));
+      expect(out).toContain("Cuvette app:");
+      child.kill("SIGUSR2");
+      expect(await exit).toBe(70);
+      expect(err.trim().split("\n")).toEqual(["Cuvette stopped because of an error: boom"]);
+    } finally {
+      child.kill("SIGKILL");
+    }
+  }, 60_000);
+
 describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-terminal", () => {
   let ollama: Server;
   let url = "";

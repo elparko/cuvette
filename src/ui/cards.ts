@@ -2,6 +2,7 @@ import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse,
 import type { PhiAction } from "../core/phi.ts";
 import { noClaudeCredentials, ENV_KEY_WARNING, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
+import { NO_ALWAYS } from "../core/no-always.ts";
 import { codeOf, plainOf } from "./items.ts";
 import { commandText, visibleText } from "../core/plain.ts";
 import { cutText } from "../core/places.ts";
@@ -126,7 +127,7 @@ export function applyRewind(session: SessionLike, n: number): { ok: boolean; tex
 
 const ARG_LIMIT = 1000;
 
-export const NO_ALWAYS = new Set(["eln_push", "run_command", "write_file", "search_literature"]);
+export { NO_ALWAYS };
 export const ALWAYS_SCOPE = "Always allow: this session only.";
 
 export function permissionView(card: Extract<Card, { t: "permission" }>) {

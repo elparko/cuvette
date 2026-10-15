@@ -1,6 +1,7 @@
 import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless, readJsonObject } from "../src/core/headless.ts";
@@ -3805,4 +3806,120 @@ test("pilot: revealing a blind reference removes it from the deny list of the bl
   } finally {
     setBlindPolicy(undefined);
   }
+});
+
+async function readerSession(count: number, provider: FakeProvider) {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  for (let i = 0; i < count; i++) writeFileSync(join(cwd, `f${i}.txt`), `text ${i}`);
+  const s = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false, referee: "none" } as never });
+  s.decisions.applySetup({});
+  return { s, cwd };
+}
+
+test("a reply with 20 tool calls runs the first 16 and returns an error result for the other 4", async () => {
+  const calls = Array.from({ length: 20 }, (_, i) => ({ name: "note", args: { text: `n${i}` } }));
+  const provider = new FakeProvider([{ calls }, { text: "Done." }]);
+  session = (await readerSession(0, provider)).s;
+  const ran: string[] = [];
+  const one = session["runOne"].bind(session);
+  session["runOne"] = async (call: { name: string; args: unknown }, signal: AbortSignal) => (ran.push((call.args as { text: string }).text), one(call as never, signal));
+  await session.send("note it");
+  expect(ran).toHaveLength(16);
+  const results = provider.requests[1]!.messages.at(-1)!.parts.filter((p) => p.type === "tool_result") as { text: string; isError?: boolean }[];
+  expect(results).toHaveLength(20);
+  expect(results.slice(0, 16).some((r) => r.isError)).toBe(false);
+  for (const r of results.slice(16)) {
+    expect(r.isError).toBe(true);
+    expect(r.text).toContain("not run: more than 16 tool calls in one reply");
+  }
+});
+
+test("parallel read-only calls in one reply run at most four at a time", async () => {
+  const provider = new FakeProvider([{ calls: [] }, { text: "Done." }]);
+  const made = await readerSession(12, provider);
+  session = made.s;
+  provider["steps"] = [{ calls: Array.from({ length: 12 }, (_, i) => ({ name: "read_file", args: { path: join(made.cwd, `f${i}.txt`) } })) }, { text: "Done." }];
+  let now = 0;
+  let peak = 0;
+  const one = session["runOne"].bind(session);
+  session["runOne"] = async (call: { name: string }, signal: AbortSignal) => {
+    peak = Math.max(peak, ++now);
+    await new Promise((r) => setTimeout(r, 10));
+    const out = await one(call as never, signal);
+    now--;
+    return out;
+  };
+  await session.send("read the files");
+  expect(peak).toBe(4);
+  const results = provider.requests[1]!.messages.at(-1)!.parts.filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results.map((r) => r.text)).toEqual(Array.from({ length: 12 }, (_, i) => `text ${i}`));
+});
+
+test("a submit while the report, the Stop hook and the title run is rejected as busy", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "First." }, { text: "Second." }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false, referee: "none" } as never });
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  let entered!: () => void;
+  const inside = new Promise<void>((r) => (entered = r));
+  session["writeReport"] = async () => {
+    entered();
+    await gate;
+  };
+  const first = session.send("one");
+  await inside;
+  expect(session.busy).toBe(true);
+  await expect(session.send("two")).rejects.toThrow(/busy/);
+  release();
+  await first;
+  expect(session.busy).toBe(false);
+});
+
+test("the session entry records the version, the model limits, the effort and a hash of the system prompt", async () => {
+  const provider = new FakeProvider([]);
+  provider.info = { ...provider.info, provider: "claude", model: "claude-test" };
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false, effort: "high" } as never });
+  const data = session.record.entries(["session"])[0]!.data;
+  expect(data).toMatchObject({ cuvetteVersion: JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version, model: "claude-test", maxTokens: 64000, effort: "high" });
+  expect(data.systemSha256).toBe(createHash("sha256").update(session["system"]).digest("hex"));
+});
+
+test("resume writes a setting entry when the hash of the system prompt changed, and none when it did not", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "hello" }]), cwd, settings: { guidance: false, phi_check: false } as never });
+  await session.send("hi");
+  const id = session.id;
+  const first = session.record.entries(["session"])[0]!.data.systemSha256;
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false } as never });
+  expect(session.record.entries(["setting"]).filter((e) => e.data.name === "system_prompt")).toHaveLength(0);
+  await session.close();
+  const record = session.record;
+  record.append("session", { ...record.entries(["session"])[0]!.data, systemSha256: "0".repeat(64) });
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false } as never });
+  const changed = session.record.entries(["setting"]).filter((e) => e.data.name === "system_prompt");
+  expect(changed).toHaveLength(1);
+  expect(changed[0]!.data).toMatchObject({ old: "0".repeat(64), new: first });
+});
+
+test("always allow does not add run_command to the allowed tools, and adds run_script", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false } as never });
+  session.bus.on((e) => {
+    if (e.type === "permission") setTimeout(() => session!.respondPermission(e.rid, true, "", true), 0);
+  });
+  const signal = new AbortController().signal;
+  await session["requestPermission"]({ name: "run_command", source: "generic", inputSchema: { type: "object" } } as never, { argv: ["ls"] }, signal);
+  expect(session["sessionAllow"].has("run_command")).toBe(false);
+  await session["requestPermission"]({ name: "run_script", source: "generic", inputSchema: { type: "object" } } as never, { code: "print(1)" }, signal);
+  expect(session["sessionAllow"].has("run_script")).toBe(true);
+});
+
+test("the tokens of the helper agent count in the usage and not in the context size", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "task", args: { job: "Look at the folder." } }] }, { text: "Helper report." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, phi_check: false, referee: "none" } as never });
+  session.decisions.applySetup({});
+  await session.send("look");
+  const usage = session.record.entries(["usage"]);
+  expect(usage).toHaveLength(3);
+  expect(usage.filter((e) => e.data.helper)).toHaveLength(1);
+  expect(session.usage().total.steps).toBe(3);
 });

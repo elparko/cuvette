@@ -18,6 +18,24 @@ if (!process.env.CUVETTE_HOME) {
   if (moved) console.error(moved);
 }
 
+let stopAll = async (): Promise<unknown> => {
+  const { Session } = await import("./core/session.ts");
+  return Promise.all([...Session.open].map((x) => x.close().catch(() => {})));
+};
+let crashing = false;
+const crash = (e: unknown) => {
+  if (crashing) return;
+  crashing = true;
+  console.error(`Cuvette stopped because of an error: ${e instanceof Error ? e.message : String(e)}`);
+  setTimeout(() => process.exit(70), 5000);
+  stopAll().then(
+    () => process.exit(70),
+    () => process.exit(70),
+  );
+};
+process.on("uncaughtException", crash);
+process.on("unhandledRejection", crash);
+
 const HELP = `cuvette - a guided analysis agent for science programs
 
 Usage
@@ -453,6 +471,7 @@ async function app(folder?: string) {
   const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [], trustFolder }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
   console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
   if (!o["no-open"]) openWithOs(a.url);
+  stopAll = () => stopApp(() => a.close());
   await new Promise<void>((done) => {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);

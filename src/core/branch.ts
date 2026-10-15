@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { copyFileSync, existsSync, linkSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, linkSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { branchPlace, inProject, placeAt, type Place } from "./places.ts";
 import { AnalysisRecord, isTempOrDamaged } from "./record.ts";
+import { LOG_READ_LIMIT } from "./sessions.ts";
 import { changeCell, currentNodes, num, numbersOf } from "./status.ts";
 
 export interface BranchSource {
@@ -36,6 +37,7 @@ export function branchSession(s: BranchSource, name: string, upTo?: number): { p
   const cut = upTo ?? s.record.entries().at(-1)?.id ?? 0;
   const id = branchId();
   const child = branchPlace(s.place, clean, id);
+  if (statSync(s.record.logPath).size > LOG_READ_LIMIT) throw new Error("The record is too large to branch. Start a new session.");
   const lines = readFileSync(s.record.logPath, "utf8")
     .replace(/^\uFEFF/, "")
     .split("\n")
