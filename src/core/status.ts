@@ -171,12 +171,14 @@ export function statusText(states: StepState[], next = "Type /rerun to run the o
   ]);
   const skipped = states.filter((s) => s.unchecked).length;
   const allUpToDate = states.length === 1 ? "The step is up to date." : `All ${states.length} steps are up to date.`;
+  const notChecked = `${skipped} ${skipped === 1 ? "step is" : "steps are"} not checked.`;
+  const upToDate = states.length - skipped;
   const head = out.length
-    ? `${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date. ${next}`
+    ? `${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date.${skipped ? ` ${notChecked}` : ""} ${next}`
     : skipped > 0 && skipped === states.length
       ? states.length === 1 ? "The step is not checked." : `${states.length} steps are not checked.`
       : skipped
-        ? `${states.length - skipped} of ${states.length} steps ${states.length - skipped === 1 ? "is" : "are"} up to date. ${skipped} not checked.`
+        ? `${upToDate} of ${states.length} steps ${upToDate === 1 ? "is" : "are"} up to date. ${notChecked}`
         : allUpToDate;
   return [...lines, "", head].join("\n");
 }
