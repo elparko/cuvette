@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { linkSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
@@ -80,4 +80,15 @@ test("expire and wait", async () => {
   expect(rec.entries(["answer"]).map((e) => e.data.by)).toEqual(["timeout-default", "timeout"]);
   const still = await q.wait(c.qid, 10);
   expect(still.status).toBe("open");
+});
+
+test("the question index is replaced in one step and is private to the user", async () => {
+  const file = join(process.env.CUVETTE_HOME!, "questions.json");
+  const q = new QuestionQueue(rec as any);
+  await q.ask(spec());
+  linkSync(file, `${file}.copy`);
+  const before = readFileSync(file, "utf8");
+  await q.ask(spec());
+  expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
+  if (process.platform !== "win32") expect(statSync(file).mode & 0o777).toBe(0o600);
 });

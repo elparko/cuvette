@@ -1,3 +1,4 @@
+import { ensureHome } from "../core/atomic.ts";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
@@ -480,6 +481,7 @@ export function applyInstall(id: string, opts: { confirmed: boolean }): { ok: bo
   if (!opts.confirmed) return { ok: false, text: "Nothing installed. The install needs your confirmation." };
   const target = userAdapterDir(p.name);
   if (p.mode === "add" && existsSync(target)) return { ok: false, text: `The folder ${target} exists. Nothing installed.` };
+  ensureHome();
   mkdirSync(join(cuvetteHome(), "adapters"), { recursive: true });
   const fresh = `${target}.new-${p.id}`;
   rmSync(fresh, { recursive: true, force: true });
@@ -493,9 +495,32 @@ export function applyInstall(id: string, opts: { confirmed: boolean }): { ok: bo
     rmSync(fresh, { recursive: true, force: true });
     return { ok: false, text: "The staged files changed after the card. Nothing installed. Start again." };
   }
-  if (existsSync(target)) rmSync(target, { recursive: true });
-  renameSync(fresh, target);
-  saveInstalled(p.entry);
+  const old = `${target}.old-${p.id}`;
+  const hadOld = existsSync(target);
+  const failed = (e: unknown) => ({ ok: false, text: `Nothing installed: ${(e as Error).message}${hadOld ? " The old files stay in place." : ""}` });
+  if (hadOld) {
+    try {
+      renameSync(target, old);
+    } catch (e) {
+      rmSync(fresh, { recursive: true, force: true });
+      return failed(e);
+    }
+  }
+  try {
+    renameSync(fresh, target);
+  } catch (e) {
+    if (hadOld) renameSync(old, target);
+    rmSync(fresh, { recursive: true, force: true });
+    return failed(e);
+  }
+  try {
+    saveInstalled(p.entry);
+  } catch (e) {
+    rmSync(target, { recursive: true, force: true });
+    if (hadOld) renameSync(old, target);
+    return failed(e);
+  }
+  rmSync(old, { recursive: true, force: true });
   const code = p.card.code.length && p.card.trust === "unlisted";
   discardPlan(p.id);
   return { ok: true, text: `${p.mode === "add" ? "Installed" : "Updated"} ${p.name} ${p.entry.version} (${TRUST_NAME[p.card.trust]}) in ${target}.${p.entry.commit ? ` Commit ${p.entry.commit}.` : ""} SHA-256 ${p.entry.sha256.slice(0, 16)}.${code ? " It ships code. Cuvette asks once more before it first runs." : ""}` };
@@ -508,7 +533,8 @@ export function removeLines(name: string): string[] {
 export function removeInstalled(name: string): { ok: boolean; text: string } {
   if (!readInstalled()[name]) return { ok: false, text: `${name} was not installed with cuvette adapter add. Cuvette removes only those adapters.` };
   const dir = userAdapterDir(name);
-  if (!(resolve(dir) + sep).startsWith(resolve(cuvetteHome(), "adapters") + sep)) return { ok: false, text: "Refused: the folder is outside the adapter folder." };
+  const base = resolve(cuvetteHome(), "adapters");
+  if (resolve(dir) === base || !(resolve(dir) + sep).startsWith(base + sep)) return { ok: false, text: "Refused: the folder is outside the adapter folder." };
   rmSync(dir, { recursive: true, force: true });
   forgetInstalled(name);
   return { ok: true, text: `Removed ${name}.` };

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,7 +11,7 @@ import { adapterCommand } from "../src/adapters/commands.ts";
 import { applyInstall, cardLines, installedRows, prepareAdd, prepareUpdate, removeInstalled, reviewPlan, stagingRoot, withoutCredentials } from "../src/adapters/install.ts";
 import { CATALOG_DIR } from "../src/adapters/manifest.ts";
 import { DEFAULT_REGISTRY, fetchIndex } from "../src/adapters/registry.ts";
-import { adapterTrust, confirmCode, hashFolder, readInstalled, saveInstalled, userAdapterDir } from "../src/adapters/source.ts";
+import { adapterTrust, confirmCode, hashFolder, indexFile, readInstalled, saveInstalled, userAdapterDir } from "../src/adapters/source.ts";
 import { listPrograms, programsTable, planAction, planFromInstall, runAction } from "../src/core/programs.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -324,6 +324,53 @@ describe("update and remove", () => {
     expect(await adapterCommand("remove", "obtest", { ask: async () => "y", say: (l) => said.push(l) })).toBe(1);
   });
 
+  test("remove refuses the adapter folder itself", () => {
+    mkdirSync(join(home, "adapters", "keep"), { recursive: true });
+    saveInstalled({ name: ".", kind: "folder", source: "x", version: "1", sha256: "0", installed_on: "2026-01-01" });
+    expect(removeInstalled(".")).toMatchObject({ ok: false });
+    expect(existsSync(join(home, "adapters", "keep"))).toBe(true);
+    saveInstalled({ name: "../outside", kind: "folder", source: "x", version: "1", sha256: "0", installed_on: "2026-01-01" });
+    mkdirSync(join(home, "outside"));
+    expect(removeInstalled("../outside")).toMatchObject({ ok: false });
+    expect(existsSync(join(home, "outside"))).toBe(true);
+  });
+
+  test("an update whose move-aside fails leaves the installed folder untouched", async () => {
+    const r = join(work, "aside");
+    fixture(r);
+    repo(r);
+    expect(applyInstall((await prepareAdd(`file://${r}`)).id, { confirmed: true }).ok).toBe(true);
+    const oldText = readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8");
+    fixture(r, { version: "1.1.0" });
+    commit(r);
+    const plan = await prepareUpdate("obtest");
+    const blocker = `${userAdapterDir("obtest")}.old-${plan.id}`;
+    mkdirSync(blocker);
+    writeFileSync(join(blocker, "x"), "x");
+    const out = applyInstall(plan.id, { confirmed: true });
+    expect(out.ok).toBe(false);
+    expect(readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8")).toBe(oldText);
+    expect(readInstalled().obtest!.version).toBe("1.0.0");
+    expect(readdirSync(join(home, "adapters")).sort()).toEqual(["obtest", `obtest.old-${plan.id}`]);
+  });
+
+  test("an update that fails after the old folder moved aside puts the old folder back", async () => {
+    const r = join(work, "fail");
+    fixture(r);
+    repo(r);
+    expect(applyInstall((await prepareAdd(`file://${r}`)).id, { confirmed: true }).ok).toBe(true);
+    const oldText = readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8");
+    fixture(r, { version: "1.1.0" });
+    commit(r);
+    const plan = await prepareUpdate("obtest");
+    rmSync(indexFile(), { force: true });
+    mkdirSync(indexFile());
+    const out = applyInstall(plan.id, { confirmed: true });
+    expect(out.ok).toBe(false);
+    expect(readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8")).toBe(oldText);
+    expect(readdirSync(join(home, "adapters"))).toEqual(["obtest"]);
+  });
+
   test("list --installed shows the source, the commit and the SHA-256", async () => {
     const r = join(work, "lst");
     fixture(r);
@@ -338,6 +385,69 @@ describe("update and remove", () => {
 });
 
 describe("trust labels", () => {
+  test("a damaged index moves aside with one notice, and the next save keeps the damaged copy", () => {
+    writeFileSync(indexFile(), '{"adapters": {"a":');
+    const told: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+    try {
+      expect(readInstalled()).toEqual({});
+      expect(readInstalled()).toEqual({});
+    } finally {
+      process.stderr.write = write;
+    }
+    expect(told.filter((t) => t.includes("damaged"))).toHaveLength(1);
+    expect(existsSync(indexFile())).toBe(false);
+    saveInstalled({ name: "n", kind: "folder", source: "x", version: "1", sha256: "0", installed_on: "2026-01-01" });
+    const aside = readdirSync(home).filter((f) => f.startsWith("installed-adapters.json.damaged-"));
+    expect(aside).toHaveLength(1);
+    expect(readFileSync(join(home, aside[0]!), "utf8")).toBe('{"adapters": {"a":');
+  });
+
+  test("an index that cannot be read gives one notice that names the file and an empty list", () => {
+    mkdirSync(indexFile());
+    const told: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+    try {
+      expect(readInstalled()).toEqual({});
+      readInstalled();
+    } finally {
+      process.stderr.write = write;
+    }
+    expect(told).toHaveLength(1);
+    expect(told[0]).toContain(indexFile());
+    expect(readdirSync(home).some((f) => f.includes(".damaged-"))).toBe(false);
+  });
+
+  test.skipIf(process.platform === "win32")("a symbolic link in the home adapter folder counts as a home adapter", () => {
+    const dir = fixture(join(work, "linked-source"), { name: "linked", code: true });
+    mkdirSync(join(home, "adapters"), { recursive: true });
+    symlinkSync(dir, join(home, "adapters", "linked"));
+    const link = join(home, "adapters", "linked");
+    expect(adapterTrust(link).codeConfirmed).toBe(false);
+    confirmCode(link);
+    expect(adapterTrust(link).codeConfirmed).toBe(true);
+  });
+
+  test("code in the home adapter folder without an install entry is not confirmed, and a project adapter is not affected", () => {
+    const dir = fixture(join(home, "adapters", "loose"), { name: "loose", code: true });
+    const t = adapterTrust(dir);
+    expect(t.codeFiles.length).toBeGreaterThan(0);
+    expect(t.codeConfirmed).toBe(false);
+    confirmCode(dir);
+    expect(adapterTrust(dir).codeConfirmed).toBe(true);
+    const project = fixture(join(work, "project-adapter"), { name: "proj", code: true });
+    expect(adapterTrust(project).codeConfirmed).toBe(true);
+  });
+
+  test.skipIf(process.platform === "win32")("a new home folder is private to the user", () => {
+    const fresh = join(work, "fresh-home");
+    process.env.CUVETTE_HOME = fresh;
+    saveInstalled({ name: "n", kind: "folder", source: "x", version: "1", sha256: "0", installed_on: "2026-01-01" });
+    expect(statSync(fresh).mode & 0o777).toBe(0o700);
+  });
+
   test("a catalog adapter is Reviewed and an installed folder is Unlisted", async () => {
     expect(adapterTrust(join(CATALOG_DIR, "openbabel")).label).toBe("Reviewed");
     applyInstall((await prepareAdd(fixture(join(work, "t1")))).id, { confirmed: true });

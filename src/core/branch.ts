@@ -47,9 +47,10 @@ export function branchSession(s: BranchSource, name: string, upTo?: number): { p
         return false;
       }
     });
-  writeFileSync(join(child.recordDir, "log.jsonl"), lines.length ? lines.join("\n") + "\n" : "");
+  writeFileSync(join(child.recordDir, "log.jsonl"), lines.length ? lines.join("\n") + "\n" : "", { mode: 0o600 });
   const rec = openRecord(child);
   for (const f of existsSync(s.record.blobDir) ? readdirSync(s.record.blobDir) : []) {
+    if (f.startsWith(".tmp-") || f.includes(".damaged-")) continue;
     const from = join(s.record.blobDir, f);
     const to = join(rec.blobDir, f);
     if (existsSync(to)) continue;

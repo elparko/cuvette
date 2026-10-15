@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { confirmCode } from "../src/adapters/source.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 const CUVETTE = join(__dirname, "..", "bin/cuvette.js");
@@ -14,6 +15,14 @@ let data = "";
 function home(settings?: Record<string, unknown>): string {
   const h = mkdtempSync(join(root, "home-"));
   cpSync(join(__dirname, "fixtures", "drive"), join(h, "adapters", "drivefix"), { recursive: true });
+  const before = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    confirmCode(join(h, "adapters", "drivefix"));
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
+  }
   if (settings) writeFileSync(join(h, "settings.json"), JSON.stringify(settings));
   return h;
 }

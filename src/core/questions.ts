@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { ensureHome, writeFileAtomic } from "./atomic.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Question } from "./types.ts";
 
@@ -22,10 +23,8 @@ function upsert(q: Question): void {
   const i = all.findIndex((x) => x.session === q.session && x.qid === q.qid);
   if (i >= 0) all[i] = q;
   else all.push(q);
-  mkdirSync(cuvetteHome(), { recursive: true });
-  const tmp = `${indexPath()}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(all, null, 2));
-  renameSync(tmp, indexPath());
+  ensureHome();
+  writeFileAtomic(indexPath(), JSON.stringify(all, null, 2), 0o600);
 }
 
 const stored = (q: Question): Question => (q.tableFrom && q.table ? { ...q, table: { columns: q.table.columns, rows: [] } } : q);

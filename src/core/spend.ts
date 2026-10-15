@@ -1,7 +1,7 @@
 import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { homeFolder } from "./old-names.ts";
+import { ensureHome } from "./atomic.ts";
 import type { Usage } from "./types.ts";
 
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -17,7 +17,7 @@ export function modelPrice(model: string): { input: number; output: number } | u
 }
 
 export function spendFile(): string {
-  return process.env.CUVETTE_SPEND_FILE || join(homeFolder(), "spend.jsonl");
+  return process.env.CUVETTE_SPEND_FILE || join(cuvetteHome(), "spend.jsonl");
 }
 
 export function costUsd(model: string, u: Usage): number {
@@ -29,6 +29,7 @@ export function costUsd(model: string, u: Usage): number {
 export function recordSpend(model: string, u: Usage, session?: string): number {
   const usd = costUsd(model, u);
   const path = spendFile();
+  if (dirname(path) === cuvetteHome()) ensureHome();
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, (endsCut(path) ? "\n" : "") + JSON.stringify({ t: new Date().toISOString(), model, session, usd, ...u }) + "\n");
   return usd;

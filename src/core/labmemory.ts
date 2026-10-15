@@ -1,5 +1,6 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
+import { ensureHome, noticeOnce } from "./atomic.ts";
 import { KnownAnswerTest, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter, Manifest } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -27,8 +28,14 @@ function readAdapter(adapter: string): LabChange[] {
   const latest = new Map<string, LabChange>();
   for (const line of readFileSync(f, "utf8").split("\n")) {
     if (!line.trim()) continue;
-    const c = JSON.parse(line) as LabChange;
-    latest.set(c.pid, c);
+    let c: LabChange;
+    try {
+      c = JSON.parse(line) as LabChange;
+    } catch {
+      noticeOnce(`Cuvette skipped a line in ${f} that is not valid JSON.`);
+      continue;
+    }
+    if (c && typeof c.pid === "string") latest.set(c.pid, c);
   }
   return [...latest.values()].sort((a, b) => a.version - b.version);
 }
@@ -38,9 +45,22 @@ function adapterNames(): string[] {
   return existsSync(base) ? readdirSync(base) : [];
 }
 
+function endsCut(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    const last = Buffer.alloc(1);
+    return size > 0 && readSync(fd, last, 0, 1, size - 1) === 1 && last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function write(c: LabChange): void {
+  ensureHome();
   mkdirSync(dirOf(c.adapter), { recursive: true });
-  appendFileSync(fileOf(c.adapter), JSON.stringify(c) + "\n");
+  appendFileSync(fileOf(c.adapter), (endsCut(fileOf(c.adapter)) ? "\n" : "") + JSON.stringify(c) + "\n");
 }
 
 export function propose(

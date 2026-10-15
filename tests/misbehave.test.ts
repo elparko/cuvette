@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { saveAccess } from "../src/adapters/access.ts";
+import { accessFile, saveAccess } from "../src/adapters/access.ts";
 import { applyInstall, prepareAdd } from "../src/adapters/install.ts";
 import { CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
+import { confirmCode } from "../src/adapters/source.ts";
 import { isRecordName } from "../src/core/places.ts";
 import { Session, cleanText } from "../src/core/session.ts";
 import { genericTools } from "../src/tools/generic.ts";
@@ -610,6 +611,7 @@ test.skipIf(windows)("a link in the project folder that leads into the Cuvette h
 test("a skill of an adapter in the Cuvette home folder is read through load_skill", async () => {
   const root = join(home, "adapters", "astropy");
   cpSync(join(CATALOG_DIR, "astropy"), root, { recursive: true });
+  confirmCode(root);
   const adapter = loadAdapter(root);
   const skill = adapter.skills()[0]!;
   const provider = new ScriptedProvider([call("load_skill", { name: skill.name }), call("read_file", { path: join(home, "adapters", "other-adapter", "x.md") }), { text: "ok" }]);
@@ -1169,4 +1171,14 @@ test("the refusal text writes out a control code and a line break in a path", as
   const hidden = /[\u0000-\u001f\u007f-\u009f\u2028\u202a-\u202e]/;
   for (const text of [pathRefusalReason("private", "/a/\u001b[2J\u202e/b\nc"), pathRefusalReason("link", "/a/\u0007/b"), writeRefusalReason("/a/\u2028b", false)]) expect(text).not.toMatch(hidden);
   expect(pathRefusalReason("private", "/a/\u202e/b\nc")).toContain(String.raw`"/a/\\u202e/b\nc"`);
+});
+
+test("saveAccess replaces the settings file in one step", () => {
+  const file = accessFile();
+  saveAccess("openbabel", { off: true });
+  linkSync(file, `${file}.copy`);
+  const before = readFileSync(file, "utf8");
+  saveAccess("openbabel", { off: false });
+  expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
+  expect(readFileSync(file, "utf8")).not.toBe(before);
 });
