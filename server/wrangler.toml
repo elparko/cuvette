@@ -10,6 +10,9 @@ routes = [
 [vars]
 MARKUP = "1.25"
 SITE_URL = "https://cuvette.ai"
+# Optional. Adds models to the default Anthropic table, or replaces a default model.
+# See "Add a host" in README.md.
+# UPSTREAMS = '{"my-model": {"kind": "openai", "base_url": "https://host.example/v1", "key_secret_name": "HOST_API_KEY", "upstream_model": "vendor/model", "price": {"input": 1, "output": 4, "cache_read": 0.1}, "max_output_tokens": 8000}}'
 
 [[d1_databases]]
 binding = "DB"

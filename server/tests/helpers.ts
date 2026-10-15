@@ -80,7 +80,7 @@ export async function sha256Hex(text: string): Promise<string> {
 
 export async function addAccount(env: TestEnv, balance: number, id = crypto.randomUUID()): Promise<{ id: string; token: string }> {
   const token = `cuv_${[...crypto.getRandomValues(new Uint8Array(43))].map((b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"[b % 64]).join("")}`;
-  env.fake.sqlite.prepare("INSERT INTO accounts (id, token_hash, balance_usd, in_flight, created_at) VALUES (?, ?, ?, 0, ?)").run(id, await sha256Hex(token), balance, "2026-01-01T00:00:00Z");
+  env.fake.sqlite.prepare("INSERT INTO accounts (id, token_hash, balance_usd, created_at) VALUES (?, ?, ?, ?)").run(id, await sha256Hex(token), balance, "2026-01-01T00:00:00Z");
   return { id, token };
 }
 
@@ -89,7 +89,7 @@ export function balanceOf(env: TestEnv, id: string): number {
 }
 
 export function inFlightOf(env: TestEnv, id: string): number {
-  return env.fake.row<{ in_flight: number }>("SELECT in_flight FROM accounts WHERE id = ?", id).in_flight;
+  return env.fake.row<{ n: number }>("SELECT COUNT(*) AS n FROM in_flight WHERE account_id = ?", id).n;
 }
 
 export function call(env: Env, path: string, init: RequestInit = {}): Promise<{ res: Response; settled: () => Promise<void> }> {
@@ -175,3 +175,26 @@ export function reserveFor(body: unknown, input: number, output: number, markup 
   const max = Math.min((body as any).max_tokens, 64000);
   return ((tokens * input + max * output) / 1e6) * markup;
 }
+
+export const OPENAI_MODEL = "host-model";
+export const OPENAI_UPSTREAMS = {
+  [OPENAI_MODEL]: {
+    kind: "openai",
+    base_url: "https://llm.example.test/v1/",
+    key_secret_name: "HOST_API_KEY",
+    upstream_model: "vendor/real-model",
+    price: { input: 1, output: 4, cache_read: 0.1 },
+    max_output_tokens: 8000,
+  },
+};
+export const HOST_KEY = "sk-host-secret-key";
+
+export function makeOpenAiEnv(extra: Partial<Env> = {}): TestEnv {
+  return makeEnv({ UPSTREAMS: JSON.stringify(OPENAI_UPSTREAMS), HOST_API_KEY: HOST_KEY, ...extra } as Partial<Env>);
+}
+
+export function openAiBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { model: OPENAI_MODEL, max_tokens: 1000, stream: true, messages: [{ role: "user", content: "hello" }], ...extra };
+}
+
+export const chunk = (data: object | string) => `data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`;
