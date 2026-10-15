@@ -500,6 +500,14 @@ describe("ollama", () => {
     expect((await makeProvider("ollama:m")).info.contextWindow).toBe(8192);
   });
 
+  test("numCtx from the settings is cut to the context length of the model", async () => {
+    const seen = stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, prompt_eval_count: 7800, eval_count: 1 }]), showBody(["tools"], "8B", 8192));
+    const p = await makeProvider("ollama:m", { numCtx: 32768 });
+    expect(p.info.contextWindow).toBe(8192);
+    await expect(p.step(req([user("q")]))).rejects.toMatchObject({ overflow: true });
+    expect(seen.find((s) => s.url.endsWith("/api/chat"))!.body.options.num_ctx).toBe(8192);
+  });
+
   test("retries without think when the server rejects it", async () => {
     const seen = stubOllama((body, n) => (n === 0 ? json({ error: '"x" does not support thinking' }, 400) : ndjson([{ message: { content: "ok" } }, { done: true }])));
     const p = await makeProvider("ollama:x");

@@ -103,7 +103,7 @@ export class OllamaProvider implements Provider {
   readonly promptedTools: boolean;
 
   constructor(readonly model: string, show: OllamaShow, opts: OllamaOpts = {}) {
-    this.numCtx = opts.numCtx ?? Math.min(DEFAULT_NUM_CTX, show.contextLength ?? DEFAULT_NUM_CTX);
+    this.numCtx = Math.min(opts.numCtx ?? DEFAULT_NUM_CTX, show.contextLength ?? Infinity);
     this.think = opts.think ?? false;
     this.promptedTools = opts.promptedTools ?? false;
     this.sleep = opts.sleep;
