@@ -41,6 +41,21 @@ test("the default skips a session that has no request, even if it is newer", () 
   expect(defaultSession(list.filter((s) => !s.ask), "/lab/sleep")).toBeUndefined();
 });
 
+test("the default keeps a session that has work but no request, and skips one with only a notice", () => {
+  const h = home();
+  const add = (id: string, kinds: string[]) => {
+    const dir = join(h, "sessions", id);
+    mkdirSync(dir, { recursive: true });
+    const lines = [{ id: 1, kind: "session", data: { cwd: "/lab/new", adapters: [], model: "m" } }, ...kinds.map((kind, i) => ({ id: i + 2, kind, data: {} }))];
+    writeFileSync(join(dir, "log.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+  };
+  add("20261009-100000-dddd", ["notice"]);
+  add("20261009-110000-eeee", ["notice", "setting"]);
+  const list = listSessions(h);
+  expect(defaultSession(list, "/lab/new")?.info.id).toBe("20261009-110000-eeee");
+  expect(defaultSession(list.filter((s) => s.id !== "20261009-110000-eeee"), "/lab/new")?.info.id).toBe("20261008-100000-bbbb");
+});
+
 test("each line has the id, the age, the folder and the first request, shortened", () => {
   const [a, , c] = listSessions(home());
   const now = Date.now();

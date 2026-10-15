@@ -18,6 +18,7 @@ export interface SessionInfo {
   description?: string;
   status?: SessionStatus;
   figure?: string;
+  worked?: boolean;
 }
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -119,6 +120,7 @@ interface Parsed {
   answered: boolean;
   waiting: boolean;
   lastFinal: boolean;
+  worked: boolean;
 }
 
 const parsed = new Map<string, { mtime: number; size: number; ino: number; p: Parsed }>();
@@ -136,6 +138,7 @@ function parseLog(log: string): Parsed {
   const asked = new Set<string>();
   let planOpen = false;
   let lastFinal = false;
+  let worked = false;
   for (const l of readFileSync(log, "utf8").replace(/^\uFEFF/, "").split("\n")) {
     if (!l) continue;
     let e: any;
@@ -146,6 +149,7 @@ function parseLog(log: string): Parsed {
     }
     if (!e || typeof e !== "object") continue;
     const d = e.data && typeof e.data === "object" ? e.data : {};
+    if (e.kind !== "session" && e.kind !== "notice") worked = true;
     if (!first && e.kind === "session") first = e;
     if (e.kind === "fork" && typeof e.session === "string") owner = e.session;
     else if (!ask && e.kind === "user" && !d.during) ask = e;
@@ -159,17 +163,17 @@ function parseLog(log: string): Parsed {
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
     else if (figures.length < 20 && e.kind === "node" && !d.sensitivityOf) figures.push(...((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).filter((p) => IMAGE.test(p)));
   }
-  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal };
+  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal, worked };
   parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, p });
   return p;
 }
 
-export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string } {
-  const { first, owner, ask, title, figures, answered, waiting, lastFinal } = parseLog(log);
+export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string; worked: boolean } {
+  const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
   const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : "not started";
-  return { first, ask, title, status, figure, owner };
+  return { first, ask, title, status, figure, owner, worked };
 }
 
 function firstFigure(folder: string | undefined): string | undefined {
@@ -190,6 +194,7 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
     name: named?.custom || s.title?.title || named?.name,
     description: s.title?.description || named?.description,
     status: s.status,
+    worked: s.worked,
     figure: s.figure ?? firstFigure(base.folder),
   };
 }
@@ -254,7 +259,7 @@ export function listSessions(home = cuvetteHome()): SessionInfo[] {
 }
 
 export function defaultSession(all: SessionInfo[], cwd: string): { info: SessionInfo; here: boolean } | undefined {
-  const list = all.filter((s) => s.ask);
+  const list = all.filter((s) => s.ask || s.worked);
   const inside = (dir: string) => !relative(resolve(dir), resolve(cwd)).startsWith("..") && !isAbsolute(relative(resolve(dir), resolve(cwd)));
   const here = list.find((s) => !s.moved && ((s.cwd && resolve(s.cwd) === resolve(cwd)) || (s.folder && inside(s.folder))));
   if (here) return { info: here, here: true };
