@@ -769,7 +769,7 @@ describe("a session whose adapter is not on this computer", () => {
       for (const n of readdirSync(d)) {
         const p = join(d, n);
         if (statSync(p).isDirectory()) walk(p);
-        else if (/\.(json|jsonl)$/.test(n)) writeFileSync(p, readFileSync(p, "utf8").split(LAB).join(moved));
+        else if (/\.(json|jsonl)$/.test(n)) writeFileSync(p, readFileSync(p, "utf8").split(JSON.stringify(LAB).slice(1, -1)).join(JSON.stringify(moved).slice(1, -1)));
       }
     };
     walk(root);

@@ -739,7 +739,9 @@ test("the settings files of a home folder inside the project are locked and hash
   mkdirSync(old);
   writeFileSync(join(old, "settings.json"), '{"hooks":{}}');
   const oldHome = process.env.HOME;
+  const oldProfile = process.env.USERPROFILE;
   process.env.HOME = h.home;
+  process.env.USERPROFILE = h.home;
   try {
     await withHome(elsewhere, () => {
       const scope = settingsScope(h.dirs);
@@ -756,6 +758,8 @@ test("the settings files of a home folder inside the project are locked and hash
   } finally {
     if (oldHome === undefined) delete process.env.HOME;
     else process.env.HOME = oldHome;
+    if (oldProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = oldProfile;
   }
 });
 

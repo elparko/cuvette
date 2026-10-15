@@ -706,7 +706,7 @@ test("a new file under the adapters folder makes the folder changed", () => {
   writeFileSync(join(p.adapter, "run.sh"), "x");
   const s = trustStatus(p.root);
   expect(s.state).toBe("changed");
-  expect(s.changes).toEqual(expect.arrayContaining([expect.stringContaining("new file: .cuvette/adapters/x/run.sh"), expect.stringContaining("new file: .cuvette/adapters/x/skills/evil.md")]));
+  expect(s.changes).toEqual(expect.arrayContaining([expect.stringContaining(`new file: ${join(".cuvette", "adapters", "x", "run.sh")}`), expect.stringContaining(`new file: ${join(".cuvette", "adapters", "x", "skills", "evil.md")}`)]));
   expect(adapterDirs(p.root).x).toBeUndefined();
 });
 
