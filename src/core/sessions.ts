@@ -196,20 +196,41 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
 
 const STALE_MS = 24 * 3600 * 1000;
 
+export function startEntriesOnly(log: string): boolean {
+  if (!existsSync(log)) return true;
+  for (const l of readFileSync(log, "utf8").replace(/^\uFEFF/, "").split("\n")) {
+    if (!l.trim()) continue;
+    try {
+      const kind = JSON.parse(l)?.kind;
+      if (kind !== "session" && kind !== "notice") return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 function staleEmpty(r: IndexRow): boolean {
   if (!basename(r.folder).startsWith(".new-") || Date.now() - (Date.parse(r.date) || 0) < STALE_MS) return false;
   const record = join(r.folder, ".record");
-  if (alive(record)) return false;
-  const log = join(record, "log.jsonl");
-  return !existsSync(log) || !scanLog(log).ask;
+  return existsSync(r.folder) && readdirSync(r.folder).every((n) => n === ".record") && !alive(record) && startEntriesOnly(join(record, "log.jsonl"));
+}
+
+export function cleanSessions(): string[] {
+  const removed: string[] = [];
+  for (const r of readIndex()) {
+    if (!staleEmpty(r)) continue;
+    const record = join(r.folder, ".record");
+    if (claimLock(record)) continue;
+    if (startEntriesOnly(join(record, "log.jsonl"))) discardPlace({ id: r.id, outDir: r.folder, recordDir: record, project: r.project, title: "", created: r.date, legacy: false, fallback: false });
+    if (existsSync(r.folder)) rmSync(join(record, LOCK), { force: true });
+    else removed.push(`${r.id}  ${r.folder}`);
+  }
+  return removed;
 }
 
 function indexed(home: string): SessionInfo[] {
-  const rows = readIndex(join(home, "sessions-index.json")).filter((r) => {
-    if (!staleEmpty(r)) return true;
-    if (home === cuvetteHome()) discardPlace({ id: r.id, outDir: r.folder, recordDir: join(r.folder, ".record"), project: r.project, title: "", created: r.date, legacy: false, fallback: false });
-    return false;
-  });
+  const rows = readIndex(join(home, "sessions-index.json")).filter((r) => !staleEmpty(r));
   return rows.map((r) => {
     const log = join(r.folder, ".record", "log.jsonl");
     if (!existsSync(log)) return { id: r.id, cwd: r.project, used: Date.parse(r.date) || 0, ask: r.title, folder: r.folder, moved: true, name: r.custom || r.name, description: r.description };

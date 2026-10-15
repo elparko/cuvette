@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, rmSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -313,3 +313,13 @@ test.skipIf(process.platform === "win32")("Ctrl+C while a session starts removes
   expect(readdirSync(root).filter((n) => n.startsWith(".new-"))).toEqual([]);
   expect(readIndex()).toEqual([]);
 }, 60_000);
+
+test("a missing provisional folder keeps its index row, so the list shows it as moved", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  const place = findPlace(session.id, { cwd })!;
+  const id = session.id;
+  rmSync(place.outDir, { recursive: true, force: true });
+  discardPlace(place);
+  expect(readIndex().map((r) => r.id)).toEqual([id]);
+});

@@ -121,7 +121,8 @@ Usage
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
   cuvette eln link <session> <id>      read an eLabFTW experiment and propose setup values
-  cuvette sessions                     list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
+  cuvette sessions [--clean]           list the sessions, newest first: folder, age, first request ("moved" if a folder is gone);
+                                       --clean removes the empty sessions that never started and are older than one day
   cuvette export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
   cuvette export <session> --format pptx|pdf --images figures|qc|pilot|all|<glob> [--order step|group|name]
             [--per-page 1|2|4|6|9] [--size 16:9|a4|letter]
@@ -216,6 +217,7 @@ const { values: o, positionals: pos } = parseArgs({
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
+    clean: { type: "boolean" },
     cite: { type: "boolean" },
     "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
@@ -784,7 +786,11 @@ async function main() {
       return;
     }
     case "sessions": {
-      const { listSessions, sessionLine } = await import("./core/sessions.ts");
+      const { listSessions, sessionLine, cleanSessions } = await import("./core/sessions.ts");
+      if (o.clean) {
+        const gone = cleanSessions();
+        return console.log(gone.length ? `Removed ${gone.length} empty session${gone.length === 1 ? "" : "s"} that never started:\n${gone.join("\n")}` : "No empty session to remove.");
+      }
       const list = listSessions();
       if (!list.length) return console.log("No sessions yet.");
       for (const s of list) console.log(sessionLine(s));

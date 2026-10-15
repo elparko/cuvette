@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
-import { ageText, claimLock, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
+import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
@@ -249,31 +249,70 @@ test("a clip does not cut an emoji in two", () => {
   expect(clip("short", 80)).toBe("short");
 });
 
-test("the list removes an empty provisional session that is older than a day and has no live lock", () => {
+function staleHome() {
   const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-stale-"));
-  const prev = process.env.CUVETTE_HOME;
   process.env.CUVETTE_HOME = h;
+  const day = 24 * 3600_000;
+  const session = { id: 1, kind: "session", data: { cwd: "/x" } };
+  const make = (id: string, ageMs: number, log: object[] | undefined, extra: (record: string, folder: string) => void = () => {}) => {
+    const folder = join(h, "proj", `.new-${id}`);
+    mkdirSync(join(folder, ".record"), { recursive: true });
+    if (log) writeFileSync(join(folder, ".record", "log.jsonl"), log.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    extra(join(folder, ".record"), folder);
+    saveIndexRow({ id, project: join(h, "proj"), outDir: folder, recordDir: join(folder, ".record"), title: "", created: new Date(Date.now() - ageMs).toISOString(), legacy: false, fallback: false });
+    return folder;
+  };
+  const folders = {
+    empty: make("20260101-000000-old1", 2 * day, [session, { id: 2, kind: "notice", data: { text: "x" } }]),
+    never: make("20260101-000000-old2", 2 * day, undefined),
+    young: make("20260101-000000-new1", 3600_000, [session]),
+    live: make("20260101-000000-old3", 2 * day, [session], (r) => writeFileSync(join(r, "open.json"), JSON.stringify({ pid: process.pid }))),
+    asked: make("20260101-000000-old4", 2 * day, [session, { id: 2, kind: "user", data: { text: "Count" } }]),
+    method: make("20260101-000000-old5", 2 * day, [session, { id: 2, kind: "setting", data: { name: "mode", new: "plan" } }]),
+    files: make("20260101-000000-old6", 2 * day, [session], (_, f) => writeFileSync(join(f, "result.csv"), "x")),
+  };
+  return { h, folders };
+}
+
+test("the list hides an old empty session but never deletes anything", () => {
+  const prev = process.env.CUVETTE_HOME;
   try {
-    const day = 24 * 3600_000;
-    const make = (id: string, ageMs: number, log: object[] | undefined, lock = false) => {
-      const folder = join(h, "proj", `.new-${id}`);
-      mkdirSync(join(folder, ".record"), { recursive: true });
-      if (log) writeFileSync(join(folder, ".record", "log.jsonl"), log.map((l) => JSON.stringify(l)).join("\n") + "\n");
-      if (lock) writeFileSync(join(folder, ".record", "open.json"), JSON.stringify({ pid: process.pid }));
-      saveIndexRow({ id, project: join(h, "proj"), outDir: folder, recordDir: join(folder, ".record"), title: "", created: new Date(Date.now() - ageMs).toISOString(), legacy: false, fallback: false });
-      return folder;
-    };
-    const session = { id: 1, kind: "session", data: { cwd: "/x" } };
-    const old = make("20260101-000000-old1", 2 * day, [session]);
-    const never = make("20260101-000000-old2", 2 * day, undefined);
-    const young = make("20260101-000000-new1", 3600_000, [session]);
-    const live = make("20260101-000000-old3", 2 * day, [session], true);
-    const asked = make("20260101-000000-old4", 2 * day, [session, { id: 2, kind: "user", data: { text: "Count" } }]);
+    const { h, folders } = staleHome();
     const ids = listSessions(h).map((s) => s.id).sort();
-    expect(ids).toEqual(["20260101-000000-new1", "20260101-000000-old3", "20260101-000000-old4"]);
-    expect([old, never].map(existsSync)).toEqual([false, false]);
-    expect([young, live, asked].map(existsSync)).toEqual([true, true, true]);
-    expect(readIndex().map((r) => r.id).sort()).toEqual(ids);
+    expect(ids).toEqual(["20260101-000000-new1", "20260101-000000-old3", "20260101-000000-old4", "20260101-000000-old5", "20260101-000000-old6"]);
+    expect(Object.values(folders).every(existsSync)).toBe(true);
+    expect(readIndex()).toHaveLength(7);
+  } finally {
+    if (prev === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = prev;
+  }
+});
+
+test("cleanSessions removes only an old session with start entries, no lock and no output files", () => {
+  const prev = process.env.CUVETTE_HOME;
+  try {
+    const { folders } = staleHome();
+    const removed = cleanSessions();
+    expect(removed.map((r) => r.split(" ")[0]).sort()).toEqual(["20260101-000000-old1", "20260101-000000-old2"]);
+    expect([folders.empty, folders.never].map(existsSync)).toEqual([false, false]);
+    expect([folders.young, folders.live, folders.asked, folders.method, folders.files].every(existsSync)).toBe(true);
+    expect(readIndex()).toHaveLength(5);
+    expect(existsSync(join(folders.files, ".record", "open.json"))).toBe(false);
+  } finally {
+    if (prev === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = prev;
+  }
+});
+
+test("cuvette sessions --clean prints what it removes", () => {
+  const prev = process.env.CUVETTE_HOME;
+  try {
+    const { h, folders } = staleHome();
+    const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "sessions", "--clean"], { env: { ...process.env, CUVETTE_HOME: h }, encoding: "utf8" });
+    expect(r.stdout).toContain("Removed 2 empty sessions that never started:");
+    expect(r.stdout).toContain("20260101-000000-old1");
+    expect(existsSync(folders.empty)).toBe(false);
+    expect(existsSync(folders.method)).toBe(true);
   } finally {
     if (prev === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = prev;
