@@ -18,7 +18,20 @@ export interface RecordPlaces {
   project?: string;
 }
 
+const HASHES = new Map<string, string>();
+
 export function sha256File(path: string): string {
+  const st = statSync(path);
+  const key = `${path}\0${st.size}\0${st.mtimeMs}`;
+  const known = HASHES.get(key);
+  if (known) return known;
+  const digest = hashOfFile(path);
+  if (HASHES.size >= 200) HASHES.delete(HASHES.keys().next().value!);
+  HASHES.set(key, digest);
+  return digest;
+}
+
+function hashOfFile(path: string): string {
   const h = createHash("sha256");
   const fd = openSync(path, "r");
   const buf = Buffer.alloc(1 << 20);
