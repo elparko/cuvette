@@ -19,7 +19,7 @@ import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
 import { pathRefusalReason } from "./refusals.ts";
-import { COPY_LIMIT_BYTES, cutText, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { COPY_LIMIT_BYTES, cutText, discardPlace, findPlace, inProject, isRecordName, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, readIndex, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle, titleInput } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers, logClaimCheck } from "./claims.ts";
@@ -387,13 +387,17 @@ export class Session {
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
     const s = new Session(id, cwd, settings, place, record);
     const held = claimLock(s.dir);
-    if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
+    if (held) {
+      if (!opts.place) discardPlace(place);
+      throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
+    }
     s.overrides = overrides;
     s.onceTrusted = !!opts.trustFolder;
     try {
       await s.init(opts);
     } catch (e) {
       s.releaseLock();
+      if (!opts.place) discardPlace(place);
       throw e;
     }
     if (opts.method) s.startMethod(opts.method);
@@ -4767,6 +4771,7 @@ export class Session {
     await this.starting.catch(() => {});
     this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
+    if (this.record.entries().every((e) => e.kind === "session" || e.kind === "notice")) discardPlace(this.place);
   }
 }
 

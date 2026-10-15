@@ -217,7 +217,8 @@ export function listSessions(home = cuvetteHome()): SessionInfo[] {
   return out.filter((s) => !(s.moved && s.used === 0)).sort((a, b) => b.used - a.used || b.id.localeCompare(a.id));
 }
 
-export function defaultSession(list: SessionInfo[], cwd: string): { info: SessionInfo; here: boolean } | undefined {
+export function defaultSession(all: SessionInfo[], cwd: string): { info: SessionInfo; here: boolean } | undefined {
+  const list = all.filter((s) => s.ask);
   const inside = (dir: string) => !relative(resolve(dir), resolve(cwd)).startsWith("..") && !isAbsolute(relative(resolve(dir), resolve(cwd)));
   const here = list.find((s) => !s.moved && ((s.cwd && resolve(s.cwd) === resolve(cwd)) || (s.folder && inside(s.folder))));
   if (here) return { info: here, here: true };

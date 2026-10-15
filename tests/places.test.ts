@@ -224,3 +224,32 @@ test("a project setting for the output folder wins over a user setting", async (
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${join(cwd, "project-results")}/<date>-<title>/`);
 });
+
+test("a start that fails leaves no provisional folder and no index row", async () => {
+  const cwd = project();
+  for (const bad of [{ adapters: ["no-such-adapter"], provider: new FakeProvider([]) }, { adapters: [], model: "gpt4" }]) {
+    await expect(Session.create({ ...bad, cwd, settings: { guidance: false, referee: "none" } })).rejects.toThrow();
+    expect(readdirSync(join(cwd, "cuvette")).filter((n) => n.startsWith(".new-"))).toEqual([]);
+    expect(readIndex()).toEqual([]);
+  }
+});
+
+test("a session that closes with no request leaves no provisional folder and no index row", async () => {
+  const cwd = project();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
+  expect(readIndex()).toHaveLength(1);
+  await session.close();
+  session = undefined;
+  expect(readdirSync(join(cwd, "cuvette")).filter((n) => n.startsWith(".new-"))).toEqual([]);
+  expect(readIndex()).toEqual([]);
+});
+
+test("a session with a request keeps its folder and index row after it closes", async () => {
+  const cwd = project();
+  const s = await analysed(cwd);
+  const id = s.id;
+  await s.close();
+  session = undefined;
+  expect(readIndex().map((r) => r.id)).toEqual([id]);
+  expect(findPlace(id, { cwd })?.id).toBe(id);
+});

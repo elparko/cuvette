@@ -29,9 +29,16 @@ test("the list is newest first by last use", () => {
 
 test("the default is the newest session of this folder, else the newest overall", () => {
   const list = listSessions(home());
-  expect(defaultSession(list, "/lab/sleep")).toMatchObject({ info: { id: "20261007-100000-cccc" }, here: true });
+  expect(defaultSession(list, "/lab/sleep")).toMatchObject({ info: { id: "20261001-090000-aaaa" }, here: true });
   expect(defaultSession(list, "/lab/other")).toMatchObject({ info: { id: "20261008-100000-bbbb" }, here: false });
   expect(defaultSession([], "/lab")).toBeUndefined();
+});
+
+test("the default skips a session that has no request, even if it is newer", () => {
+  const list = listSessions(home());
+  expect(list[1]!.id).toBe("20261007-100000-cccc");
+  expect(defaultSession(list, "/lab/sleep")?.info.id).not.toBe("20261007-100000-cccc");
+  expect(defaultSession(list.filter((s) => !s.ask), "/lab/sleep")).toBeUndefined();
 });
 
 test("each line has the id, the age, the folder and the first request, shortened", () => {

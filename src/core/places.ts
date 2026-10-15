@@ -191,6 +191,15 @@ export function provisional(p: Place): boolean {
   return !p.legacy && basename(p.outDir).startsWith(".new-");
 }
 
+export function discardPlace(p: Place): void {
+  if (!provisional(p)) return;
+  try {
+    if (readdirSync(p.outDir).some((n) => n !== ".record")) return;
+    rmSync(p.outDir, { recursive: true, force: true });
+  } catch {}
+  removeIndexRow(p.id);
+}
+
 const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export function branchPlace(parent: Place, name: string, id: string): Place {
