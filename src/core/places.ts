@@ -89,12 +89,41 @@ function writeIndex(rows: IndexRow[]): void {
   });
 }
 
+const LOCK_WAIT_MS = 10_000;
+const LOCK_STALE_MS = 15_000;
+
+function withIndexLock<T>(fn: () => T): T {
+  const dir = `${indexPath()}.lock`;
+  mkdirSync(dirname(dir), { recursive: true });
+  const start = Date.now();
+  let held = false;
+  while (!held) {
+    try {
+      mkdirSync(dir);
+      held = true;
+    } catch {
+      try {
+        if (Date.now() - statSync(dir).mtimeMs > LOCK_STALE_MS) rmSync(dir, { recursive: true, force: true });
+      } catch {}
+      if (Date.now() - start > LOCK_WAIT_MS) break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    if (held) rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
-  const all = readIndex();
-  const old = all.find((r) => r.id === p.id);
-  const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
-  writeIndex([...all.filter((r) => r.id !== p.id), row]);
+  withIndexLock(() => {
+    const all = readIndex();
+    const old = all.find((r) => r.id === p.id);
+    const row: IndexRow = { ...old, id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
+    writeIndex([...all.filter((r) => r.id !== p.id), row]);
+  });
 }
 
 export function cutText(s: string, n: number): string {
@@ -103,19 +132,23 @@ export function cutText(s: string, n: number): string {
 }
 
 export function renameIndexRow(id: string, custom: string): boolean {
-  const rows = readIndex();
-  const row = rows.find((r) => r.id === id);
-  if (!row) return false;
-  row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
-  writeIndex(rows);
-  return true;
+  return withIndexLock(() => {
+    const rows = readIndex();
+    const row = rows.find((r) => r.id === id);
+    if (!row) return false;
+    row.custom = cutText(custom.replace(/\s+/g, " ").trim(), 60) || undefined;
+    writeIndex(rows);
+    return true;
+  });
 }
 
 export function removeIndexRow(id: string): boolean {
-  const rows = readIndex();
-  if (!rows.some((r) => r.id === id)) return false;
-  writeIndex(rows.filter((r) => r.id !== id));
-  return true;
+  return withIndexLock(() => {
+    const rows = readIndex();
+    if (!rows.some((r) => r.id === id)) return false;
+    writeIndex(rows.filter((r) => r.id !== id));
+    return true;
+  });
 }
 
 export function slug(text: string, max = 40): string {

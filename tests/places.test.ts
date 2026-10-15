@@ -350,3 +350,28 @@ test("a missing provisional folder keeps its index row, so the list shows it as 
   discardPlace(place);
   expect(readIndex().map((r) => r.id)).toEqual([id]);
 });
+
+test("two processes that save index rows at the same time lose no row", async () => {
+  const go = join(home, "go");
+  const code = (tag: string) => `
+    import { existsSync, writeFileSync } from "node:fs";
+    import { saveIndexRow, removeIndexRow } from ${JSON.stringify(join(__dirname, "../src/core/places.ts"))};
+    writeFileSync(${JSON.stringify(go)} + "-${tag}", "");
+    while (!existsSync(${JSON.stringify(go)})) {}
+    for (let i = 0; i < 60; i++) {
+      saveIndexRow({ id: "${tag}-" + i, recordDir: "/x", outDir: "/x/" + i, project: "/x", title: "t", created: "2026-01-01", legacy: false, fallback: false });
+      if (i % 3 === 0) removeIndexRow("${tag}-" + i);
+    }
+  `;
+  const run = (tag: string) => {
+    const child = spawn(process.execPath, [TSX_CLI, "--eval", code(tag)], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
+    return new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+  };
+  const exits = Promise.all([run("a"), run("b")]);
+  for (let i = 0; i < 1200 && !(existsSync(`${go}-a`) && existsSync(`${go}-b`)); i++) await new Promise((r) => setTimeout(r, 50));
+  writeFileSync(go, "");
+  expect(await exits).toEqual([0, 0]);
+  const ids = readIndex().map((r) => r.id);
+  const expected = ["a", "b"].flatMap((t) => Array.from({ length: 60 }, (_, i) => `${t}-${i}`).filter((_, i) => i % 3 !== 0));
+  expect(ids.sort()).toEqual(expected.sort());
+}, 120_000);
