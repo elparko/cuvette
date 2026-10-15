@@ -373,11 +373,13 @@ export interface FigureFile {
 const CHANGED_NOTE_LOST = "The file changed after the run, and the record kept no copy. The workbook has no figure for this file.";
 const CHANGED_NOTE_TABLE_LOST = "The file changed after the run, and the record kept no copy. The workbook does not use the changed file.";
 const CHANGED_NOTE = "The file changed after the run. The workbook uses the copy that the record kept.";
+const MISSING_NOTE_LOST = "The file is missing, and the record kept no copy. The workbook has no figure for this file.";
+const MISSING_NOTE_TABLE_LOST = "The file is missing, and the record kept no copy. The workbook does not use the file.";
 
-function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string }): { path?: string; changed: boolean } {
+function recordedSource(record: AnalysisRecord, o: { path: string; sha?: string }): { path?: string; changed: boolean; missing?: boolean } {
   const blob = o.sha ? record.blobPath(o.sha) : undefined;
   if (blob && resolve(blob) !== resolve(o.path)) return { path: blob, changed: existsSync(o.path) && o.sha!.length === 64 && sha256File(o.path) !== o.sha };
-  if (o.sha && !blob && record.blobRef(o.sha)) return { path: undefined, changed: true };
+  if (o.sha && !blob && record.blobRef(o.sha)) return existsSync(o.path) ? { path: undefined, changed: true } : { path: undefined, changed: false, missing: true };
   return { path: existsSync(o.path) ? o.path : undefined, changed: false };
 }
 
@@ -592,6 +594,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     const read = (path: string, sha?: string) => {
       const found = recordedSource(record, { path, sha });
       if (found.changed) summary.push(["Note", `${basename(path)} (step ${step})`, "changed after the run", found.path ? CHANGED_NOTE : CHANGED_NOTE_TABLE_LOST]);
+      else if (found.missing) summary.push(["Note", `${basename(path)} (step ${step})`, "missing", MISSING_NOTE_TABLE_LOST]);
       return found.path ? readTable(found.path) : undefined;
     };
     if (result.table?.columns?.length) {
@@ -643,6 +646,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     for (const f of figureSources(n, record, true)) {
       const found = recordedSource(record, f);
       if (!found.path && found.changed) summary.push(["Note", `${basename(f.path)} (step ${steps.get(n.id)})`, "changed after the run", `${CHANGED_NOTE_LOST}`]);
+      else if (found.missing) summary.push(["Note", `${basename(f.path)} (step ${steps.get(n.id)})`, "missing", MISSING_NOTE_LOST]);
     }
   for (const f of w.figures) {
     listed.add(f.path);
