@@ -23,7 +23,7 @@ Release 0.1.1 includes all changes since 12 October.
 
 - Cuvette stores each row of the session list in its own file in the folder `sessions-index`. Two windows that save at the same time no longer lose a row.
 - Cuvette still reads the old file `sessions-index.json`. It does not write to it.
-- Remove writes a removal row for a session in the old sessions folder. It keeps the files.
+- The Remove command writes a removal row for a session in the old sessions folder. It keeps the files.
 - Cuvette moves a row file that has bad JSON (JavaScript Object Notation) or a wrong identifier (ID) aside. A read error does not move it.
 
 ### Hook scripts
@@ -38,8 +38,8 @@ Release 0.1.1 includes all changes since 12 October.
 - A folder that a hook glob names is in the lock only if the hook runs it. This includes a glob in a loop.
 - Cuvette remembers the result for each link, so a rejected link stays rejected and a link cycle ends. Link targets that are logs, cuvette output or records are skipped. The hash covers the files of a linked folder.
 - The macOS sandbox matches a name with a non-ASCII character as a whole name part. It keeps a POSIX class such as `[[:space:]]` in a glob. A `?` or a negated bracket denies a whole name part, so the deny is wider.
-- `write_file` refuses the paths that the lock list of `run_script` holds. LAB.md is on that list.
-- The hook hash covers a script of up to 64 MB by its content. For a larger script it uses the size, the time, and the first and last 1 MB.
+- `write_file` refuses the paths that the lock list of `run_script` holds. LAB.md is on that list. On Windows and macOS the check ignores letter case.
+- The hook hash covers a script of up to 64 megabytes (MB) by its content. For a larger script it uses the size, the time, and the first and last 1 MB.
 - The hash and the sandbox use one glob matcher.
 - The folder walk adds only regular files. A link inside the project gets a link hash, and the scan adds its target. The pattern `**/` matches zero folders.
 
@@ -54,7 +54,7 @@ Release 0.1.1 includes all changes since 12 October.
 - The key status and the key card show the `ant auth login` line.
 - In the programs panel, Esc stops a running install or update. The screen says so.
 - The setup page has a Check again control for `ant auth login`.
-- The browser app answers a new POST request with HTTP 409 while it closes. `cuvette app` treats SIGHUP like SIGTERM and Ctrl+C.
+- The browser app answers a new request (HTTP POST) with HTTP 409 while it closes. `cuvette app` treats the hang-up signal (SIGHUP) like the stop signal (SIGTERM) and Ctrl+C.
 - The Claude API key setting and the setup key step show the `ant auth login` command.
 - The status row of an unchecked step shows "Not checked".
 - A large output that someone deleted shows "missing", not "changed".
