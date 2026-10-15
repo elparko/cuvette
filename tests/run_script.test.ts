@@ -355,7 +355,7 @@ test.skipIf(process.platform === "win32")("write steps lock the folder of a hook
   expect(bwrapCommand(["tool"], steps).join(" ")).toContain(`--ro-bind ${join(l.project, "hooks")} ${join(l.project, "hooks")}`);
 });
 
-test("a hook script in the project root locks the file only, so other project folders and an output folder inside the project stay writable", () => {
+test.skipIf(process.platform === "win32")("a hook script in the project root locks the file only, so other project folders and an output folder inside the project stay writable", () => {
   const l = layout();
   mkdirSync(join(l.project, "results"));
   writeFileSync(join(l.settings), JSON.stringify({ hooks: { PreToolUse: [{ command: ["python3", "check.py"] }, { command: ["sh", "-c", "./guard.sh"] }] } }));
@@ -393,7 +393,7 @@ test("a hook glob in the project root denies new files that match the glob, and 
   expect(bwrap).not.toContain(join(l.project, "notes.txt"));
 });
 
-test("bwrap ro-binds only regular files for a root glob, never a folder that the glob matches", () => {
+test.skipIf(process.platform === "win32")("bwrap ro-binds only regular files for a root glob, never a folder that the glob matches", () => {
   const l = layout();
   mkdirSync(join(l.project, "results"));
   writeFileSync(join(l.project, "res.sh"), "x");
@@ -406,7 +406,7 @@ test("bwrap ro-binds only regular files for a root glob, never a folder that the
   expect(all).not.toContain(`--ro-bind ${l.out} `);
 });
 
-test("bwrap knows xdigit, blank, cntrl, graph and print, and locks every file for an unknown class", () => {
+test.skipIf(process.platform === "win32")("bwrap knows xdigit, blank, cntrl, graph and print, and locks every file for an unknown class", () => {
   const l = layout();
   for (const n of ["hookA.sh", "hookZ.sh", "other.txt"]) writeFileSync(join(l.project, n), "x");
   const bind = (g: string) => bwrapCommand(["tool"], [{ path: l.project, allow: false, pattern: `^${literalEre(l.project)}/${globEre(g)}$` }]).join(" ");
