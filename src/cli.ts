@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { cuvetteHome } from "./adapters/manifest.ts";
+import { writeFileAtomic } from "./core/atomic.ts";
 import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import { plainText } from "./core/plain.ts";
 import type { Mode } from "./core/types.ts";
@@ -17,6 +19,33 @@ if (!process.env.CUVETTE_HOME) {
   const moved = moveOldHome();
   if (moved) console.error(moved);
 }
+
+let stopAll = async (): Promise<unknown> => {
+  const { Session } = await import("./core/session.ts");
+  return Promise.all([...Session.open].map((x) => x.close().catch(() => {})));
+};
+let crashing = false;
+const crash = (e: unknown) => {
+  if (crashing) return;
+  crashing = true;
+  const err = e instanceof Error ? e : new Error(String(e));
+  let file = "";
+  try {
+    mkdirSync(cuvetteHome(), { recursive: true });
+    file = join(cuvetteHome(), `crash-${new Date().toISOString().replace(/[:.]/g, "-")}.log`);
+    writeFileAtomic(file, `${err.stack ?? `${err.name}: ${err.message}`}\n`, 0o600);
+  } catch {
+    file = "";
+  }
+  console.error(`Cuvette stopped because of an error: ${err.name}: ${err.message}${file ? `. Details: ${file}` : ""}`);
+  setTimeout(() => process.exit(70), 5000);
+  stopAll().then(
+    () => process.exit(70),
+    () => process.exit(70),
+  );
+};
+process.on("uncaughtException", crash);
+process.on("unhandledRejection", crash);
 
 const HELP = `cuvette - a guided analysis agent for science programs
 
@@ -453,6 +482,7 @@ async function app(folder?: string) {
   const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [], trustFolder }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
   console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
   if (!o["no-open"]) openWithOs(a.url);
+  stopAll = () => stopApp(() => a.close());
   await new Promise<void>((done) => {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);

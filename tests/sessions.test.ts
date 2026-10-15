@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
-import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
+import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, logLimits, openLock, scanLog, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
@@ -393,5 +393,29 @@ test("a session in the old sessions folder can be renamed and removed from the l
   } finally {
     if (old === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = old;
+  }
+});
+
+test("a log over the read limit is read at both ends, and the status says that the log is too large", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-big-"));
+  const dir = join(h, "sessions", "20261009-100000-dddd");
+  mkdirSync(dir, { recursive: true });
+  const filler = Array.from({ length: 40 }, (_, i) => JSON.stringify({ id: i + 3, kind: "note", data: { text: "x".repeat(60) } }));
+  const lines = [{ id: 1, kind: "session", data: { cwd: "/lab/big", adapters: [], model: "m" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l));
+  writeFileSync(join(dir, "log.jsonl"), [...lines, ...filler, JSON.stringify({ id: 99, kind: "assistant", data: { text: "Done.", final: true } })].join("\n") + "\n");
+  const before = { ...logLimits };
+  try {
+    logLimits.read = 1000;
+    logLimits.edge = 400;
+    expect(scanLog(join(dir, "log.jsonl"))).toMatchObject({ partial: true, status: "log too large to read", first: { data: { cwd: "/lab/big" } }, ask: { data: { text: "Count the cells" } } });
+    const list = listSessions(h);
+    expect(list.map((x) => x.id)).toEqual(["20261009-100000-dddd"]);
+    expect(list[0]).toMatchObject({ cwd: "/lab/big", ask: "Count the cells", status: "log too large to read" });
+    logLimits.read = before.read;
+    const whole = scanLog(join(dir, "log.jsonl"));
+    expect(whole.status).toBe("answered");
+    expect(whole.partial).toBeUndefined();
+  } finally {
+    Object.assign(logLimits, before);
   }
 });

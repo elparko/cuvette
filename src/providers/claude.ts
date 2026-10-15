@@ -10,7 +10,7 @@ import { ImageBudget, prepareImages } from "./images.ts";
 import { RETRIES, noRetry, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
-const MAX_TOKENS = 64000;
+export const MAX_TOKENS = 64000;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const NO_CREDENTIALS = "No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.";
 const NO_CREDENTIALS_HEADLESS = "No valid Claude credentials. Run cuvette key, or set ANTHROPIC_API_KEY.";
@@ -104,7 +104,7 @@ export class ClaudeProvider implements Provider {
   private headless = false;
   private apiKey?: string;
   private made?: { client: any; version: number; login: boolean };
-  private effort: string;
+  effort: string;
   private display: "summarized" | "omitted";
   private fallbacks = true;
   private sleep?: Sleep;

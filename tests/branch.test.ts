@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
+import { logLimits } from "../src/core/sessions.ts";
+import { branchSession } from "../src/core/branch.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, type CommandCtx } from "../src/ui/commands.ts";
@@ -102,4 +104,19 @@ test("/branch does not copy temporary or moved-aside blob files, and the branch 
   expect(child).toContain(`${sha}.ref.json`);
   expect(child.filter((f) => f.startsWith(".tmp-") || f.includes(".damaged-"))).toEqual([]);
   if (process.platform !== "win32") expect(statSync(join(r.folder, ".record", "log.jsonl")).mode & 0o777).toBe(0o600);
+});
+
+test("a record over the size limit is refused before any branch folder or index row exists", async () => {
+  const s = await counted("Otsu");
+  const rows = readdirSync(dirname(s.place.outDir));
+  const index = existsSync(join(process.env.CUVETTE_HOME!, "index.jsonl")) ? readFileSync(join(process.env.CUVETTE_HOME!, "index.jsonl"), "utf8") : "";
+  const before = logLimits.read;
+  logLimits.read = 10;
+  try {
+    expect(() => branchSession(s, "too big")).toThrow(/too large to branch/);
+  } finally {
+    logLimits.read = before;
+  }
+  expect(readdirSync(dirname(s.place.outDir))).toEqual(rows);
+  expect(existsSync(join(process.env.CUVETTE_HOME!, "index.jsonl")) ? readFileSync(join(process.env.CUVETTE_HOME!, "index.jsonl"), "utf8") : "").toBe(index);
 });

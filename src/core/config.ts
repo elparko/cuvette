@@ -75,6 +75,9 @@ export const DEFAULTS: Settings = {
   phi_check: "on",
 };
 
+export const MAX_CALLS_PER_REPLY = 16;
+export const PARALLEL_CALL_LIMIT = 4;
+
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {
   return s.export_xlsx !== false && s.export_xlsx !== "off";
 }
