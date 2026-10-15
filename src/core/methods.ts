@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { writeFileAtomic } from "./atomic.ts";
@@ -213,7 +213,7 @@ export function exportMethod(name: string, to: string): string {
   const m = loadMethod(name);
   const { path: _p, hash: _h, ...plain } = m;
   const dest = to.endsWith(".json") ? to : join(to, `${m.name}.cuvette-method.json`);
-  writeFileSync(dest, JSON.stringify(plain, null, 2) + "\n");
+  writeFileAtomic(dest, JSON.stringify(plain, null, 2) + "\n");
   return dest;
 }
 
