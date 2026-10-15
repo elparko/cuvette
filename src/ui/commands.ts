@@ -91,6 +91,31 @@ export function table(headers: string[], rows: string[][]): string {
   return [fmt(headers), fmt(widths.map((w) => "-".repeat(w))), ...rows.map(fmt)].join("\n");
 }
 
+function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line && line.length + 1 + word.length > width) (lines.push(line), (line = word));
+    else line = line ? `${line} ${word}` : word;
+  }
+  return [...lines, line];
+}
+
+export function helpTable(headers: [string, string], rows: string[][], width = 80, nameMax = 22): string {
+  const nameW = Math.max(headers[0].length, ...rows.map((r) => r[0]!.length).filter((n) => n <= nameMax));
+  const helpW = width - nameW - 2;
+  const out = [`${headers[0].padEnd(nameW)}  ${headers[1]}`, `${"-".repeat(nameW)}  ${"-".repeat(Math.min(headers[1].length, helpW))}`];
+  for (const [name, help] of rows) {
+    const helpLines = wrapWords(help!, helpW);
+    if (name!.length <= nameW) {
+      out.push(`${name!.padEnd(nameW)}  ${helpLines[0]}`, ...helpLines.slice(1).map((l) => " ".repeat(nameW + 2) + l));
+      continue;
+    }
+    out.push(...wrapWords(name!, width - 4).map((l, i) => (i ? "    " : "") + l), ...helpLines.map((l) => " ".repeat(nameW + 2) + l));
+  }
+  return out.join("\n");
+}
+
 function clip(s: string, n = 48): string {
   const one = s.replace(/\s+/g, " ");
   return one.length > n ? cutText(one, n - 1) + "…" : one;
@@ -313,7 +338,7 @@ const base: Command[] = [
     run(_, ctx) {
       const rows = commands.map((c) => [`/${c.name}${c.args ? " " + c.args : ""}`, c.help]);
       const keys = ctx.keys?.() ?? "Keys: Esc stops the agent. Shift+Tab changes the mode. Ctrl+C twice quits. Up and Down show past input.";
-      ctx.print(table(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
+      ctx.print(helpTable(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
     },
   },
   { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },

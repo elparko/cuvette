@@ -240,6 +240,15 @@ describe("the text of the commands", () => {
     }
   });
 
+  test("/help fits 80 columns and prints the dash line once", async () => {
+    const s = new FakeSession();
+    const r = await run(s as unknown as SessionLike, "/help");
+    const lines = all(r).split("\n\n")[0]!.split("\n");
+    expect(lines.filter((l) => l.length > 80)).toEqual([]);
+    expect(lines.filter((l) => /^-+ +-+$/.test(l))).toHaveLength(1);
+    expect(lines.some((l) => l.startsWith("/export <"))).toBe(true);
+  });
+
   test("a command name does not depend on capital letters, and the web view and the terminal agree", async () => {
     expect(parseCommand("/HELP")).toEqual({ head: "help", args: [] });
     expect(parseCommand("/Mode  Teach\nnow")).toEqual({ head: "mode", args: ["Teach", "now"] });
