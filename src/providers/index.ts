@@ -19,6 +19,7 @@ export interface ProviderOpts {
   cache?: "off" | "5m" | "1h";
   sleep?: Sleep;
   retries?: number;
+  headless?: boolean;
 }
 
 export interface ModelListing {

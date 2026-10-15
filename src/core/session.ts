@@ -485,7 +485,7 @@ export class Session {
     };
     checkSetting("model", !!opts.provider || !!opts.model);
     checkSetting("referee", !!opts.refereeProvider || !!opts.referee);
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings) }));
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache, showThinking: thinkingShown(this.settings), headless: this.settings.headless }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
@@ -3247,7 +3247,7 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next) }) : this.provider;
+    const provider = ["model", "effort", "promptCache", "show_thinking"].includes(name) ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache, showThinking: thinkingShown(next), headless: next.headless }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name) || (name === "show_thinking" && next.referee === "same")
       ? next.referee === "same"
         ? provider
