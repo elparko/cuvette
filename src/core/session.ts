@@ -224,6 +224,9 @@ export function announcesStep(text: string): boolean {
   return new RegExp(`\\b(?:I will|I'll|we will|we'll) (?:now )?(?:${ACTION})\\b|\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i").test(tail);
 }
 
+const plainPath = (p: string) => p.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+const shellQuote = (p: string) => `'${p.replace(/'/g, `'\\''`)}'`;
+
 export class Session {
   id: string;
   dir: string;
@@ -489,7 +492,7 @@ export class Session {
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? `Cuvette did not load the adapter folder ${stray} from the record. Run: cuvette resume ${id} --adapter ${stray}`
+        ? `Cuvette did not load the adapter folder ${plainPath(stray)} from the record. Run: cuvette resume ${id} --adapter ${shellQuote(plainPath(stray))}`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }

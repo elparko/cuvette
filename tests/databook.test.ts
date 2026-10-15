@@ -147,7 +147,7 @@ describe("databook", () => {
     const b = book([session()]);
     const methods = /<p class="methods">([^<]*)<\/p>/.exec(b.html)![1]!.replace(/&quot;/g, '"');
     expect(methods).toMatch(/^The analysis used statsmodels, pingouin, lifelines version lifelines 0\.30\.3[^(]* \(Seabold &amp; Perktold, 2010; Vallat, 2018; Davidson-Pilon, 2019\)\./);
-    expect(methods).toContain("Cuvette 0.1.0 (Smith, 2026) ran the program steps");
+    expect(methods).toContain(`Cuvette ${JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version} (Smith, 2026) ran the program steps`);
     expect(methods).toContain("ran the program steps through the biostats 0.1.1 adapter");
     expect(methods).toContain("Step 1 (inspect_table): 20 rows x 4 columns.");
     expect(methods).toContain("Step 2 (compare_two_groups): paired t-test, two-sided");
@@ -157,7 +157,7 @@ describe("databook", () => {
     expect(b.html).toMatch(/<td[^>]*>scientist<\/td><td[^>]*>answer to q1<\/td>/);
     expect(b.html).toMatch(/<ul class="refs"><li>Davidson-Pilon, C\. \(2019\)\. lifelines[^<]*<a href="https:\/\/doi\.org\/10\.21105\/joss\.01317">/);
     expect(b.html).toMatch(/<li>Seabold, S\., &amp; Perktold, J\. \(2010\)[^<]*<a/);
-    expect(b.html).toMatch(/<li>Smith, P\. \(2026\)\. Cuvette \(Version 0\.1\.0\) \[Computer software\]/);
+    expect(b.html).toContain(`<li>Smith, P. (2026). Cuvette (Version ${JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version}) [Computer software]`);
   });
 
   it("numbers figures and tables in order and gives n and the error bar type", () => {

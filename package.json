@@ -1,6 +1,6 @@
 {
   "name": "@elparko/cuvette",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A terminal agent that analyzes data in existing science software while the scientist owns the method decisions.",
   "license": "AGPL-3.0-only",
   "homepage": "https://cuvette.ai",
