@@ -336,7 +336,7 @@ function testInResults(record: ReviewContext["record"]): boolean {
     const d = (n.result as { data?: { test?: unknown } } | undefined)?.data;
     return typeof d?.test === "string" && d.test.trim() !== "";
   });
-  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && TEST_IN_TEXT.test(String(e.data.text ?? "")));
+  return named || record.live(["tool_result"]).some((e) => e.data.ok !== false && (e.data.tool === "run_script" || !!e.data.adapter) && TEST_IN_TEXT.test(String(e.data.text ?? "")));
 }
 
 function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {

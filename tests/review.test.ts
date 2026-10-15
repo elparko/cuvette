@@ -372,3 +372,17 @@ test("significant is not an error if the script output shows a p value or a test
   expect((await run(make(named))).some((f) => f.check === "significance_without_test")).toBe(false);
   expect((await run(make(none))).some((f) => f.check === "significance_without_test")).toBe(true);
 });
+
+test("a p value in the text of a read_file result does not count as a test", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const text = "sample,p value\nS1,0.03";
+  const record = {
+    entries: () => [],
+    live: (kinds?: string[]) => [{ id: 1, kind: "tool_result", data: { ok: true, tool: "read_file", text } }].filter((e) => !kinds || kinds.includes(e.kind)),
+    nodes: () => [{ id: "n1", result: { metrics: { mean_area: 3 } } }],
+    numbers: () => [],
+    stale: () => new Set(),
+  };
+  const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
+  expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
+});
