@@ -47,7 +47,7 @@ export function indexPath(): string {
   return join(cuvetteHome(), "sessions-index.json");
 }
 
-const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 
 const rowDir = (path = indexPath()) => join(dirname(path), "sessions-index");
 
@@ -80,11 +80,14 @@ function parseRowFile(json: string, id: string): IndexRow | null | undefined {
   }
 }
 
+const missing = (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT";
+
 function readRowFile(file: string, id: string): IndexRow | null | undefined {
   try {
     return parseRowFile(readFileSync(file, "utf8"), id);
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (missing(e)) return undefined;
+    throw e;
   }
 }
 
@@ -107,8 +110,10 @@ function readRowFolder(dir: string): Map<string, IndexRow | null> {
   for (const name of names) {
     const id = name.slice(0, -".json".length);
     if (!name.endsWith(".json") || !SAFE_ID.test(id)) continue;
-    const row = readRowFile(join(dir, name), id);
-    if (row !== undefined) out.set(id, row);
+    try {
+      const row = readRowFile(join(dir, name), id);
+      if (row !== undefined) out.set(id, row);
+    } catch {}
   }
   return out;
 }
@@ -125,12 +130,24 @@ function findRow(id: string): { row?: IndexRow; inOld: boolean } {
   return { row: mine === null ? undefined : (mine ?? old), inOld: !!old };
 }
 
-// A row file that cannot be read moves aside before the new row replaces it. Then no row goes away.
+// A row file with bad JSON or a wrong id moves aside before the new row replaces it. Then no row goes away.
 function writeRow(id: string, body: object): void {
   const dir = rowDir();
   const file = join(dir, `${id}.json`);
   mkdirSync(dir, { recursive: true });
-  if (existsSync(file) && readRowFile(file, id) === undefined) renameSync(file, `${file}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
+  let damaged = false;
+  try {
+    damaged = parseRowFile(readFileSync(file, "utf8"), id) === undefined;
+  } catch (e) {
+    if (!missing(e)) throw e;
+  }
+  if (damaged) {
+    try {
+      renameSync(file, `${file}.damaged-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
+    } catch (e) {
+      if (!missing(e)) throw e;
+    }
+  }
   const tmp = `${file}.${process.pid}.${randomBytes(3).toString("hex")}.tmp`;
   harnessWrite(file, () => {
     writeFileSync(tmp, JSON.stringify(body, null, 1));

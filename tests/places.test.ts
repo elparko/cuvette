@@ -359,13 +359,14 @@ const rowDir = () => join(home, "sessions-index");
 async function twoProcesses(bodyA: string, bodyB: string) {
   const go = join(home, "go");
   const places = JSON.stringify(join(__dirname, "../src/core/places.ts"));
-  const prefix = `import { existsSync } from "node:fs"; import { saveIndexRow, renameIndexRow, removeIndexRow } from ${places}; const place = (id) => ({ id, recordDir: "/p/" + id + "/.record", outDir: "/p/" + id, project: "/p", title: id, created: "2026-10-01T00:00:00Z", legacy: false, fallback: false }); while (!existsSync(${JSON.stringify(go)})) {}`;
-  const start = (body: string) => {
-    const child = spawn(process.execPath, [TSX_CLI, "--eval", `${prefix} ${body}`], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
+  const prefix = (n: number) => `import { existsSync, writeFileSync } from "node:fs"; import { saveIndexRow, renameIndexRow, removeIndexRow } from ${places}; const place = (id) => ({ id, recordDir: "/p/" + id + "/.record", outDir: "/p/" + id, project: "/p", title: id, created: "2026-10-01T00:00:00Z", legacy: false, fallback: false }); writeFileSync(${JSON.stringify(join(home, "ready-" + n))}, ""); while (!existsSync(${JSON.stringify(go)})) {}`;
+  const start = (body: string, n: number) => {
+    const child = spawn(process.execPath, [TSX_CLI, "--eval", `${prefix(n)} ${body}`], { env: { ...process.env, CUVETTE_HOME: home }, stdio: "ignore" });
     return new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
   };
-  const exits = [start(bodyA), start(bodyB)];
-  await new Promise((r) => setTimeout(r, 1500));
+  const exits = [start(bodyA, 1), start(bodyB, 2)];
+  for (let i = 0; i < 1200 && !(existsSync(join(home, "ready-1")) && existsSync(join(home, "ready-2"))); i++) await new Promise((r) => setTimeout(r, 50));
+  expect(existsSync(join(home, "ready-1")) && existsSync(join(home, "ready-2"))).toBe(true);
   writeFileSync(go, "");
   return Promise.all(exits);
 }
@@ -394,6 +395,10 @@ test("rename and remove work for an id that is only in the old file, and the res
   expect(removeIndexRow(gone)).toBe(true);
   expect(removeIndexRow(gone)).toBe(false);
   expect(renameIndexRow(gone, "x")).toBe(false);
+  writeFileSync(join(home, "sessions-index.json"), JSON.stringify([oldRow(keep), oldRow("UPPER")]));
+  expect(renameIndexRow("UPPER", "x")).toBe(false);
+  expect(removeIndexRow("UPPER")).toBe(false);
+  writeFileSync(join(home, "sessions-index.json"), old);
   const rows = readIndex();
   expect(rows.map((r) => r.id)).toEqual([keep]);
   expect(rows[0]!.custom).toBe("My run");
@@ -423,6 +428,39 @@ test("a damaged row file is skipped and not deleted, and an id that is not a saf
   saveIndexRow(rowPlace("../escape"));
   expect(existsSync(join(home, "escape.json"))).toBe(false);
   expect(readIndex().map((r) => r.id)).toEqual([good]);
+});
+
+test("an id with an uppercase letter gets no row file, so two ids never share a file on a case-insensitive file system", () => {
+  saveIndexRow(rowPlace("ABC"));
+  saveIndexRow(rowPlace("abc"));
+  expect(readdirSync(rowDir())).toEqual(["abc.json"]);
+  expect(renameIndexRow("ABC", "x")).toBe(false);
+  expect(removeIndexRow("ABC")).toBe(false);
+});
+
+test("a damaged row file moves aside when the next save replaces it", () => {
+  const id = rowId("aaaa", 1);
+  saveIndexRow(rowPlace(id));
+  writeFileSync(join(rowDir(), `${id}.json`), "{bad");
+  saveIndexRow(rowPlace(id));
+  expect(readIndex().map((r) => r.id)).toEqual([id]);
+  expect(readdirSync(rowDir()).filter((f) => f.includes(".damaged-"))).toHaveLength(1);
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a row file that cannot be read keeps its custom name and is not moved aside", () => {
+  const id = rowId("aaaa", 1);
+  saveIndexRow(rowPlace(id));
+  expect(renameIndexRow(id, "mine")).toBe(true);
+  const file = join(rowDir(), `${id}.json`);
+  chmodSync(file, 0o000);
+  try {
+    expect(() => saveIndexRow({ ...rowPlace(id), title: "later" })).toThrow();
+    expect(() => renameIndexRow(id, "other")).toThrow();
+  } finally {
+    chmodSync(file, 0o600);
+  }
+  expect(readdirSync(rowDir())).toEqual([`${id}.json`]);
+  expect(readIndex()[0]!.custom).toBe("mine");
 });
 
 test.skipIf(process.platform === "win32")("two processes that save 50 rows each at the same time lose no row", async () => {
