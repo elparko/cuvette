@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { addOldEnv } from "../core/old-names.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import type { LoadedAdapter } from "./manifest.ts";
-import { cap, decorate, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, withoutSecrets, type KindContext } from "./kinds/common.ts";
+import { cap, decorate, envAllowed, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, withoutSecrets, type KindContext } from "./kinds/common.ts";
 import type { AdapterRuntime } from "./runtime.ts";
 import { blindArgv } from "./blind.ts";
 
@@ -115,10 +115,11 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       const headers = Object.fromEntries(Object.entries(conn.headers).map(([k, v]) => [k, expand(v, c.ph)]));
       t = new StreamableHTTPClientTransport(new URL(expand(conn.url, c.ph)), { requestInit: { headers } });
     } else {
-      const argv = blindArgv(conn.command.map((a) => expand(a, c.ph)));
+      const ok = envAllowed(c.adapter.manifest);
+      const argv = blindArgv(conn.command.map((a) => expand(a, c.ph, ok)));
       if (!argv.length) throw new Error("connection.command is empty");
       const env = withoutSecrets(process.env);
-      for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph);
+      for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph, ok);
       Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
       addOldEnv(env);
       t = new StdioClientTransport({ command: argv[0], args: argv.slice(1), env, cwd: conn.cwd ? expand(conn.cwd, c.ph) : c.adapter.root, stderr: "pipe" });

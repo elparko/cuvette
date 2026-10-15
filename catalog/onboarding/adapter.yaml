@@ -27,6 +27,7 @@ program:
 connection:
   kind: mcp
   transport: stdio
+  pass_env: [CUVETTE_DRAFT_DIR]
   command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
   env:
     CUVETTE_DRAFT_DIR: "{env:CUVETTE_DRAFT_DIR}"

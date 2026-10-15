@@ -1,3 +1,6 @@
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import { commands, windowsOpenArgs } from "../src/ui/commands.ts";
 
@@ -9,11 +12,25 @@ const run = (path: string) => {
 };
 
 test("/open shows the path of a program file and does not open it", () => {
-  for (const ext of ["command", "sh", "bat", "cmd", "exe", "jar", "app", "ps1", "scpt", "py", "pyw", "vbs", "js", "jse", "wsf", "wsh", "lnk", "msi", "pkg", "dmg", "rb", "pl", "reg", "SH"]) {
+  for (const ext of ["command", "sh", "bat", "cmd", "exe", "jar", "app", "ps1", "scpt", "py", "pyw", "vbs", "js", "jse", "wsf", "wsh", "lnk", "msi", "pkg", "dmg", "rb", "pl", "reg", "hta", "desktop", "scr", "com", "terminal", "applescript", "workflow", "docm", "xlsm", "SH"]) {
     const out = run(`/work/run.${ext}`);
     expect(out.errors[0]).toContain(`/work/run.${ext}`);
     expect(out.notices).toEqual([]);
   }
+});
+
+test.skipIf(process.platform === "win32")("/open refuses an extensionless file with an executable bit and opens one without", () => {
+  const dir = mkdtempSync(join(tmpdir(), "open-"));
+  const tool = join(dir, "tool");
+  const plain = join(dir, "notes");
+  writeFileSync(tool, "#!/bin/sh\n");
+  writeFileSync(plain, "text");
+  chmodSync(tool, 0o755);
+  chmodSync(plain, 0o644);
+  expect(run(tool).errors[0]).toContain(tool);
+  expect(run(tool).notices).toEqual([]);
+  expect(run(plain)).toEqual({ errors: [], notices: [`Opening ${plain}`] });
+  expect(run(dir).errors).toEqual([]);
 });
 
 test("/open opens a data file", () => {

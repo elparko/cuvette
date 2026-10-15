@@ -425,6 +425,14 @@ class Session {
 5. `interrupt()` aborts the model call and the running tool; every open call gets an error
    result, so the history stays valid.
 
+## Crash path (`src/cli.ts`)
+
+An unexpected error prints one line.
+The line has the error name, the message and the path of the log file.
+Cuvette writes the stack to `<cuvette home>/crash-<timestamp>.log` with mode 0600.
+Cuvette then closes the open sessions and exits with code 70.
+If the sessions do not close in 5 seconds, Cuvette exits with code 70 anyway.
+
 ## Terminal UI (`src/tui/`, owner F)
 
 Built like Claude Code: a scrolling transcript, an input box at the bottom, a status line, and

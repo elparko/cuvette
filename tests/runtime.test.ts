@@ -519,6 +519,28 @@ test("mcp: the server process gets no secret variables and a tool hint from the 
   }
 }, 30000);
 
+test("mcp: env expansion for a stdio server resolves a safe name and a pass_env name, and not an unlisted or secret name", async () => {
+  process.env.CUVETTE_TEST_PLAIN = "visible";
+  process.env.CUVETTE_TEST_API_KEY = "s3cret";
+  const fields = (extra: string) =>
+    hintAdapter(`${extra}  env: { CUVETTE_TEST_PLAIN: "{env:CUVETTE_TEST_PLAIN}", CUVETTE_TEST_API_KEY: "{env:CUVETTE_TEST_API_KEY}" }\n`);
+  const peek = async (dir: string, name: string) => {
+    const r = await startAdapter(loadAdapter(dir), { workDir: join(root, `${name}-work`), sessionDir: join(root, `${name}-session`) });
+    try {
+      return (await (await r.tools()).find((t) => t.name === "peek")!.execute({}, ctx())).data;
+    } finally {
+      await r.close();
+    }
+  };
+  try {
+    expect(await peek(fields(""), "envmcp1")).toEqual({ secret: "", plain: "" });
+    expect(await peek(fields("  pass_env: [CUVETTE_TEST_PLAIN, CUVETTE_TEST_API_KEY]\n"), "envmcp2")).toEqual({ secret: "", plain: "visible" });
+  } finally {
+    delete process.env.CUVETTE_TEST_PLAIN;
+    delete process.env.CUVETTE_TEST_API_KEY;
+  }
+}, 30000);
+
 test("mcp: the manifest can mark a tool read-only", async () => {
   const dir = hintAdapter("tools:\n  - name: peek\n    description: Show two variables.\n    read_only: true\n");
   const own = { workDir: join(root, "hint2-work"), sessionDir: join(root, "hint2-session") };
