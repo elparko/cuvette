@@ -4480,13 +4480,12 @@ export class Session {
     if (!this.plan || this.planning || !this.approvedEntry) return;
     const name = tool.remoteName ?? tool.name;
     if (name === "calculate") return;
-    if (tool.readOnly) return;
     const i = matchStep(this.plan, name, tool.adapter);
     if (i >= 0) {
       if (this.plan.steps[i]!.status !== "skipped") this.plan.steps[i]!.status = "done";
       return;
     }
-    if (this.planWarned.has(name)) return;
+    if (tool.readOnly || this.planWarned.has(name)) return;
     this.planWarned.add(name);
     this.record.append("notice", { text: `Not in the approved plan: ${name}. Reason: ${lastSentence(this.lastSaid) || "the agent gave none yet."}`, plan: "deviation", tool: name });
     this.notes.push(`${name} is not in the approved plan. Call plan now to add it as a step, with the reason.`);

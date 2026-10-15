@@ -3442,3 +3442,19 @@ test("a number in the late part of a long script output is a measured claim, not
   const claims = (session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string }[] }).claims;
   expect(claims.find((c) => c.value === 7342.5)?.label).toBe("measured");
 });
+
+test("an approved plan step is done after a read-only adapter tool made a node: no reminder and no not-done notice", async () => {
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  (session["tools"].get("blur") as { readOnly: boolean }).readOnly = true;
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  expect(session.record.nodes().map((n) => n.tool)).toEqual(["blur"]);
+  const texts = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text").map((p) => (p as { text: string }).text);
+  expect(texts.some((t) => /Your plan still has steps that are not done/.test(t))).toBe(false);
+  expect(session.record.entries(["notice"]).some((e) => /Not done from the approved plan/.test(String(e.data.text)))).toBe(false);
+  expect(session.plan?.steps[0]?.status).toBe("done");
+});
