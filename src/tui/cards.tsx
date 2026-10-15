@@ -202,6 +202,7 @@ export function QuestionCard(props: {
   const [other, setOther] = useState(free);
   const [cursor, setCursor] = useState(() => questionCursor(q, props.current));
   const [need, setNeed] = useState("");
+  const [digits, setDigits] = useState("");
   const onTyping = props.onTyping;
   useEffect(() => {
     onTyping?.(other);
@@ -221,7 +222,15 @@ export function QuestionCard(props: {
     (input, key) => {
       if (!guardPass()) return;
       const n = Number(input);
-      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) onAnswer(q.options[n - 1]!.value);
+      const many = q.options.length >= 10;
+      if (many && /^[0-9]$/.test(input)) {
+        const typed = Number(digits + input) >= 1 && Number(digits + input) <= q.options.length ? digits + input : input;
+        setDigits(typed);
+        if (Number(typed) >= 1 && Number(typed) <= q.options.length) setCursor(Number(typed) - 1);
+        return;
+      }
+      if (digits) setDigits("");
+      if (!many && Number.isInteger(n) && n >= 1 && n <= q.options.length) onAnswer(q.options[n - 1]!.value);
       else if (key.upArrow) setCursor((c) => (c + q.options.length - 1) % q.options.length);
       else if (key.downArrow) setCursor((c) => (c + 1) % q.options.length);
       else if (input === "o") setOther(true);
@@ -284,7 +293,7 @@ export function QuestionCard(props: {
         <Text dimColor>
           {compact
             ? `↑↓ choose · Enter accepts${props.onBack ? " · ← back" : ""} · Esc later`
-            : `↑↓ choose · Enter accepts · a number answers at once${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
+            : `↑↓ choose · Enter accepts · ${q.options.length >= 10 ? "a number moves to that option" : "a number answers at once"}${props.onBack ? " · ← back" : ""} · Esc ${props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}`}
         </Text>
       )}
     </Frame>
