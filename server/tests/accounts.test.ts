@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SCHEMA, addAccount, call, makeEnv, mockFetch, post, sha256Hex } from "./helpers.ts";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -48,8 +48,10 @@ describe("account create and auth", () => {
   it("rejects a wrong method and an unknown route", async () => {
     const env = makeEnv();
     expect((await call(env, "/v1/account", { method: "POST" })).res.status).toBe(405);
-    expect((await call(env, "/v1/models")).res.status).toBe(404);
-    expect((await call(env, "/v1/messages/count_tokens", post("x", {}))).res.status).toBe(404);
+    expect((await call(env, "/v1/nothing")).res.status).toBe(404);
+    expect((await call(env, "/v1/models", { method: "POST" })).res.status).toBe(405);
+    expect((await call(env, "/v1/messages/count_tokens")).res.status).toBe(405);
+    expect((await call(env, "/v1/chat/completions")).res.status).toBe(405);
   });
 
   it("limits account creation to five an hour for each address", async () => {
@@ -101,7 +103,9 @@ describe("checkout", () => {
 });
 
 describe("schema", () => {
-  it("keeps the migration the same as schema.sql", () => {
-    expect(readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8")).toBe(SCHEMA);
+  it("keeps schema.sql the same as the migrations in order", () => {
+    const dir = new URL("../migrations/", import.meta.url);
+    const joined = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n");
+    expect(joined).toBe(SCHEMA);
   });
 });

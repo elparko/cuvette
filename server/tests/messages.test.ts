@@ -315,3 +315,138 @@ describe("client abort", () => {
     expect(inFlightOf(env, acct.id)).toBe(0);
   });
 });
+
+describe("in-flight table", () => {
+  const age = (env: ReturnType<typeof makeEnv>, minutes: number) => env.fake.sqlite.prepare("UPDATE in_flight SET started_at = started_at - ?").run(minutes * 60_000);
+
+  it("writes one row at the start of a request and deletes it at settle", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    const rows = env.fake.rows<{ request_id: string; account_id: string; started_at: number }>("SELECT * FROM in_flight");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.account_id).toBe(acct.id);
+    expect(Math.abs(rows[0]!.started_at - Date.now())).toBeLessThan(5000);
+    held.push(streamText());
+    held.end();
+    await res.text();
+    await settled();
+    expect(env.fake.rows("SELECT * FROM in_flight")).toHaveLength(0);
+  });
+
+  it("ignores rows that are 15 minutes old or older when it counts toward the limit of four", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 50);
+    const streams = [heldStream(), heldStream(), heldStream(), heldStream(), heldStream()];
+    let n = 0;
+    mockFetch(() => streams[n++]!.response);
+    const first = [];
+    for (let i = 0; i < 4; i++) first.push(await call(env, "/v1/messages", post(acct.token, chatBody())));
+    expect((await call(env, "/v1/messages", post(acct.token, chatBody()))).res.status).toBe(429);
+    age(env, 14);
+    expect((await call(env, "/v1/messages", post(acct.token, chatBody()))).res.status).toBe(429);
+    age(env, 2);
+    const fifth = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    expect(fifth.res.status).toBe(200);
+    expect(inFlightOf(env, acct.id)).toBe(1);
+    for (const f of [...first, fifth]) await f.res.body!.cancel();
+  });
+
+  it("does not count the rows of another account", async () => {
+    const env = makeEnv();
+    const a = await addAccount(env, 50);
+    const b = await addAccount(env, 50);
+    const streams = [heldStream(), heldStream(), heldStream(), heldStream(), heldStream()];
+    let n = 0;
+    mockFetch(() => streams[n++]!.response);
+    const held = [];
+    for (let i = 0; i < 4; i++) held.push(await call(env, "/v1/messages", post(a.token, chatBody())));
+    const other = await call(env, "/v1/messages", post(b.token, chatBody()));
+    expect(other.res.status).toBe(200);
+    for (const f of [...held, other]) await f.res.body!.cancel();
+  });
+
+  it("answers 429 and not 402 when the account is both busy and short of credit", async () => {
+    const env = makeEnv();
+    const body = chatBody();
+    const acct = await addAccount(env, reserveFor(body, 2, 10) * 4.5);
+    const streams = [heldStream(), heldStream(), heldStream(), heldStream()];
+    let n = 0;
+    mockFetch(() => streams[n++]!.response);
+    const first = [];
+    for (let i = 0; i < 4; i++) first.push(await call(env, "/v1/messages", post(acct.token, body)));
+    expect((await call(env, "/v1/messages", post(acct.token, body))).res.status).toBe(429);
+    for (const f of first) await f.res.body!.cancel();
+  });
+
+  it("keeps the reservation and writes status expired when the row is older than 15 minutes at settle", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const body = chatBody();
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, body));
+    age(env, 16);
+    held.push(streamText());
+    held.end();
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 2, 10), 9);
+    expect(env.fake.row("SELECT status, cost_usd FROM usage")).toMatchObject({ status: "expired" });
+    expect(env.fake.row("SELECT cost_usd FROM usage").cost_usd).toBeCloseTo(reserveFor(body, 2, 10), 9);
+    expect(env.fake.rows("SELECT * FROM in_flight")).toHaveLength(0);
+  });
+
+  it("keeps the reservation when the row was already removed", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const body = chatBody();
+    const held = heldStream();
+    mockFetch(() => held.response);
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, body));
+    env.fake.sqlite.prepare("DELETE FROM in_flight").run();
+    held.push(streamText());
+    held.end();
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 2, 10), 9);
+    expect(env.fake.row("SELECT status FROM usage").status).toBe("expired");
+  });
+
+  it("keeps the reservation of an expired row when the upstream fails", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    const body = chatBody();
+    mockFetch(() => {
+      age(env, 16);
+      return new Response("{}", { status: 529 });
+    });
+    await call(env, "/v1/messages", post(acct.token, body));
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - reserveFor(body, 2, 10), 9);
+  });
+
+  it("removes expired rows of the account when a new request starts", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    env.fake.sqlite.prepare("INSERT INTO in_flight (request_id, account_id, started_at) VALUES ('old', ?, ?)").run(acct.id, Date.now() - 20 * 60_000);
+    mockFetch(() => sseResponse(streamText()));
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    await res.text();
+    await settled();
+    expect(env.fake.rows("SELECT * FROM in_flight")).toHaveLength(0);
+  });
+
+  it("stays usable after a Worker stop left four old rows", async () => {
+    const env = makeEnv();
+    const acct = await addAccount(env, 5);
+    for (let i = 0; i < 4; i++) env.fake.sqlite.prepare("INSERT INTO in_flight (request_id, account_id, started_at) VALUES (?, ?, ?)").run(`stale${i}`, acct.id, Date.now() - 20 * 60_000);
+    mockFetch(() => sseResponse(streamText()));
+    const { res, settled } = await call(env, "/v1/messages", post(acct.token, chatBody()));
+    expect(res.status).toBe(200);
+    await res.text();
+    await settled();
+    expect(balanceOf(env, acct.id)).toBeCloseTo(5 - SONNET_COST * 1.25, 9);
+  });
+});
