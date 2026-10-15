@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { namesValue } from "../src/core/asked.ts";
 import { linear as once, Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 function linear(make: (n: number) => string, run: (s: string) => void, n: number) {
   let res = once(make, run, n);
@@ -228,6 +229,6 @@ describe("fuzz: the value gate for setting changes", () => {
     }
     const t = performance.now();
     namesValue("set the minimum cells to 6 and ".repeat(33000), f, 5, ALL);
-    expect(performance.now() - t).toBeLessThan(3000);
+    withinMs(performance.now() - t, 3000);
   });
 });

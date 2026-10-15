@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
 import { CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-fuzz-manifest-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -79,7 +80,7 @@ describe("fuzz: adapter.yaml loader", () => {
     const r = new Rng(13001);
     for (let i = 0; i < runs(200); i++) {
       const res = load(damage(r, r.pick(SEEDS)));
-      expect(res.ms).toBeLessThan(5000);
+      withinMs(res.ms, 5000);
       if (!res.ok) clear(res.message);
     }
   });
@@ -96,7 +97,7 @@ describe("fuzz: adapter.yaml loader", () => {
     ];
     for (const c of cases) {
       const res = load(c);
-      expect(res.ms, c.slice(0, 60)).toBeLessThan(10000);
+      withinMs(res.ms, 10000, c.slice(0, 60));
       expect(res.ok, c.slice(0, 60)).toBe(false);
       clear(res.message);
     }

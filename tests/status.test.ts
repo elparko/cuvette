@@ -14,6 +14,7 @@ import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, rerunText } from "../src/ui/commands.ts";
 import { Mapper } from "../src/ui/items.ts";
 import type { SessionLike } from "../src/ui/types.ts";
+import { withinMs } from "./timing.ts";
 
 let session: Session | undefined;
 beforeEach(() => {
@@ -236,7 +237,7 @@ test("the answer check reads the step status once for a record with 500 steps", 
   const start = Date.now();
   const claims = checkAnswer(text, record);
   expect(claims.length).toBeGreaterThan(0);
-  expect(Date.now() - start).toBeLessThan(20_000);
+  withinMs(Date.now() - start, 20_000);
 });
 
 test.skipIf(process.platform === "win32")("cuvette status does not run the version command of a recorded adapter path outside the adapter folders", async () => {

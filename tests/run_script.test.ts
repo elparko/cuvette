@@ -12,6 +12,7 @@ import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-script-"));
 let n = 0;
@@ -119,7 +120,7 @@ test("timeout kills the script", async () => {
   const t0 = Date.now();
   const r = await run("import time\ntime.sleep(60)", { timeout_s: 1 });
   expect(r).toMatchObject({ ok: false, error: "the script timed out after 1 s" });
-  expect(Date.now() - t0).toBeLessThan(8000);
+  withinMs(Date.now() - t0, 8000);
 });
 
 test("abort signal stops the script", async () => {

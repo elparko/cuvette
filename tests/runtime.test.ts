@@ -8,6 +8,7 @@ import { loadAdapter, Manifest } from "../src/adapters/manifest.ts";
 import { locate } from "../src/adapters/locate.ts";
 import { convertResult } from "../src/adapters/mcp.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-runtime-"));
 const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
@@ -90,7 +91,7 @@ test("cancel stops a call that obeys cancel and keeps the process", async () => 
   const r = await p;
   expect(r.ok).toBe(false);
   expect(r.error).toMatch(/cancelled/);
-  expect(Date.now() - t0).toBeLessThan(4000);
+  withinMs(Date.now() - t0, 4000);
   expect(rt.running).toBe(true);
   expect((await run("echo", { text: "again" })).ok).toBe(true);
 });
@@ -108,7 +109,7 @@ test("cancel kills a process that does not answer, and the next call restarts it
   await new Promise((r) => setTimeout(r, 500));
   const t0 = Date.now();
   await rt.cancel();
-  expect(Date.now() - t0).toBeLessThan(6000);
+  withinMs(Date.now() - t0, 6000);
   expect((await p).ok).toBe(false);
   expect(rt.running).toBe(false);
   expect((await run("echo", { text: "back" })).text).toBe("echo: back");
@@ -200,7 +201,7 @@ test("quick start: a Python adapter starts before its version command ends, and 
     const dirs = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
     const t0 = Date.now();
     const rt = await startAdapter(a, dirs, { quick: true });
-    expect(Date.now() - t0).toBeLessThan(2000);
+    withinMs(Date.now() - t0, 2000);
     expect(rt.programVersion).toBe("from the manifest");
     const f = await rt.checked;
     expect(f).toMatchObject({ version: "9.9", identified: true });
@@ -270,7 +271,7 @@ test("quick start: a stop while the version command runs ends the call at once, 
     setTimeout(() => stop.abort(), 100);
     const t0 = Date.now();
     const out = await nap.execute({ seconds: 5 }, { ...ctx(stop.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t0).toBeLessThan(4000);
+    withinMs(Date.now() - t0, 4000);
     expect(out.ok).toBe(false);
     await rt.checked;
     const next = await nap.execute({ seconds: 0 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
@@ -280,7 +281,7 @@ test("quick start: a stop while the version command runs ends the call at once, 
     setTimeout(() => queued.abort(), 100);
     const t1 = Date.now();
     const second = await nap.execute({ seconds: 0 }, { ...ctx(queued.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t1).toBeLessThan(5000);
+    withinMs(Date.now() - t1, 5000);
     expect(second.ok).toBe(false);
     expect((await first).ok).toBe(true);
     await rt.close();
@@ -353,12 +354,12 @@ test("warm: the worker starts and imports the adapter modules before the first c
   const { rt, call } = await quickStart(dir);
   const t0 = Date.now();
   rt.warm!(true);
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
   await until(() => existsSync(join(dir, "imported")));
   await new Promise((r) => setTimeout(r, 3500));
   const t1 = Date.now();
   const out = await call();
-  expect(Date.now() - t1).toBeLessThan(1500);
+  withinMs(Date.now() - t1, 1500);
   expect(out.ok).toBe(true);
   expect((out.data as { pid: number }).pid).toBe(Number(readFileSync(join(dir, "imported"), "utf8")));
   await rt.close();
@@ -386,7 +387,7 @@ test("warm: a close while the worker imports the modules stops the worker", asyn
   const pid = Number(readFileSync(join(dir, "imported"), "utf8"));
   const t0 = Date.now();
   await rt.close();
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
   await until(() => !alive(pid), 3000);
 }, 20000);
 
@@ -413,7 +414,7 @@ test("warm: a call that Esc stops while the worker imports the modules returns a
   const out = await p;
   expect(out.ok).toBe(false);
   expect(out.error).toMatch(/interrupted/);
-  expect(Date.now() - t0).toBeLessThan(1500);
+  withinMs(Date.now() - t0, 1500);
   await rt.close();
 }, 20000);
 
@@ -457,7 +458,7 @@ test("warm: an import of the adapter modules that does not end stops at the star
   const out = await call();
   expect(out.ok).toBe(false);
   expect(out.error).toMatch(/did not end within 2 s/);
-  expect(Date.now() - t0).toBeLessThan(4000);
+  withinMs(Date.now() - t0, 4000);
   await until(() => !alive(pid));
   await rt.close();
 }, 20000);

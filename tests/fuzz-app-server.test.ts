@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const home = mkdtempSync(join(tmpdir(), "cuvette-fuzz-app-home-"));
 const outside = mkdtempSync(join(tmpdir(), "cuvette-fuzz-app-outside-"));
@@ -275,7 +276,7 @@ describe("the event stream", () => {
     const t = performance.now();
     const r = await get(withToken("/api/state"));
     expect(r.status).toBe(200);
-    expect(performance.now() - t).toBeLessThan(2000);
+    withinMs(performance.now() - t, 2000);
     slow.resume();
     for (let i = 0; i < 40 && !closed; i++) await new Promise((d) => setTimeout(d, 50));
     expect(closed).toBe(true);

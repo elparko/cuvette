@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { Session } from "../src/core/session.ts";
 import { saveClaudeKey, saveClaudeWorkspace, WORKSPACE_HELP } from "../src/core/credentials.ts";
 import { checkClaudeKey, ClaudeProvider } from "../src/providers/claude.ts";
+import { withinMs } from "./timing.ts";
 
 type Block =
   | { type: "thinking"; thinking: string; signature: string }
@@ -339,7 +340,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     replies = [{ hang: true }];
     const t0 = Date.now();
     expect(await checkClaudeKey("sk-ant-slow", "claude-opus-5-5", 300)).toMatchObject({ ok: true, text: expect.stringMatching(/^Cannot reach the Claude API/) });
-    expect(Date.now() - t0).toBeLessThan(5000);
+    withinMs(Date.now() - t0, 5000);
     replies = [];
     expect(await checkClaudeKey("sk-ant-err")).toEqual({ ok: true, text: "Cannot check the key: the Claude API gave HTTP 500. The first request tests it." });
   });

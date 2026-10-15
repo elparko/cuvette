@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { namesValue } from "../src/core/asked.ts";
+import { withinMs } from "./timing.ts";
 
 const alpha = { key: "alpha", label: "Alpha" };
 const perms = { key: "permutations", label: "Permutations" };
@@ -49,7 +50,7 @@ test("a long run of punctuation does not take quadratic time", () => {
   const request = `alpha 0.05 ${")".repeat(100_000)}x`;
   const start = Date.now();
   expect(namesValue(request, alpha, 0.05)).toBe(true);
-  expect(Date.now() - start).toBeLessThan(3000);
+  withinMs(Date.now() - start, 3000);
 });
 
 test("a negation in the same clause before the number makes the number not asked", () => {

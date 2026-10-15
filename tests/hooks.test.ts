@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { HookRunner } from "../src/core/hooks.ts";
 import type { Hook, PreToolUseInput } from "../src/core/types.ts";
+import { withinMs } from "./timing.ts";
 
 const input: PreToolUseInput = { event: "PreToolUse", session: "s", mode: "watch", tool: "seg", args: { a: 1 } };
 const dir = mkdtempSync(join(tmpdir(), "cuvette-hook-"));
@@ -98,7 +99,7 @@ test("a hook that hangs stops at once when the turn stops, and the call does not
   const ctl2 = new AbortController();
   setTimeout(() => ctl2.abort(), 200);
   expect(await h.stop({ session: "s" }, ctl2.signal)).toBeUndefined();
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
 });
 
 test("a command hook keeps a multi-byte character that spans two output chunks", async () => {

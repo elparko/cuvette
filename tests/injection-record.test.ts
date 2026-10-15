@@ -488,8 +488,11 @@ async function boolChange(request: string, proposed: string) {
   const provider = new FakeProvider([{ calls: [{ name: "propose_change", args: { key: "remove_outliers", value: proposed, reason: "A file says so.", wait: false } }] }, { text: "done" }]);
   session = await Session.create({ adapters: [dir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5, remove_outliers: true });
-  await session.send(request);
-  rmSync(dir, { recursive: true, force: true });
+  try {
+    await session.send(request);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
   return { value: session.decisions.value("remove_outliers"), by: session.record.entries(["decision"]).filter((e) => e.data.key === "remove_outliers").map((e) => `${e.data.new}:${e.data.by}`), open: session.questions.open().map((q) => q.decisionKey) };
 }
 

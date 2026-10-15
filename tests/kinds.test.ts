@@ -16,6 +16,7 @@ import { interruptTarget } from "../src/adapters/kinds/python.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
 import { parseCsv, parseKeyValue, readFields, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-kinds-"));
 const started: AdapterRuntime[] = [];
@@ -481,7 +482,7 @@ test.skipIf(process.platform === "win32")("runProcess returns after the program 
   const code = "const c=require('child_process').spawn('sleep',['30'],{stdio:'inherit',detached:true});console.log(c.pid);c.unref();";
   const t0 = Date.now();
   const r = await runProcess([process.execPath, "-e", code], { timeoutMs: 20_000 });
-  expect(Date.now() - t0).toBeLessThan(10_000);
+  withinMs(Date.now() - t0, 10_000);
   expect(r.code).toBe(0);
   try {
     process.kill(Number(r.stdout.trim()), "SIGKILL");

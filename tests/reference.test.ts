@@ -6,6 +6,7 @@ import { decodePng } from "../src/bench/png.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { zip } from "../src/eln/zip.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, readTable, referenceValues } from "../src/core/reference.ts";
+import { withinMs } from "./timing.ts";
 
 
 function project() {
@@ -119,7 +120,7 @@ test("a second search reads the folders again only after they change, so a paren
   const first = performance.now() - t0;
   const t1 = performance.now();
   findReferences([proj, root], ["counts"]);
-  expect(performance.now() - t1).toBeLessThan(Math.max(20, first / 5));
+  withinMs(performance.now() - t1, Math.max(20, first / 5));
   writeFileSync(join(root, "counts_summary.csv"), "sample,count\nwell_a,3\n");
   writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,area,count\nwell_a,3,4\n");
   const again = findReferences([proj, root], ["counts", "area"]);
