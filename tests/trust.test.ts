@@ -11,6 +11,7 @@ import { Session } from "../src/core/session.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 import { describe as describeSettings, changeSetting } from "../src/core/settings.ts";
 import { endTrustOnce, ereToRegExp, folderLines, globEre, globMatcher, hookScriptScan, literalEre, longLabRefusal, scanFolder, stateLabel, trustedFolders, trustFolder, trustOnce, trustStatus, trustText, TRUST_TITLE, untrustFolder } from "../src/core/trust.ts";
+import { saveMethod } from "../src/core/methods.ts";
 import { checkText } from "../src/core/ste.ts";
 import { commands } from "../src/ui/commands.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -545,6 +546,31 @@ test("trust once keeps the hash, so a rewritten LAB.md ends the once state", () 
   } finally {
     endTrustOnce(cwd);
   }
+});
+
+describe("trust once and the user's own project writes", () => {
+  beforeEach(() => {
+    project(".ga", hook("ran"));
+    trustOnce(cwd);
+  });
+  afterEach(() => endTrustOnce(cwd));
+
+  test("saving a project setting keeps the once state", async () => {
+    expect(trustStatus(cwd).state).toBe("once");
+    await changeSetting({ cwd, env: {} }, "export_xlsx", "off", "project");
+    expect(trustStatus(cwd).state).toBe("once");
+  });
+
+  test("saving a project method keeps the once state", () => {
+    const m = { cuvette_method: 1, name: "m1", saved: "", questions: [], analysis: { steps: [] }, programs: [], decisions: {}, pilot: { required: true, shows: [] } };
+    saveMethod(m as never, cwd);
+    expect(trustStatus(cwd).state).toBe("once");
+  });
+
+  test("a write by a script after trust once gives changed or new", () => {
+    writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify(hook("evil")));
+    expect(["new", "changed"]).toContain(trustStatus(cwd).state);
+  });
 });
 
 test("a script that imports a module in its own small folder has that module in the trust hash", () => {
