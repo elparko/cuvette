@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import { CutReplyError } from "../src/core/types.ts";
 import { dropThinking, elideOld, estimateTokens, headText, pointerText, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { Session } from "../src/core/session.ts";
@@ -42,6 +43,27 @@ test("elision shortens only old bulky tool output, keeps its first lines, and do
   expect(estimateTokens(messages)).toBeLessThan(estimateTokens(h) / 2);
 });
 
+test("the shortening of old output waits for a batch, so that the prompt cache holds between steps", () => {
+  const changedSteps = (batch: number) => {
+    let h = oneLongTurn(8);
+    let changed = 0;
+    for (let step = 9; step <= 40; step++) {
+      h = [...h, call(`c${step}`), result(`c${step}`, `file ${step} mean 12.${step}\n${"row\n".repeat(1000)}`)];
+      const next = elideOld(h, 20_000, batch).messages;
+      if (h.slice(0, -2).some((m, i) => JSON.stringify(m) !== JSON.stringify(next[i]))) changed++;
+      h = next;
+    }
+    return changed;
+  };
+  const each = changedSteps(1);
+  const batched = changedSteps(10);
+  expect(each).toBeGreaterThan(25);
+  expect(batched).toBeLessThanOrEqual(4);
+  const h = oneLongTurn(12);
+  expect(elideOld(h, 20_000, 10)).toEqual({ messages: h, elided: 0 });
+  expect(elideOld(h, 20_000, 1).elided).toBeGreaterThan(0);
+});
+
 test("the estimate counts the tool schemas", () => {
   const tools = [{ name: "read_file", description: "x".repeat(3500), inputSchema: {} }];
   expect(estimateTokens([], "", tools) - estimateTokens([])).toBeGreaterThanOrEqual(1000);
@@ -59,6 +81,29 @@ test("summarizing inside one turn keeps the request and the recent window, and p
   const callIds = next.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
   const resultIds = next.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_result" ? [p.callId] : [])));
   expect(callIds).toEqual(resultIds);
+});
+
+test("a summary that hit the output limit is asked again once with a shorter request, then it fails", async () => {
+  const h = oneLongTurn(6);
+  const inputs: string[] = [];
+  const cut = (answers: (string | "cut")[]) => {
+    const provider = new FakeProvider({ steps: [], complete: "x" });
+    (provider as { complete: (s: string, t: string, g: undefined, o?: { failIfCut?: boolean }) => Promise<string> }).complete = async (_s, text, _g, opts) => {
+      inputs.push(text);
+      const a = answers.shift()!;
+      if (a === "cut" && opts?.failIfCut) throw new CutReplyError("cut");
+      return a;
+    };
+    return provider;
+  };
+  const res = await summarizeOld(h, cut(["cut", "short summary"]), 10, undefined, h[0]);
+  expect(res!.summary).toBe("short summary");
+  expect(inputs).toHaveLength(2);
+  expect(inputs[1]).toContain("Write a much shorter summary.");
+  expect(inputs[0]).not.toContain("Write a much shorter summary.");
+  inputs.length = 0;
+  await expect(summarizeOld(h, cut(["cut", "cut"]), 10, undefined, h[0])).rejects.toBeInstanceOf(CutReplyError);
+  expect(inputs).toHaveLength(2);
 });
 
 test("a second summary updates the first one", async () => {
