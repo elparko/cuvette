@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, realpathSync, statSync } from "node:fs";
 import { basename } from "node:path";
-import { findAdapter } from "../adapters/manifest.ts";
+import { adapterDirs, findAdapter } from "../adapters/manifest.ts";
 import { locate } from "../adapters/locate.ts";
 import { expand, placeholders } from "../adapters/kinds/common.ts";
 import { scriptPython } from "../tools/run_script.ts";
@@ -179,7 +179,10 @@ export async function currentFromDisk(record: AnalysisRecord, cwd: string): Prom
   for (const a of [...(first ?? []), ...record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string })]) if (a.path && existsSync(a.path)) paths.set(a.name, a.path);
   for (const name of new Set(record.nodes().map((n) => n.adapter).filter(Boolean))) {
     try {
-      const a = findAdapter(paths.get(name) ?? name, cwd);
+      const path = paths.get(name);
+      const known = path ? Object.values(adapterDirs(cwd)).some((d) => realpathSync(d) === realpathSync(path)) : true;
+      if (!known) continue;
+      const a = findAdapter(path ?? name, cwd);
       for (const d of a.manifest.decisions) labels[d.key] = d.label;
       const found = await locate(a.manifest, a.root);
       const ph = placeholders(a, { workDir: record.workDir, sessionDir: record.dir }, found.path);

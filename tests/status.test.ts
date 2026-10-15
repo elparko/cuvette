@@ -1,4 +1,4 @@
-import { mkdtempSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -8,7 +8,7 @@ import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook } from "../src/core/results.ts";
 import { runChecks } from "../src/core/review.ts";
 import { Session } from "../src/core/session.ts";
-import { outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
+import { currentFromDisk, outOfDateNodes, changeRows, changeTable, fileSha, liveReasons, rerunBody, stepStatus, statusText, type Current, type RerunData } from "../src/core/status.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, rerunText } from "../src/ui/commands.ts";
@@ -237,4 +237,18 @@ test("the answer check reads the step status once for a record with 500 steps", 
   const claims = checkAnswer(text, record);
   expect(claims.length).toBeGreaterThan(0);
   expect(Date.now() - start).toBeLessThan(20_000);
+});
+
+test.skipIf(process.platform === "win32")("cuvette status does not run the version command of a recorded adapter path outside the adapter folders", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-status-evil-"));
+  const marker = join(root, "marker");
+  const dir = join(root, "evil");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), `adapter: { name: evil, title: Evil, version: "1.0.0" }\nprogram: { name: Evil, version: "1.0" }\nconnection: { kind: cli }\nlocate: { which: [sh], version_command: ["{program_path}", "-c", "touch ${marker}"] }\n`);
+  const record = new AnalysisRecord(join(root, "rec"), "s1");
+  record.append("session", { adapters: [{ name: "evil", version: "1.0.0", programVersion: "1.0", path: dir }], model: "m" });
+  record.addNode({ entry: 1, adapter: "evil", adapterVersion: "1.0.0", programVersion: "1.0", tool: "run", args: {}, decisions: {}, codeHash: "c", inputHashes: [], outputs: [], result: { ok: true, metrics: {} }, parents: [], summary: "Ran.", model: "fake", manualRoute: "", fidelity: "none" });
+  const { current } = await currentFromDisk(record, root);
+  expect(existsSync(marker)).toBe(false);
+  expect(current.has("evil")).toBe(false);
 });
