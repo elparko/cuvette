@@ -432,7 +432,7 @@ async function sharedApp(ref: string): Promise<string | undefined> {
 
 async function app(folder?: string) {
   if (o["no-open"]) process.env.CUVETTE_NO_OPEN = "1";
-  const { startApp, APP_CLOSE_LIMIT_MS } = await import("./server/app.ts");
+  const { startApp, stopApp } = await import("./server/app.ts");
   const { openWithOs } = await import("./ui/commands.ts");
   let resume: string | undefined;
   if (o.resume !== undefined) {
@@ -458,8 +458,7 @@ async function app(folder?: string) {
     process.once("SIGTERM", done);
   });
   console.log("Stopping. Press Ctrl+C again to quit now.");
-  process.once("SIGINT", () => process.exit(130));
-  await Promise.race([a.close(), new Promise((r) => setTimeout(r, APP_CLOSE_LIMIT_MS).unref())]);
+  await stopApp(() => a.close());
   process.exit(0);
 }
 

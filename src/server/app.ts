@@ -53,6 +53,11 @@ export function appAdapters(name: string | undefined, flags: string[] | undefine
 const JOB_STOP_WAIT_MS = 6000;
 export const APP_CLOSE_LIMIT_MS = JOB_STOP_WAIT_MS + 14_000;
 
+export async function stopApp(close: () => Promise<unknown>, limitMs = APP_CLOSE_LIMIT_MS) {
+  process.once("SIGINT", () => process.exit(130));
+  await Promise.race([close(), new Promise((r) => setTimeout(r, limitMs).unref())]);
+}
+
 export interface AppOptions {
   folder?: string;
   trustFolder?: boolean;

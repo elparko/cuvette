@@ -302,7 +302,7 @@ test("typed keeps a column of IDs with a leading zero as text", () => {
   expect(typed([["001", "1.5"], ["002", "2"]], 2)).toEqual([["001", 1.5], ["002", 2]]);
 });
 
-test("a value that is not finite as a number, and an ID with an exponent, stay text", () => {
+test("1e400 stays a text cell in a number column, and an ID with an exponent stays text", () => {
   expect(typed([["1e400"], ["2"]], 1)).toEqual([["1e400"], [2]]);
   expect(typed([["5E3"], ["7E10"]], 1)).toEqual([["5E3"], ["7E10"]]);
   expect(typed([["1.5e3"], ["2"]], 1)).toEqual([[1500], [2]]);
