@@ -431,6 +431,7 @@ export class Session {
     const gone = new Map<string, boolean>();
     const recorded = new Map<string, string | undefined>();
     const strayPath = new Map<string, string>();
+    const swapped = new Map<string, string>();
     for (const a of [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded]) recorded.set(a.name, a.path);
     if (opts.trustFolder && cwd) trustOnce(cwd);
     let adapters: string[];
@@ -449,6 +450,7 @@ export class Session {
       adapters =
         opts.adapters ??
         [...recorded].filter(([name]) => !replaced.includes(name)).map(([name, path]) => [name, path, refOf(name, path)] as const).filter(([name, path, ref]) => {
+          if (path && existsSync(path) && dirs[name] && ref === dirs[name] && !known.has(realpathSync(path))) swapped.set(name, path);
           try {
             findAdapter(ref, cwd, { byName: ref === name && !dirs[name] });
             return true;
@@ -476,13 +478,18 @@ export class Session {
       const missing = !!before && !existsSync(before);
       s.record.append("notice", { text: `The adapter ${name} comes from the folder that you gave for this run. ${missing ? "The folder that this session used before does not exist now." : "This session used another folder before."}`, warn: true });
     }
+    for (const [name, path] of swapped) {
+      if (!s.adapters.some((x) => x.name === name)) continue;
+      const text = `The session used the adapter ${name} from ${path} before. This resumed session did not use that folder. It loaded the installed adapter ${name} instead.`;
+      if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
+    }
     for (const [name, untrusted] of gone) {
       const stray = strayPath.get(name);
       if (stray && s.adapters.some((x) => x.name === name)) continue;
       const text = untrusted
         ? `The adapter ${name} is in the project folder, and this folder is not trusted. This resumed session does not load it. Check the folder with /trust, then trust it with /trust on.`
         : stray
-        ? `The adapter ${name} was loaded from ${stray}. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
+        ? `The session loaded the adapter ${name} from ${stray} before. That folder is not an installed adapter and no trusted folder covers it. This resumed session does not load it. To load it, resume with --adapter ${stray}.`
         : `The adapter ${name} is not installed here, or its folder moved. This resumed session does not load it. The record and the exports of its steps stay available.`;
       if (!s.record.entries(["notice"]).some((n) => n.data.text === text)) s.record.append("notice", { text, warn: true });
     }
