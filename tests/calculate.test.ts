@@ -44,11 +44,20 @@ test("a minus sign binds less tightly than a power, and a number can start with 
   expect(evaluate("2^3^2")).toBe(512);
 });
 
-test("a thousands separator in an argument list is an error, not two arguments", () => {
+test("a thousands separator in the arguments of a variadic function is an error, not two arguments", () => {
   expect(() => evaluate("sum(1,234)")).toThrow(/thousands separator/);
   expect(() => evaluate("mean(1,234,5)")).toThrow(/1,234/);
+  expect(() => evaluate("abs(1,234)")).toThrow(/takes 1 argument.*thousands separator/);
   expect(evaluate("sum(1, 234)")).toBe(235);
   expect(evaluate("sum([1,2,3])")).toBe(6);
+});
+
+test("a comma with no space is an argument separator if the argument count fits", () => {
+  expect(evaluate("ratio(412,450)")).toBeCloseTo(412 / 450, 10);
+  expect(evaluate("mean([100,200,300])")).toBe(200);
+  expect(evaluate("sum([100,200], 5)")).toBe(305);
+  expect(evaluate("pct_change(100,150)")).toBe(50);
+  expect(calculateTool().description).toContain("space after each comma");
 });
 
 test("a function with the wrong number of arguments is an error", () => {
