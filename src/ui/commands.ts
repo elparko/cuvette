@@ -286,7 +286,7 @@ export function renderGraph(session: SessionLike): string {
 
 export const noOpen = () => !!(process.env.VITEST || process.env.CUVETTE_NO_OPEN);
 
-export const RUNNABLE = /\.(command|sh|bat|cmd|exe|jar|app|ps1|scpt)$/i;
+export const RUNNABLE = /\.(command|sh|bat|cmd|exe|jar|app|ps1|scpt|py|pyw|vbs|js|jse|wsf|wsh|lnk|msi|pkg|dmg|rb|pl|reg)$/i;
 
 export const windowsOpenArgs = (path: string) => ["/c", "start", '""', `"${path.replace(/"/g, "")}"`];
 

@@ -18,6 +18,7 @@ import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock } from "../core/sessions.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { findPlace, removeIndexRow, renameIndexRow } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
@@ -410,7 +411,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (get && p === "/api/thumb") {
       const info = listSessions().find((s) => s.id === url.searchParams.get("id"));
       const f = info?.figure;
-      if (!f || !allowedFile(f, [info!.folder, info!.cwd]) || !existsSync(f)) return send(res, 404, { error: "no figure" });
+      if (!f || !allowedFile(f, [info!.folder, info!.cwd, join(cuvetteHome(), "sessions", info!.id)]) || !existsSync(f)) return send(res, 404, { error: "no figure" });
       return pipeFile(res, f, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=300" });
     }
     if (get && p === "/api/settings") return send(res, 200, settingsHtml(ctx()), "text/html; charset=utf-8");

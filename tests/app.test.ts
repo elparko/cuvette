@@ -205,11 +205,16 @@ describe("the app server", () => {
       ];
       writeFileSync(join(home, "sessions", id, "log.jsonl"), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
     };
+    const legacyFig = join(home, "sessions", "thumb-legacy", "work", "fig.png");
+    mkdirSync(join(home, "sessions", "thumb-legacy", "work"), { recursive: true });
+    writeFileSync(legacyFig, "x");
+    log("thumb-legacy", legacyFig);
     log("thumb-ok", join(proj, "ok.png"));
     log("thumb-link", join(proj, "link.png"));
     app = await startApp({ env, start: home, makeSession: async () => new FakeSession() });
     const c = client(app);
     expect((await c.get("api/thumb?id=thumb-ok")).status).toBe(200);
+    expect((await c.get("api/thumb?id=thumb-legacy")).status).toBe(200);
     expect((await c.get("api/thumb?id=thumb-link")).status).toBe(404);
   });
 
@@ -241,13 +246,15 @@ describe("the app server", () => {
     }
   });
 
-  test("close waits for a session that is still opening and closes it", async () => {
+  const closeWhileOpening = async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const made = new FakeSession();
     const closed = vi.spyOn(made, "close");
+    const attached = vi.fn();
+    (made as unknown as { markOpen: unknown }).markOpen = attached;
     let asked = false;
-    app = await startApp({
+    const handle = await startApp({
       env,
       start: home,
       makeSession: async () => {
@@ -256,15 +263,28 @@ describe("the app server", () => {
         return made;
       },
     });
-    const c = client(app);
-    expect((await c.post("api/open", { folder: home })).status).toBe(200);
+    expect((await client(handle).post("api/open", { folder: home })).status).toBe(200);
     await until(() => asked);
-    const stopping = app.close();
-    app = undefined;
-    release();
-    await stopping;
-    await new Promise((r) => setTimeout(r, 30));
-    expect(closed).toHaveBeenCalled();
+    let done = false;
+    const stopping = handle.close().then(() => (done = true));
+    return { release, stopping, closed, attached, isDone: () => done };
+  };
+
+  test("close waits for an open that is still pending, then closes the new session", async () => {
+    const t = await closeWhileOpening();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.isDone()).toBe(false);
+    t.release();
+    await t.stopping;
+    expect(t.closed).toHaveBeenCalled();
+  });
+
+  test("an open that finishes after close started closes its session and does not attach it", async () => {
+    const t = await closeWhileOpening();
+    t.release();
+    await t.stopping;
+    expect(t.attached).not.toHaveBeenCalled();
+    expect(t.closed).toHaveBeenCalled();
   });
 
   test("a permission card for a tool that never allows always sends a plain allow from the app", async () => {

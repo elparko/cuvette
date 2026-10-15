@@ -9,7 +9,7 @@ const run = (path: string) => {
 };
 
 test("/open shows the path of a program file and does not open it", () => {
-  for (const ext of ["command", "sh", "bat", "cmd", "exe", "jar", "app", "ps1", "scpt", "SH"]) {
+  for (const ext of ["command", "sh", "bat", "cmd", "exe", "jar", "app", "ps1", "scpt", "py", "pyw", "vbs", "js", "jse", "wsf", "wsh", "lnk", "msi", "pkg", "dmg", "rb", "pl", "reg", "SH"]) {
     const out = run(`/work/run.${ext}`);
     expect(out.errors[0]).toContain(`/work/run.${ext}`);
     expect(out.notices).toEqual([]);
