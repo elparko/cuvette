@@ -94,6 +94,12 @@ describe("collecting tests", () => {
     expect(collectTests(recordWith([n])).map((t) => t.p)).toEqual([0.004]);
   });
 
+  test("a mixed ANOVA counts the within p value, the between p value and the interaction p value", () => {
+    const metrics = { p_uncorrected: 0.001, p_gg: 0.004, p_reported: 0.004, mauchly_p: 0.62, p_between: 0.03, p_interaction: 0.2, p_interaction_gg: 0.25 };
+    const n = { id: "n1", tool: "anova_repeated", args: { path: "/d/rm.csv" }, inputFiles: [{ path: "/d/rm.csv" }], result: { metrics, data: { test: "mixed ANOVA" } } };
+    expect(collectTests(recordWith([n])).map((t) => [t.test, t.p])).toEqual([["mixed ANOVA", 0.004], ["mixed ANOVA: between", 0.03], ["mixed ANOVA: interaction", 0.2]]);
+  });
+
   test("each term of a factorial ANOVA is one test of the family", () => {
     const n = { id: "n1", tool: "anova_factorial", args: { path: "/d/f.csv" }, inputFiles: [{ path: "/d/f.csv" }], result: { metrics: { F_drug: 9, p_drug: 0.01, p_dose: 0.03, p_drug_x_dose: 0.2, levene_p: 0.5 }, data: { test: "two-way ANOVA" } } };
     const rows = testRows(recordWith([n]));

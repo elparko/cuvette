@@ -27,19 +27,28 @@ const NOT_A_TEST = /^(levene|ph_|shapiro|normality|bartlett|mauchly|min_)|_(leve
 const TERM = /^p_(.+)$/i;
 const PATHISH = /\.(csv|tsv|txt|xlsx?|parquet|h5ad|fcs|json)$/i;
 
-export function pValueOf(metrics: Record<string, unknown> | undefined): number | undefined {
+const SAME_TEST = /^p_(reported|uncorrected|gg|interaction_gg)$/i;
+
+function mainKey(metrics: Record<string, unknown> | undefined): string | undefined {
   if (!metrics) return undefined;
   const ok = (k: string) => typeof metrics[k] === "number" && (metrics[k] as number) >= 0 && (metrics[k] as number) <= 1;
   const keys = Object.keys(metrics).filter((k) => ok(k) && !NOT_A_TEST.test(k));
-  const key = keys.find((k) => EXACT.test(k)) ?? keys.find((k) => SUFFIX.test(k)) ?? keys.find((k) => k === "p_reported");
-  return key === undefined ? undefined : (metrics[key] as number);
+  return keys.find((k) => EXACT.test(k)) ?? keys.find((k) => SUFFIX.test(k)) ?? keys.find((k) => k === "p_reported");
+}
+
+export function pValueOf(metrics: Record<string, unknown> | undefined): number | undefined {
+  const key = mainKey(metrics);
+  return key === undefined ? undefined : (metrics![key] as number);
 }
 
 export function termPValuesOf(metrics: Record<string, unknown> | undefined): { term: string; p: number }[] {
-  if (!metrics || pValueOf(metrics) !== undefined) return [];
+  if (!metrics) return [];
+  const key = mainKey(metrics);
+  if (key !== undefined && key !== "p_reported") return [];
   return Object.entries(metrics).flatMap(([k, v]) => {
     const term = TERM.exec(k)?.[1];
-    return term && typeof v === "number" && v >= 0 && v <= 1 && !NOT_A_TEST.test(k) ? [{ term: term.replace(/_x_/g, " x ").replace(/_/g, " "), p: v }] : [];
+    const skip = key === "p_reported" && SAME_TEST.test(k);
+    return term && !skip && typeof v === "number" && v >= 0 && v <= 1 && !NOT_A_TEST.test(k) ? [{ term: term.replace(/_x_/g, " x ").replace(/_/g, " "), p: v }] : [];
   });
 }
 
@@ -73,7 +82,7 @@ export function collectTests(record: AnalysisRecord): TestEntry[] {
     if (!step || record.replacedBy?.(n.id) || n.tool === "adjust_pvalues") continue;
     const result = n.result as { metrics?: Record<string, unknown>; data?: { test?: unknown } } | undefined;
     const single = pValueOf(result?.metrics);
-    const found = single !== undefined ? [{ term: "", p: single }] : termPValuesOf(result?.metrics);
+    const found = [...(single !== undefined ? [{ term: "", p: single }] : []), ...termPValuesOf(result?.metrics)];
     if (!found.length) continue;
     const source = sourceOf(n);
     const name = typeof result?.data?.test === "string" && result.data.test ? result.data.test : n.tool.replace(/_/g, " ");
