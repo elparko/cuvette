@@ -444,6 +444,9 @@ export function findAdapter(nameOrPath: string, cwd = process.cwd(), opts: { byN
   if (inProject) nameOrPath = basename(resolve(nameOrPath));
   const dirs = adapterDirs(cwd);
   const dir = dirs[nameOrPath];
-  if (!dir) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);
+  if (!dir) {
+    const hint = !pathForm && existsSync(join(process.cwd(), nameOrPath, "adapter.yaml")) ? ` Use --adapter ./${nameOrPath} to load the folder.` : "";
+    throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}${hint ? `.${hint}` : ""}`);
+  }
   return loadAdapter(dir);
 }

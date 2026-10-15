@@ -137,3 +137,10 @@ unix("resume with addAdapters keeps the recorded adapters and adds the new one, 
   session = await Session.resume(id, { addAdapters: [other, "lab"], provider: new FakeProvider([]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.adapters.map((a) => a.name)).toEqual(["lab", "other"]);
 });
+
+test("a bare name that matches a folder with a manifest in the process folder gives a hint", () => {
+  evilAdapter(cwd, "mydir");
+  process.chdir(join(cwd, "data"));
+  expect(() => findAdapter("mydir", cwd)).toThrow(/Use --adapter \.\/mydir to load the folder\./);
+  expect(() => findAdapter("nothing", cwd)).not.toThrow(/Use --adapter/);
+});
