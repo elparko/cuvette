@@ -508,6 +508,23 @@ describe("ollama", () => {
     expect(seen.find((s) => s.url.endsWith("/api/chat"))!.body.options.num_ctx).toBe(8192);
   });
 
+  test("a closing think tag without an opening tag moves the earlier text to thinking", async () => {
+    stubOllama((body) =>
+      ndjson(
+        body.stream
+          ? [{ message: { content: "reason" } }, { message: { content: "ing</thi" } }, { message: { content: "nk>The answer." } }, { done: true }]
+          : [],
+      ),
+    );
+    const p = await makeProvider("ollama:x");
+    const r = await p.step(req([user("q")]));
+    expect(r.message.parts).toEqual([
+      { type: "thinking", text: "reasoning" },
+      { type: "text", text: "The answer." },
+    ]);
+    expect(await p.complete("S", "Q")).toBe("The answer.");
+  });
+
   test("retries without think when the server rejects it", async () => {
     const seen = stubOllama((body, n) => (n === 0 ? json({ error: '"x" does not support thinking' }, 400) : ndjson([{ message: { content: "ok" } }, { done: true }])));
     const p = await makeProvider("ollama:x");
@@ -865,6 +882,16 @@ describe("agent loop fixes, round three", () => {
     stubOllama(() => json({}));
     const l: any = await makeProvider("ollama:x");
     expect(l.toNative("S", hist)[3].content).toBe("ERROR: no tool named add");
+  });
+
+  test("OpenAI: a closing think tag without an opening tag moves the earlier text to thinking", async () => {
+    vi.stubGlobal("fetch", async () => sse([delta({ role: "assistant", content: "weigh it" }), delta({ content: "</think>Done." }), delta({}, "stop")]));
+    const p = await makeProvider("openai:http://localhost:1234/v1|m");
+    const r = await p.step(req([user("q")]));
+    expect(r.message.parts).toEqual([
+      { type: "thinking", text: "weigh it" },
+      { type: "text", text: "Done." },
+    ]);
   });
 
   test("OpenAI: streams text, two parallel tool calls in pieces, and usage with cached tokens", async () => {

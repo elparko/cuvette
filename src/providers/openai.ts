@@ -183,12 +183,7 @@ export class OpenAIProvider implements Provider {
     let sse = /event-stream/i.test(res.headers.get("content-type") ?? "");
     let decided = sse;
     const reply: Reply = { content: "", thinking: "", calls: [], finish: "" };
-    const textOut: string[] = [];
-    const thinkOut: string[] = [];
-    const splitter = new ThinkSplitter((kind, s) => {
-      (kind === "text" ? textOut : thinkOut).push(s);
-      onDelta?.({ type: kind, text: s });
-    });
+    const splitter = new ThinkSplitter((kind, s) => onDelta?.({ type: kind, text: s }));
     const slots = new Map<string, CallDraft>();
     let ended = false;
     const chunk = (j: any) => {
@@ -269,8 +264,8 @@ export class OpenAIProvider implements Provider {
       if (buf.trim()) line(buf);
       splitter.end();
       if (!ended && !reply.finish) throw partial("the reply ended without a finish reason");
-      reply.text = textOut.join("");
-      reply.thinking = [reply.thinking.trim(), thinkOut.join("").trim()].filter(Boolean).join("\n\n");
+      reply.text = splitter.text;
+      reply.thinking = [reply.thinking.trim(), splitter.thinking.trim()].filter(Boolean).join("\n\n");
       return reply;
     }
     let j: any;
