@@ -1,8 +1,17 @@
 import { existsSync, linkSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { AnalysisRecord } from "../src/core/record.ts";
+import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { copyFileAtomic, writeFileAtomic } from "../src/core/atomic.ts";
+
+const reads = vi.hoisted(() => [] as string[]);
+
+vi.mock("node:fs", async (original) => {
+  const real = await original<typeof import("node:fs")>();
+  return { ...real, readFileSync: ((p: any, ...rest: any[]) => (reads.push(String(p)), (real.readFileSync as any)(p, ...rest))) as typeof real.readFileSync };
+});
 
 const tmp = () => mkdtempSync(join(tmpdir(), "cuvette-atomic-"));
 
@@ -42,4 +51,16 @@ test("copyFileAtomic copies through a temporary file in the same folder", () => 
   expect(readFileSync(join(dir, "dest"), "utf8")).toBe("abc");
   expect(readFileSync(join(dir, "link"), "utf8")).toBe("old");
   expect(readdirSync(dir).sort()).toEqual(["dest", "link", "src"]);
+});
+
+test("a large file in the work folder is copied without reading it whole into memory", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  const src = join(dir, "rec", "work", "big.bin");
+  writeFileSync(src, Buffer.alloc(COPY_LIMIT_BYTES + 1, 5));
+  reads.length = 0;
+  const sha = r.putBlob(src);
+  expect(reads).not.toContain(src);
+  expect(statSync(r.blobPath(sha)!).size).toBe(COPY_LIMIT_BYTES + 1);
+  expect(readdirSync(join(dir, "rec", "blobs"))).toEqual([sha + ".bin"]);
 });

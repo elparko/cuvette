@@ -1,5 +1,4 @@
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, existsSync, readdirSync } from "node:fs";
-import fs from "node:fs";
 import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -363,20 +362,4 @@ test.skipIf(process.platform === "win32")("the record folder and blob folder are
   expect(mode(join(dir, "rec"))).toBe(0o700);
   expect(mode(join(dir, "rec", "blobs"))).toBe(0o700);
   expect(mode(join(dir, "rec", "log.jsonl"))).toBe(0o600);
-});
-
-test("a large file in the work folder is copied without reading it whole into memory", () => {
-  const dir = tmp();
-  const r = new AnalysisRecord(join(dir, "rec"), "s1");
-  const src = join(dir, "rec", "work", "big.bin");
-  writeFileSync(src, Buffer.alloc(COPY_LIMIT_BYTES + 1, 5));
-  const reads: string[] = [];
-  const orig = fs.readFileSync;
-  (fs as any).readFileSync = (p: any, ...rest: any[]) => (reads.push(String(p)), (orig as any)(p, ...rest));
-  try {
-    r.putBlob(src);
-  } finally {
-    (fs as any).readFileSync = orig;
-  }
-  expect(reads).not.toContain(src);
 });
