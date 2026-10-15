@@ -26,6 +26,15 @@ export type Card =
 
 export type CardType = Card["t"];
 
+export function cardId(c: Card): string {
+  if (c.t === "permission") return `permission:${c.rid}`;
+  if (c.t === "question") return `question:${c.q.qid}`;
+  if (c.t === "plan") return `plan:${c.stage}:${c.version}`;
+  if (c.t === "clarify") return `clarify:${c.qids.join(",")}`;
+  if (c.t === "instruction") return `instruction:${c.step}`;
+  return c.t;
+}
+
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
   if (typeof v === "string") return v;

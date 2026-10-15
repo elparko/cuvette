@@ -18,7 +18,7 @@ import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
 import { canGoBack, isPlainQuestion, questionHead, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
-import { applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { cardId, applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { droppedNote, inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
@@ -418,9 +418,10 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   });
 
   const card = cards[0];
+  const cardKey = card ? cardId(card) : "";
   useEffect(() => {
-    if (card) guardCardOpened();
-  }, [card]);
+    if (cardKey) guardCardOpened();
+  }, [cardKey]);
   const program = session.adapterInfo[0]?.title ?? "the program";
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";

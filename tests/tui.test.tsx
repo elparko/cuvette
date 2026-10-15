@@ -315,6 +315,24 @@ describe("cards", () => {
     }
   });
 
+  test("the key guard does not restart when the same card arrives again", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      s.proposePlan("Question: Q1");
+      await until(() => h.all().includes("approve and start"));
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      s.proposePlan("Question: Q1");
+      await sleep(100);
+      h.type("a");
+      await until(() => s.planResponses.length === 1);
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
+  });
+
   test("permission: n asks for a note and denies", async () => {
     const { h, s } = start();
     await sleep(100);
