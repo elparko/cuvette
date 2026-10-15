@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { writeFileAtomic } from "./atomic.ts";
 import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -140,7 +141,7 @@ export function saveMethod(m: Method, project?: string): string {
   const before = project ? trustStatus(project).state : undefined;
   try {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+    writeFileAtomic(p, JSON.stringify(m, null, 2) + "\n");
   } catch (e) {
     if (["EACCES", "EPERM", "EROFS"].includes((e as NodeJS.ErrnoException).code ?? "")) throw new Error(`Cannot write the method file ${p}. Check that the folder is not read-only.`);
     throw e;

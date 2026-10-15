@@ -1,4 +1,5 @@
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import fs from "node:fs";
 import { COPY_LIMIT_BYTES } from "../src/core/places.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -313,4 +314,69 @@ test("messages() matches a copy of the history after every entry, also after a r
       for (let k = 0; k <= snaps.length - 1; k += 7) expect(texts(rec.messages(k))).toEqual(snaps[k]);
     }
   }
+});
+
+test("a torn reference file moves aside, gives no blob and is reported once", () => {
+  const dir = tmp();
+  const work = join(dir, "out");
+  const r = new AnalysisRecord(join(dir, "rec"), "s1", { workDir: work, exportDir: work, project: dir });
+  const big = join(dir, "big.bin");
+  writeFileSync(big, Buffer.alloc(COPY_LIMIT_BYTES + 1, 3));
+  const sha = r.putBlob(big);
+  const ref = join(dir, "rec", "blobs", `${sha}.ref.json`);
+  writeFileSync(ref, '{"path": "/x", "si');
+  const told: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+  try {
+    expect(r.blobRef(sha)).toBeUndefined();
+    expect(r.blobPath(sha)).toBeUndefined();
+  } finally {
+    process.stderr.write = write;
+  }
+  expect(told.filter((t) => t.includes("damaged"))).toHaveLength(1);
+  expect(existsSync(ref)).toBe(false);
+  const aside = readdirSync(join(dir, "rec", "blobs")).filter((f) => f.startsWith(`${sha}.ref.json.damaged-`));
+  expect(aside).toHaveLength(1);
+  expect(r.putBlob(big)).toBe(sha);
+  expect(r.blobPath(sha)).toBe(big);
+});
+
+test("a temporary file and a moved-aside reference file are not blobs", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  const sha = "a".repeat(64);
+  writeFileSync(join(dir, "rec", "blobs", `${sha}.ref.json.damaged-2026-01-01`), "x");
+  writeFileSync(join(dir, "rec", "blobs", ".tmp-1-abcd"), "x");
+  expect(r.blobPath(sha)).toBeUndefined();
+  expect(r.blobPath("a".repeat(10))).toBeUndefined();
+  const real = r.putBlob(Buffer.from("abc"), ".txt");
+  expect(readdirSync(join(dir, "rec", "blobs")).filter((f) => f.startsWith(real))).toEqual([real + ".txt"]);
+  expect(readdirSync(join(dir, "rec", "blobs")).some((f) => f.startsWith(".tmp-") && f !== ".tmp-1-abcd")).toBe(false);
+});
+
+test.skipIf(process.platform === "win32")("the record folder and blob folder are private, and so is the log", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  r.append("note" as any, { text: "x" });
+  const mode = (p: string) => statSync(p).mode & 0o777;
+  expect(mode(join(dir, "rec"))).toBe(0o700);
+  expect(mode(join(dir, "rec", "blobs"))).toBe(0o700);
+  expect(mode(join(dir, "rec", "log.jsonl"))).toBe(0o600);
+});
+
+test("a large file in the work folder is copied without reading it whole into memory", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  const src = join(dir, "rec", "work", "big.bin");
+  writeFileSync(src, Buffer.alloc(COPY_LIMIT_BYTES + 1, 5));
+  const reads: string[] = [];
+  const orig = fs.readFileSync;
+  (fs as any).readFileSync = (p: any, ...rest: any[]) => (reads.push(String(p)), (orig as any)(p, ...rest));
+  try {
+    r.putBlob(src);
+  } finally {
+    (fs as any).readFileSync = orig;
+  }
+  expect(reads).not.toContain(src);
 });

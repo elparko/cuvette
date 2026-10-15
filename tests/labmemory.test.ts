@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "vitest";
@@ -107,5 +107,41 @@ describe("lab memory", () => {
     writeFileSync(join(cwd, "LAB.md"), "Real rule.\nNew rule.\n");
     expect(scanned.scan.lab).toBe("Real rule.");
     expect(labText(cwd)).toBe("");
+  });
+});
+
+describe("lab memory file damage", () => {
+  const file = () => join(home, "labmemory", "demo", "changes.jsonl");
+  const line = (n: number) => JSON.stringify({ pid: `lm-demo-${n}`, adapter: "demo", changeKind: "standard", payload: { text: "t" }, reason: "r", status: "pending", version: n, by: "agent", ts: "2026-01-01T00:00:00.000Z" });
+
+  test("a bad line is skipped with one notice that names the file", () => {
+    mkdirSync(join(home, "labmemory", "demo"), { recursive: true });
+    writeFileSync(file(), `${line(1)}\n{"pid": "lm-demo-2", "ver\n${line(3)}\n`);
+    const told: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+    try {
+      expect(pending().map((c) => c.pid)).toEqual(["lm-demo-1", "lm-demo-3"]);
+      pending();
+    } finally {
+      process.stderr.write = write;
+    }
+    expect(told).toHaveLength(1);
+    expect(told[0]).toContain(file());
+  });
+
+  test("a cut last line does not swallow the next change", () => {
+    mkdirSync(join(home, "labmemory", "demo"), { recursive: true });
+    writeFileSync(file(), `${line(1)}\n{"pid": "lm-demo-2", "adap`);
+    const c = propose("demo", "standard", { text: "new" }, "r");
+    expect(c.pid).toBe("lm-demo-2");
+    expect(readFileSync(file(), "utf8").split("\n").filter(Boolean).at(-1)).toBe(JSON.stringify(c));
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      expect(pending().map((x) => x.pid)).toEqual(["lm-demo-1", "lm-demo-2"]);
+    } finally {
+      process.stderr.write = write;
+    }
   });
 });

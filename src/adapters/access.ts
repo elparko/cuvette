@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { writeFileAtomic } from "../core/atomic.ts";
 import { harnessWrite } from "../core/harness-writes.ts";
 import { dirname, join } from "node:path";
 import { folderTrusted, projectSettingFiles } from "../core/trust.ts";
@@ -60,7 +61,7 @@ export function saveAccess(name: string, change: Partial<Record<keyof Access, un
   if (Object.keys(all).length) data.programs = all;
   else delete data.programs;
   mkdirSync(dirname(file), { recursive: true });
-  harnessWrite(file, () => writeFileSync(file, JSON.stringify(data, null, 2) + "\n"));
+  harnessWrite(file, () => writeFileAtomic(file, JSON.stringify(data, null, 2) + "\n"));
   return next as Access;
 }
 

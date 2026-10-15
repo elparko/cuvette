@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { writeFileAtomic } from "./atomic.ts";
 import { harnessWrite } from "./harness-writes.ts";
 import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
@@ -613,7 +614,7 @@ function writeSetting(path: string, name: string, value: unknown): void {
   if (value === undefined) delete data[name];
   else data[name] = value;
   mkdirSync(dirname(path), { recursive: true });
-  harnessWrite(path, () => writeFileSync(path, JSON.stringify(data, null, 2) + "\n"));
+  harnessWrite(path, () => writeFileAtomic(path, JSON.stringify(data, null, 2) + "\n"));
 }
 
 export function recordSetting(session: SettingSession | undefined, d: SettingDef, old: unknown, value: unknown, scope: Scope): void {

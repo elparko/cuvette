@@ -1,9 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
-import { deleteMethod, exportMethod, importMethod, listMethods, loadMethod, methodsDir, readMethod } from "../src/core/methods.ts";
+import { deleteMethod, exportMethod, importMethod, listMethods, loadMethod, methodsDir, readMethod, saveMethod } from "../src/core/methods.ts";
 import { attachHeadless } from "../src/core/headless.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
@@ -239,4 +239,14 @@ test("headless mode stops at a likely unit change and writes it to the record, u
   expect(stopped.s.record.entries(["notice"]).some((e) => /Headless mode stops at a likely unit change\. Column 'weight'.*Pass --allow data-change to continue\./.test(String(e.data.text)))).toBe(true);
   const allowed = await runOn(weights(1000), "weights", [], new Set(["data-change"]));
   expect(allowed.s.record.entries(["decision"]).find((e) => String(e.data.key).startsWith("data_check:method_data:"))!.data.new).toBe("continue");
+});
+
+test("saveMethod replaces the file in one step, so a reader of the old file keeps whole content", () => {
+  const m = { name: "atomic-check", saved: "1" } as any;
+  const file = saveMethod(m);
+  linkSync(file, `${file}.copy`);
+  const before = readFileSync(file, "utf8");
+  saveMethod({ ...m, saved: "2" });
+  expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
+  expect(readFileSync(file, "utf8")).toContain('"saved": "2"');
 });
