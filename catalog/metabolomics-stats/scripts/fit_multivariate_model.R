@@ -74,14 +74,15 @@ run_tool(function() {
   }
   if (nzchar(out_path("features"))) write.csv(feat_tab, out_path("features"), row.names = FALSE)
   sc_df <- data.frame(sample = rownames(scores), scores, check.names = FALSE)
-  if (model == "opls") sc_df$o1 <- getScoreMN(fit, orthoL = TRUE)[, 1]
+  has_ortho <- model == "opls" && metrics$n_orthogonal > 0
+  if (has_ortho) sc_df$o1 <- getScoreMN(fit, orthoL = TRUE)[, 1]
   if (nzchar(out_path("scores"))) write.csv(sc_df, out_path("scores"), row.names = FALSE)
 
   draw_both(out_path("plot"), out_path("plot_svg"), 6, 5, function() {
     par(mar = c(4, 4, 3, 1))
     xs <- scores[, 1]
-    ys <- if (model == "opls") getScoreMN(fit, orthoL = TRUE)[, 1] else if (ncol(scores) > 1) scores[, 2] else rep(0, length(xs))
-    ylab <- if (model == "opls") "orthogonal score o1" else "score t2"
+    ys <- if (has_ortho) getScoreMN(fit, orthoL = TRUE)[, 1] else if (ncol(scores) > 1) scores[, 2] else rep(0, length(xs))
+    ylab <- if (has_ortho) "orthogonal score o1" else "score t2"
     grp <- if (classification) as.factor(tb$resp) else cut(tb$resp, 4)
     pal <- c("#1f618d", "#b03a2e", "#1e8449", "#7d3c98", "#b9770e", "#566573")
     col <- pal[(as.integer(grp) - 1) %% length(pal) + 1]

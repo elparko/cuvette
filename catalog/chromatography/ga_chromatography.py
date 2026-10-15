@@ -143,9 +143,12 @@ def integrate_peaks(path, baseline=None, prominence=None, time_column=None, sign
     total = float(out["area"].sum())
     out["area_percent"] = 100.0 * out["area"] / total
     work = chrom.df
+    step = float(np.median(np.diff(work["time"].to_numpy(dtype=float))))
+    out["area_signal_time"] = out["area"] * step
     signal_col = "estimated_background" if "estimated_background" in work.columns else None
-    metrics = {"n_peaks": len(out), "total_area": total}
+    metrics = {"n_peaks": len(out), "total_area": total, "time_step": step, "total_area_signal_time": float(out["area_signal_time"].sum())}
     for i, r in out.iterrows():
+        metrics["area_signal_time_%d" % (i + 1)] = float(r["area_signal_time"])
         metrics["retention_time_%d" % (i + 1)] = float(r["retention_time"])
         metrics["area_%d" % (i + 1)] = float(r["area"])
     _style()
@@ -165,6 +168,7 @@ def integrate_peaks(path, baseline=None, prominence=None, time_column=None, sign
         os.path.basename(path), len(out), baseline, float(prominence),
         "; ".join("retention time %.4g, area %.6g (%.1f%%)" % (r.retention_time, r.area, r.area_percent) for r in out.itertuples()), total)
     summary += " hplc-py fits a skew-normal peak to each window, so the area includes the fitted tail."
+    summary += " The area is the summed signal. Multiply it by the time step %.6g to get the signal times time that a data system reports: total %.6g." % (step, metrics["total_area_signal_time"])
     if integration_window:
         summary += " The area covers the window %g to %g only." % (iw[0], iw[1])
     return {"ok": True, "summary": summary, "metrics": metrics,

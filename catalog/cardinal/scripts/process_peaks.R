@@ -14,7 +14,8 @@ run_tool(function() {
   if (!method %in% c("tic", "rms", "none")) fail("normalize must be tic, rms or none")
   set.seed(seed)
   if (method != "none") x <- normalize(x, method = method)
-  pk <- peakProcess(x, SNR = snr, sampleSize = size, tolerance = tol, units = units)
+  size_arg <- if (size >= 1) ncol(x) else size
+  pk <- peakProcess(x, SNR = snr, sampleSize = size_arg, tolerance = tol, units = units)
   out <- out_path("peaks")
   saveRDS(pk, out)
   emit(list(
