@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { normalizeText, resultKey } from "../src/core/loopkey.ts";
+import { withinMs } from "./timing.ts";
 
 const W = "/p/out";
 const run = (n: number, extra: object = {}) => ({
@@ -56,7 +57,7 @@ test("a very long text gives a key fast, and a change at the end or in the lengt
   const big = "ab cd ".repeat(2e6);
   const t0 = Date.now();
   const a = key({ ok: true, text: big });
-  expect(Date.now() - t0).toBeLessThan(10_000);
+  withinMs(Date.now() - t0, 10_000);
   expect(a).toBe(key({ ok: true, text: big }));
   expect(a).not.toBe(key({ ok: true, text: big + "x" }));
   expect(a).not.toBe(key({ ok: true, text: big + big }));

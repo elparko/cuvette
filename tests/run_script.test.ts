@@ -12,6 +12,7 @@ import { harnessWrite } from "../src/core/harness-writes.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-script-"));
 let n = 0;
@@ -115,11 +116,13 @@ test("call sends a tool call to the parent and returns the result", async () => 
 });
 
 test("timeout kills the script", async () => {
-  const { run } = setup();
+  const { run, dirs } = setup();
+  const pidFile = join(dirs.workDir, "pid.txt");
   const t0 = Date.now();
-  const r = await run("import time\ntime.sleep(60)", { timeout_s: 1 });
+  const r = await run(`import os, time\nopen(${JSON.stringify(pidFile)}, "w").write(str(os.getpid()))\ntime.sleep(60)`, { timeout_s: 1 });
   expect(r).toMatchObject({ ok: false, error: "the script timed out after 1 s" });
-  expect(Date.now() - t0).toBeLessThan(8000);
+  expect(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0)).toThrow();
+  withinMs(Date.now() - t0, 8000);
 });
 
 test("abort signal stops the script", async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { Masker, scanContent, type PhiHit } from "../src/core/phi.ts";
 import { linear, Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const FIRST = ["John", "Mary", "Anne-Marie", "O'Neil", "Jose", "Li", "Chen", "Smith"];
 const LAST = ["Smith", "Garcia", "O'Brien", "Nguyen", "Doe", "Fischer", "Kowalski"];
@@ -97,7 +98,7 @@ describe("fuzz: patient data scan and mask", () => {
     const letters = Array.from({ length: 250 }, () => `Ab ${"x".repeat(4000)} Cd`).join("\n");
     const start = performance.now();
     scanContent(letters, "x");
-    expect(performance.now() - start).toBeLessThan(5000);
+    withinMs(performance.now() - start, 5000);
     const json = (n: number) => JSON.stringify(Array.from({ length: n / 50 }, (_, j) => ({ name: "John Smith", id: j, dob: "01/02/1980" })));
     expect(linear(json, (s) => scanContent(s, "x"), 20000).ok).toBe(true);
   });

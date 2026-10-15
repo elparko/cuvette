@@ -2,6 +2,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { keyStream, partialTail } from "../src/tui/key-stream.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const ESC_MS = 40;
 const PASTE_MS = 500;
@@ -132,7 +133,7 @@ describe("fuzz: key stream", () => {
     feed(PASTE_END);
     wait(ESC_MS + 1);
     expect(got.join("")).toBe(`\x1b[200~${body}${PASTE_END}`);
-    expect(performance.now() - t0).toBeLessThan(2000);
+    withinMs(performance.now() - t0, 2000);
   });
 
   test("mouse reports of the old kind never reach the app as text, in any split", () => {

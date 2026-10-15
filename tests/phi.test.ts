@@ -11,6 +11,7 @@ import { runTui } from "../src/tui/app.tsx";
 import { makeHarness, sleep, until } from "../src/tui/testing.ts";
 import { cardFromEvent, closesCard, phiView, type Card } from "../src/ui/cards.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
+import { withinMs } from "./timing.ts";
 
 beforeEach(() => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-phi-"));
@@ -471,7 +472,7 @@ test("a binary or very large tool result does not stop the MCP mask", async () =
   const big = `${CLINIC_CSV}${"x,1\n".repeat(500_000)}`;
   const t0 = Date.now();
   const out = session.phiForClient(big, "read_file");
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
   expect(out).not.toContain("John Doe");
   await session.close();
 });
@@ -597,7 +598,7 @@ test("a long line with many ZIP codes and no date is scanned in linear time", ()
   const line = "ZIP 70112 ".repeat(30000);
   const t0 = Date.now();
   expect(scanText(line, "f")).toEqual([]);
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
 });
 
 test("the Masker masks 20000 values, and two calls give the same text", () => {
@@ -614,7 +615,7 @@ test("groupHits of 50000 hits in one group is fast", () => {
   const hits = Array.from({ length: 50000 }, (_, i) => ({ kind: "name" as const, value: `N${i}`, where: "t", line: i + 1 }));
   const t0 = Date.now();
   const g = groupHits(hits);
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
   expect(g).toHaveLength(1);
 });
 

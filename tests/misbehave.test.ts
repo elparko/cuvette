@@ -13,6 +13,7 @@ import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
 import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
 import { checkText } from "../src/core/ste.ts";
+import { withinMs } from "./timing.ts";
 
 type Bad = FakeStep & { stopReason?: StepResult["stopReason"]; parseError?: string; note?: string };
 
@@ -437,7 +438,7 @@ test("a result of 100 MB is cut to the limit and the harness stays fast", async 
   expect(text.length).toBeLessThan(21000);
   expect(text).toMatch(/\[The harness cut \d+ characters\. Write long output to a file and read it in parts\.\]$/);
   expect(String(results(s)[0]!.text).length).toBe(4000);
-  expect(Date.now() - t0).toBeLessThan(30000);
+  withinMs(Date.now() - t0, 30000);
 });
 
 test("one line of 5 MB is cut too", async () => {
@@ -748,9 +749,9 @@ test.skipIf(windows)("a script that starts many processes, also in new sessions,
     "open(os.environ['WORK_DIR'] + '/pids.txt', 'w').write(' '.join(str(p.pid) for p in same + apart))",
     "time.sleep(120)",
   ].join("\n");
-  const { provider, session: s } = await start([script(code), { text: "ok" }]);
+  const { provider, session: s } = await start([script(code, 8), { text: "ok" }]);
   await s.send("go");
-  expect(texts(provider)[0]).toContain("the script timed out after 1 s");
+  expect(texts(provider)[0]).toContain("the script timed out after 8 s");
   const pids = readFileSync(join(s.workDir, "pids.txt"), "utf8").split(" ").map(Number);
   expect(pids).toHaveLength(10);
   try {

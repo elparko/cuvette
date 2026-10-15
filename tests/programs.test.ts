@@ -18,6 +18,7 @@ import { appPageHtml } from "../src/server/app-page.ts";
 import { programsHtml } from "../src/server/app-html.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { planFor } from "../src/ui/programs.ts";
+import { withinMs } from "./timing.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
 let home = "";
@@ -559,7 +560,7 @@ describe("a long install: stop, password, and a second action at the same time",
     setTimeout(() => abort.abort(), 300);
     const t0 = Date.now();
     const r = await runAction(plan, { ...fakes(), via: "app", confirmed: true, signal: abort.signal, onLine: (l) => lines.push(l) });
-    expect(Date.now() - t0).toBeLessThan(3000);
+    withinMs(Date.now() - t0, 3000);
     expect(r.text).toMatch(/^You stopped the install/);
     expect(lines).not.toContain("after");
   });

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { channelOf, checkFiles, checkTable, dataCheckText, extremes, fileInfos, imageInfo, listDataFiles, readCsvTable, toNumber, unitOf, type FileInfo, type Table } from "../src/core/datacheck.ts";
+import { withinMs } from "./timing.ts";
 
 const t = (columns: string[], rows: string[][]): Table => ({ columns, rows });
 const ids = (c: { items: { id: string }[] }) => c.items.map((i) => i.id);
@@ -288,7 +289,7 @@ describe("file reading and edge cases", () => {
     const rows = Array.from({ length: 50000 }, (_, i) => [`S${i}`, i % 2 ? "A" : "B", String(i % 997)]);
     const start = Date.now();
     checkTable(t(["sample", "group", "value"], rows), "big");
-    expect(Date.now() - start).toBeLessThan(5000);
+    withinMs(Date.now() - start, 5000);
   });
 
   test("statistic names in brackets are not units, and one unit in two spellings is not mixed", () => {

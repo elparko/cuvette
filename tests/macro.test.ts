@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { macroString, parseStdout, renderMacro, startMacro } from "../src/adapters/kinds/macro.ts";
 import type { Tool, ToolContext } from "../src/core/types.ts";
+import { withinMs } from "./timing.ts";
 
 const FAKE = `
 import { readFileSync, writeFileSync } from "node:fs";
@@ -239,7 +240,7 @@ describe("macro runtime", () => {
     const o = await byName.slow.execute({}, ctx());
     expect(o.ok).toBe(false);
     expect(o.error).toMatch(/timed out after 8 s/);
-    expect(Date.now() - t0).toBeLessThan(30000);
+    withinMs(Date.now() - t0, 30000);
   });
 
   test("the abort signal stops the program", async () => {

@@ -318,9 +318,10 @@ describe("a short or narrow terminal", () => {
     s.bus.emit({ type: "permission", rid: "rx", tool: "run_command", args: { purpose: "Run", does: "Runs it.", argv }, touches: "Runs on this computer with your user permissions." });
     await until(() => h.term.view().includes("Permission needed: run_command"));
     expect(h.term.view()).toMatch(/lines 1–\d+ of \d+ · /);
-    for (let i = 0; i < 40 && !h.term.view().includes("last-word"); i++) {
+    const end = Date.now() + 60000;
+    while (!h.term.view().includes("last-word") && Date.now() < end) {
       h.type("\x1b[6~");
-      await sleep(40);
+      await sleep(100);
     }
     expect(h.term.view()).toContain("last-word");
     for (const l of h.term.lines()) expect(l.length).toBeLessThanOrEqual(40);

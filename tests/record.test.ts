@@ -6,6 +6,7 @@ import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { extractNumbers } from "../src/core/claims.ts";
 import type { NodeIn } from "../src/core/types.ts";
+import { withinMs } from "./timing.ts";
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), "cuvette-rec-"));
@@ -231,7 +232,7 @@ test("a log with 100,000 entries loads, rebuilds the history and finds numbers i
   const r = new AnalysisRecord(dir, "s1");
   expect(r.messages().length).toBeGreaterThan(0);
   expect(r.numbers().length).toBeGreaterThan(1000);
-  expect(Date.now() - t0).toBeLessThan(15_000);
+  withinMs(Date.now() - t0, 15_000);
 }, 30_000);
 
 function scriptNode(files: Record<string, string | Buffer>) {
@@ -267,7 +268,7 @@ test("numbers from script output files: a huge file gives none and many files st
   const { r, dir } = scriptNode(files);
   const t = Date.now();
   const nums = r.numbers();
-  expect(Date.now() - t).toBeLessThan(3000);
+  withinMs(Date.now() - t, 3000);
   expect(nums.length).toBe(2000);
   expect(nums.some((n) => n.path.endsWith("huge.csv"))).toBe(false);
   rmSync(dir, { recursive: true, force: true });
@@ -277,7 +278,7 @@ test("a long table in a file is read in linear time", () => {
   const rows = Array.from({ length: 20_000 }, (_, i) => `| ${i} | ${i % 7} | ${(i * 0.37).toFixed(3)} |`).join("\n");
   const t = Date.now();
   expect(extractNumbers(rows).length).toBeGreaterThan(40_000);
-  expect(Date.now() - t).toBeLessThan(2000);
+  withinMs(Date.now() - t, 2000);
 });
 
 test("messages() matches a copy of the history after every entry, also after a reload from disk", () => {

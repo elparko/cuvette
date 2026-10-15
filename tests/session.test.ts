@@ -14,6 +14,7 @@ import { writeXlsx } from "./fixtures/xlsx.ts";
 import { recordSpend } from "../src/core/spend.ts";
 import { processStart } from "../src/core/sessions.ts";
 import { trustFolder } from "../src/core/trust.ts";
+import { withinMs } from "./timing.ts";
 
 let session: Session | undefined;
 beforeEach(() => {
@@ -1223,7 +1224,7 @@ test("a message with send now stops the running tool and the agent reads it next
   });
   const t0 = Date.now();
   await session.send("wait");
-  expect(Date.now() - t0).toBeLessThan(10000);
+  withinMs(Date.now() - t0, 10000);
   const parts = provider.requests[1]!.messages.at(-1)!.parts as { type: string; text?: string }[];
   expect(parts[1]!.text).toMatch(/not run\. The scientist sent a message/);
   expect(parts.at(-1)!.text).toContain("Stop, wrong folder.");
@@ -3208,7 +3209,7 @@ test("resume restores a pilot that a pilot card change started from the approved
 function slowPython(delayS: number): string {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-slowpy-"));
   const exe = join(dir, "python");
-  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; echo "openpyxl 9.9";; esac\n`);
+  writeFileSync(exe, `#!/bin/sh\ncase "$1" in -W) sleep ${delayS}; : > ${join(dir, "marker")}; echo "openpyxl 9.9";; esac\n`);
   chmodSync(exe, 0o755);
   writeFileSync(
     join(dir, "adapter.yaml"),
@@ -3233,9 +3234,11 @@ test("the first request does not wait for the version command of a Python adapte
   const step = provider.step.bind(provider);
   provider.step = (req) => (sent.push(Date.now()), step(req));
   const t0 = Date.now();
-  session = await Session.create({ adapters: [slowPython(2)], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  const slowDir = slowPython(2);
+  session = await Session.create({ adapters: [slowDir], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
   await session.send("Say done.");
-  expect(sent[0]! - t0).toBeLessThan(1500);
+  withinMs(sent[0]! - t0, 1500);
+  expect(existsSync(join(slowDir, "marker"))).toBe(false);
   expect((session.record.entries(["session"])[0]!.data.adapters as { programVersion: string }[])[0]!.programVersion).toBe("from the manifest");
   expect(session.adapterInfo[0]!.programVersion).toBe("from the manifest");
   await session["starting"];
@@ -3300,7 +3303,7 @@ test("Stop while a tool call waits for the version command ends the turn at once
   });
   const t0 = Date.now();
   await session.send("Nap.");
-  expect(Date.now() - t0).toBeLessThan(1500);
+  withinMs(Date.now() - t0, 1500);
   expect(session.record.entries(["tool_result"])[0]!.data.ok).toBe(false);
   expect(session.endedBy).toBe("stopped");
 });
