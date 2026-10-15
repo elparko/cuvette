@@ -29,8 +29,8 @@ const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?", "."]);
 const CLAUSE_END = /[,;.!?][)"'\]]*$/;
 const BOUNDARY = new Set(["and", "but", "so", "then", "because", "since", "while", "instead"]);
 const AFTER_WORD = new Set(["to", "as", "of", "at", "is", "="]);
-const WANTING = new Set(["to", "want", "need", "like"]);
-const AFTER_RETRY = new Set([...FILLER, "of", "for", "as", "on", "in", "please", "instead", "now", "then", "and", "but", "or", "rather", "again"]);
+const FILLER_WORDS = new Set([...FILLER, "want", "need", "like", "i", "do", "we", "you", "please"]);
+const RETRY_LEAD = new Set(["use", "to", "instead", "rather", "set", "="]);
 const REASK = new Set(["use", "set", "take", "apply", "run", "try", "make"]);
 const OWN = 1;
 const OTHER = 2;
@@ -38,6 +38,7 @@ const AFTER = 4;
 const AFTER_TEXT = 6;
 const BEFORE_TEXT = 3;
 const REACH = 5;
+const REACH_FILLER = 7;
 
 function trimEnd(s: string): string {
   let n = s.length;
@@ -194,9 +195,18 @@ function assignClauses(words: Item[], l: Layout): void {
   }
 }
 
+function negatedVerb(l: Layout, words: Item[], k: number, no: boolean): boolean {
+  for (let j = k - 1; j >= 0 && j >= k - 4 && words[j]!.clause === words[k]!.clause; j--) {
+    if (negWord(words, j, no) && !l.named[j]) return true;
+    if (!FILLER_WORDS.has(words[j]!.w)) return false;
+  }
+  return false;
+}
+
 function negatedAt(l: Layout, words: Item[], i: number, no: boolean): boolean {
   let cost = 0;
   let chain = false;
+  let fillerOnly = true;
   for (let k = i - 1; k >= 0 && words[k]!.clause === words[i]!.clause; k--) {
     const it = words[k]!;
     if (negWord(words, k, no) && !l.named[k]) return true;
@@ -205,8 +215,9 @@ function negatedAt(l: Layout, words: Item[], i: number, no: boolean): boolean {
       chain = true;
       continue;
     }
-    if (WANTING.has(it.w)) continue;
-    if (!it.free && ++cost > REACH) return false;
+    if (REASK.has(it.w) && negatedVerb(l, words, k, no)) return true;
+    if (!FILLER_WORDS.has(it.w)) fillerOnly = false;
+    if (!it.free && ++cost > (fillerOnly ? REACH_FILLER : REACH)) return false;
   }
   return false;
 }
@@ -218,11 +229,12 @@ function reasked(words: Item[], i: number): boolean {
 }
 
 function retryFits(words: Item[], l: Layout, from: number, i: number): boolean {
-  for (let j = from; j < i; j++) if (words[j]!.ce === "x") return false;
-  if (l.starts[i + 1]! & OTHER) return false;
-  if (l.prevEnd[i] === i - 1 && l.prevMask[i]! & OTHER) return false;
+  for (let j = from; j < i; j++) if (words[j]!.ce === "x" || (j > from && l.starts[j]! & OTHER)) return false;
+  if (!RETRY_LEAD.has(words[i - 1]?.w ?? "")) return false;
   const next = words[i + 1];
-  return !next || words[i]!.ce !== undefined || next.clause !== words[i]!.clause || AFTER_RETRY.has(next.w) || !!l.named[i + 1];
+  if (!next) return true;
+  if (words[i]!.ce !== undefined) return true;
+  return next.clause === words[i]!.clause && l.starts[i + 1] === OWN;
 }
 
 function numberNamed(words: Item[], l: Layout, [b, e]: [number, number], value: number): boolean {

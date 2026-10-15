@@ -100,13 +100,23 @@ test("a value for another target in a later clause is not the value of the setti
   expect(namesValue("Do not use window 5, use 7", window, 7)).toBe(true);
 });
 
-test("a retry number after a negated value is not the value when it belongs to something else", () => {
-  const cells = { key: "min_cells", label: "Minimum cells" };
+test("a retry number after a negated value applies only for the same setting", () => {
+  const cells = { key: "min_cells", label: "Min cells" };
   const threads = { key: "threads", label: "Threads" };
-  expect(namesValue("Do not rerun to change the min cells to 5; use 10 threads.", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
-  expect(namesValue("Do not set min cells to 5; use 10 threads", { key: "min_cells", label: "Min cells" }, 10)).toBe(false);
-  expect(namesValue("Do not set min cells to 5. Use 10 for the threads", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
-  expect(namesValue("Do not set min cells to 5, use 10 threads", { key: "min_cells", label: "Min cells" }, 10, [threads])).toBe(false);
-  expect(namesValue("Do not set min cells to 5, use 10", { key: "min_cells", label: "Min cells" }, 10)).toBe(true);
-  expect(namesValue("Do not set min cells to 5, use 10 please", cells, 10)).toBe(true);
+  const card = (text: string) => expect(namesValue(text, cells, 10, [threads]), text).toBe(false);
+  card("Do not set min cells to 5, run 10 in parallel.");
+  card("Do not set min cells to 5, use 10 as the threads value.");
+  card("Do not set min cells to 5, use 10 of the 16 cores.");
+  card("Do not set min cells to 5, use 10 or more threads.");
+  card("Do not set min cells to 5, use 10 on the threads.");
+  card("No need to rerun to set min cells to 5, use 10");
+  card("Do not rerun to change the min cells to 5; use 10 threads.");
+  card("Do not set min cells to 5; use 10 threads");
+  card("Do not set min cells to 5, use 10 threads");
+  card("Do not set min cells to 5. Use 10 for the threads");
+  card("Do not set min cells to 5, use 10 please");
+  expect(namesValue("Do not set min cells to 5, use 10", cells, 10, [threads])).toBe(true);
+  expect(namesValue("Do not set min cells to 5, use 10.", cells, 10, [threads])).toBe(true);
+  expect(namesValue("Do not set min cells to 5, use 10 for min cells", cells, 10, [threads])).toBe(true);
+  expect(namesValue("Do not set min cells to 5, use 10 min cells", cells, 10, [threads])).toBe(true);
 });
