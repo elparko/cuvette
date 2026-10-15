@@ -2505,7 +2505,7 @@ export class Session {
         ok: output.ok,
         error: output.error === undefined ? undefined : hideKeys(output.error).text,
         summary: hideKeys(summary).text,
-        text: hideKeys(output.text ?? "").text.slice(0, Math.max(this.settings.maxResultChars, 4000)),
+        text: hideKeys(output.text ?? "").text.slice(0, tool.name === "run_script" ? this.recordedTextLimit() : 4000),
         metrics: output.metrics,
         table: output.table,
         images: images.map((o) => o.sha),
@@ -2611,12 +2611,16 @@ export class Session {
     return stepStatus(this.record, { labels: this.labels() });
   }
 
+  private recordedTextLimit(): number {
+    return this.provider.info.small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
+  }
+
   private render(tool: Tool, o: ToolOutput): { text: string; images?: string[] } {
     const adapter = this.adapterOf(tool);
     const cloud = isCloud(this.provider.info);
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
-    const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
+    const limit = this.recordedTextLimit();
     if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") {
       const reason = !o.ok && o.error && !o.text.includes(o.error) ? `ERROR: ${o.error}\n` : "";
       return { text: reason + (o.text.length > limit ? `${headText(o.text, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text) };

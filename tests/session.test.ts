@@ -3513,3 +3513,17 @@ test("a null, empty or blank pilot value is missing, not zero", async () => {
   expect(out.ok).toBe(false);
   expect(out.error).toMatch(/^Give the numbers for the pilot sample/);
 });
+
+test("a number that a small model did not see in a cut script output is not a measured claim", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
+  const code = "save_table('t', [{'a': 1}])\nprint('x' * 5000)\nprint('seen total 111.5')\nprint('y' * 2000)\nprint('unseen total 222.5')";
+  const args = { purpose: "Totals", does: "Saves a table and prints a long text and two totals.", code };
+  const answer = "The seen total is 111.5. The unseen total is 222.5.";
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args }] }, { text: answer }, { text: answer }]);
+  provider.info = { ...provider.info, small: true };
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, permissionMode: "bypass" } });
+  await session.send("totals");
+  const claims = (session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string }[] }).claims;
+  expect(claims.find((c) => c.value === 111.5)?.label).toBe("measured");
+  expect(claims.find((c) => c.value === 222.5)?.label).toBe("unsourced");
+});
