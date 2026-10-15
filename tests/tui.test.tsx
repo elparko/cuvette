@@ -246,6 +246,28 @@ describe("cards", () => {
     expect(h.last().match(/import numpy as np/g)).toHaveLength(1);
   });
 
+  test("permission card ignores keys that follow typing and acts after a pause", async () => {
+    process.env.CUVETTE_CARD_GUARD_MS = "400";
+    try {
+      const { h, s } = start();
+      await sleep(100);
+      await submit(h, "go");
+      await until(() => h.all().includes("Permission needed: run_script"));
+      await type(h, "a");
+      await type(h, "y");
+      await type(h, "\r");
+      expect(s.record.entries(["permission"])).toHaveLength(0);
+      expect(h.last()).toContain("Permission needed: run_script");
+      const quiet = Date.now() + 500;
+      await until(() => Date.now() >= quiet);
+      h.type("y");
+      await until(() => s.record.entries(["permission"]).length === 1);
+      expect(s.record.entries(["permission"])[0]!.data).toMatchObject({ decision: "allowed" });
+    } finally {
+      process.env.CUVETTE_CARD_GUARD_MS = "0";
+    }
+  });
+
   test("permission: n asks for a note and denies", async () => {
     const { h, s } = start();
     await sleep(100);

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, render, useApp, useInput, usePaste, useStdout, useWindowSize } from "ink";
 import { Text } from "./text.tsx";
+import { guardCardOpened, guardNoteKey } from "./key-guard.ts";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
@@ -383,6 +384,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   usePaste(() => {});
 
   useInput((ch, key) => {
+    guardNoteKey();
     if (key.ctrl && ch === "c") {
       const now = Date.now();
       if (now - lastCtrlC.current < 2000) return void quit();
@@ -411,6 +413,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   });
 
   const card = cards[0];
+  useEffect(() => {
+    if (card) guardCardOpened();
+  }, [card]);
   const program = session.adapterInfo[0]?.title ?? "the program";
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";

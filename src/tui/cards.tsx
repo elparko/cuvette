@@ -5,6 +5,7 @@ import { Box, useInput } from "ink";
 import { Text } from "./text.tsx";
 import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
+import { guardPass } from "./key-guard.ts";
 import type { Question } from "../core/types.ts";
 import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionHead, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
@@ -96,6 +97,7 @@ export function PermissionCard(props: {
   const onInterrupt = once(props.onInterrupt);
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       if (input === "y") onAllow();
       else if (input === "a" && always) onAlways();
       else if (input === "n") setAsking(true);
@@ -148,6 +150,7 @@ export function PhiCard(props: { card: Extract<Card, { t: "phi" }>; onAction: (a
   const v = phiView(props.card);
   const onAction = useOnce()(props.onAction);
   useInput((input, key) => {
+    if (!guardPass()) return;
     if (key.escape) return onAction("stop");
     const a = v.actions.find((x) => x.key === input);
     if (a) onAction(a.act);
@@ -202,6 +205,7 @@ export function QuestionCard(props: {
   const gap = compact ? 0 : 1;
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       const n = Number(input);
       if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) onAnswer(q.options[n - 1]!.value);
       else if (key.upArrow) setCursor((c) => (c + q.options.length - 1) % q.options.length);
@@ -287,6 +291,7 @@ export function InstructionCard(props: {
   const onAgent = once(props.onAgent);
   const onInterrupt = once(props.onInterrupt);
   useInput((input, key) => {
+    if (!guardPass()) return;
     if (key.return) onDone();
     else if (input === "s") onAgent();
     else if (key.escape) onInterrupt();
@@ -665,6 +670,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const mode = st.mode;
   useInput(
     (input, key) => {
+      if (!guardPass()) return;
       if (step === "program") {
         const n = Number(input);
         if (Number.isInteger(n) && n >= 1 && n <= switches.length) act({ a: "program", index: n - 1 });
