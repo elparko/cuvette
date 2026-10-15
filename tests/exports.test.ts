@@ -318,3 +318,21 @@ test("the protocol falls back to the plain index when a step has no trail number
   expect(md).toContain("1. open");
   expect(md).toContain("2. fit");
 });
+
+test("the rewind note never holds the text undefined", () => {
+  const r = new AnalysisRecord(join(dir, "s6"), "20260101-000000-abd1");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.addNode(nodeIn({ tool: "open", args: { path: "/w/1.tif" } }));
+  const upTo = r.entries().at(-1)!.id;
+  r.addNode(nodeIn({ tool: "blur", args: { path: "/w/x.tif", sigma: 5 } }));
+  r.append("rewind", { upTo });
+  const plain = readFileSync(exportProtocol(r, [adapter], join(dir, "p6b.md")), "utf8");
+  expect(plain).toContain("A rewind set aside step 2 of the trail.");
+  expect(plain).not.toContain("undefined");
+  const all = r.nodes().map((n) => ({ ...n }));
+  Object.defineProperty(all[1]!, "sensitivityOf", { get: () => (new Error().stack!.includes("housekeeping") ? "sigma" : undefined) });
+  const stub = Object.create(r, { nodes: { value: () => all } });
+  const md = readFileSync(exportProtocol(stub, [adapter], join(dir, "p6.md")), "utf8");
+  expect(md).not.toContain("undefined");
+  expect(md).toContain("A rewind set aside step 2 of the trail.");
+});

@@ -169,7 +169,7 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
   lines.push("", "## Steps", "");
   const numbers = stepNumbers(record.nodes());
   const live = new Set(nodes.map((n) => n.id));
-  const missing = mainNodes(record).filter((n) => !live.has(n.id)).map((n) => numbers.get(n.id));
+  const missing = mainNodes(record).flatMap((n, k) => (live.has(n.id) ? [] : [stepNumberOf(numbers, n.id, k)]));
   if (missing.length) lines.push(`A rewind set aside ${missing.length === 1 ? "step" : "steps"} ${missing.join(", ")} of the trail. This list does not have ${missing.length === 1 ? "it" : "them"}. The other steps keep the numbers of the trail.`, "");
   const groups = group(nodes);
   const sentences: string[] = [];
