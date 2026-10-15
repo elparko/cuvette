@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { openAdapter, programOf, rJson, type OpenAdapter } from "./independent.ts";
+import { CATALOG, openAdapter, programOf, pyJson, rJson, type OpenAdapter } from "./independent.ts";
 
 const python = await programOf("biostats");
 const rscript = await programOf("vegan");
@@ -159,5 +159,180 @@ describe.skipIf(!python || !rscript)("biostats adapter against base R", () => {
     close(exact.metrics.p_value, r.mw, 1e-8);
     const paired = await stats.run("rank_test", { path: file.replace("two", "pair"), outcome: "v", group: "grp", paired: true, id_column: "id", method: "exact" });
     close(paired.metrics.p_value, r.sr, 1e-8);
+  });
+});
+
+describe.skipIf(!python)("biostats adapter group labels and missing group marks", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-labels-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const write = (name: string, labels: string[]) => {
+    const file = join(root, name);
+    const rows = ["group,value"];
+    labels.forEach((label, i) => {
+      for (let k = 0; k < 6; k++) rows.push(`${label},${(i + 1) * 2 + k * 0.7 + (k % 2) * 0.3}`);
+    });
+    writeFileSync(file, rows.join("\n") + "\n");
+    return file;
+  };
+
+  for (const label of ["None"]) {
+    test(`a group named ${label} stays a group in the one-way ANOVA`, { timeout: slow }, async () => {
+      const file = write(`oneway-${label}.csv`, [label, "A", "B", "C"]);
+      const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
+      expect(out.metrics.n_groups).toBe(4);
+      expect(out.metrics.n).toBe(24);
+    });
+  }
+
+  for (const label of ["NA", "Na", "N/A", "#N/A", "<NA>", "null", "NaN", "-", "?", "."]) {
+    test(`a group written ${label} is a missing group, not a group`, { timeout: slow }, async () => {
+      const file = write(`missing-${label.replace(/\W/g, "_")}.csv`, [label, "A", "B", "C"]);
+      const out = await stats.run("anova_oneway", { path: file, outcome: "value", group: "group" });
+      expect(out.metrics.n_groups).toBe(3);
+      expect(out.metrics.n).toBe(18);
+      expect(out.metrics.n_dropped_missing_group).toBe(6);
+      expect(out.summary).toContain("6 rows have no group and are left out.");
+    });
+  }
+
+  test("the other group tools count the rows without a group", { timeout: slow }, async () => {
+    const kw = await stats.run("kruskal_dunn", { path: write("kw-missing.csv", ["NA", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
+    expect(kw.metrics.n_dropped_missing_group).toBe(6);
+    expect(kw.summary).toContain("6 rows have no group and are left out.");
+    const two = await stats.run("compare_two_groups", { path: write("two-missing.csv", ["NA", "A", "B"]), outcome: "value", group: "group" });
+    expect(two.metrics.n_dropped_missing_group).toBe(6);
+    const rank = await stats.run("rank_test", { path: write("rank-missing.csv", ["null", "A", "B"]), outcome: "value", group: "group", method: "asymptotic" });
+    expect(rank.metrics.n_dropped_missing_group).toBe(6);
+    const none = await stats.run("compare_two_groups", { path: write("two-clean.csv", ["A", "B"]), outcome: "value", group: "group" });
+    expect(none.metrics.n_dropped_missing_group).toBe(0);
+    expect(none.summary).not.toContain("no group");
+  });
+
+  test("a group named None stays a group in the Kruskal-Wallis test and the two-group test", { timeout: slow }, async () => {
+    const kw = await stats.run("kruskal_dunn", { path: write("kw.csv", ["None", "A", "B"]), outcome: "value", group: "group", p_adjust: "holm" });
+    expect(kw.metrics.n).toBe(18);
+    const two = await stats.run("compare_two_groups", { path: write("two.csv", ["None", "A"]), outcome: "value", group: "group" });
+    expect(two.metrics.n_a + two.metrics.n_b).toBe(12);
+  });
+});
+
+describe.skipIf(!python)("biostats rank test labels", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-rank-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a paired exact test with one unpaired subject still reports an exact p value", { timeout: slow }, async () => {
+    const file = join(root, "paired.csv");
+    const rows = ["subject,group,value"];
+    const before = [5.1, 6.3, 7.2, 8.8, 9.5];
+    const after = [6.0, 7.9, 7.9 + 0.5, 10.7, 11.6];
+    before.forEach((v, i) => rows.push(`s${i},pre,${v}`, `s${i},post,${after[i]}`));
+    rows.push("s9,pre,4.4");
+    writeFileSync(file, rows.join("\n") + "\n");
+    const out = await stats.run("rank_test", { path: file, outcome: "value", group: "group", paired: true, id_column: "subject", method: "exact" });
+    expect(out.metrics.exact).toBe(1);
+    expect(out.summary).toContain(", exact p:");
+    expect(out.summary).toContain("leaves out 1 subject");
+  });
+});
+
+describe.skipIf(!python)("biostats chi-square effect size", () => {
+  let stats: OpenAdapter;
+  beforeAll(async () => {
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+  });
+
+  test("Cramer's V of a 2 x 2 table does not use the Yates correction", { timeout: slow }, async () => {
+    const counts = [[12, 5], [3, 9]];
+    const yates = await stats.run("chi_square_test", { counts, correction: true });
+    const plain = await stats.run("chi_square_test", { counts, correction: false });
+    expect(yates.metrics.chi2).toBeLessThan(plain.metrics.chi2);
+    close(yates.metrics.cramers_v, plain.metrics.cramers_v);
+  });
+});
+
+describe.skipIf(!python)("biostats p value adjustment with a missing p value", () => {
+  test("a missing p value is not a test and keeps its place in the output", { timeout: slow }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-biostats-adjust-"));
+    try {
+      const out = await pyJson<{ n_tests: number; adjusted: (number | null)[] }>(
+        python!,
+        `import os, sys, math
+sys.path.insert(0, ${JSON.stringify(join(CATALOG, "biostats"))})
+os.chdir(${JSON.stringify(dir)})
+import ga_biostats
+r = ga_biostats.adjust_pvalues([0.01, 0.02, float("nan"), 0.04], "holm")
+print(json.dumps({"n_tests": r["metrics"]["n_tests"], "adjusted": [None if v is None else v for v in [row[1] for row in r["table"]["rows"]]]}))`,
+        dir,
+      );
+      expect(out.n_tests).toBe(3);
+      close(out.adjusted[0]!, 0.03);
+      close(out.adjusted[1]!, 0.04);
+      expect(out.adjusted[2]).toBeNull();
+      close(out.adjusted[3]!, 0.04);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe.skipIf(!python)("biostats tools list their test keys", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-terms-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a mixed ANOVA lists its within, between and corrected interaction p values", { timeout: slow }, async () => {
+    const file = join(root, "mixed.csv");
+    const rows = ["subject,arm,visit,score"];
+    for (let s = 0; s < 12; s++)
+      for (let v = 0; v < 3; v++) rows.push(`s${s},${s % 2 ? "drug" : "control"},v${v},${10 + v * (1 + (s % 2) * 0.8) + ((s * 7 + v * 3) % 5) * 0.6}`);
+    writeFileSync(file, rows.join("\n") + "\n");
+    const base = { path: file, outcome: "score", within: "visit", subject: "subject", between: "arm" };
+    const gg = await stats.run("anova_repeated", { ...base, correction: "greenhouse-geisser" });
+    expect(gg.data.data.p_terms).toEqual(["p_reported", "p_between", "p_interaction_reported"]);
+    close(gg.metrics.p_interaction_reported, gg.metrics.p_interaction_gg, 1e-12);
+    const plain = await stats.run("anova_repeated", { ...base, correction: "none" });
+    close(plain.metrics.p_interaction_reported, plain.metrics.p_interaction, 1e-12);
+  });
+
+  test("a factorial ANOVA and a Cox model list one p key for each term", { timeout: slow }, async () => {
+    const file = join(root, "factorial.csv");
+    const rows = ["drug,dose,y"];
+    for (const drug of ["a", "b"]) for (const dose of ["lo", "hi"]) for (let k = 0; k < 5; k++) rows.push(`${drug},${dose},${5 + (drug === "b" ? 2 : 0) + (dose === "hi" ? 1 : 0) + ((k * 3) % 4) * 0.5}`);
+    writeFileSync(file, rows.join("\n") + "\n");
+    const f = await stats.run("anova_factorial", { path: file, outcome: "y", factors: ["drug", "dose"], ss_type: 2 });
+    expect([...f.data.data.p_terms].sort()).toEqual(["p_dose", "p_drug", "p_drug_x_dose"]);
+    const cox = join(root, "cox.csv");
+    const crows = ["time,event,age,dose"];
+    for (let i = 0; i < 40; i++) crows.push(`${5 + ((i * 7) % 23) + (i % 3)},${i % 4 === 0 ? 0 : 1},${40 + ((i * 5) % 30)},${(i * 3) % 7}`);
+    writeFileSync(cox, crows.join("\n") + "\n");
+    const c = await stats.run("fit_cox", { path: cox, duration: "time", event: "event", covariates: "age, dose" });
+    expect(c.data.data.p_terms).toEqual(["p_age", "p_dose"]);
   });
 });

@@ -89,6 +89,36 @@ describe("collecting tests", () => {
     expect(collectTests(recordWith([n]))).toEqual([]);
   });
 
+  test("a repeated-measures ANOVA counts its ANOVA p value and not the sphericity p value", () => {
+    const n = { id: "n1", tool: "anova_repeated", args: { path: "/d/rm.csv" }, inputFiles: [{ path: "/d/rm.csv" }], result: { metrics: { p_uncorrected: 0.001, p_gg: 0.004, p_reported: 0.004, mauchly_W: 0.8, mauchly_p: 0.62 } } };
+    expect(collectTests(recordWith([n])).map((t) => t.p)).toEqual([0.004]);
+  });
+
+  test("a mixed ANOVA counts the within p value, the between p value and the interaction p value", () => {
+    const metrics = { p_uncorrected: 0.001, p_gg: 0.004, p_reported: 0.004, mauchly_p: 0.62, p_between: 0.03, p_interaction: 0.2, p_interaction_gg: 0.25, p_interaction_reported: 0.25 };
+    const data = { test: "mixed ANOVA", p_terms: ["p_reported", "p_between", "p_interaction_reported"] };
+    const n = { id: "n1", tool: "anova_repeated", args: { path: "/d/rm.csv" }, inputFiles: [{ path: "/d/rm.csv" }], result: { metrics, data } };
+    expect(collectTests(recordWith([n])).map((t) => [t.test, t.p])).toEqual([["mixed ANOVA", 0.004], ["mixed ANOVA: between", 0.03], ["mixed ANOVA: interaction", 0.25]]);
+  });
+
+  test("each term of a factorial ANOVA is one test of the family", () => {
+    const n = { id: "n1", tool: "anova_factorial", args: { path: "/d/f.csv" }, inputFiles: [{ path: "/d/f.csv" }], result: { metrics: { F_drug: 9, p_drug: 0.01, p_dose: 0.03, p_drug_x_dose: 0.2, levene_p: 0.5 }, data: { test: "two-way ANOVA", p_terms: ["p_drug", "p_dose", "p_drug_x_dose"] } } };
+    const rows = testRows(recordWith([n]));
+    expect(rows.map((r) => [r.test, r.p, r.size])).toEqual([["two-way ANOVA: drug", 0.01, 3], ["two-way ANOVA: dose", 0.03, 3], ["two-way ANOVA: drug x dose", 0.2, 3]]);
+  });
+
+  test("the test name and the listed keys also come from the result that a Python tool nests in data", () => {
+    const n = { id: "n1", tool: "anova_factorial", args: {}, result: { metrics: { p_a: 0.01, p_b: 0.5 }, data: { ok: true, data: { test: "two-way ANOVA", p_terms: ["p_a", "p_b"] } } } };
+    expect(collectTests(recordWith([n])).map((t) => t.test)).toEqual(["two-way ANOVA: a", "two-way ANOVA: b"]);
+  });
+
+  test("a p key that the tool does not list is not a test", () => {
+    const calcium = { id: "n1", tool: "compare_cells", args: {}, result: { metrics: { p_cell_level_not_valid: 0.01, n: 5 } } };
+    const enrichment = { id: "n2", tool: "run_gsea", args: {}, result: { metrics: { p_floor: 0.001, n_terms: 5 } } };
+    const listed = { id: "n3", tool: "fit_cox", args: {}, result: { metrics: { p_age: 0.2, p_sex: 0.4, p_floor: 0.001 }, data: { p_terms: ["p_age", "p_sex"] } } };
+    expect(collectTests(recordWith([calcium, enrichment, listed])).map((t) => [t.node, t.p])).toEqual([["n3", 0.2], ["n3", 0.4]]);
+  });
+
   test("latestValue reads setup and decision entries", () => {
     const e = [
       { id: 1, kind: "setup", data: { values: { test_correction: "holm" } } },

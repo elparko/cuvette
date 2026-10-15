@@ -735,7 +735,7 @@ def detect_events_for_cells(folder, pattern=None, metadata=None, event_method=No
     frame = pd.DataFrame(rows)
     note = ""
     if metadata:
-        m = pd.read_csv(os.path.expanduser(str(metadata)))
+        m = R.read_labels_csv(os.path.expanduser(str(metadata)))
         if "cell" not in m.columns:
             raise ValueError("The metadata file %s has no column 'cell'. The column must hold the file name of each cell without the extension. The columns are: %s." % (os.path.basename(str(metadata)), ", ".join(map(str, m.columns))))
         m["cell"] = m["cell"].astype(str)
@@ -768,7 +768,7 @@ def collect_cell_features(paths, metadata=None, id_column="cell"):
     for f in files:
         if not os.path.exists(f):
             raise FileNotFoundError("File not found: %s." % f)
-        d = pd.read_csv(f)
+        d = R.read_labels_csv(f)
         if id_column not in d.columns:
             raise ValueError("Column %r is not in %s. The columns are: %s." % (id_column, os.path.basename(f), ", ".join(map(str, d.columns))))
         for _, row in d.iterrows():
@@ -776,7 +776,7 @@ def collect_cell_features(paths, metadata=None, id_column="cell"):
     frame = pd.DataFrame([{id_column: k, **v} for k, v in parts.items()])
     note = ""
     if metadata:
-        m = pd.read_csv(os.path.expanduser(str(metadata)))
+        m = R.read_labels_csv(os.path.expanduser(str(metadata)))
         if id_column not in m.columns:
             raise ValueError("Column %r is not in the metadata file %s. The columns are: %s." % (id_column, os.path.basename(str(metadata)), ", ".join(map(str, m.columns))))
         m[id_column] = m[id_column].astype(str)
@@ -819,7 +819,7 @@ def compare_cell_groups(table, group_col=None, features=None, replicate_unit=Non
     path = os.path.expanduser(str(table))
     if not os.path.exists(path):
         raise FileNotFoundError("File not found: %s." % path)
-    d = pd.read_csv(path)
+    d = R.read_labels_csv(path)
     if not group_col or group_col not in d.columns:
         raise ValueError("group_col %r is not a column of %s. The columns are: %s." % (group_col, os.path.basename(path), ", ".join(map(str, d.columns))))
     levels = sorted(d[group_col].dropna().unique().tolist(), key=str)

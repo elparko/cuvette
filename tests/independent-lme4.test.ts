@@ -22,6 +22,11 @@ describe.skipIf(!rscript || !(await rJson<boolean>(rscript, 'requireNamespace("n
     await lme4?.close();
   });
 
+  test("the mixed model lists the p value of each fixed effect except the intercept", { timeout: slow }, async () => {
+    const fit = await lme4.run("fit_mixed_model", { data, formula: "Reaction ~ Days + (Days | Subject)", reml: true });
+    expect((fit.data as any).p_terms).toEqual(["p_Days"]);
+  });
+
   // nlme (a package that ships with R) fits the same model with its own code. Pinheiro and Bates (2000) describe the method.
   test("the ML fit and the likelihood ratio test of Days agree with nlme", { timeout: slow }, async () => {
     const hand = await rJson<{ ll: number; ll0: number }>(rscript!, `${fits}\n list(ll = ll(fit(Reaction ~ Days, ~ Days | Subject, "ML")), ll0 = ll(fit(Reaction ~ 1, ~ Days | Subject, "ML")))`);
