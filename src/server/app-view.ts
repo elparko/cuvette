@@ -19,6 +19,7 @@ export interface ViewHost {
   token: string;
   env: Record<string, string | undefined>;
   url(path: string): string;
+  open?(url: string): void;
   quit(): Promise<string | void>;
 }
 
@@ -377,6 +378,7 @@ export class WebView {
       notice: (text) => this.line("▸", text),
       error: (text) => this.line("✗", text, "red"),
       keys: () => WEB_KEYS,
+      web: true,
       openCard: (c) => this.openCard(c),
       hasQuestionCard: (qid) => this.slots.some((s) => s.card.t === "question" && s.card.q.qid === qid),
       refresh: () => this.sendStatus(),
@@ -391,7 +393,11 @@ export class WebView {
       quit: () => void this.host.quit().then((text) => text && this.line("▸", text)),
       outputs: () => this.mapper.outputs,
       toggleDetails: () => this.toggleDetails(),
-      startWindow: async () => this.host.url("graph/"),
+      startWindow: async () => {
+        const url = this.host.url("graph/");
+        this.host.open?.(url);
+        return url;
+      },
       startPanel: async () => {
         const url = this.host.url("graph/panel");
         return { url, ...(await openPanels(this.session, url)) };

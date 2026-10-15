@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
-import { cutText, discardPlace, readIndex, type IndexRow } from "./places.ts";
+import { cutText, discardPlace, readIndex, readRowMarks, type IndexRow } from "./places.ts";
 
 export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started";
 
@@ -173,7 +173,7 @@ export function scanLog(log: string): { first: any; ask: any; title?: { title: s
   const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
-  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask ? "waiting for you" : worked ? "in progress" : "not started";
+  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask || worked ? "in progress" : "not started";
   return { first, ask, title, status, figure, owner, worked };
 }
 
@@ -248,10 +248,11 @@ export function listSessions(home = cuvetteHome()): SessionInfo[] {
   const dir = join(home, "sessions");
   const out: SessionInfo[] = indexed(home);
   const seen = new Set(out.map((s) => s.id));
+  const marks = readRowMarks(join(home, "sessions-index.json"));
   for (const id of existsSync(dir) ? readdirSync(dir) : []) {
     const log = join(dir, id, "log.jsonl");
-    if (seen.has(id) || !existsSync(log)) continue;
-    const s = info(id, log, { cwd: "" });
+    if (seen.has(id) || !existsSync(log) || marks.get(id) === null) continue;
+    const s = info(id, log, { cwd: "" }, "", marks.get(id) ?? undefined);
     s.cwd = String(scanLog(log).first?.data.cwd ?? "");
     out.push(s);
   }
@@ -260,9 +261,9 @@ export function listSessions(home = cuvetteHome()): SessionInfo[] {
 }
 
 export function defaultSession(all: SessionInfo[], cwd: string): { info: SessionInfo; here: boolean } | undefined {
-  const list = all.filter((s) => s.ask || s.worked);
+  const list = all.filter((s) => !s.moved && (s.ask || s.worked));
   const inside = (dir: string) => !relative(resolve(dir), resolve(cwd)).startsWith("..") && !isAbsolute(relative(resolve(dir), resolve(cwd)));
-  const here = list.find((s) => !s.moved && ((s.cwd && resolve(s.cwd) === resolve(cwd)) || (s.folder && inside(s.folder))));
+  const here = list.find((s) => ((s.cwd && resolve(s.cwd) === resolve(cwd)) || (s.folder && inside(s.folder))));
   if (here) return { info: here, here: true };
   return list[0] ? { info: list[0], here: false } : undefined;
 }

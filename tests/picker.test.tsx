@@ -42,3 +42,20 @@ test("a long folder and a status fit on one line at 80 columns", async () => {
   h.type("\x1b");
   await done;
 });
+
+test("a moved session shows how to open it, and Enter does not open it", async () => {
+  const h = makeHarness(100, 24);
+  const moved: SessionInfo[] = [
+    { id: "20261009-100000-bbbb", cwd: "/gone", used: Date.now(), ask: "Newer", moved: true },
+    { id: "20261008-100000-aaaa", cwd: "/lab", used: Date.now() - 3600000, ask: "Older" },
+  ];
+  const done = pickSession(moved, 0, undefined, { stdin: h.stdin, stdout: h.stdout });
+  await until(() => h.all().includes("Enter opens"));
+  expect(h.all()).toContain("moved: run cuvette open <new folder>");
+  h.type("\r");
+  await sleep(80);
+  h.type("\x1b[B");
+  await sleep(50);
+  h.type("\r");
+  expect((await done)?.id).toBe("20261008-100000-aaaa");
+});
