@@ -29,6 +29,7 @@ const TAIL = new Set([")", '"', "'", "]", ",", ";", ":", "!", "?", "."]);
 const CLAUSE_END = /[,;.!?][)"'\]]*$/;
 const BOUNDARY = new Set(["and", "but", "so", "then", "because", "since", "while", "instead"]);
 const AFTER_WORD = new Set(["to", "as", "of", "at", "is", "="]);
+const WANTING = new Set(["to", "want", "need", "like"]);
 const REASK = new Set(["use", "set", "take", "apply", "run", "try", "make"]);
 const OWN = 1;
 const OTHER = 2;
@@ -203,6 +204,7 @@ function negatedAt(l: Layout, words: Item[], i: number, no: boolean): boolean {
       chain = true;
       continue;
     }
+    if (WANTING.has(it.w)) continue;
     if (!it.free && ++cost > REACH) return false;
   }
   return false;

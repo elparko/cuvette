@@ -83,6 +83,15 @@ test("a negation reaches only five tokens back and not over a clause boundary", 
   expect(namesValue("Do not worry about the old runs window 5", window, 5)).toBe(true);
 });
 
+test("a negation reaches over the filler words to and want", () => {
+  const cells = { key: "min_cells", label: "Minimum cells" };
+  const window = { key: "window", label: "Window" };
+  expect(namesValue("I do not want to set the minimum cells to 5", cells, 5)).toBe(false);
+  expect(namesValue("I want to set the minimum cells to 5", cells, 5)).toBe(true);
+  expect(namesValue("Do not set the old runs window to 5", window, 5)).toBe(false);
+  expect(namesValue("Do not worry about the old runs window 5", window, 5)).toBe(true);
+});
+
 test("a value for another target in a later clause is not the value of the setting", () => {
   const window = { key: "window", label: "Window" };
   expect(namesValue("don't set window to 5, I want 7 for the threshold", window, 7)).toBe(false);
