@@ -200,3 +200,30 @@ describe.skipIf(!python)("biostats adapter group labels that look like missing v
     expect(two.metrics.n_a + two.metrics.n_b).toBe(12);
   });
 });
+
+describe.skipIf(!python)("biostats rank test labels", () => {
+  let stats: OpenAdapter;
+  let root: string;
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "cuvette-biostats-rank-"));
+    stats = await openAdapter("biostats");
+  });
+  afterAll(async () => {
+    await stats?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a paired exact test with one unpaired subject still reports an exact p value", { timeout: slow }, async () => {
+    const file = join(root, "paired.csv");
+    const rows = ["subject,group,value"];
+    const before = [5.1, 6.3, 7.2, 8.8, 9.5];
+    const after = [6.0, 7.9, 7.9 + 0.5, 10.7, 11.6];
+    before.forEach((v, i) => rows.push(`s${i},pre,${v}`, `s${i},post,${after[i]}`));
+    rows.push("s9,pre,4.4");
+    writeFileSync(file, rows.join("\n") + "\n");
+    const out = await stats.run("rank_test", { path: file, outcome: "value", group: "group", paired: true, id_column: "subject", method: "exact" });
+    expect(out.metrics.exact).toBe(1);
+    expect(out.summary).toContain(", exact p:");
+    expect(out.summary).toContain("leaves out 1 subject");
+  });
+});

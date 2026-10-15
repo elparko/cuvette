@@ -416,6 +416,7 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         return _fail("The group column must have exactly 2 levels. It has %d: %s." % (len(levels), levels))
     first, second = levels
     note = ""
+    approximated = method != "exact"
     if paired:
         if not id_column:
             return _fail("A paired rank test needs id_column, the column that names the same subject in both groups.")
@@ -429,6 +430,7 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         ties = len(diff) - len(np.unique(np.abs(diff[diff != 0])))
         if method == "exact" and (zeros or ties > 0):
             note += " The differences have %d zeros and %d tied absolute values, so scipy cannot give an exact p; it used the normal approximation." % (zeros, max(ties, 0))
+            approximated = True
             res = stats.wilcoxon(diff, alternative=alternative, method="approx", correction=True)
         else:
             res = stats.wilcoxon(diff, alternative=alternative, method="exact" if method == "exact" else "approx", correction=method != "exact")
@@ -444,13 +446,14 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
         if method == "exact" and tied:
             note = " The data have %d tied values, so scipy cannot give an exact p; it used the normal approximation." % tied
             m = "asymptotic"
+            approximated = True
         res = stats.mannwhitneyu(x, y, alternative=alternative, method=m, use_continuity=True)
         name, n1, n2 = "Mann-Whitney U test", len(y), len(x)
         stat_name = "U of the second group (R calls it W)"
         statistic = float(res.statistic)
         estimate = float(np.median(np.subtract.outer(x, y)))
     p = float(res.pvalue)
-    used = "exact" if method == "exact" and not note else "normal approximation with continuity correction"
+    used = "exact" if not approximated else "normal approximation with continuity correction"
     summary = "%s of %s, %s against %s, %s, %s p: %s = %.4g, p = %s. Estimate (%s): %.4g.%s" % (
         name, outcome, second, first, alternative, used, stat_name, statistic, _fmt_p(p),
         "median of the paired differences" if paired else "Hodges-Lehmann shift, second minus first", estimate, note)
