@@ -221,9 +221,9 @@ function linePriceId(line: any): string | undefined {
   return typeof price === "string" ? price : undefined;
 }
 
-function windowShare(resetsAt: number, periodEnd: number, now: number): number {
-  const start = addMonths(resetsAt, -1, new Date(periodEnd).getUTCDate());
-  return Math.min(1, Math.max(0, (resetsAt - now) / (resetsAt - start)));
+function windowShare(windowStart: number | null, resetsAt: number, now: number): number {
+  if (windowStart === null || resetsAt <= windowStart) return 1;
+  return Math.min(1, Math.max(0, (resetsAt - now) / (resetsAt - windowStart)));
 }
 
 async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Effect | undefined> {
@@ -248,15 +248,15 @@ async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Ef
     const total = Number(invoice.total ?? invoice.amount_paid ?? 0);
     const inTrial = account.sub_status === "trialing" || account.allowance_granted_usd === cfg.trial.allowanceUsd;
     const keepWindow = !inTrial && account.allowance_resets_at !== null && account.allowance_resets_at > now + 60_000;
-    const share = keepWindow ? windowShare(account.allowance_resets_at!, periodEnd, now) : 1;
+    const share = keepWindow ? windowShare(account.allowance_window_start, account.allowance_resets_at!, now) : 1;
     const delta = total > 0 ? Math.max(0, plan.allowanceUsd - account.allowance_granted_usd) * share : 0;
     return {
       statements: [
         env.DB
           .prepare(
-            "UPDATE accounts SET plan = ?1, plan_interval = ?2, period_end = ?3, stripe_subscription_id = COALESCE(?4, stripe_subscription_id), allowance_remaining_usd = allowance_remaining_usd + ?5, allowance_granted_usd = allowance_granted_usd + ?5, allowance_resets_at = ?6 WHERE id = ?7",
+            "UPDATE accounts SET plan = ?1, plan_interval = ?2, period_end = ?3, stripe_subscription_id = COALESCE(?4, stripe_subscription_id), allowance_remaining_usd = allowance_remaining_usd + ?5, allowance_granted_usd = allowance_granted_usd + ?5, allowance_resets_at = ?6, allowance_window_start = ?7 WHERE id = ?8",
           )
-          .bind(plan.id, interval, periodEnd, subscription, delta, keepWindow ? account.allowance_resets_at : resets, account.id),
+          .bind(plan.id, interval, periodEnd, subscription, delta, keepWindow ? account.allowance_resets_at : resets, keepWindow ? account.allowance_window_start : now, account.id),
       ],
     };
   }
@@ -266,9 +266,9 @@ async function invoicePaid(env: Env, cfg: PlansConfig, invoice: any): Promise<Ef
     statements: [
       env.DB
         .prepare(
-          "UPDATE accounts SET plan = ?1, plan_interval = ?2, sub_status = ?3, period_end = ?4, stripe_subscription_id = COALESCE(?5, stripe_subscription_id), allowance_remaining_usd = ?6, allowance_granted_usd = ?6, allowance_resets_at = ?7 WHERE id = ?8",
+          "UPDATE accounts SET plan = ?1, plan_interval = ?2, sub_status = ?3, period_end = ?4, stripe_subscription_id = COALESCE(?5, stripe_subscription_id), allowance_remaining_usd = ?6, allowance_granted_usd = ?6, allowance_resets_at = ?7, allowance_window_start = ?8 WHERE id = ?9",
         )
-        .bind(plan.id, interval, trial ? "trialing" : "active", periodEnd, subscription, level, resets, account.id),
+        .bind(plan.id, interval, trial ? "trialing" : "active", periodEnd, subscription, level, resets, now, account.id),
     ],
   };
 }

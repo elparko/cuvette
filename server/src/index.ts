@@ -214,7 +214,7 @@ function anthropicFlavor(req: Request, table: UpstreamTable, hold: Hold, checked
       const tokens = mergeUsage(undefined, json.usage);
       return { charge: finalCharge(model, tokens), model, tokens, status: "ok" };
     },
-    isOurs: (status, text) => status === 401 || status === 403 || (status === 400 && /credit balance/i.test(text)),
+    isOurs: (status, text) => status === 401 || status === 403 || (status === 400 && /credit balance|usage limits/i.test(text)),
   };
 }
 
@@ -239,7 +239,7 @@ function openAiFlavor(hold: Hold, checked: Checked, key: string): Flavor {
       const tokens = openAiTokens(json?.usage);
       return tokens ? { charge: cost(tokens), model: hold.requestedModel, tokens, status: "ok" } : undefined;
     },
-    isOurs: (status, text) => status === 401 || status === 402 || status === 403 || (status === 429 && /insufficient_quota/i.test(text)),
+    isOurs: (status, text) => status === 401 || status === 402 || status === 403 || (status === 429 && /insufficient_quota/i.test(text)) || (status === 400 && /billing_hard_limit_reached/i.test(text)),
   };
 }
 

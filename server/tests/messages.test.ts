@@ -147,7 +147,7 @@ describe("reservation and refund", () => {
   });
 
   it("hides an upstream key problem or upstream credit problem from the user", async () => {
-    for (const [status, message] of [[401, "invalid x-api-key"], [403, "forbidden"], [400, "Your credit balance is too low"]] as const) {
+    for (const [status, message] of [[401, "invalid x-api-key"], [403, "forbidden"], [400, "Your credit balance is too low"], [400, "You have reached your specified API usage limits. You will regain access on 2026-11-01."]] as const) {
       const env = makeEnv();
       const acct = await addAccount(env, 5);
       mockFetch(() => new Response(JSON.stringify({ type: "error", error: { type: "x", message } }), { status }));

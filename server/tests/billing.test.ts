@@ -789,6 +789,19 @@ describe("webhook: invoice.paid", () => {
     expect(acc(env, a.id)).toMatchObject({ plan: "standard", allowance_remaining_usd: 1.5 + 13, allowance_granted_usd: 15, allowance_resets_at: Date.parse("2026-11-01T12:00:00Z"), period_end: period(31) * 1000 });
   });
 
+  it("scales a second upgrade by the window that the first upgrade started", async () => {
+    freeze();
+    const env = makeEnv();
+    const a = await addAccount(env, 1.5, { plan: "standard", granted: 15, customer: "cus_1", subscription: "sub_1", resetsAt: NOW.getTime() - DAY, periodEnd: NOW.getTime() + 15 * DAY });
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 4600, amount_paid: 4600, lines: { data: [line("price_lab_m", 4600, period(15))] } })));
+    expect(acc(env, a.id)).toMatchObject({ plan: "lab", allowance_granted_usd: 46, allowance_resets_at: period(15) * 1000, allowance_window_start: NOW.getTime() });
+    vi.setSystemTime(new Date(NOW.getTime() + 5 * DAY));
+    await send(env, event("invoice.paid", invoice({ billing_reason: "subscription_update", total: 7200, amount_paid: 7200, lines: { data: [line("price_labplus_m", 7200, period(15))] } })));
+    expect(acc(env, a.id).allowance_granted_usd).toBeCloseTo(46 + 72 * (10 / 15), 6);
+    expect(acc(env, a.id).allowance_resets_at).toBe(period(15) * 1000);
+    expect(acc(env, a.id).allowance_window_start).toBe(NOW.getTime());
+  });
+
   it("changes the plan but adds nothing when an update invoice has no charge", async () => {
     freeze();
     const env = makeEnv();

@@ -108,6 +108,7 @@ export interface AddOptions {
   subStatus?: string;
   granted?: number;
   resetsAt?: number | null;
+  windowStart?: number | null;
   periodEnd?: number | null;
   customer?: string | null;
   subscription?: string | null;
@@ -129,9 +130,15 @@ export async function addAccount(env: TestEnv, allowance: number, o: AddOptions 
   const id = o.id ?? `acc_${crypto.randomUUID()}`;
   const plan = o.plan ?? "lab_plus";
   const none = plan === "none";
+  const resetsAt = o.resetsAt === undefined ? (none ? null : Date.now() + 20 * DAY) : o.resetsAt;
+  const monthBefore = (t: number) => {
+    const d = new Date(t);
+    d.setUTCMonth(d.getUTCMonth() - 1);
+    return d.getTime();
+  };
   env.fake.sqlite
     .prepare(
-      "INSERT INTO accounts (id, created_at, plan, plan_interval, sub_status, stripe_customer_id, stripe_subscription_id, allowance_remaining_usd, allowance_granted_usd, allowance_resets_at, period_end, suspended) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO accounts (id, created_at, plan, plan_interval, sub_status, stripe_customer_id, stripe_subscription_id, allowance_remaining_usd, allowance_granted_usd, allowance_resets_at, allowance_window_start, period_end, suspended) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .run(
       id,
@@ -143,7 +150,8 @@ export async function addAccount(env: TestEnv, allowance: number, o: AddOptions 
       o.subscription ?? null,
       allowance,
       o.granted ?? (none ? 0 : allowance),
-      o.resetsAt === undefined ? (none ? null : Date.now() + 20 * DAY) : o.resetsAt,
+      resetsAt,
+      o.windowStart === undefined ? (resetsAt === null ? null : monthBefore(resetsAt)) : o.windowStart,
       o.periodEnd === undefined ? (none ? null : Date.now() + 25 * DAY) : o.periodEnd,
       o.suspended ?? 0,
     );

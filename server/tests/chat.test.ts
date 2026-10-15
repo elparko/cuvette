@@ -261,13 +261,13 @@ describe("chat completions usage", () => {
   });
 
   it("refunds in full when the host returns an HTTP error and hides a host key problem", async () => {
-    for (const [status, text, expected] of [[500, '{"error":{"message":"boom"}}', 500], [401, '{"error":{"message":"bad key sk-host"}}', 503], [402, "pay", 503], [429, '{"error":{"code":"insufficient_quota"}}', 503], [429, '{"error":{"message":"slow down"}}', 503], [529, '{"error":{"message":"slow down"}}', 503]] as const) {
+    for (const [status, text, expected] of [[500, '{"error":{"message":"boom"}}', 500], [401, '{"error":{"message":"bad key sk-host"}}', 503], [402, "pay", 503], [429, '{"error":{"code":"insufficient_quota"}}', 503], [400, '{"error":{"code":"billing_hard_limit_reached"}}', 503], [429, '{"error":{"message":"slow down"}}', 503], [529, '{"error":{"message":"slow down"}}', 503]] as const) {
       const env = makeOpenAiEnv();
       const acct = await addAccount(env, 5);
       mockFetch(() => new Response(text, { status, headers: { "content-type": "application/json" } }));
       const { res } = await call(env, "/v1/chat/completions", post(acct.token, openAiBody()));
       expect(res.status).toBe(expected);
-      if (expected === 503) expect(await res.text()).not.toMatch(/sk-host|slow down|insufficient_quota/);
+      if (expected === 503) expect(await res.text()).not.toMatch(/sk-host|slow down|insufficient_quota|billing_hard_limit/);
       expect(balanceOf(env, acct.id)).toBe(5);
       expect(holdsOf(env, acct.id)).toBe(0);
       expect(env.fake.row("SELECT status, cost_usd FROM usage")).toEqual({ status: "rejected", cost_usd: 0 });

@@ -20,6 +20,7 @@ export interface Account {
   allowance_remaining_usd: number;
   allowance_granted_usd: number;
   allowance_resets_at: number | null;
+  allowance_window_start: number | null;
   period_end: number | null;
   suspended: number;
 }
@@ -121,9 +122,13 @@ export async function lazyReset(env: Env, cfg: PlansConfig, a: Account, now: num
   if (a.allowance_resets_at === null || a.period_end === null || a.allowance_resets_at > now || a.period_end <= now) return false;
   const anchorDay = new Date(a.period_end).getUTCDate();
   let next = a.allowance_resets_at;
-  for (let i = 0; i < 36 && next <= now; i++) next = Math.min(addMonths(next, 1, anchorDay), a.period_end);
+  let start = next;
+  for (let i = 0; i < 36 && next <= now; i++) {
+    start = next;
+    next = Math.min(addMonths(next, 1, anchorDay), a.period_end);
+  }
   if (next <= now) return false;
-  const done = await env.DB.prepare("UPDATE accounts SET allowance_remaining_usd = ?1, allowance_granted_usd = ?1, allowance_resets_at = ?2 WHERE id = ?3 AND allowance_resets_at = ?4").bind(plan.allowanceUsd, next, a.id, a.allowance_resets_at).run();
+  const done = await env.DB.prepare("UPDATE accounts SET allowance_remaining_usd = ?1, allowance_granted_usd = ?1, allowance_resets_at = ?2, allowance_window_start = ?3 WHERE id = ?4 AND allowance_resets_at = ?5").bind(plan.allowanceUsd, next, start, a.id, a.allowance_resets_at).run();
   return done.meta.changes > 0;
 }
 
