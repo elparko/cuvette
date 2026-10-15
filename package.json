@@ -24,6 +24,10 @@
     "scripts/build-registry-index.mjs",
     "registry-template/",
     "README.md",
+    "CITATION.cff",
+    "CREDITS.md",
+    "DATA_LICENSES.md",
+    "LICENSES/",
     "!**/__pycache__/",
     "!**/*.pyc"
   ],
