@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
@@ -18,12 +18,16 @@ export function globToRegex(pattern: string): RegExp {
   return new RegExp(`^${re}$`, "i");
 }
 
-export function matchFiles(folder: string, pattern: string): string[] {
+const LIST_CAP = 2000;
+const TABLE_CAP = 8 * 1024 * 1024;
+
+export function matchFiles(folder: string, pattern: string, limit = Infinity): string[] {
   const re = globToRegex(pattern.replaceAll("\\", "/"));
   const deep = pattern.includes("**") || pattern.includes("/");
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (out.length >= limit) return;
       const p = join(dir, e.name);
       if (e.isDirectory()) {
         if (deep) walk(p);
@@ -121,14 +125,16 @@ export function startFiles(c: KindContext): AdapterRuntime {
       run(a) {
         const folder = resolve(String(a.folder));
         if (!existsSync(folder) || !statSync(folder).isDirectory()) return { ok: false, error: `${folder} is not a folder` };
-        const files = matchFiles(folder, String(a.pattern));
+        const found = matchFiles(folder, String(a.pattern), LIST_CAP + 1);
+        const cut = found.length > LIST_CAP;
+        const files = found.slice(0, LIST_CAP);
         const rows = files.map((p) => {
           const s = statSync(p);
           return [relative(folder, p), s.size, s.mtime.toISOString()];
         });
         return {
           ok: true,
-          summary: `${files.length} file(s) in ${folder} match ${a.pattern}.`,
+          summary: `${files.length} file(s) in ${folder} match ${a.pattern}.${cut ? ` The list stops at ${LIST_CAP} files. More files match.` : ""}`,
           data: { files: files.map((p, i) => ({ path: p, size: rows[i][1], modified: rows[i][2] })) },
           table: { columns: ["name", "size", "modified"], rows: rows.slice(0, 12), n_rows: rows.length },
           metrics: { n_files: files.length },
@@ -146,10 +152,21 @@ export function startFiles(c: KindContext): AdapterRuntime {
       run(a) {
         const path = resolve(String(a.path));
         if (!existsSync(path)) return { ok: false, error: `${path} does not exist` };
-        const table = tablePreview(readFileSync(path, "utf8"), path, Number(a.max_rows));
+        const fd = openSync(path, "r");
+        let text: string;
+        let cut = false;
+        try {
+          const buf = readAt(fd, 0, TABLE_CAP + 1);
+          cut = buf.length > TABLE_CAP;
+          text = buf.subarray(0, TABLE_CAP).toString("utf8");
+        } finally {
+          closeSync(fd);
+        }
+        if (cut) text = text.slice(0, Math.max(text.lastIndexOf("\n"), 0));
+        const table = tablePreview(text, path, Number(a.max_rows));
         return {
           ok: true,
-          summary: `${basename(path)}: ${table.n_rows} rows, ${table.columns.length} columns.`,
+          summary: `${basename(path)}: ${table.n_rows} rows, ${table.columns.length} columns.${cut ? ` Cuvette read only the first ${TABLE_CAP / 1024 / 1024} MB of the file. The row count covers that part.` : ""}`,
           table,
           metrics: { n_rows: table.n_rows, n_columns: table.columns.length },
           outputs: [{ path, kind: "table", name: basename(path) }],

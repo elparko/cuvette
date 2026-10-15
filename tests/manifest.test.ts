@@ -86,3 +86,12 @@ test("an adapter that names a module outside its folder is refused with a clear 
   writeFileSync(join(dir, "adapter.yaml"), `${base}module: sub/adapter.ts\n`);
   expect(loadAdapter(dir).manifest.module).toBe("sub/adapter.ts");
 });
+
+test("call_timeout_s must be more than 0, finite and at most 86400", () => {
+  const base = { adapter: { name: "x" }, program: { name: "X" } };
+  const parse = (v: number) => Manifest.safeParse({ ...base, connection: { kind: "mcp", call_timeout_s: v } });
+  expect(parse(600).success).toBe(true);
+  expect(parse(86400).success).toBe(true);
+  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 86401]) expect(parse(bad).success, String(bad)).toBe(false);
+  expect(parse(0).error?.issues[0].message).toContain("call_timeout_s must be more than 0");
+});

@@ -26,6 +26,27 @@ function renderDeep(v: unknown, s: Scope): unknown {
   return v;
 }
 
+const BODY_CAP = 16 * 1024 * 1024;
+
+async function readCapped(r: Response): Promise<{ bytes: Buffer; cut: boolean }> {
+  if (!r.body) return { bytes: Buffer.alloc(0), cut: false };
+  const parts: Buffer[] = [];
+  let size = 0;
+  const reader = r.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return { bytes: Buffer.concat(parts), cut: false };
+    const room = BODY_CAP - size;
+    if (value.length > room) {
+      parts.push(Buffer.from(value.subarray(0, room)));
+      await reader.cancel();
+      return { bytes: Buffer.concat(parts), cut: true };
+    }
+    parts.push(Buffer.from(value));
+    size += value.length;
+  }
+}
+
 export function startHttp(c: KindContext): AdapterRuntime {
   const conn = c.adapter.manifest.connection;
   const live = inflight();
@@ -54,7 +75,7 @@ export function startHttp(c: KindContext): AdapterRuntime {
       const res = await live
         .track(ctx.signal, async (signal) => {
           const r = await fetch(url, { method, headers, body: payload, signal: AbortSignal.any([signal, AbortSignal.timeout(conn.call_timeout_s * 1000)]) });
-          return { status: r.status, ok: r.ok, type: r.headers.get("content-type") ?? "", bytes: Buffer.from(await r.arrayBuffer()) };
+          return { status: r.status, ok: r.ok, type: r.headers.get("content-type") ?? "", ...(await readCapped(r)) };
         })
         .catch((e: Error) => ({ error: e.name === "TimeoutError" ? `the request timed out after ${conn.call_timeout_s} s` : e.name === "AbortError" ? "the request was cancelled" : `the request failed: ${e.message}` }));
       if ("error" in res) return { ok: false, error: res.error, manualRoute: route };
@@ -63,9 +84,9 @@ export function startHttp(c: KindContext): AdapterRuntime {
         const key = Object.keys(call.outputs)[0];
         const path = key ? call.outputs[key] : join(call.dir, "response");
         writeFileSync(path, res.bytes);
-        return { ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}`, summary: `${def.title || def.name}: saved ${res.bytes.length} bytes.`, outputs: [outputFile(path, key)], manualRoute: route, fidelity: "exact" };
+        return { ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}`, summary: `${def.title || def.name}: saved ${res.bytes.length} bytes.${res.cut ? " The response is cut at 16 MB." : ""}`, outputs: [outputFile(path, key)], manualRoute: route, fidelity: "exact" };
       }
-      const text = res.bytes.toString("utf8");
+      const text = res.bytes.toString("utf8") + (res.cut ? "\n[The response is cut at 16 MB.]" : "");
       let data: unknown = text;
       if (/json/i.test(res.type) || /^\s*[[{]/.test(text)) {
         try {
