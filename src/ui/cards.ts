@@ -1,4 +1,5 @@
 import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
+import { usesAnthropicApi } from "../core/types.ts";
 import type { PhiAction } from "../core/phi.ts";
 import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
@@ -448,7 +449,7 @@ export type KeyCheck = (key: string, model?: string) => Promise<{ ok: boolean; t
 
 export async function saveKey(session: SessionLike, key: string, env: Record<string, string | undefined>, say: Say, check: KeyCheck): Promise<{ ok: boolean; text: string }> {
   say.dim(`Checking the key ${maskKey(key)} with the Claude API…`);
-  const r = await check(key, session.model.provider === "claude" ? session.model.model : undefined);
+  const r = await check(key, usesAnthropicApi(session.model.provider) ? session.model.model : undefined);
   if (!r.ok) return (say.bad(r.text), r);
   const path = saveClaudeKey(key);
   recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");

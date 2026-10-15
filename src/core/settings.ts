@@ -3,10 +3,11 @@ import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
-import { CLAUDE_MODELS } from "../providers/index.ts";
+import { CLAUDE_MODELS, CUVETTE_MODEL } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
-import { claudeKey, elabftwConfig } from "./credentials.ts";
+import { claudeKey, cuvetteToken, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
+import { usesAnthropicSpec } from "./types.ts";
 import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
 import { folderHasNoPatientData, setFolderNoPatientData } from "./phi.ts";
 
@@ -67,7 +68,7 @@ export interface SettingRow {
 }
 
 const ALL: Scope[] = ["session", "user", "project"];
-const MODELS = () => CLAUDE_MODELS.map((m) => m.spec);
+const MODELS = () => [...CLAUDE_MODELS, CUVETTE_MODEL].map((m) => m.spec);
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 export type Paper = "a4" | "letter";
@@ -108,7 +109,7 @@ export const SETTINGS: SettingDef[] = [
     scopes: ALL,
     choices: () => EFFORTS,
     lockedInTurn: true,
-    shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
+    shown: (ctx) => usesAnthropicSpec(String(resolve(find("model")!, ctx).value)),
   },
   {
     name: "promptCache",
@@ -118,7 +119,7 @@ export const SETTINGS: SettingDef[] = [
     scopes: ALL,
     choices: () => ["5m", "1h", "off"],
     lockedInTurn: true,
-    shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
+    shown: (ctx) => usesAnthropicSpec(String(resolve(find("model")!, ctx).value)),
   },
   {
     name: "mode",
@@ -420,6 +421,19 @@ export const SETTINGS: SettingDef[] = [
     read: (ctx) => {
       const k = claudeKey(ctx.env ?? process.env);
       return k.from === "env" ? { value: "set by environment", source: "env" } : k.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
+    },
+  },
+  {
+    name: "cuvette_account",
+    group: "Account and spend",
+    label: "Cuvette account",
+    help: "A Cuvette account holds your Cuvette credit for Cuvette hosted. The screen never shows the token. CUVETTE_TOKEN in the shell wins over the saved token. On the command line: cuvette account.",
+    brief: "A Cuvette account holds your Cuvette credit. The screen never shows the token.",
+    scopes: [],
+    secret: true,
+    read: (ctx) => {
+      const t = cuvetteToken(ctx.env ?? process.env);
+      return t.from === "env" ? { value: "set by environment", source: "env" } : t.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
     },
   },
   {

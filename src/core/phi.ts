@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { folderKey } from "./trust.ts";
-import type { Message, ModelInfo, Part } from "./types.ts";
+import { usesAnthropicApi, type Message, type ModelInfo, type Part } from "./types.ts";
 
 export type PhiKind = "name" | "birth_date" | "mrn" | "ssn" | "phone" | "email" | "address" | "zip";
 export type PhiAction = "send" | "mask" | "local" | "stop";
@@ -357,7 +357,7 @@ export function isLocal(info: Pick<ModelInfo, "provider"> & { local?: boolean })
 }
 
 export function isCloud(info: Pick<ModelInfo, "provider"> & { local?: boolean }): boolean {
-  return info.local === false || (info.local === undefined && info.provider === "claude");
+  return info.local === false || (info.local === undefined && usesAnthropicApi(info.provider));
 }
 
 export function localUrl(url: string): boolean {

@@ -455,7 +455,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <ScrollTextIcon />
             </Button>
           </Tooltip>
-          <ModelMenu model={session.model} busy={busy} openSettings={() => ctx.go("settings")} />
+          <ModelMenu model={session.model} provider={session.provider} busy={busy} openSettings={() => ctx.go("settings")} />
           <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
             <Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground lg:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>

@@ -28,6 +28,8 @@ export interface ModelListing {
   contextWindow: number;
 }
 
+export const CUVETTE_MODEL: ModelListing = { spec: "cuvette", label: "Cuvette hosted (pay as you go)", local: false, tools: true, contextWindow: 1_000_000 };
+
 export const CLAUDE_MODELS: ModelListing[] = [
   { spec: "claude:claude-opus-5-5", label: "Claude Opus 5.5 (default)", local: false, tools: true, contextWindow: 1_000_000 },
   { spec: "claude:claude-sonnet-5-5", label: "Claude Sonnet 5.5", local: false, tools: true, contextWindow: 1_000_000 },
@@ -42,6 +44,8 @@ export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promi
   switch (kind) {
     case "claude":
       return new ClaudeProvider(rest || DEFAULT_CLAUDE_MODEL, opts);
+    case "cuvette":
+      return new ClaudeProvider(rest || DEFAULT_CLAUDE_MODEL, { ...opts, hosted: true });
     case "ollama":
       if (!rest) throw new ProviderError("Name an Ollama model, for example ollama:qwen3:8b");
       return createOllama(rest, opts);
@@ -53,12 +57,12 @@ export async function makeProvider(spec: string, opts: ProviderOpts = {}): Promi
     case "fake":
       return rest ? FakeProvider.fromFile(rest) : new FakeProvider();
     default:
-      throw new ProviderError(`Unknown model spec "${spec}". Use claude, claude:<id>, ollama:<model>, openai:<url>|<model>, or fake:<file>.`);
+      throw new ProviderError(`Unknown model spec "${spec}". Use claude, claude:<id>, cuvette, cuvette:<id>, ollama:<model>, openai:<url>|<model>, or fake:<file>.`);
   }
 }
 
 export async function listModels(): Promise<ModelListing[]> {
-  const list = [...CLAUDE_MODELS];
+  const list = [...CLAUDE_MODELS, CUVETTE_MODEL];
   try {
     const res = await fetch(`${ollamaHost()}/api/tags`, { signal: AbortSignal.timeout(1500) });
     if (!res.ok) return list;

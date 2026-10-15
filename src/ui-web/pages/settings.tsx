@@ -3,6 +3,7 @@ import { ArrowUpIcon, FolderIcon, LockIcon, SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
+import { CuvetteAccount } from "../components/cuvette-account.tsx";
 import { DoctorView } from "../components/doctor.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -301,7 +302,27 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
       control = <Input value={draft} onChange={(e) => setDraft(e.target.value)} aria-labelledby={id} spellCheck={false} disabled={dis} className="max-w-md" onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} onBlur={() => draft.trim() !== (r.value === "not set" ? "" : r.value) && draft.trim() && ask(draft.trim())} />;
       break;
     case "secret":
-      control = (
+      control = r.name === "cuvette_account" ? (
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={r.secret === "not set" ? "default" : "ok"}>{r.secret}</Badge>
+            {r.secret === "saved" && (
+              <Button
+                variant={sure ? "destructive" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  if (!sure) return setSure(true);
+                  setSure(false);
+                  void finish("api/setting/remove", { name: r.name });
+                }}
+              >
+                {sure ? "Click again to remove" : "Remove"}
+              </Button>
+            )}
+          </div>
+          <CuvetteAccount key={r.secret} createLabel="Pay Cuvette for inference" onCreated={reload} />
+        </div>
+      ) : (
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={r.secret === "not set" ? "default" : "ok"}>{r.secret}</Badge>
           <Button variant="outline" size="sm" onClick={edit}>

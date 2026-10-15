@@ -9,10 +9,11 @@ import { fileURLToPath } from "node:url";
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
-import { claudeKey } from "../core/credentials.ts";
+import { claudeKey, cuvetteToken } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
-import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
+import { accountStatus, AccountError, AMOUNTS, checkoutUrl, CUVETTE_NOTICE } from "../core/account.ts";
+import { APP_CHOICES, chooseClaude, chooseCuvette, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
 import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
@@ -403,11 +404,23 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       lastOpen = { key, at: Date.now() };
       return send(res, 200, { ok: true });
     }
-    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
+    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: APP_CHOICES, notice: CUVETTE_NOTICE, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
     if (p === "/api/firststart/claude") {
       const r = await chooseClaude(String(body.key ?? ""), { ...fsCtx(), check: opts.checkKey });
       if (r.ok) recordSetting(c?.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
       return send(res, r.ok ? 200 : 400, r.ok ? r : { error: r.text });
+    }
+    if (p === "/api/firststart/cuvette" || p === "/api/cuvette" || p === "/api/cuvette/buy") {
+      try {
+        if (p === "/api/firststart/cuvette") return send(res, 200, await chooseCuvette(fsCtx()));
+        const ctx = { env, fetch: opts.fetch };
+        if (p === "/api/cuvette/buy") return send(res, 200, { url: await checkoutUrl(Number(body.amount), ctx) });
+        if (cuvetteToken(env).from === "none") return send(res, 200, { hasToken: false, notice: CUVETTE_NOTICE, amounts: AMOUNTS });
+        return send(res, 200, { hasToken: true, ...(await accountStatus(ctx)), notice: CUVETTE_NOTICE, amounts: AMOUNTS });
+      } catch (e) {
+        if (e instanceof AccountError) return send(res, 400, { error: e.message });
+        throw e;
+      }
     }
     if (p === "/api/firststart/local") return send(res, 200, await chooseLocal(String(body.model ?? ""), fsCtx()));
     if (p === "/api/doctor") {

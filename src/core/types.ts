@@ -108,8 +108,12 @@ export interface ToolSchema {
   inputSchema: Record<string, unknown>;
 }
 
+export const usesAnthropicApi = (provider: string | undefined): boolean => provider === "claude" || provider === "cuvette";
+
+export const usesAnthropicSpec = (spec: string): boolean => /^(claude|cuvette)(:|$)/.test(spec);
+
 export interface ModelInfo {
-  provider: "claude" | "ollama" | "openai" | "fake";
+  provider: "claude" | "cuvette" | "ollama" | "openai" | "fake";
   model: string;
   contextWindow: number;
   vision: boolean;

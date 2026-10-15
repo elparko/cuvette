@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
-import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
+import { CREDIT_USED_UP, NO_TOKEN, TOKEN_REFUSED, TOO_MANY } from "../core/account.ts";
+import { claudeKey, claudeWorkspace, cuvetteToken, cuvetteUrl, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget } from "./images.ts";
@@ -19,10 +20,19 @@ export interface ClaudeOpts {
   sleep?: Sleep;
   retries?: number;
   cache?: "off" | "5m" | "1h";
+  hosted?: boolean;
+  baseURL?: string;
+  authToken?: string;
 }
 
-function mapError(e: unknown, model: string): unknown {
+function mapError(e: unknown, model: string, hosted = false): unknown {
+  if (e instanceof ProviderError) return e;
   if (e instanceof Anthropic.APIUserAbortError) return e;
+  if (hosted && e instanceof Anthropic.APIError) {
+    if (e.status === 402) return new ProviderError(CREDIT_USED_UP);
+    if (e.status === 401) return new ProviderError(TOKEN_REFUSED);
+    if (e.status === 429 && (e as any).error?.error?.type === "too_many_requests") return new ProviderError(TOO_MANY, true);
+  }
   if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${NO_CREDENTIALS} The API said: ${e.message}`);
   if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return new ProviderError(keyApiProblem(e.status, e.message));
   if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message} ${keyApiProblem(403)}`);
@@ -50,6 +60,10 @@ function cacheLast(messages: any[], mark?: Record<string, unknown>): any[] {
   return [...messages.slice(0, -1), { ...last, content }];
 }
 
+function makeHostedClient(baseURL: string, authToken: string): any {
+  return new Anthropic({ apiKey: null, authToken, baseURL, maxRetries: 0 });
+}
+
 function makeClient(key?: string): any {
   const ws = claudeWorkspace();
   const headers = ws ? { defaultHeaders: { "anthropic-workspace-id": ws } } : {};
@@ -69,6 +83,9 @@ export class ClaudeProvider implements Provider {
   info: ModelInfo;
   private fixedClient: any;
   private apiKey?: string;
+  private hosted: boolean;
+  private baseURL?: string;
+  private authToken?: string;
   private made?: { client: any; version: number };
   private effort: string;
   private fallbacks = true;
@@ -77,7 +94,10 @@ export class ClaudeProvider implements Provider {
   private mark?: Record<string, unknown>;
 
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
-    this.info = { provider: "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
+    this.hosted = !!opts.hosted;
+    this.baseURL = opts.baseURL;
+    this.authToken = opts.authToken;
+    this.info = { provider: this.hosted ? "cuvette" : "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
     this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
     this.fixedClient = opts.client;
     this.apiKey = opts.apiKey;
@@ -93,8 +113,14 @@ export class ClaudeProvider implements Provider {
   private get client(): any {
     if (this.fixedClient) return this.fixedClient;
     if (!this.made || this.made.version !== keyVersion()) {
-      const key = this.apiKey ?? claudeKey().key;
-      this.made = { client: makeClient(key), version: keyVersion() };
+      if (this.hosted) {
+        const token = this.authToken ?? cuvetteToken().token;
+        if (!token) throw new ProviderError(NO_TOKEN);
+        this.made = { client: makeHostedClient(this.baseURL ?? cuvetteUrl(), token), version: keyVersion() };
+      } else {
+        const key = this.apiKey ?? claudeKey().key;
+        this.made = { client: makeClient(key), version: keyVersion() };
+      }
     }
     return this.made.client;
   }
@@ -104,7 +130,7 @@ export class ClaudeProvider implements Provider {
     const out: unknown[] = [];
     for (const m of messages) {
       if (m.role === "assistant") {
-        if (m.raw && m.provider === "claude" && m.model === this.model) {
+        if (m.raw && m.provider === this.info.provider && m.model === this.model) {
           out.push({ role: "assistant", content: m.raw });
           continue;
         }
@@ -183,10 +209,10 @@ export class ClaudeProvider implements Provider {
         } else throw e;
       }
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.hosted);
     }
     const out = this.fromNative(msg);
-    if (!this.fixedClient) recordSpend(this.model, out.usage);
+    if (!this.fixedClient) recordSpend(this.model, out.usage, undefined, this.info.provider);
     return out;
   }
 
@@ -214,7 +240,7 @@ export class ClaudeProvider implements Provider {
     const stopReason: StepResult["stopReason"] =
       stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" || stop === "model_context_window_exceeded" ? "max_tokens" : "end";
     const result: StepResult = {
-      message: { role: "assistant", parts, provider: "claude", model: this.model, raw: content },
+      message: { role: "assistant", parts, provider: this.info.provider, model: this.model, raw: content },
       usage,
       stopReason,
     };
@@ -236,20 +262,21 @@ export class ClaudeProvider implements Provider {
       if (over) throw new ProviderError(over);
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
-      if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 });
+      if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 }, undefined, this.info.provider);
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.hosted);
     }
   }
 
   async countTokens(req: Omit<StepRequest, "signal" | "onDelta">): Promise<number> {
+    if (this.hosted) throw new ProviderError("Cuvette hosted inference does not count tokens before a request.");
     const p = this.params(req.system, req.messages, req.tools);
     try {
       const r = await this.client.messages.countTokens({ model: this.model, system: p.system, messages: p.messages, tools: p.tools });
       return r.input_tokens;
     } catch (e) {
-      throw mapError(e, this.model);
+      throw mapError(e, this.model, this.hosted);
     }
   }
 }

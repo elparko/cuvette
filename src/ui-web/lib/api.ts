@@ -86,7 +86,7 @@ export function midText(t: string, n: number) {
 }
 
 export interface AppState {
-  session: { id: string; folder: string; folderLine: string; model: string; programs: string[]; details: boolean } | null;
+  session: { id: string; folder: string; folderLine: string; model: string; provider?: string; programs: string[]; details: boolean } | null;
   opening: boolean;
   error: string;
   setup: boolean;

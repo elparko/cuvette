@@ -1,5 +1,5 @@
 import { COST_FITS, REFERENCE_MODEL, TOKEN_MIX, type CostFit } from "./estimate-table.ts";
-import { costUsd, dollars, modelPrice } from "./spend.ts";
+import { costUsd, CUVETTE_MARKUP, dollars, modelPrice } from "./spend.ts";
 
 export interface CostRange {
   low: number;
@@ -26,7 +26,12 @@ function band(f: CostFit, steps: number): CostRange {
 }
 
 export function estimateCost(model: string, steps: number): CostRange | undefined {
-  const id = model.replace(/^claude:/, "");
+  const r = listEstimate(model.replace(/^(claude|cuvette):/, ""), steps);
+  const k = model.startsWith("cuvette:") ? CUVETTE_MARKUP : 1;
+  return r && { low: r.low * k, high: r.high * k };
+}
+
+function listEstimate(id: string, steps: number): CostRange | undefined {
   const own = COST_FITS[id];
   if (own) return band(own, steps);
   if (!modelPrice(id)) return undefined;

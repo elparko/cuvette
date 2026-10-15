@@ -11,10 +11,10 @@ const MODELS = [
   { id: "claude-fable-5-1", name: "Fable 5.1", help: "" },
 ];
 
-export function ModelMenu({ model, busy, openSettings }: { model: string; busy: boolean; openSettings: () => void }) {
+export function ModelMenu({ model, provider, busy, openSettings }: { model: string; provider?: string; busy: boolean; openSettings: () => void }) {
   const current = MODELS.find((m) => model.includes(m.id));
   const change = async (id: string) => {
-    const r = await post<{ text?: string }>("api/setting", { name: "model", value: `claude:${id}`, scope: "session" });
+    const r = await post<{ text?: string }>("api/setting", { name: "model", value: `${provider === "cuvette" ? "cuvette" : "claude"}:${id}`, scope: "session" });
     if (r?.text) toast(r.text);
   };
   return (

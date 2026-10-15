@@ -65,6 +65,30 @@ export function removeClaudeKey(): boolean {
   return true;
 }
 
+export function cuvetteToken(env: Record<string, string | undefined> = process.env): { token?: string; from: "env" | "file" | "none" } {
+  if (env.CUVETTE_TOKEN) return { token: env.CUVETTE_TOKEN, from: "env" };
+  const t = readFile().cuvette_token;
+  return t ? { token: t, from: "file" } : { from: "none" };
+}
+
+export function saveCuvetteToken(token: string): string {
+  return write({ ...readFile(), cuvette_token: token });
+}
+
+export function removeCuvetteToken(): boolean {
+  const rest = readFile();
+  if (!rest.cuvette_token) return false;
+  delete rest.cuvette_token;
+  write(rest);
+  return true;
+}
+
+export const CUVETTE_URL = "https://api.cuvette.ai";
+
+export function cuvetteUrl(env: Record<string, string | undefined> = process.env): string {
+  return (env.CUVETTE_INFERENCE_URL || CUVETTE_URL).replace(/\/+$/, "");
+}
+
 export function elabftwConfig(): { url: string; key: string } | undefined {
   const f = readFile();
   return f.elabftw_url && f.elabftw_api_key ? { url: f.elabftw_url, key: f.elabftw_api_key } : undefined;

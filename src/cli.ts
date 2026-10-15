@@ -107,6 +107,7 @@ Usage
   cuvette config set <name> <value> [--user|--project]   save a setting (default: user settings)
   cuvette spend                        Claude spend by day and model (set CUVETTE_BUDGET_USD to stop at a limit)
   cuvette key [status|remove|workspace <id>] save, show or remove your Claude API key
+  cuvette account create|status|buy [10|25|50]  make a Cuvette account, show its Cuvette credit, or open the page to buy Cuvette credit
   cuvette eln setup [--url <address>]  save your eLabFTW address and API key
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
@@ -149,7 +150,7 @@ Proposed analysis: in an interactive session the agent goes through four stages 
   A step that processes many files waits for a confirmed demonstration. /pilot off skips that.
   CUVETTE_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
 
-Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
+Models: "claude" (claude-opus-5-5), "claude:<model id>", "cuvette" or "cuvette:<model id>" (Cuvette hosted, paid with Cuvette credit), "ollama:<model>", "openai:<base url>|<model>".`;
 
 const argv = process.argv.slice(2).map((a, i, all) => ((a === "--resume" || a === "-r") && (all[i + 1] === undefined || all[i + 1]!.startsWith("-")) ? "--resume=" : a));
 const { values: o, positionals: pos } = parseArgs({
@@ -493,6 +494,34 @@ async function main() {
       if (!r.ok) return fail(r.text);
       console.log(`${r.text} Saved to ${cred.saveClaudeKey(key)}.`);
       return;
+    }
+    case "account": {
+      const acc = await import("./core/account.ts");
+      const cred = await import("./core/credentials.ts");
+      try {
+        if (a1 === "create") {
+          if (cred.cuvetteToken().from !== "none") return fail("A Cuvette account token is already set. Run cuvette account status.");
+          const r = await acc.createAccount();
+          console.log(`Made the Cuvette account ${r.accountId}. Saved the token to ${r.path}.\n${acc.CUVETTE_NOTICE}\nRun cuvette account buy to add Cuvette credit. Use the model "cuvette" for Cuvette hosted.`);
+          return;
+        }
+        if (a1 === "status") {
+          const t = cred.cuvetteToken();
+          if (t.from === "none") return console.log(acc.NO_TOKEN);
+          const s = await acc.accountStatus();
+          return console.log(`Account ${s.accountId}. Credit ${acc.balanceText(s.balanceUsd)}. Token ${cred.maskKey(t.token!)} from ${t.from === "env" ? "CUVETTE_TOKEN" : cred.credentialsPath()}.`);
+        }
+        if (a1 === "buy") {
+          const amount = a2 === undefined ? 10 : Number(a2);
+          const url = await acc.checkoutUrl(amount);
+          (await import("./ui/commands.ts")).openWithOs(url);
+          return console.log(`Opening the payment page for ${amount} US dollars:\n${url}`);
+        }
+      } catch (e) {
+        if (e instanceof acc.AccountError) return fail(e.message);
+        throw e;
+      }
+      return fail("usage: cuvette account create|status|buy [10|25|50]");
     }
     case "eln": {
       const cred = await import("./core/credentials.ts");
