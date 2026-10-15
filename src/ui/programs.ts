@@ -31,11 +31,11 @@ export function summaryLine(rows: ProgramRow[]): string {
   return `${rows.length} adapters: ${n((r) => ["installed", "custom", "found"].includes(r.state))} with the program, ${n((r) => r.state === "missing")} missing, ${n((r) => r.state === "old")} old, ${n((r) => !!r.access.off)} off.`;
 }
 
-export async function planFor(name: string, action: Action, opts: ProgramsOpts & { path?: string; by?: string } = {}): Promise<{ plan?: Plan; row?: ProgramRow; error?: string }> {
+export async function planFor(name: string, action: Action, opts: ProgramsOpts & { path?: string; by?: string; exec?: RunOpts["exec"] } = {}): Promise<{ plan?: Plan; row?: ProgramRow; error?: string }> {
   const [row] = await listPrograms({ ...opts, only: [name] });
   if (!row) return { error: `No adapter named ${name}. Type /programs to see the names.` };
   const manifest = opts.adapters?.[name]?.manifest ?? (action === "path" ? loadAdapter(row.root).manifest : undefined);
-  return { row, plan: await planAction(row, action, { path: opts.path, by: opts.by, locate: opts.locate, manifest }) };
+  return { row, plan: await planAction(row, action, { path: opts.path, by: opts.by, locate: opts.locate, manifest, exec: opts.exec }) };
 }
 
 export async function addFor(source: string, opts: PrepareOpts = {}): Promise<{ plan?: Plan; error?: string }> {

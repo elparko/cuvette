@@ -140,7 +140,7 @@ describe("the listing", () => {
 describe("the actions", () => {
   test("install runs only after confirmation, shows progress lines, and goes in the log and the session record", async () => {
     const r = await rows();
-    const plan = await planAction(r.zeta!, "install");
+    const plan = await planAction(r.zeta!, "install", { exec: async () => 0 });
     expect(plan).toMatchObject({ confirm: "Install", runs: true });
     expect(plan.command).toMatch(/^uv venv --python 3.12 .*envs[\\/]cellpose/);
     const exec = vi.fn(async (_c: string, line: (l: string) => void) => (line("Resolved 12 packages"), 0));
@@ -176,7 +176,7 @@ describe("the actions", () => {
 
   test("Homebrew runs only after an explicit confirmation; a download shows the link and runs nothing", async () => {
     const r = await rows();
-    const brew = await planAction(r.samtools!, "install");
+    const brew = await planAction(r.samtools!, "install", { exec: async () => 0 });
     expect(brew).toMatchObject({ confirm: "Run Homebrew", command: "brew install samtools", runs: true });
     expect(brew.lines.join(" ")).toMatch(/Cuvette does not remove it later/);
     const exec = vi.fn(async () => 0);
@@ -187,13 +187,13 @@ describe("the actions", () => {
     expect(link.confirm).toBeUndefined();
     expect(await runAction(link, { ...fakes(), via: "app", exec, confirmed: true })).toMatchObject({ ok: false });
     expect(exec).not.toHaveBeenCalled();
-    const noBrew = await planAction((await rows(fakes({ find: () => undefined }))).samtools!, "install");
+    const noBrew = await planAction((await rows(fakes({ find: () => undefined }))).samtools!, "install", { exec: async () => 0 });
     expect(noBrew.refused).toMatch(/Homebrew is not installed/);
   });
 
   test("update installs the version that the adapter supports; install of an installed program says to update", async () => {
     const r = await rows();
-    const up = await planAction(r.alpha!, "update");
+    const up = await planAction(r.alpha!, "update", { exec: async () => 0 });
     expect(up.command).toMatch(/uv pip install --python .*biostats[\\/](bin|Scripts)[\\/]python(\.exe)?.? --upgrade statsmodels/);
     expect((await planAction(r.alpha!, "install")).refused).toMatch(/already installed. Choose Update/);
     expect((await planAction(r.beta!, "update")).refused).toMatch(/not installed. Choose Install/);
@@ -443,7 +443,7 @@ describe("a long install: stop, password, and a second action at the same time",
   test("an update of the program while its install runs gets the install job, and a remove is refused", async () => {
     const { post, get } = await server(async (_c, line, signal) => waitAbort(line, signal));
     const job = await post("api/programs/run", { name: "zeta", action: "install", confirmed: true });
-    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    const plan = (await planFor("zeta", "install", { ...fakes(), exec: async () => 0 })).plan!;
     const staged = await post("api/programs/run", { name: "zeta", action: "update", confirmed: true });
     expect(staged.job ?? staged.error).toBe(job.job);
     const removed = await post("api/programs/run", { name: "zeta", action: "path", path: "", confirmed: true });
@@ -461,6 +461,20 @@ describe("a long install: stop, password, and a second action at the same time",
     expect(stream).toMatch(/"ok":false,"text":"The command asks for your password, and Cuvette cannot type it\. Run the command in Terminal/);
   });
 
+  test("on Windows the plan card says at once that the command does not run, shows the link, and has no confirm button", async () => {
+    const real = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const r = await rows();
+      const plan = await planAction(r.samtools!, "install");
+      expect(plan.runs).toBe(false);
+      expect(plan.refused).toMatch(/^Cuvette cannot run the install command on Windows\. Nothing changes\. Install .* yourself, then choose Check again\.$/);
+      expect(plan.confirm).toBeUndefined();
+    } finally {
+      Object.defineProperty(process, "platform", { value: real });
+    }
+  });
+
   test("on Windows the install command does not run, and the text gives the link", async () => {
     const real = process.platform;
     Object.defineProperty(process, "platform", { value: "win32" });
@@ -468,9 +482,9 @@ describe("a long install: stop, password, and a second action at the same time",
       const plan: Plan = { action: "install", name: "zeta", title: "", lines: [], runs: true, confirm: "Install", command: "brew install zeta", link: "https://example.org/zeta" };
       const r = await runAction(plan, { home, via: "terminal", confirmed: true });
       expect(r.ok).toBe(false);
-      expect(r.text).toBe("Cuvette cannot run an install command on Windows. Nothing changed. Download zeta from this link, then choose Check again: https://example.org/zeta");
+      expect(r.text).toBe("Cuvette cannot run the install command on Windows. Nothing changes. Download zeta from this link, then choose Check again: https://example.org/zeta");
       const bare = await runAction({ ...plan, link: undefined }, { home, via: "terminal", confirmed: true });
-      expect(bare.text).toContain("Install the program yourself");
+      expect(bare.text).toContain("Install zeta yourself");
     } finally {
       Object.defineProperty(process, "platform", { value: real });
     }
@@ -504,7 +518,7 @@ describe("a long install: stop, password, and a second action at the same time",
   });
 
   test("an install that runs in another process blocks a second one until that process ends", async () => {
-    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    const plan = (await planFor("zeta", "install", { ...fakes(), exec: async () => 0 })).plan!;
     mkdirSync(join(home, "programs-running"), { recursive: true });
     writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: process.ppid, action: "update", name: "zeta" }));
     const exec = vi.fn(async () => 0);
@@ -516,7 +530,7 @@ describe("a long install: stop, password, and a second action at the same time",
   });
 
   test("a damaged or empty lock file does not block and does not stop the install", async () => {
-    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    const plan = (await planFor("zeta", "install", { ...fakes(), exec: async () => 0 })).plan!;
     mkdirSync(join(home, "programs-running"), { recursive: true });
     const exec = vi.fn(async () => 0);
     for (const body of ["", "null", "{bad", "7"]) {
@@ -527,7 +541,7 @@ describe("a long install: stop, password, and a second action at the same time",
   });
 
   test("a lock file from before a restart of the computer does not block, also if a new process has its process ID", async () => {
-    const plan = (await planFor("zeta", "install", fakes())).plan!;
+    const plan = (await planFor("zeta", "install", { ...fakes(), exec: async () => 0 })).plan!;
     mkdirSync(join(home, "programs-running"), { recursive: true });
     const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();
     writeFileSync(join(home, "programs-running", "zeta.json"), JSON.stringify({ pid: process.ppid, action: "install", name: "zeta", started: before }));

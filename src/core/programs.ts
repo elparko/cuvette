@@ -411,10 +411,13 @@ export const ACTION_LABEL: Record<Action, string> = {
   "trust-code": "Allow its code to run",
 };
 
-function installLines(r: ProgramRow, i: Install, update: boolean): Partial<Plan> {
+const windowsInstallText = (program: string, link?: string) => `Cuvette cannot run the install command on Windows. Nothing changes. ${link ? `Download ${program} from this link, then choose Check again: ${link}` : `Install ${program} yourself, then choose Check again.`}`;
+
+function installLines(r: ProgramRow, i: Install, update: boolean, canRun: boolean): Partial<Plan> {
   const verb = update ? "Update" : "Install";
   const tested = r.tested.length ? `The adapter is tested with ${r.program} ${r.tested.join(", ")}.` : "";
   const cmd = update ? i.update ?? i.command : i.command;
+  if (!canRun && (i.kind === "uv" || i.kind === "r" || i.kind === "brew")) return { refused: windowsInstallText(r.program, i.link), link: i.link, runs: false, lines: [] };
   if (i.kind === "uv" || i.kind === "r") {
     if (i.needs) return { refused: `${i.needs} is not installed. Install ${i.needs} first: ${i.needs === "uv" ? "brew install uv" : "brew install r"}.`, command: i.needs === "uv" ? "brew install uv" : "brew install r", runs: false };
     const where = i.kind === "uv" ? `the Python environment ${tilde(i.dir!)}` : `the R library ${tilde(i.dir!)}`;
@@ -428,7 +431,7 @@ function installLines(r: ProgramRow, i: Install, update: boolean): Partial<Plan>
   return { link: i.link, runs: false, lines: [i.text!, "Then choose Check again.", tested].filter(Boolean) };
 }
 
-export async function planAction(r: ProgramRow, action: Action, opts: { path?: string; by?: string; locate?: ProgramsOpts["locate"]; manifest?: Manifest } = {}): Promise<Plan> {
+export async function planAction(r: ProgramRow, action: Action, opts: { path?: string; by?: string; locate?: ProgramsOpts["locate"]; manifest?: Manifest; exec?: RunOpts["exec"] } = {}): Promise<Plan> {
   const base: Plan = { action, name: r.name, title: `${ACTION_LABEL[action]}: ${r.program} (${r.name})`, lines: [], runs: true };
   const refuse = (why: string, more: Partial<Plan> = {}): Plan => ({ ...base, ...more, runs: false, refused: why });
   switch (action) {
@@ -437,7 +440,7 @@ export async function planAction(r: ProgramRow, action: Action, opts: { path?: s
       if (!r.install) return refuse(`The adapter ${r.name} gives no install command for ${r.program}.`);
       if (action === "install" && (r.state === "installed" || r.state === "custom" || r.state === "found")) return refuse(`${r.program} is already installed. Choose Update.`);
       if (action === "update" && r.state === "missing") return refuse(`${r.program} is not installed. Choose Install.`);
-      return { ...base, lines: [], ...installLines(r, r.install, action === "update") };
+      return { ...base, lines: [], ...installLines(r, r.install, action === "update", process.platform !== "win32" || !!opts.exec) };
     }
     case "remove": {
       if (!r.owned) return refuse(r.path ? `Installed outside Cuvette: ${tilde(r.path)}. Cuvette removes only what it installed.` : `Nothing to remove: ${r.program} is not installed.`);
@@ -637,7 +640,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
   switch (plan.action) {
     case "install":
     case "update": {
-      if (process.platform === "win32" && !opts.exec) return { ok: false, text: `Cuvette cannot run an install command on Windows. Nothing changed. ${plan.link ? `Download ${plan.name} from this link, then choose Check again: ${plan.link}` : `Install the program yourself, then choose Check again. The command is: ${plan.command}`}` };
+      if (process.platform === "win32" && !opts.exec) return { ok: false, text: windowsInstallText(plan.name, plan.link) };
       const claim = claimRun(home, plan);
       if ("busy" in claim) return { ok: false, text: claim.busy };
       try {
