@@ -141,7 +141,7 @@ Usage
   cuvette replay <flow.json> [--input name=path ...] [--session <id>]
   cuvette run-step <adapter> <tool> '<json args>'
   cuvette questions                    open questions in every session
-  cuvette status [session]             list each step as up to date or out of date, with the reason
+  cuvette status [session] [--adapter <folder>]   list each step as up to date or out of date, with the reason
                                        (a changed decision, input file, adapter, program or package version)
   cuvette bench [scenario|all] --model <model> [--guidance on|off|both]
   cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]

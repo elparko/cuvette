@@ -316,3 +316,8 @@ test("headless text output keeps the rest of an answer after a stray control int
   expect(r.out).toContain("middle text");
   expect(r.out).toContain("End");
 });
+
+test("the help line for cuvette status names the --adapter option", () => {
+  const r = cli(home(), ["--help"]);
+  expect(r.out).toMatch(/cuvette status \[session\] \[--adapter <folder>\]/);
+});
