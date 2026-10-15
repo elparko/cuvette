@@ -54,6 +54,16 @@ test("cuvette key saves the key and warns when ANTHROPIC_API_KEY is set", () => 
   expect(run("").out).not.toContain("ANTHROPIC_API_KEY");
 }, 90_000);
 
+test("an unknown --mode stops with the list of modes and starts no session", () => {
+  const h = home();
+  for (const args of [["-p", "Give the mean of x", "--mode", "foo", "--model", "fake:"], ["--mode", "foo"]]) {
+    const r = cli(h, args);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('Unknown mode "foo". Use one of: watch, follow, teach, plan.');
+  }
+  expect(existsSync(join(h, "sessions-index.json"))).toBe(false);
+});
+
 test("a run with an answer exits 0, and its script, flow and replay give the same numbers", () => {
   const h = home();
   const model = fake("answer", [{ calls: [{ name: "mean_of", args: { path: data, column: "x" } }] }, { calls: [{ name: "count_rows", args: { path: data } }] }, { text: "The mean of x is 2.5 over 4 rows." }]);

@@ -459,6 +459,7 @@ async function app(folder?: string) {
 async function main() {
   if (o.help) return console.log(HELP);
   if (o.version) return console.log(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
+  if (typeof o.mode === "string" && !["watch", "follow", "teach", "plan"].includes(o.mode)) fail(`Unknown mode "${o.mode}". Use one of: watch, follow, teach, plan.`);
   if (typeof o.print === "string") return headless(o.print);
   const [cmd, a1, a2, a3] = pos;
   if (typeof o.method === "string" && (cmd === undefined || existsSync(cmd))) {
