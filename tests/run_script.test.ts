@@ -64,6 +64,13 @@ test("Linux wrap: bubblewrap covers the key file and blocks the network; unshare
   expect(linuxWrap("off", argv, { network: false, writable: [], cred })).toEqual(argv);
 });
 
+test("a line break of two characters in the output of a script becomes one new line", async () => {
+  const { run } = setup();
+  const r = await run("import sys\nsys.stdout.buffer.write(b'one\\r\\ntwo\\r\\n')\nsys.stdout.flush()\nsys.stderr.buffer.write(b'e1\\r\\ne2\\r\\n')\nsys.stderr.flush()");
+  expect(r.ok).toBe(true);
+  expect(r.text).toBe("one\ntwo\n\n[stderr]\ne1\ne2\n");
+});
+
 test("stdout, stderr, exit code and a traceback", async () => {
   const { run } = setup();
   const ok = await run("print(2+2)\nimport sys\nprint('warn', file=sys.stderr)");

@@ -552,6 +552,8 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       if (!timedOut && !aborted) await Promise.allSettled(handling);
 
       const after = snapshot(dirs.workDir, scriptDir);
+      stdout = stdout.replace(/\r\n/g, "\n");
+      stderr = stderr.replace(/\r\n/g, "\n");
       const outputs: OutputFile[] = [];
       const images: string[] = [];
       for (const [p, sig] of after) {
