@@ -143,7 +143,7 @@ export interface StepResult {
 export interface Provider {
   info: ModelInfo;
   step(req: StepRequest): Promise<StepResult>;
-  complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean }): Promise<string>;
+  complete(system: string, text: string, signal?: AbortSignal, opts?: { effort?: string; failIfCut?: boolean; maxTokens?: number }): Promise<string>;
   countTokens?(req: Omit<StepRequest, "signal" | "onDelta">): Promise<number>;
 }
 

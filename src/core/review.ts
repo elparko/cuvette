@@ -466,8 +466,8 @@ Write your report as JSON lines. One finding for each line, with no other text:
 {"severity": "info" | "warning" | "error", "message": "<one or two plain sentences>", "entries": [<log entry numbers>]}
 Cite the log entry numbers (the number after #) that support each finding.
 Report only problems. Do not write a finding for a check that passed.
-Write at most five findings. Write the most severe first.
-If you find nothing, write [].`;
+Write at most five findings. Write each finding on one line, with one sentence in the message. Write the most severe first.
+If you find nothing, write exactly this line: No findings.`;
 
 export function refereePrompt(ctx: ReviewContext): { system: string; text: string } {
   const textChecks = ctx.adapters.flatMap((a) => a.manifest.checks.filter((c) => !c.rule && c.text.trim()).map((c) => `- ${c.id}: ${c.text.trim()}`));
@@ -528,8 +528,45 @@ export function parseReferee(raw: string): FindingIn[] {
 }
 
 export const REFEREE_EFFORT = "low";
+export const REFEREE_MAX_TOKENS = 8000;
+
+const ADDRESSES_REVIEWER = /\bas the referee noted\b|\bthe referee\b|\byou are right\b|\bi agree with the finding\b/i;
+const STOP_WORDS = new Set("the and for are was were with that this from not has have had its but all any can will would should does did than then into onto over under about after before also each which while there their they them what when where who whom whose why how".split(" "));
+
+const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+function quotesFinding(line: string, finding: string): boolean {
+  const need = wordsOf(finding).filter((w) => !STOP_WORDS.has(w));
+  if (need.length < 5) return false;
+  const have = wordsOf(line).filter((w) => !STOP_WORDS.has(w));
+  let at = 0;
+  let hit = 0;
+  for (const w of need) {
+    const next = have.indexOf(w, at);
+    if (next >= 0) {
+      hit++;
+      at = next + 1;
+    }
+  }
+  return hit >= 5 && hit >= need.length * 0.6;
+}
+
+export function readsLikeReply(answer: string, findings: string[]): boolean {
+  const first = answer.trim().split("\n")[0] ?? "";
+  if (ADDRESSES_REVIEWER.test(first)) return true;
+  if (!/^\d+[.)]\s/.test(first)) return false;
+  return /\bas noted above\b/i.test(first) || findings.some((m) => quotesFinding(first, m));
+}
+
+export class EmptyReview extends Error {
+  constructor() {
+    super("The review gave no text. The answer is not checked.");
+  }
+}
 
 export async function referee(provider: Provider, ctx: ReviewContext, signal?: AbortSignal): Promise<FindingIn[]> {
   const { system, text } = refereePrompt(ctx);
-  return parseReferee(await provider.complete(system, text, signal, { effort: REFEREE_EFFORT }));
+  const raw = await provider.complete(system, text, signal, { effort: REFEREE_EFFORT, maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
+  if (!raw.trim()) throw new EmptyReview();
+  return parseReferee(raw);
 }
