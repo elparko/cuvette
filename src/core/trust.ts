@@ -250,7 +250,7 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
   return out;
 }
 
-const LAUNCHER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell|env|uv|npx|pnpx|bunx|npm|pnpm|yarn|cmd|exec|time|nice|xargs|source)(\.exe)?$/i;
+const LAUNCHER = /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|tsx|Rscript|pwsh|powershell|env|uv|npx|pnpx|bunx|npm|pnpm|yarn|cmd|exec|time|nice|xargs|timeout|nohup|sudo|command|source)(\.exe)?$/i;
 const RUN_AFTER = /^(uv|npm|pnpm|yarn|bun)(\.exe)?$/i;
 const DENY_EXT = /\.(log|json|txt|csv|tsv|db|sqlite|out|md|png|jpg|pdf|xlsx|parquet)$/i;
 const SCRIPT_EXT = /\.(js|mjs|cjs|ts|py|sh|bash|zsh|rb|pl|r|ps1|bat|cmd)$/i;
@@ -302,6 +302,7 @@ function tokens(argv: string[], key: string): Token[] {
         i++;
         continue;
       }
+      if (afterLauncher && /^\d+(\.\d+)?[smhd]?$/.test(w)) continue;
       if (/^\/[ck]$/i.test(w) || (w === "run" && RUN_AFTER.test(afterLauncher))) continue;
       const opt = w.startsWith("-");
       for (const part of [...(opt ? [] : [w]), ...w.split(/[=:]/)]) if (part && !part.startsWith("-")) out.push({ word: part, allowed: allowed && !opt && part === w, base: [...bases] });
@@ -370,7 +371,7 @@ function escapes(p: string, realKey: string): boolean {
   }
 }
 
-function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, realKey: string): Walk {
+function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, realKey: string, volatileToo = false): Walk {
   const out: Walk = { files: [], count: 0, exceeded: false, outside: [], inLinks: [] };
   let entries = 0;
   const visit = (d: string, depth: number) => {
@@ -383,7 +384,7 @@ function walkFiles(dir: string, skip: (rel: string) => boolean, key: string, rea
     for (const name of names) {
       if (out.exceeded) return;
       const p = join(d, name);
-      if (name.startsWith(".") || SKIPPED_DIR.test(name) || VOLATILE_DIR.test(name) || skip(relative(key, p))) continue;
+      if (name.startsWith(".") || SKIPPED_DIR.test(name) || (!volatileToo && VOLATILE_DIR.test(name)) || skip(relative(key, p))) continue;
       if (++entries > WALK_ENTRIES) {
         out.exceeded = true;
         return;
@@ -504,8 +505,9 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
     const parts = rel.split(sep);
     if (parts.some((part) => SKIPPED_DIR.test(part))) return true;
     if (parts[0] === ".git" && parts[1] !== "hooks") return true;
+    if (namedSet.has(abs)) return false;
     if (roots.some((r) => abs === r || abs.startsWith(r + sep))) return true;
-    return !namedSet.has(abs) && userRoots.some((r) => abs === r || abs.startsWith(r + sep));
+    return userRoots.some((r) => abs === r || abs.startsWith(r + sep));
   };
   const own = (d: string) => d !== key && !skip(relative(key, d));
   const link = (rel: string, real: string) => {
@@ -547,7 +549,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
       return;
     }
     if (st.isFile()) {
-      if (!t.allowed && !glob && (DENY_EXT.test(path) && !MANIFEST.test(path) || st.size === 0 || rel.split(sep).some((part) => VOLATILE_DIR.test(part)))) return;
+      if (!t.allowed && !glob && (DENY_EXT.test(path) && !MANIFEST.test(path) || st.size === 0 || (rel.split(sep).some((part) => VOLATILE_DIR.test(part)) && !SCRIPT_EXT.test(path) && !isExec(path)))) return;
       if (glob && DENY_EXT.test(path) && !MANIFEST.test(path)) return;
       addFile(path);
     } else if (st.isDirectory() && own(path)) addFolder(path, rel);
@@ -562,7 +564,7 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
           const prefix = resolve(base, t.word.split(/[/\\]/).filter((_, i, a) => !a.slice(0, i + 1).some(hasGlob)).join("/"));
           const re = globRegex(relative(key, path).split(sep).join("/"));
           let matches = 0;
-          const w = walkFiles(prefix, skip, key, realKey);
+          const w = walkFiles(prefix, skip, key, realKey, true);
           if (w.exceeded) result.incomplete.push(`Too many files in the script folder ${relative(key, prefix) || "."}`);
           for (const o of w.outside) {
             if (!re.test(o.split(sep).join("/"))) continue;
@@ -574,8 +576,12 @@ export function hookScriptScan(folder: string, layers?: Record<string, unknown>[
             }
           }
           for (const f of [...w.files, ...w.inLinks]) {
-            if (matches >= GLOB_CAP) break;
             if (re.test(relative(key, f).split(sep).join("/"))) {
+              if (matches >= GLOB_CAP) {
+                result.incomplete.push(`Too many files match ${t.word}`);
+                break;
+              }
+              if (relative(key, f).split(sep).some((part) => VOLATILE_DIR.test(part)) && !SCRIPT_EXT.test(f) && !isExec(f)) continue;
               matches++;
               consider(f, t, true);
             }

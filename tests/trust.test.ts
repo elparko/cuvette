@@ -116,14 +116,14 @@ test("a hook script in the project root is part of the trust hash", () => {
 });
 
 test("a log or state file that a hook writes does not change the trust hash", () => {
-  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "./run.sh >> logs/out.log"] }, { command: ["node", "run.js", "--state", "state.json", "--log=run.log", "data.csv", "cache/tmp.py"] }] } });
+  project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "./run.sh >> logs/out.log"] }, { command: ["node", "run.js", "--state", "state.json", "--log=run.log", "data.csv", "cache/tmp.dat"] }] } });
   writeFileSync(join(cwd, "run.sh"), "echo one\n");
   writeFileSync(join(cwd, "run.js"), "1;\n");
   trustFolder(cwd);
   expect(trustStatus(cwd).state).toBe("trusted");
   mkdirSync(join(cwd, "logs"));
   mkdirSync(join(cwd, "cache"));
-  for (const f of ["logs/out.log", "state.json", "run.log", "data.csv", "cache/tmp.py"]) writeFileSync(join(cwd, f), "written by the hook\n");
+  for (const f of ["logs/out.log", "state.json", "run.log", "data.csv", "cache/tmp.dat"]) writeFileSync(join(cwd, f), "written by the hook\n");
   expect(trustStatus(cwd).state).toBe("trusted");
   writeFileSync(join(cwd, "run.js"), "evil();\n");
   expect(trustStatus(cwd).state).toBe("changed");
@@ -326,11 +326,36 @@ describe("the files of a hook command, found with no shell parsing", () => {
     }
   });
 
-  test("a new step script in the default output folder does not change the hash", () => {
-    project(".ga", { hooks: { SessionStart: [{ command: ["node", "hooks/check.js", "cuvette/s1/step1.py"] }] } });
-    put("hooks/check.js");
+  test("a script that a command names in the cuvette folder is in the hash, and a new step there is not", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["node", "cuvette/run.js"] }] } });
+    put("cuvette/run.js");
+    trustFolder(cwd);
     put("cuvette/s1/step1.py");
-    expect(hooked()).toEqual(["hooks/check.js"]);
+    expect(hooked()).toEqual(["cuvette/run.js"]);
+    expect(trustStatus(cwd).state).toBe("trusted");
+    put("cuvette/run.js", "evil();\n");
+    expect(trustStatus(cwd).state).toBe("changed");
+  });
+
+  test("a glob with more than 500 matches makes the folder not trustable", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "cat hooks/*.sh"] }] } });
+    for (let i = 0; i < 520; i++) writeFileSync(join(cwd, ...(i === 0 ? [(mkdirSync(join(cwd, "hooks")), "hooks")] : ["hooks"]), `m${i}.sh`), "x");
+    expect(scanFolder(cwd).incomplete.join(" ")).toContain("Too many files match");
+  });
+
+  test("a glob match with a script extension in a logs folder is in the hash, and a text file there is not", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["sh", "-c", "for f in tools/*/*; do $f; done"] }] } });
+    put("tools/logs/run.sh");
+    put("tools/logs/out.txt");
+    put("tools/logs/state.dat");
+    expect(hooked()).toEqual(["tools/logs/run.sh"]);
+  });
+
+  test("a token after a prefix that is not a launcher is in the hash", () => {
+    project(".ga", { hooks: { SessionStart: [{ command: ["timeout", "5", "node", "logs/x.js"] }, { command: ["prefix-tool", "node", "state/y.py"] }] } });
+    put("logs/x.js");
+    put("state/y.py");
+    expect(hooked()).toEqual(["logs/x.js", "state/y.py"]);
   });
 
   test("a project setting for the output folder never removes a hook script from the hash", () => {
