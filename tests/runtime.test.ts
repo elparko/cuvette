@@ -528,16 +528,35 @@ test("mcp: the manifest can mark a tool read-only", async () => {
   }
 }, 30000);
 
-test("mcp: a text result of more than 16 MB is cut with a note and an image of more than 16 MB is not saved", () => {
+test("mcp: a result of more than 16 MB is cut and the final text keeps the note", () => {
   const big = "a".repeat(23 * 1024 * 1024);
   const work = mkdtempSync(join(root, "cap-"));
   const r = convertResult({ content: [{ type: "text", text: big }, { type: "image", data: big, mimeType: "image/png" }] }, "t", {}, undefined, work);
   expect(r.ok).toBe(true);
   expect(r.images).toBeUndefined();
   expect(r.text!.length).toBeLessThan(21000);
+  expect(r.text).toContain("[The tool result is cut at 16 MB.]");
+  expect(r.text).toContain("Cuvette did not save this image");
   const e = convertResult({ isError: true, content: [{ type: "text", text: big }, { type: "image", data: big, mimeType: "image/png" }] }, "t", {}, undefined, work);
   expect(e.text!.length).toBeLessThan(big.length);
   expect(e.text).toContain("cut at 16 MB");
-  expect(e.text).toContain("more than 16 MB. Cuvette did not save it");
+  expect(e.text).toContain("Cuvette did not save this image");
   expect(readdirSync(work)).toEqual([]);
+});
+
+test("mcp: the images together are capped at 16 MB and structured content of more than 16 MB is dropped", () => {
+  const work = mkdtempSync(join(root, "cap-"));
+  const half = "a".repeat(14 * 1024 * 1024);
+  const r = convertResult({ content: [{ type: "text", text: "ok" }, { type: "image", data: half }, { type: "image", data: half }] }, "t", {}, undefined, work);
+  expect(r.images).toHaveLength(1);
+  expect(r.text).toContain("Cuvette did not save this image");
+  const s = convertResult({ content: [{ type: "text", text: "small" }], structuredContent: { v: "a".repeat(17 * 1024 * 1024) } }, "t", {}, undefined, work);
+  expect(s.data).toBeUndefined();
+  expect(s.text).toContain("structured content");
+});
+
+test("catalog MCP adapters mark their read tools read-only in the manifest", () => {
+  const readOnly = (dir: string) => loadAdapter(dir).manifest.tools.filter((t) => t.read_only).map((t) => t.name).sort();
+  expect(readOnly("catalog/onboarding")).toEqual(["fetch_url", "list_files", "probe_program", "python_api", "read_file", "read_help"]);
+  expect(readOnly("catalog/smile-msi")).toEqual(["analysis_catalog", "history", "list_slides", "run_result", "scripting_guide", "slide_state", "state"]);
 });

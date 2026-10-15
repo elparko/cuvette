@@ -30,27 +30,38 @@ const IMAGE_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": "
 export function convertResult(res: McpResult, tool: string, args: Args, adapter: LoadedAdapter | undefined, workDir: string): ToolOutput {
   const content = res.content ?? [];
   let text = content.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n");
-  if (text.length > RESULT_CAP) text = `${text.slice(0, RESULT_CAP)}\n[The tool result is cut at 16 MB.]`;
   const notes: string[] = [];
+  if (text.length > RESULT_CAP) {
+    text = text.slice(0, RESULT_CAP);
+    notes.push("[The tool result is cut at 16 MB.]");
+  }
   const images: string[] = [];
+  let imageBytes = 0;
   const files: OutputFile[] = [];
   for (const part of content) {
     if (part.type !== "image" || !part.data) continue;
-    if (Math.floor(part.data.length * 0.75) > RESULT_CAP) {
-      notes.push("[An image in the tool result is more than 16 MB. Cuvette did not save it.]");
+    const size = Math.floor(part.data.length * 0.75);
+    if (imageBytes + size > RESULT_CAP) {
+      notes.push("[The images in the tool result are more than 16 MB. Cuvette did not save this image.]");
       continue;
     }
+    imageBytes += size;
     const ext = IMAGE_EXT[(part.mimeType ?? "image/png").toLowerCase()] ?? ".png";
     const path = uniqueFile(workDir, `${safeName(tool)}-image`, ext);
     writeFileSync(path, Buffer.from(part.data, "base64"));
     images.push(path);
     files.push(outputFile(path));
   }
-  if (notes.length) text = `${text}\n${notes.join("\n")}`.trim();
+  let structured = res.structuredContent;
+  if (structured !== undefined && JSON.stringify(structured).length > RESULT_CAP) {
+    structured = undefined;
+    notes.push("[The structured content of the tool result is more than 16 MB. Cuvette did not use it.]");
+  }
   if (res.isError) {
+    if (notes.length) text = `${text}\n${notes.join("\n")}`.trim();
     return { ok: false, error: text || "the tool reported an error", text, images: images.length ? images : undefined, outputs: files.length ? files : undefined };
   }
-  let data: unknown = res.structuredContent;
+  let data: unknown = structured;
   if (data === undefined && /^\s*[[{]/.test(text)) {
     try {
       data = JSON.parse(text);
@@ -61,7 +72,7 @@ export function convertResult(res: McpResult, tool: string, args: Args, adapter:
   for (const o of f.outputs ?? []) if (!outputs.has(o.path)) outputs.set(o.path, o);
   const entry = adapter?.mapEntry(tool, args);
   const out: ToolOutput = { ok: f.ok !== false };
-  out.text = cap(text || (data !== undefined ? JSON.stringify(data) : ""), 20000);
+  out.text = [cap(text || (data !== undefined ? JSON.stringify(data) : ""), 20000), ...notes].join("\n").trim();
   if (data !== undefined) out.data = data;
   if (f.error) out.error = f.error;
   else if (!out.ok) out.error = f.summary ?? "the tool reported a failure";

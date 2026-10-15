@@ -1398,6 +1398,13 @@ data_rules:
 
 # Tools that run code: the scientist approves each call.
 tools:
+  - { name: list_slides, description: "List slides.", read_only: true }
+  - { name: slide_state, description: "Show the state of a slide.", read_only: true }
+  - { name: analysis_catalog, description: "List the analyses.", read_only: true }
+  - { name: scripting_guide, description: "Show the scripting guide.", read_only: true }
+  - { name: run_result, description: "Read a past result.", read_only: true }
+  - { name: state, description: "Show the state of the open slide.", read_only: true }
+  - { name: history, description: "Show the steps that the scientist ran in the app.", read_only: true }
   - { name: run_script, description: "Run Python code in the SMILE MSI engine. Read scripting_guide first.", approval: true }
   - { name: create_tool, description: "Save a new user tool in SMILE MSI.", approval: true }
   - { name: edit_tool, description: "Change a user tool in SMILE MSI.", approval: true }

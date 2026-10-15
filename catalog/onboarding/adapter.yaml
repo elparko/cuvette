@@ -40,6 +40,14 @@ checks:
     description: The draft adapter must pass the adapter checklist (the lint of cuvette adapter check) before the agent finishes.
     severity: error
 
+tools:
+  - { name: probe_program, description: "Probe a program for its version and type.", read_only: true }
+  - { name: read_help, description: "Read the help text of a program.", read_only: true }
+  - { name: python_api, description: "Read the Python interface of a module.", read_only: true }
+  - { name: fetch_url, description: "Fetch a web page.", read_only: true }
+  - { name: list_files, description: "List files in a folder.", read_only: true }
+  - { name: read_file, description: "Read a file.", read_only: true }
+
 map:
   - { tool: probe_program, route: "Run the program name in a terminal with --version", fidelity: code_only }
   - { tool: read_help, route: "Run the program in a terminal with --help", fidelity: code_only }

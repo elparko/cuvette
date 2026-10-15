@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
@@ -156,7 +156,7 @@ export function startFiles(c: KindContext): AdapterRuntime {
         let text: string;
         let cut = false;
         try {
-          const buf = readAt(fd, 0, TABLE_CAP + 1);
+          const buf = readAt(fd, 0, Math.min(fstatSync(fd).size, TABLE_CAP + 1));
           cut = buf.length > TABLE_CAP;
           text = buf.subarray(0, TABLE_CAP).toString("utf8");
         } finally {
