@@ -1257,10 +1257,28 @@ describe("the output cap name of the openai provider", () => {
     expect(bodies[0].max_tokens).toBe(8000);
   });
 
+  test("a chat or o1-mini model gets no reasoning_effort, and a 400 that names it makes one retry without it", async () => {
+    for (const model of ["gpt-5-chat-latest", "o1-mini"]) {
+      const bodies = capture([ok()]);
+      await (await makeProvider(`openai:https://api.openai.com/v1|${model}`, { effort: "low" })).complete("S", "Q", undefined, { maxTokens: 8000 });
+      expect("reasoning_effort" in bodies[0]).toBe(false);
+    }
+    const bodies = capture([refuse("reasoning_effort"), ok(), ok()]);
+    const p = await makeProvider("openai:https://api.openai.com/v1|gpt-5", { effort: "low" });
+    await p.complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].reasoning_effort).toBe("low");
+    expect("reasoning_effort" in bodies[1]).toBe(false);
+    await p.complete("S", "Q", undefined, { maxTokens: 8000 });
+    expect(bodies).toHaveLength(3);
+    expect("reasoning_effort" in bodies[2]).toBe(false);
+  });
+
   test("a reply cut by the output limit fails when the caller asks for it", async () => {
     capture([new Response(JSON.stringify({ choices: [{ message: { content: '{"severity":"info","message":"A"}' }, finish_reason: "length" }] }), { status: 200, headers: { "content-type": "application/json" } })]);
     const p = await makeProvider("openai:http://localhost:1234/v1|m");
     await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toBeInstanceOf(CutReplyError);
+    await expect(p.complete("S", "Q", undefined, { failIfCut: true, maxTokens: 50 })).rejects.toMatchObject({ text: '{"severity":"info","message":"A"}' });
     expect(await p.complete("S", "Q")).toContain("severity");
   });
 });

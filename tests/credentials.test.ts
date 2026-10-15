@@ -2,6 +2,8 @@ import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
+import { spawnSync } from "node:child_process";
+import { commands } from "../src/ui/commands.ts";
 import { claudeKey, credentialsPath, isCredentialsFile, elabftwConfig, elabftwProblem, hideKeys, removeElabftw, saveClaudeWorkspace, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
 
 const old = process.env.CUVETTE_HOME;
@@ -111,3 +113,42 @@ test("a key file that is replaced by a new file inside the cache time is still f
   writeFileSync(credentialsPath(), JSON.stringify({ anthropic_api_key: KEY }));
   expect(isCredentialsFile(credentialsPath())).toBe(true);
 });
+
+function antConfig(): string {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  mkdirSync(join(cfg, "credentials"), { recursive: true });
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  return cfg;
+}
+
+test("/key status says that an ant auth login is signed in, not that there is no key", async () => {
+  const cfg = antConfig();
+  const saved = { key: process.env.ANTHROPIC_API_KEY, dir: process.env.ANTHROPIC_CONFIG_DIR };
+  process.env.ANTHROPIC_API_KEY = "";
+  const notices: string[] = [];
+  const run = () => commands.find((c) => c.name === "key")!.run(["status"], { notice: (m: string) => notices.push(m) } as never);
+  try {
+    process.env.ANTHROPIC_CONFIG_DIR = join(cfg, "none");
+    await run();
+    process.env.ANTHROPIC_CONFIG_DIR = cfg;
+    await run();
+  } finally {
+    for (const [name, v] of [["ANTHROPIC_API_KEY", saved.key], ["ANTHROPIC_CONFIG_DIR", saved.dir]] as const) {
+      if (v === undefined) delete process.env[name];
+      else process.env[name] = v;
+    }
+    rmSync(cfg, { recursive: true, force: true });
+  }
+  expect(notices[0]).toMatch(/^There is no Claude API key/);
+  expect(notices[1]).toBe("You signed in with ant auth login.");
+});
+
+test("cuvette key status says that an ant auth login is signed in", () => {
+  const cfg = antConfig();
+  try {
+    const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "key", "status"], { env: { ...process.env, CUVETTE_HOME: process.env.CUVETTE_HOME, ANTHROPIC_API_KEY: "", ANTHROPIC_CONFIG_DIR: cfg }, encoding: "utf8", timeout: 60_000 });
+    expect(r.stdout.trim()).toBe("You signed in with ant auth login.");
+  } finally {
+    rmSync(cfg, { recursive: true, force: true });
+  }
+}, 60_000);

@@ -77,6 +77,8 @@ export class OpenAIProvider implements Provider {
   private capKey: "max_tokens" | "max_completion_tokens";
   private capSwapped = false;
   private reasoning: boolean;
+  private effortOk: boolean;
+  private effortRefused = false;
   private effort?: string;
 
   constructor(baseUrl: string, readonly model: string, opts: OpenAIOpts = {}) {
@@ -85,6 +87,7 @@ export class OpenAIProvider implements Provider {
     this.sleep = opts.sleep;
     this.retries = opts.retries ?? RETRIES;
     this.reasoning = /^https:\/\/api\.openai\.com(?:[/:]|$)/i.test(this.base) && /^(o\d|gpt-5)/i.test(model);
+    this.effortOk = this.reasoning && /^(o3|o4|gpt-5)/i.test(model) && !/-chat/i.test(model);
     this.capKey = this.reasoning ? "max_completion_tokens" : "max_tokens";
     this.effort = opts.effort;
   }
@@ -144,6 +147,10 @@ export class OpenAIProvider implements Provider {
     if (res.status === 400 && sent && !this.capSwapped && /unsupported parameter|unknown (?:parameter|field|argument)|unrecognized (?:request )?argument|use ['"]?max_(?:completion_)?tokens['"]? instead/i.test(text) && /max_tokens|max_completion_tokens/i.test(text)) {
       this.capSwapped = true;
       this.capKey = sent === "max_tokens" ? "max_completion_tokens" : "max_tokens";
+      return "again";
+    }
+    if (res.status === 400 && "reasoning_effort" in body && !this.effortRefused && /reasoning_effort/i.test(text)) {
+      this.effortRefused = true;
       return "again";
     }
     if (res.status === 400 && body.stream && NO_STREAM.test(text)) {
@@ -371,11 +378,11 @@ export class OpenAIProvider implements Provider {
     const effort = opts?.effort ?? this.effort;
     const make = () => {
       const body = this.body(native, [], cap);
-      if (this.reasoning && effort) body.reasoning_effort = reasoningEffort(effort);
+      if (this.effortOk && !this.effortRefused && effort) body.reasoning_effort = reasoningEffort(effort);
       return body;
     };
     const reply = await this.exchange(make, signal, undefined, undefined);
-    if (opts?.failIfCut && reply.finish === "length") throw new CutReplyError("The reply hit the output limit and was cut short.");
+    if (opts?.failIfCut && reply.finish === "length") throw new CutReplyError("The reply hit the output limit and was cut short.", (reply.text ?? splitThink(reply.content).text).trim());
     return (reply.text ?? splitThink(reply.content).text).trim();
   }
 }

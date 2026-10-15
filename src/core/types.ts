@@ -153,7 +153,11 @@ export class ProviderError extends Error {
   }
 }
 
-export class CutReplyError extends ProviderError {}
+export class CutReplyError extends ProviderError {
+  constructor(message: string, readonly text = "") {
+    super(message);
+  }
+}
 
 export const CONTEXT_OVERFLOW =
   /prompt is too long|maximum context length is|context_length_exceeded|exceeds? (?:the )?(?:available |maximum )?context (?:size|length|window)|longer than the maximum model length|too many input tokens(?! per)/i;

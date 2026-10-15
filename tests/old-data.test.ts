@@ -72,8 +72,8 @@ async function run(s: Session, name: string, args: string[] = []): Promise<strin
   return out.join("\n");
 }
 
-async function resume(ref: string, script: ConstructorParameters<typeof FakeProvider>[0] = [{ text: "Noted." }]): Promise<Session> {
-  const s = await Session.resume(ref, { provider: new FakeProvider(script), cwd: join(root, "project") });
+async function resume(ref: string, script: ConstructorParameters<typeof FakeProvider>[0] = [{ text: "Noted." }], addAdapters: string[] = []): Promise<Session> {
+  const s = await Session.resume(ref, { addAdapters, provider: new FakeProvider(script), cwd: join(root, "project") });
   open.push(s);
   return s;
 }
@@ -100,7 +100,7 @@ describe.each(PROJECT_FORMATS)("session folder written by %s", (format) => {
   test("resume loads the record, keeps every old line, and a new turn only adds lines", async () => {
     const [first] = projectSessions();
     const before = logLines(first!.folder);
-    const s = await resume(first!.id);
+    const s = await resume(first!.id, undefined, [LAB]);
     expect(s.id).toBe(first!.id);
     expect(s.history.length).toBeGreaterThan(0);
     expect(s.record.nodes().length).toBeGreaterThan(0);
@@ -880,11 +880,11 @@ test("a branch of a session with a byte order mark in its log keeps the first en
   const [first] = projectSessions();
   const file = join(first!.folder, ".record", "log.jsonl");
   writeFileSync(file, "\uFEFF" + readFileSync(file, "utf8"));
-  const s = await resume(first!.id);
+  const s = await resume(first!.id, undefined, [LAB]);
   const b = s.branch("with a mark");
   const lines = readFileSync(join(b.folder, ".record", "log.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   expect(lines[0].kind).toBe("session");
-  const child = await Session.resume(b.folder, { provider: new FakeProvider([{ text: "Noted." }]) });
+  const child = await Session.resume(b.folder, { addAdapters: [LAB], provider: new FakeProvider([{ text: "Noted." }]) });
   open.push(child);
   expect(child.adapters.length).toBe(1);
 });

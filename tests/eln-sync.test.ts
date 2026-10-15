@@ -186,10 +186,10 @@ test("cuvette eln push asks in the terminal and sends nothing on n", async () =>
 test("cuvette eln link applies the proposed values only after y", async () => {
   mock.experiments.set(5, { id: 5, title: "Plan", body: "", tags: [], uploads: [], revisions: [], items: [], metadata: { extra_fields: { min_size: { value: "12" } } } });
   await s.close();
-  const no = await cli(["eln", "link", s.id, "5"], "n\n");
+  const no = await cli(["eln", "link", s.id, "5", "--adapter", join(__dirname, "fixtures/lab")], "n\n");
   expect(no.stdout).toMatch(/Smallest particle = 12/);
   expect(no.stdout).not.toMatch(/Applied/);
-  const yes = await cli(["eln", "link", s.id, "5"], "y\n");
+  const yes = await cli(["eln", "link", s.id, "5", "--adapter", join(__dirname, "fixtures/lab")], "y\n");
   expect(yes.stdout).toMatch(/Applied/);
   const log = readFileSync(join(s.dir, "log.jsonl"), "utf8");
   expect(log).toMatch(/"key":"min_size"/);

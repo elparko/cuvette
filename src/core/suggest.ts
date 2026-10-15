@@ -153,6 +153,7 @@ export function suggestLines(s: Suggestions): string[] {
 }
 
 export function suggestOutput(s: Suggestions, defaults: string[]): string[] {
+  if (s.matches[0]?.table && defaults.includes(s.matches[0].adapter)) return [];
   const lines = suggestLines(s);
   const best = s.matches[0]?.adapter;
   return lines.length && best && !defaults.includes(best) ? [...lines, `To use it, run: cuvette --adapter ${best}`] : lines;

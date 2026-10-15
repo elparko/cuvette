@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -150,6 +150,25 @@ test("a large table that changed after the run says that no copy exists", () => 
   const note = sheets[0]!.rows.find((r) => r[0] === "Note" && /big\.csv/.test(String(r[1])))!;
   expect(String(note[3])).toMatch(/record kept no copy/);
   expect(String(note[3])).not.toMatch(/uses the copy/);
+});
+
+test("a large figure and a large table that are deleted after the run say missing, not changed", () => {
+  const record = new AnalysisRecord(join(mkdtempSync(join(tmpdir(), "cuvette-res-")), "session"), "s6");
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-res-big-"));
+  const fig = join(dir, "big.png");
+  const tab = join(dir, "big.csv");
+  writeFileSync(fig, Buffer.alloc(COPY_LIMIT_BYTES + 1, 7));
+  writeFileSync(tab, "a,b\n" + "1,2\n".repeat(COPY_LIMIT_BYTES / 4 + 10));
+  const r1 = record.append("tool_result", { tool: "run_script" });
+  record.addNode(node({ entry: r1.id, outputs: [{ path: fig, kind: "image", sha: record.putBlob(fig) }, { path: tab, kind: "table", sha: record.putBlob(tab) }], result: { metrics: {} }, summary: "Big files." }));
+  rmSync(fig);
+  rmSync(tab);
+  const sheets = buildWorkbook({ record, adapters: [], fields: [] as never, programs: [], dir: record.workDir, figures: copyFigures(record, record.workDir) });
+  for (const name of ["big.png", "big.csv"]) {
+    const note = sheets[0]!.rows.find((r) => r[0] === "Note" && String(r[1]).startsWith(name))!;
+    expect(String(note[2])).toBe("missing");
+    expect(String(note[3])).toMatch(/is missing/);
+  }
 });
 
 test("a table that changed after the run is read from the recorded blob, with a note", () => {

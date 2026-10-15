@@ -92,7 +92,7 @@ test("rewind rebuilds the model history from the record and marks the later resu
   const folder = s.place.outDir;
   const history = s.history;
   await s.close();
-  session = await Session.resume(folder, { provider: new FakeProvider([]) });
+  session = await Session.resume(folder, { addAdapters: [LAB], provider: new FakeProvider([]) });
   expect(session.id).toBe(id);
   expect(session.history).toEqual(history);
   expect([...session.record.rewound()]).toEqual(["n2"]);
@@ -110,7 +110,7 @@ test("rewind returns the decisions made after the point to their earlier values 
   expect(logged).toMatchObject({ key: "method", old: "Triangle", new: "Otsu", by: "human", rewind: true, reason: "rewind to You wrote: Count the particles in a.tif" });
   expect(s.history).toEqual([]);
   await s.close();
-  session = await Session.resume(s.place.outDir, { provider: new FakeProvider([]) });
+  session = await Session.resume(s.place.outDir, { addAdapters: [LAB], provider: new FakeProvider([]) });
   expect(session.decisions.value("method")).toBe("Otsu");
 });
 

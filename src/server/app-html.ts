@@ -9,7 +9,7 @@ import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import {
   choiceLabel, choiceValue, CLARIFY_TITLE, DATA_CHECK_TITLE, DESIGN_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, phiView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
-  recommendedIndex, questionCursor, questionHead, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
+  recommendedIndex, questionCursor, questionHead, KEY_ANT_LOGIN, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
   type Card, type CardType, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
 import { settingsHtml } from "./app-settings.ts";
@@ -324,6 +324,7 @@ function keyGuideHtml(): string {
 
 function keyCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "key" }>, path: string): string {
   return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from ${esc(KEYS_URL)}. The page does not show it.</p>
+<p class="dim small">${esc(KEY_ANT_LOGIN)}</p>
 ${keyGuideHtml()}
 <p class="dim small">The app checks it with the API, then saves it to ${esc(path)}. Only your user can read that file.</p>
 <label class="field"><span>Key</span><input type="password" name="key" autocomplete="off"></label>

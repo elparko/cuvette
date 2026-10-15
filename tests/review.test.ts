@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { CutReplyError } from "../src/core/types.ts";
 import { EmptyReview, Findings, REFEREE_MAX_TOKENS, logText, parseReferee, readsLikeReply, referee, refereePrompt, runChecks } from "../src/core/review.ts";
 import type { Claim, Entry, EntryKind, Provider } from "../src/core/types.ts";
 
@@ -261,6 +262,8 @@ describe("referee", () => {
   test("a plain no-findings reply gives no finding", () => {
     expect(parseReferee("No findings.")).toEqual([]);
     expect(parseReferee("none")).toEqual([]);
+    expect(parseReferee("No findings.\nThe answer follows the log in each part.")).toEqual([]);
+    expect(parseReferee("```\nNone.\n```\nChecked all claims.")).toEqual([]);
   });
 
   test("parses fenced JSON lines and arrays", () => {
@@ -442,6 +445,20 @@ describe("a referee reply with no text", () => {
   });
   test("the line No findings. means a clean answer", async () => {
     expect(await run("No findings.")).toEqual([]);
+  });
+  const cut = (text: string) => ({ complete: async () => { throw new CutReplyError("cut", text); } }) as unknown as Provider;
+  const line = (m: string) => JSON.stringify({ severity: "warning", message: m });
+  test("a reply that is cut but has complete finding lines gives those findings and calls the cut callback", async () => {
+    let called = 0;
+    const got = await referee(cut(`${line("First problem.")}\n${line("Second problem.")}\n{"severity":"warning","mess`), ctx(makeRecord(seed), "a"), undefined, () => called++);
+    expect(got.map((f) => f.message)).toEqual(["First problem.", "Second problem."]);
+    expect(called).toBe(1);
+  });
+  test("a reply that is cut with no complete finding line still fails", async () => {
+    let called = 0;
+    await expect(referee(cut('{"severity":"warning","mess'), ctx(makeRecord(seed), "a"), undefined, () => called++)).rejects.toBeInstanceOf(CutReplyError);
+    await expect(referee(cut(""), ctx(makeRecord(seed), "a"))).rejects.toBeInstanceOf(CutReplyError);
+    expect(called).toBe(0);
   });
   test("the prompt asks for that exact line", () => {
     expect(refereePrompt(ctx(makeRecord(seed), "a")).system).toContain("No findings.");
