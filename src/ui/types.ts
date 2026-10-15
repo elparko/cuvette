@@ -74,6 +74,7 @@ export interface SessionLike {
   askTrust?(): Promise<Question | undefined>;
   followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;
   review(): Promise<Finding[]>;
+  reviewFailure?: string;
   checklist?(arg?: string): Promise<{ text: string; asked: number }>;
   compact(): Promise<boolean>;
   exportAs(fmt: any): Promise<string>;

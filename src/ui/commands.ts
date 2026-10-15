@@ -618,7 +618,9 @@ const base: Command[] = [
     async run(_, ctx) {
       ctx.notice("Reviewing the analysis.");
       const list = await ctx.session.review();
-      if (!list.length) return ctx.notice("The review found nothing.");
+      const failure = ctx.session.reviewFailure;
+      if (failure) ctx.notice(failure);
+      if (!list.length) return failure ? undefined : ctx.notice("The review found nothing.");
       ctx.openCard({ t: "findings", list });
     },
   },

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Findings, parseReferee, referee, refereePrompt, runChecks } from "../src/core/review.ts";
+import { EmptyReview, Findings, REFEREE_MAX_TOKENS, parseReferee, readsLikeReply, referee, refereePrompt, runChecks } from "../src/core/review.ts";
 import type { Claim, Entry, EntryKind, Provider } from "../src/core/types.ts";
 
 function makeRecord(seed: { kind: EntryKind; data: Record<string, unknown>; node?: string }[] = [], nodes: any[] = [], stale: string[] = []) {
@@ -281,6 +281,20 @@ describe("referee", () => {
     expect(out[0].message).toContain("I think it is fine overall.");
   });
 
+  test("the referee call carries the output cap and the same effort", async () => {
+    let got: { effort?: string; maxTokens?: number; failIfCut?: boolean } | undefined;
+    const provider = { complete: async (_s: string, _t: string, _g?: AbortSignal, opts?: { effort?: string; maxTokens?: number; failIfCut?: boolean }) => ((got = opts), "[]") } as unknown as Provider;
+    await referee(provider, ctx(makeRecord(seed), "a"));
+    expect(got).toEqual({ effort: "low", maxTokens: REFEREE_MAX_TOKENS, failIfCut: true });
+      });
+
+  test("the referee prompt asks for five findings of one line each, most severe first", () => {
+    const { system } = refereePrompt(ctx(makeRecord(seed), "a"));
+    expect(system).toMatch(/at most five findings/);
+    expect(system).toMatch(/each finding on one line/);
+    expect(system).toMatch(/most severe first/);
+  });
+
   test("the referee call gets the stop signal of the turn", async () => {
     let got: AbortSignal | undefined;
     const provider = { complete: async (_s: string, _t: string, signal?: AbortSignal) => ((got = signal), "[]") } as unknown as Provider;
@@ -385,4 +399,54 @@ test("a p value in the text of a read_file result does not count as a test", asy
   };
   const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
   expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
+});
+
+describe("an answer that reads like a reply to the referee", () => {
+  const found = ["The missing weight is in row S15 and the answer does not say which row.", "The group sizes are not in the answer.", "Mean CRP has no source."];
+  test("a numbered first line that quotes a finding is a reply", () => {
+    expect(readsLikeReply("1. The missing weight is in row S15, and the answer does not say which row.", found)).toBe(true);
+  });
+  test("a first line that addresses the referee is a reply", () => {
+    expect(readsLikeReply("As the referee noted, the weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("The referee is right. The mean is 21 g.", found)).toBe(true);
+    expect(readsLikeReply("You are right. The weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("I agree with the finding. The weight is missing.", found)).toBe(true);
+  });
+  test("as noted above counts only after a numbered item", () => {
+    expect(readsLikeReply("1. As noted above, the weight is missing.", found)).toBe(true);
+    expect(readsLikeReply("As noted above, the mean is 21 g.", found)).toBe(false);
+  });
+  test("a legitimate numbered answer that shares words with a finding is not a reply", () => {
+    expect(readsLikeReply("1. Group sizes: 8 and 9\n2. Missing weight: row S15", found)).toBe(false);
+    expect(readsLikeReply("1. The missing weight is row S15. The group sizes are 8 and 9.", found)).toBe(false);
+    expect(readsLikeReply("1. The findings support the hypothesis.", found)).toBe(false);
+  });
+  test("an answer about a review is not a reply", () => {
+    expect(readsLikeReply("The review found 12 eligible trials.", found)).toBe(false);
+    expect(readsLikeReply("1. The systematic review of 12 trials found a lower risk.", found)).toBe(false);
+  });
+  test("a short finding is never quoted", () => {
+    expect(readsLikeReply("1. Mean CRP has no source.", found)).toBe(false);
+  });
+  test("an answer that starts with the result is not a reply", () => {
+    expect(readsLikeReply("The mean weight is 21 g (n = 17). One animal has no weight.", found)).toBe(false);
+  });
+});
+
+describe("a referee reply with no text", () => {
+  const seed: any[] = [];
+  const run = (reply: string) => referee({ complete: async () => reply } as unknown as Provider, ctx(makeRecord(seed), "a"));
+  test("an empty reply is an error, not no findings", async () => {
+    await expect(run("")).rejects.toBeInstanceOf(EmptyReview);
+    await expect(run("  \n ")).rejects.toThrow("The review gave no text. The answer is not checked.");
+  });
+  test("the line No findings. means a clean answer", async () => {
+    expect(await run("No findings.")).toEqual([]);
+  });
+  test("the prompt asks for that exact line", () => {
+    expect(refereePrompt(ctx(makeRecord(seed), "a")).system).toContain("No findings.");
+  });
+  test("the output cap is 8000 tokens", () => {
+    expect(REFEREE_MAX_TOKENS).toBe(8000);
+  });
 });
