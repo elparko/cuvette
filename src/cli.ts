@@ -261,16 +261,17 @@ async function headless(prompt: string) {
     if (out === "text" && e.type === "entry" && e.entry.kind === "assistant" && e.entry.data.final) {
       if (printed) console.log("\nCorrected answer. The review found problems in the answer above:\n");
       console.log(plainText(String(e.entry.data.annotated ?? e.entry.data.text)));
+      if (e.entry.data.assumed) console.log(`\n${plainText(String(e.entry.data.assumed))}`);
       printed = true;
     }
   });
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
   if (s.endedBy !== "answer") process.exitCode = 1;
-  const result = { session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list(), review: s.reviewState, findingCount: s.reviewFindings, answerReadyMs: s.answerReadyMs ?? null, turnMs: s.turnMs ?? null };
+  const result = { session: s.id, dir: s.dir, answer, assumptions: s.assumptions, stop: s.endedBy, findings: s.findings.list(), review: s.reviewState, findingCount: s.reviewFindings, answerReadyMs: s.answerReadyMs ?? null, turnMs: s.turnMs ?? null };
   if (out === "json") console.log(JSON.stringify(result, null, 1));
   else if (out === "stream-json") process.stdout.write(JSON.stringify({ type: "result", ...result }) + "\n");
-  else if (out === "text") console.log(`${printed ? "" : `${plainText(answer)}\n`}\nSession: ${s.id}\nFolder: ${plainText(s.workDir)}\nRecord: ${plainText(join(s.dir, "log.jsonl"))}`);
+  else if (out === "text") console.log(`${printed ? "" : `${plainText(answer)}\n${s.assumptions ? `\n${plainText(s.assumptions)}\n` : ""}`}\nSession: ${s.id}\nFolder: ${plainText(s.workDir)}\nRecord: ${plainText(join(s.dir, "log.jsonl"))}`);
   await s.close();
 }
 

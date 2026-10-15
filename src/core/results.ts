@@ -465,7 +465,7 @@ function show(v: unknown): Cell {
 
 function chosenBy(record: AnalysisRecord, key: string, owner: string): string {
   const last = record.entries(["decision"]).filter((e) => e.data.key === key).at(-1);
-  if (last) return `${last.data.by === "agent" ? "agent" : last.data.by === "profile" ? "lab profile" : "scientist"}${last.data.reason ? ` (${last.data.reason})` : ""}`;
+  if (last) return `${last.data.by === "agent" ? "agent" : last.data.by === "profile" ? "lab profile" : last.data.by === "default" ? "default, set by the harness" : "scientist"}${last.data.reason ? ` (${last.data.reason})` : ""}`;
   const setup = record.entries(["setup"]).at(-1);
   if (setup && Object.hasOwn((setup.data.values as object) ?? {}, key)) {
     if (((setup.data.defaultsAccepted as string[]) ?? []).includes(key)) return "default, accepted at setup";
@@ -547,6 +547,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const answer = record.entries(["assistant"]).filter((e) => e.data.final).at(-1);
   if (answer) {
     const text = answerText(answer.data);
+    for (const line of String(answer.data.assumed ?? "").split("\n").filter((l) => l.startsWith("- "))) summary.push(["Assumption", line.slice(2), "", "text of the harness, not of the model"]);
     const seen = new Set<string>();
     for (const c of checkAnswer(text, record)) {
       if (c.value === null || seen.has(`${c.text}\u0000${c.value}`)) continue;

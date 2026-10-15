@@ -556,6 +556,7 @@ function sectionResults(w: Writer, p: Part, level: number): void {
   const claims = answerClaims(arr(check?.data.claims) as Claim[]);
   w.head(level + 1, "Final answer");
   w.add(`<div class="answer">${linkedAnswer(p, str(final.data.text), claims)}</div>`);
+  if (final.data.assumed) w.add(`<div class="answer harness"><p><em>Text of the harness, not of the model:</em></p><pre>${esc(str(final.data.assumed))}</pre></div>`);
   const numbered = claims;
   if (numbered.length) {
     const source = (c: Claim) => (c.node && p.steps.has(c.node) ? stepLink(p, p.steps.get(c.node)!) : c.label === "unsourced" ? "no source" : esc(c.label));

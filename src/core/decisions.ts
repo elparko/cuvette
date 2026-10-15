@@ -414,7 +414,7 @@ export class DecisionRecord {
     this.setupDone = true;
   }
 
-  change(key: string, value: unknown, opts: { by?: "human" | "agent" | "profile"; reason?: string } = {}): string[] {
+  change(key: string, value: unknown, opts: { by?: "human" | "agent" | "profile" | "default"; reason?: string } = {}): string[] {
     const s = this.state(key);
     const next = coerce(s.def, value);
     if (s.set && same(s.value, next)) return [];
