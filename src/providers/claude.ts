@@ -72,10 +72,12 @@ function makeClient(key?: string): any {
   return key ? new Anthropic({ apiKey: key, maxRetries: 0, ...headers }) : new Anthropic({ maxRetries: 0, ...headers });
 }
 
-function usageOf(u: any): Usage {
+function usageOf(u: any, longCache = false): Usage {
   const usage: Usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
   if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
   if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
+  const long = typeof u.cache_creation?.ephemeral_1h_input_tokens === "number" ? u.cache_creation.ephemeral_1h_input_tokens : longCache ? (usage.cacheWrite ?? 0) : 0;
+  if (long > 0) usage.cacheWrite1h = long;
   return usage;
 }
 
@@ -219,7 +221,7 @@ export class ClaudeProvider implements Provider {
     } catch (e) {
       // A stopped stream still costs the input tokens. The budget must count them.
       const started = req.signal?.aborted ? live?.currentMessage?.usage : undefined;
-      if (started && !this.fixedClient) recordSpend(this.model, usageOf(started));
+      if (started && !this.fixedClient) recordSpend(this.model, usageOf(started, this.mark?.ttl === "1h"));
       throw mapError(e, this.model);
     }
     const out = this.fromNative(msg);
@@ -246,7 +248,7 @@ export class ClaudeProvider implements Provider {
       note = `The model declined this request${cat ? ` (category: ${cat})` : ""}.`;
       parts.push({ type: "text", text: note });
     } else if (stop === "max_tokens") note = "The reply hit the output limit and was cut short.";
-    const usage = usageOf(msg.usage ?? {});
+    const usage = usageOf(msg.usage ?? {}, this.mark?.ttl === "1h");
     const stopReason: StepResult["stopReason"] =
       stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" ? "max_tokens" : "end";
     const result: StepResult = {
@@ -272,7 +274,7 @@ export class ClaudeProvider implements Provider {
       if (over) throw new ProviderError(over);
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
-      if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 });
+      if (!this.fixedClient) recordSpend(this.model, usageOf(u, false));
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
       throw mapError(e, this.model);

@@ -103,6 +103,7 @@ export interface Usage {
   outputTokens: number;
   cacheRead?: number;
   cacheWrite?: number;
+  cacheWrite1h?: number;
 }
 
 export interface ToolSchema {

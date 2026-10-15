@@ -72,6 +72,15 @@ describe("claude", () => {
     expect(DEFAULTS.show_thinking).toBe("on");
   });
 
+  test("usage marks the cache writes of the one-hour cache, so that they cost twice the input price", async () => {
+    const withUsage = (usage: any) => claudeMsg([{ type: "text", text: "hi" }], "end_turn", { usage });
+    const base = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 500 };
+    const run = async (cache: "5m" | "1h", usage: any) => (await new ClaudeProvider("claude-opus-5-5", { client: fakeClient([withUsage(usage)]).client, cache }).step(req([user("q")]))).usage;
+    expect((await run("5m", base)).cacheWrite1h).toBeUndefined();
+    expect((await run("1h", base)).cacheWrite1h).toBe(500);
+    expect((await run("5m", { ...base, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 300 } })).cacheWrite1h).toBe(300);
+  });
+
   test("request shape: adaptive thinking, effort, cache control, no tool_choice", async () => {
     const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "hi" }])]);
     const p = new ClaudeProvider("claude-opus-5-5", { client });
