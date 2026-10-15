@@ -248,7 +248,24 @@ test.skipIf(process.platform === "win32")("cuvette status does not run the versi
   const record = new AnalysisRecord(join(root, "rec"), "s1");
   record.append("session", { adapters: [{ name: "evil", version: "1.0.0", programVersion: "1.0", path: dir }], model: "m" });
   record.addNode({ entry: 1, adapter: "evil", adapterVersion: "1.0.0", programVersion: "1.0", tool: "run", args: {}, decisions: {}, codeHash: "c", inputHashes: [], outputs: [], result: { ok: true, metrics: {} }, parents: [], summary: "Ran.", model: "fake", manualRoute: "", fidelity: "none" });
-  const { current } = await currentFromDisk(record, root);
+  const { current, unchecked } = await currentFromDisk(record, root);
   expect(existsSync(marker)).toBe(false);
   expect(current.has("evil")).toBe(false);
+  expect([...unchecked]).toEqual(["evil"]);
+  expect(statusText(stepStatus(record, { unchecked }))).toMatch(/Up to date .*\n\s+not checked: adapter outside the trusted folders/);
+});
+
+test("cuvette status checks an adapter folder that the user gives for this run", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-status-user-"));
+  const dir = join(root, "mine");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "adapter.yaml"), `adapter: { name: mine, title: Mine, version: "2.0.0" }\nprogram: { name: Mine, version: "1.0" }\nconnection: { kind: cli }\n`);
+  const record = new AnalysisRecord(join(root, "rec"), "s1");
+  record.append("session", { adapters: [{ name: "mine", version: "1.0.0", programVersion: "1.0", path: dir }], model: "m" });
+  record.addNode({ entry: 1, adapter: "mine", adapterVersion: "1.0.0", programVersion: "1.0", tool: "run", args: {}, decisions: {}, codeHash: "c", inputHashes: [], outputs: [], result: { ok: true, metrics: {} }, parents: [], summary: "Ran.", model: "fake", manualRoute: "", fidelity: "none" });
+  const without = await currentFromDisk(record, root);
+  expect([...without.unchecked]).toEqual(["mine"]);
+  const given = await currentFromDisk(record, root, [dir]);
+  expect([...given.unchecked]).toEqual([]);
+  expect(given.current.get("mine")?.version).toBe("2.0.0");
 });

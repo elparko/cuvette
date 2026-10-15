@@ -871,10 +871,10 @@ async function main() {
       const place = findPlace(ref, { cwd }) ?? fail(`No session ${ref}. See cuvette sessions.`);
       if (!existsSync(join(place.recordDir, "log.jsonl"))) fail(`No session ${ref}. See cuvette sessions.`);
       const record = new AnalysisRecord(place.recordDir, place.id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
-      const { current, labels } = await st.currentFromDisk(record, place.legacy ? cwd : place.project);
+      const { current, labels, unchecked } = await st.currentFromDisk(record, place.legacy ? cwd : place.project, (o.adapter as string[]) ?? []);
       const live = await st.liveReasons(record, current);
       console.log(`Session ${place.id}\n`);
-      console.log(st.statusText(st.stepStatus(record, { live, labels }), `To run the out-of-date steps again, type cuvette resume ${place.id}, then type /rerun.`));
+      console.log(st.statusText(st.stepStatus(record, { live, labels, unchecked }), `To run the out-of-date steps again, type cuvette resume ${place.id}, then type /rerun.`));
       return;
     }
     case "questions": {
