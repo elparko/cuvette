@@ -161,7 +161,7 @@ export interface KnownDecision {
 const GENERIC = new Set(["the", "a", "an", "of", "to", "in", "on", "for", "and", "or", "with", "per", "each", "is", "are", "that", "this", "what", "which", "do", "you", "use", "value", "setting", "method", "image", "images", "channel", "cell", "cells", "object", "objects", "group", "groups", "test", "count", "number"]);
 const termsOf = (s: string) => s.toLowerCase().replace(/_/g, " ").split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !GENERIC.has(w)).map((w) => w.replace(/s$/, ""));
 
-const NEGATED = /\b(no|not|never|without|false|off)\b|n['’]t\b|\b(un|non)[- ]?paired\b/;
+const NEGATED = /\b(no|not|never|false|off)\b|n['’]t\b|\b(un|non)[- ]?paired\b|^\s*without\b|\bwithout\s+pair/;
 
 export function coerceSetting(d: KnownDecision, value: unknown): { ok: true; value: unknown } | { ok: false } {
   if (value === undefined || value === null) return { ok: false };

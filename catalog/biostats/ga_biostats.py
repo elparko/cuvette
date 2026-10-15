@@ -28,6 +28,12 @@ def _note_placeholders(fn):
     return run
 
 
+def _keeps_text(cleaned):
+    cells = cleaned.dropna().astype(str).str.strip()
+    integers = cells[cells.str.fullmatch(r"[-+]?\d+")]
+    return bool(cells.str.match(r"[-+]?0\d").any() or (integers.str.count(r"\d") > 15).any())
+
+
 def _typed(path, enc):
     frame = pd.read_csv(path, encoding=enc)
     raw = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
@@ -38,7 +44,7 @@ def _typed(path, enc):
             hidden = text.isin(MISSING_TEXT)
             cleaned = raw[column].where(~hidden, np.nan)
             numbers = pd.to_numeric(cleaned, errors="coerce")
-            if cleaned.notna().any() and numbers.notna().sum() == cleaned.notna().sum():
+            if cleaned.notna().any() and not _keeps_text(cleaned) and numbers.notna().sum() == cleaned.notna().sum():
                 placeholders += int((hidden & (text != "")).sum())
                 cleaned = numbers
             frame[column] = cleaned
