@@ -303,7 +303,7 @@ test("typed keeps a column of IDs with a leading zero as text", () => {
 });
 
 test("a value that is not finite as a number, and an ID with an exponent, stay text", () => {
-  expect(typed([["1e400"], ["2"]], 1)).toEqual([["1e400"], ["2"]]);
+  expect(typed([["1e400"], ["2"]], 1)).toEqual([["1e400"], [2]]);
   expect(typed([["5E3"], ["7E10"]], 1)).toEqual([["5E3"], ["7E10"]]);
   expect(typed([["1.5e3"], ["2"]], 1)).toEqual([[1500], [2]]);
   expect(typed([["3e2"], ["2"]], 1)).toEqual([[300], [2]]);
@@ -321,4 +321,9 @@ test("readTable keeps the cells of a wide row after row 1000", () => {
   const t = readTable(p)!;
   expect(t.columns).toEqual(["a", "b", "column 3"]);
   expect(t.rows[1100]).toEqual([1, 2, 3]);
+});
+
+test("one cell with a signed exponent or a value that is not finite does not turn a number column into text", () => {
+  expect(typed([["1E-05"], ["2"]], 1)).toEqual([[0.00001], [2]]);
+  expect(typed([["1e999"], ["2"], ["3.5"]], 1)).toEqual([["1e999"], [2], [3.5]]);
 });

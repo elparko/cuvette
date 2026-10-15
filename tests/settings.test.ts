@@ -8,7 +8,7 @@ import { budgetUsd } from "../src/core/spend.ts";
 import { loadSettings, xlsxOn } from "../src/core/config.ts";
 import { trustFolder } from "../src/core/trust.ts";
 import { folderHasNoPatientData } from "../src/core/phi.ts";
-import { saveSetting } from "../src/ui/config.ts";
+import { saveSetting, secretState } from "../src/ui/config.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
 const old = process.env.CUVETTE_HOME;
@@ -256,4 +256,11 @@ test("a model or referee value that is not a model spec is not saved", async () 
   for (const ok of ["claude", "claude:claude-sonnet-5-5", "ollama:qwen3:8b", "openai:http://localhost:1234/v1|m", "fake:"]) await changeSetting({ cwd, env: {} }, "model", ok, "user");
   for (const ok of ["same", "none"]) await changeSetting({ cwd, env: {} }, "referee", ok, "user");
   expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8"))).toMatchObject({ model: "fake:", referee: "none" });
+});
+
+test("the key state text for an ant auth login is not 'not set'", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "cuvette-ant-"));
+  mkdirSync(join(cfg, "credentials"));
+  writeFileSync(join(cfg, "credentials", "default.json"), "{}");
+  expect(secretState(row(describe({ cwd, env: { ANTHROPIC_CONFIG_DIR: cfg } }), "claude_key") as never)).toBe("signed in with ant auth login");
 });
