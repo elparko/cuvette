@@ -96,9 +96,10 @@ export async function openChrome(extraArgs: string[] = []): Promise<Page> {
     },
     async close() {
       ws.close();
+      const exited = new Promise<void>((done) => proc.once("exit", () => done()));
       proc.kill();
-      await wait(200);
-      rmSync(dir, { recursive: true, force: true });
+      if (proc.exitCode === null && proc.signalCode === null) await exited;
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }
