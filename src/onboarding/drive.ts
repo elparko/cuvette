@@ -7,7 +7,7 @@ import { extractNumbers } from "../core/claims.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Session as SessionT } from "../core/session.ts";
 import type { Args, Entry, Provider, ToolOutput } from "../core/types.ts";
-import { getPath, judge } from "./kat.ts";
+import { fillAdapterDir, getPath, judge } from "./kat.ts";
 import { firstSentence } from "./lint.ts";
 
 type Call = KnownAnswerTest["calls"][number];
@@ -63,7 +63,7 @@ function shown(value: unknown, root: string, steps: Call[]): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const ref = /\{saved\.([^.{}]+)/.exec(text);
   if (ref) return `the result of step ${steps.findIndex((s) => s.save_as === ref[1]) + 1}`;
-  return text.replaceAll("{adapter_dir}", root);
+  return fillAdapterDir(text, root);
 }
 
 export function buildRequest(a: LoadedAdapter, steps: Call[], target: Call, extra = new Map<string, string>()): string {
@@ -146,7 +146,7 @@ export function judgeDrive(c: DriveCase, entries: Entry[], nodes: { entry: numbe
   if (!rightTool) confusions.push({ text: `never called ${c.tool}` });
   let validArgs = false;
   let output: ToolOutput | undefined;
-  const wanted = Object.fromEntries(Object.entries(c.target.args).filter(([, v]) => !(typeof v === "string" && v.includes("{saved."))).map(([k, v]) => [k, typeof v === "string" ? v.replaceAll("{adapter_dir}", root) : v]));
+  const wanted = Object.fromEntries(Object.entries(c.target.args).filter(([, v]) => !(typeof v === "string" && v.includes("{saved."))).map(([k, v]) => [k, typeof v === "string" ? fillAdapterDir(v, root) : v]));
   for (const t of targets) {
     const args = (t.data.args ?? {}) as Args;
     const problems = schemaProblems(schema, args);
@@ -177,7 +177,7 @@ function answersFor(a: LoadedAdapter, c: DriveCase): Record<string, unknown> {
     for (const l of d.links) {
       const call = [...c.steps, c.target].find((s) => s.tool === l.tool);
       const v = call ? getPath(call.args, l.arg) : undefined;
-      if (v !== undefined && !(typeof v === "string" && v.includes("{saved."))) out[d.key] = typeof v === "string" ? v.replaceAll("{adapter_dir}", a.root) : v;
+      if (v !== undefined && !(typeof v === "string" && v.includes("{saved."))) out[d.key] = typeof v === "string" ? fillAdapterDir(v, a.root) : v;
     }
   }
   return out;
