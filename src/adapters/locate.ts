@@ -18,6 +18,8 @@ export interface Located {
 function expandPath(p: string): string {
   let out = p.replace(/\{env:([^{}]+)\}/g, (_, n: string) => process.env[n] ?? "");
   if (out === "~" || out.startsWith("~/") || out.startsWith("~\\")) out = homedir() + out.slice(1);
+  const own = join(homedir(), ".cuvette");
+  if (out === own || out.startsWith(own + sep)) out = cuvetteHome() + out.slice(own.length);
   return oldHomePath(out);
 }
 

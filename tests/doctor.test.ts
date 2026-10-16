@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { adapterDirs, loadAdapter, Manifest as ManifestSchema, type LoadedAdapter, type Manifest } from "../src/adapters/manifest.ts";
-import { canStart, doctorText, older, rInstallCommand, runDoctor, runSelfTests, safeFixes, selfTestText, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
+import { canStart, doctorText, older, rInstallCommand, rLibrary, runDoctor, runSelfTests, safeFixes, selfTestText, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
 const oldPath = process.env.PATH;
@@ -338,4 +338,8 @@ test("a login from ant auth login counts as a Claude credential, so Cuvette can 
   const some = await runDoctor(base({ env, fetch: ollamaDown }));
   expect(byId(some, "claude-key")).toMatchObject({ status: "ok", detail: "a login from ant auth login" });
   expect(canStart(some)).toBe(true);
+});
+
+test("the R library folder is inside CUVETTE_HOME", () => {
+  expect(rLibrary({})).toBe(join(home, "R-library"));
 });

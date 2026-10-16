@@ -130,9 +130,9 @@ export function uvCommand(home: string, name: string): string {
   return `uv venv --python ${PYTHON} ${q(dir)} && uv pip install --python ${q(envPython(home, name))} ${pkgs.map(q).join(" ")}`;
 }
 
-export function rLibrary(env: Record<string, string | undefined>, home = homedir()): string {
-  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, join(home, ".cuvette", "R-library"), join(home, ".guided-analysis", "R-library")].filter((x): x is string => !!x);
-  return cand.find((c) => existsSync(c)) ?? join(home, ".cuvette", "R-library");
+export function rLibrary(env: Record<string, string | undefined>, home = cuvetteHome()): string {
+  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, join(home, "R-library")].filter((x): x is string => !!x);
+  return cand.find((c) => existsSync(c)) ?? join(home, "R-library");
 }
 
 export function rInstallCommand(lib: string, p: { cran?: string[]; bioc?: string[] }): string {
