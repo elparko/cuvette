@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { closeSync, existsSync, linkSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, linkSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { cutText, discardPlace, readIndex, readRowMarks, type IndexRow } from "./places.ts";
@@ -29,10 +29,13 @@ export interface OpenLock {
   app?: string;
   started?: string;
   procStart?: number;
+  fresh?: boolean;
 }
 
 const LOCK = "open.json";
 const START_SLACK_MS = 5000;
+const LOCK_GRACE_MS = 5000;
+const CLOCK_SKEW_MS = 1000;
 
 export function processStart(pid: number): number | undefined {
   if (process.platform === "win32") return undefined;
@@ -71,43 +74,98 @@ function readLock(path: string): OpenLock | undefined {
   }
 }
 
+function freshFile(path: string): boolean {
+  try {
+    const age = Date.now() - statSync(path).mtimeMs;
+    return age >= -CLOCK_SKEW_MS && age < LOCK_GRACE_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function openLock(recordDir: string, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const lock = readLock(join(recordDir, LOCK));
   return lockAlive(lock, startOf) ? lock : undefined;
 }
 
+const NO_LINK_CODES = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
+let warnedNoLinks = false;
+
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 export function claimLock(recordDir: string, extra: Record<string, unknown> = {}, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const path = join(recordDir, LOCK);
+  const guard = `${path}.take`;
   const body = () => JSON.stringify({ pid: process.pid, procStart: ownStart(), started: new Date().toISOString(), ...extra });
-  for (let i = 0; i < 5; i++) {
+  const writeInPlace = () => {
+    const fd = openSync(path, "wx", 0o600);
     try {
-      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
-      return undefined;
+      writeSync(fd, body());
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  };
+  const publish = () => {
+    const temp = `${path}.new.${process.pid}.${randomBytes(4).toString("hex")}`;
+    try {
+      writeFileSync(temp, body(), { flag: "wx", mode: 0o600 });
+      linkSync(temp, path);
+      return true;
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
+      const code = (e as NodeJS.ErrnoException).code ?? "";
+      if (code === "EEXIST") return false;
+      if (!NO_LINK_CODES.has(code)) throw e;
+      if (!warnedNoLinks) {
+        warnedNoLinks = true;
+        process.stderr.write("This file system has no hard links. The session lock is weaker here.\n");
+      }
+      try {
+        writeInPlace();
+        return true;
+      } catch (e2) {
+        if ((e2 as NodeJS.ErrnoException).code === "EEXIST") return false;
+        throw e2;
+      }
+    } finally {
+      rmSync(temp, { force: true });
     }
-    const held = readLock(path);
-    if (held && lockAlive(held, startOf)) {
-      if (held.pid === process.pid) return undefined;
-      return held;
-    }
-    const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
+  };
+  const takeGuard = () => {
     try {
-      renameSync(path, aside);
-    } catch {
+      closeSync(openSync(guard, "wx", 0o600));
+      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    }
+    if (!freshFile(guard)) rmSync(guard, { force: true });
+    return false;
+  };
+  const opening: OpenLock = { pid: 0, fresh: true };
+  for (let i = 0; i < 5; i++) {
+    if (publish()) return undefined;
+    const held = readLock(path);
+    if (held && lockAlive(held, startOf)) return held.pid === process.pid ? undefined : held;
+    if (!held && freshFile(path)) return opening;
+    if (!takeGuard()) {
+      pause(100);
       continue;
     }
-    const moved = readLock(aside);
-    if (moved && lockAlive(moved, startOf) && moved.pid !== process.pid) {
+    try {
+      const again = readLock(path);
+      if (again && lockAlive(again, startOf)) return again.pid === process.pid ? undefined : again;
+      if (!again && freshFile(path)) return opening;
+      const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
       try {
-        linkSync(aside, path);
+        renameSync(path, aside);
+        rmSync(aside, { force: true });
       } catch {}
-      rmSync(aside, { force: true });
-      return moved;
+      if (publish()) return undefined;
+    } finally {
+      rmSync(guard, { force: true });
     }
-    rmSync(aside, { force: true });
   }
-  return readLock(path);
+  return opening;
 }
 
 const alive = (dir: string) => !!openLock(dir);
