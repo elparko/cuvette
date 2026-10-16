@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { basename, delimiter, dirname, join, sep } from "node:path";
+import { basename, delimiter, dirname, join, normalize, sep } from "node:path";
 import { oldHomePath } from "../core/old-names.ts";
 import { accessOf } from "./access.ts";
 import { adapterDirs, cuvetteHome, type Manifest } from "./manifest.ts";
@@ -19,7 +19,8 @@ function expandPath(p: string): string {
   let out = p.replace(/\{env:([^{}]+)\}/g, (_, n: string) => process.env[n] ?? "");
   if (out === "~" || out.startsWith("~/") || out.startsWith("~\\")) out = homedir() + out.slice(1);
   const own = join(homedir(), ".cuvette");
-  if (out === own || out.startsWith(own + sep)) out = cuvetteHome() + out.slice(own.length);
+  const flat = normalize(out);
+  if (flat === own || flat.startsWith(own + sep)) out = cuvetteHome() + flat.slice(own.length);
   return oldHomePath(out);
 }
 
