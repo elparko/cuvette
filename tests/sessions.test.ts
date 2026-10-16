@@ -257,6 +257,19 @@ test("claimLock takes a free or dead lock, and refuses a live lock of another pr
   expect(lockAlive({ pid: process.pid, procStart: Date.now() - 86_400_000 * 400 })).toBe(false);
 });
 
+test("claimLock does not take an empty lock file that is new, and takes one that is old", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-empty-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  expect(claimLock(dir)).toMatchObject({ pid: 0 });
+  expect(readFileSync(lock, "utf8")).toBe("");
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(lock, old, old);
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid });
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
 test("of many processes that claim one lock at the same time, exactly one gets it", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-race-"));
   const code = `import { claimLock } from ${JSON.stringify(join(__dirname, "../src/core/sessions.ts"))}; const at = Number(process.env.AT); while (Date.now() < at) {} const held = claimLock(${JSON.stringify(dir)}); console.log(held ? "lost" : "won"); process.stdin.resume();`;

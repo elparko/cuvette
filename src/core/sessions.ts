@@ -33,6 +33,7 @@ export interface OpenLock {
 
 const LOCK = "open.json";
 const START_SLACK_MS = 5000;
+const LOCK_GRACE_MS = 5000;
 
 export function processStart(pid: number): number | undefined {
   if (process.platform === "win32") return undefined;
@@ -71,6 +72,14 @@ function readLock(path: string): OpenLock | undefined {
   }
 }
 
+function freshFile(path: string): boolean {
+  try {
+    return Date.now() - statSync(path).mtimeMs < LOCK_GRACE_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function openLock(recordDir: string, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const lock = readLock(join(recordDir, LOCK));
   return lockAlive(lock, startOf) ? lock : undefined;
@@ -79,18 +88,27 @@ export function openLock(recordDir: string, startOf?: (pid: number) => number | 
 export function claimLock(recordDir: string, extra: Record<string, unknown> = {}, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const path = join(recordDir, LOCK);
   const body = () => JSON.stringify({ pid: process.pid, procStart: ownStart(), started: new Date().toISOString(), ...extra });
-  for (let i = 0; i < 5; i++) {
+  const publish = () => {
+    const temp = `${path}.new.${process.pid}.${randomBytes(4).toString("hex")}`;
     try {
-      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
-      return undefined;
+      writeFileSync(temp, body(), { flag: "wx", mode: 0o600 });
+      linkSync(temp, path);
+      return true;
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return true;
+      return false;
+    } finally {
+      rmSync(temp, { force: true });
     }
+  };
+  for (let i = 0; i < 5; i++) {
+    if (publish()) return undefined;
     const held = readLock(path);
     if (held && lockAlive(held, startOf)) {
       if (held.pid === process.pid) return undefined;
       return held;
     }
+    if (!held && freshFile(path)) return { pid: 0 };
     const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
     try {
       renameSync(path, aside);
