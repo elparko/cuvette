@@ -17,7 +17,7 @@ import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsF
 import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
-import { listSessions, openLock } from "../core/sessions.ts";
+import { listSessions, openLock, ownerKnown, OPENING_TEXT } from "../core/sessions.ts";
 import { findPlace, removeIndexRow, renameIndexRow } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
@@ -472,7 +472,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       else if (typeof body.id === "string") {
         const place = findPlace(body.id);
         const lock = place ? openLock(place.recordDir) : undefined;
-        if (lock && lock.pid !== process.pid) return send(res, 409, { error: lock.app ? `This session is open in another app window: ${lock.app}` : "This session is open in a terminal. Type /app there to show it here." });
+        if (lock && lock.pid !== process.pid) return send(res, 409, { error: lock.app ? `This session is open in another app window: ${lock.app}` : !ownerKnown(lock) ? OPENING_TEXT : "This session is open in a terminal. Type /app there to show it here." });
         void open({ resume: body.id });
       }
       else if (typeof body.folder === "string" && body.folder.trim()) {

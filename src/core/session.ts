@@ -8,7 +8,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { namesValue } from "./asked.ts";
 import { refangDeep } from "../providers/text.ts";
 import { hideKeys, isCredentialsFile, isSecretFile } from "./credentials.ts";
-import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
+import { claimLock, lockAlive, ownerKnown, OPENING_TEXT, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { adapterDirs, findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -408,7 +408,7 @@ export class Session {
       const held = claimLock(s.dir);
       if (held) {
         if (!opts.place) discardPlace(place);
-        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
+        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : !ownerKnown(held) ? OPENING_TEXT : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
       }
       s.overrides = overrides;
       s.onceTrusted = !!opts.trustFolder;

@@ -81,6 +81,16 @@ function readLock(path: string): OpenLock | undefined {
 
 const LOCK_GRACE_MS = 2000;
 
+export const OPENING_TEXT = "This session is opening in another window. Try again in a moment.";
+
+export const ownerKnown = (lock: OpenLock | undefined): lock is OpenLock => !!lock && Number.isInteger(lock.pid) && lock.pid > 0;
+
+export function signalOwner(lock: OpenLock, signal: NodeJS.Signals, kill: (pid: number, signal: NodeJS.Signals) => unknown = process.kill): boolean {
+  if (!ownerKnown(lock)) return false;
+  kill(lock.pid, signal);
+  return true;
+}
+
 function unfinished(path: string): boolean {
   try {
     return Date.now() - statSync(path).mtimeMs < LOCK_GRACE_MS;
@@ -147,7 +157,7 @@ export function claimLock(recordDir: string, extra: Record<string, unknown> = {}
     }
     rmSync(aside, { force: true });
   }
-  return readLock(path);
+  return readLock(path) ?? { pid: 0 };
 }
 
 const alive = (dir: string) => !!openLock(dir);

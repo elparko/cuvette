@@ -12,7 +12,7 @@ import { saveVersion } from "../src/adapters/locate.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { recordSpend } from "../src/core/spend.ts";
-import { processStart } from "../src/core/sessions.ts";
+import { OPENING_TEXT, processStart } from "../src/core/sessions.ts";
 import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
@@ -2331,6 +2331,9 @@ test("a session open in another live process cannot open twice, and a reused pro
   const start = processStart(other);
   writeFileSync(lock, JSON.stringify({ pid: other, procStart: start ?? 0 }));
   if (start !== undefined) await expect(Session.resume(id, { provider: new FakeProvider([]) })).rejects.toThrow(/open in another window \(process \d+\)/);
+  writeFileSync(lock, "");
+  await expect(Session.resume(id, { provider: new FakeProvider([]) })).rejects.toThrow(OPENING_TEXT);
+  rmSync(lock);
   writeFileSync(lock, JSON.stringify({ pid: other, procStart: (start ?? Date.now()) - 3_600_000 }));
   session = await Session.resume(id, { provider: new FakeProvider([]) });
   expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);

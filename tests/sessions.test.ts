@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 
-const linkFails = vi.hoisted(() => ({ code: undefined as string | undefined }));
+const linkFails = vi.hoisted(() => ({ code: undefined as string | undefined, rename: false }));
 vi.mock("node:fs", async (original) => {
   const real = await original<typeof import("node:fs")>();
-  return { ...real, linkSync: (a: string, b: string) => { if (linkFails.code) throw Object.assign(new Error(linkFails.code), { code: linkFails.code }); return real.linkSync(a, b); } };
+  return { ...real, linkSync: (a: string, b: string) => { if (linkFails.code) throw Object.assign(new Error(linkFails.code), { code: linkFails.code }); return real.linkSync(a, b); }, renameSync: (a: string, b: string) => { if (linkFails.rename) throw Object.assign(new Error("EBUSY"), { code: "EBUSY" }); return real.renameSync(a, b); } };
 });
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
-import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
+import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, OPENING_TEXT, ownerKnown, sessionLine, signalOwner } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
@@ -456,4 +456,43 @@ test("a claim leaves no temporary file after a success or after an error", () =>
     linkFails.code = undefined;
   }
   expect(existsSync(missing)).toBe(false);
+});
+
+test("claimLock returns held, not claimed, if the loop ends and the lock file is empty", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-end-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  const old = new Date(Date.now() - 10_000);
+  utimesSync(lock, old, old);
+  linkFails.rename = true;
+  try {
+    expect(claimLock(dir)).toMatchObject({ pid: 0 });
+  } finally {
+    linkFails.rename = false;
+  }
+});
+
+test("a lock with no known owner never gets a signal", () => {
+  const kill = vi.fn();
+  for (const pid of [0, -1, 1.5, Number.NaN, undefined as unknown as number]) {
+    expect(ownerKnown({ pid }), String(pid)).toBe(false);
+    expect(signalOwner({ pid }, "SIGUSR2", kill)).toBe(false);
+  }
+  expect(kill).not.toHaveBeenCalled();
+  expect(signalOwner({ pid: 4242 }, "SIGUSR2", kill)).toBe(true);
+  expect(kill).toHaveBeenCalledExactlyOnceWith(4242, "SIGUSR2");
+});
+
+test("lockAlive never sends a signal to process 0 or a negative process", () => {
+  const spy = vi.spyOn(process, "kill");
+  try {
+    for (const pid of [0, -1, 1.5]) expect(lockAlive({ pid })).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+test("the opening text says to try again", () => {
+  expect(OPENING_TEXT).toBe("This session is opening in another window. Try again in a moment.");
 });

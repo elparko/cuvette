@@ -13,6 +13,7 @@ import { FakeSession } from "../src/ui/fake-session.ts";
 import { until } from "../src/tui/testing.ts";
 import type { Question } from "../src/core/types.ts";
 import { claudeKey } from "../src/core/credentials.ts";
+import { OPENING_TEXT } from "../src/core/sessions.ts";
 
 const home = mkdtempSync(join(tmpdir(), "cuvette-app-home-"));
 const oldHome = process.env.CUVETTE_HOME;
@@ -283,6 +284,23 @@ describe("the app server", () => {
     expect((await c.post("api/open", { folder: home })).status).toBe(200);
     for (let i = 0; i < 1000 && (await (await c.get("api/state")).json()).session === null; i++) await new Promise((r) => setTimeout(r, 30));
     expect((await (await c.get("api/state")).json()).session).not.toBeNull();
+  });
+
+  test("a request to open a session with a young empty lock gets the opening text, and a lock with an app gets the app name", async () => {
+    app = await startApp({ env, start: home, makeSession: async () => new FakeSession() });
+    const c = client(app);
+    const id = "20261015-120000-lock";
+    const dir = join(home, "sessions", id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "log.jsonl"), JSON.stringify({ id: 1, kind: "session", data: { cwd: home, adapters: [], model: "m" } }) + "\n");
+    writeFileSync(join(dir, "open.json"), "");
+    const r = await c.post("api/open", { id });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toBe(OPENING_TEXT);
+    writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.ppid, app: "http://127.0.0.1:1/" }));
+    const r2 = await c.post("api/open", { id });
+    expect(r2.status).toBe(409);
+    expect((await r2.json()).error).toContain("http://127.0.0.1:1/");
   });
 
   test("the start page gets a program suggestion for a folder and opens with the chosen program", async () => {

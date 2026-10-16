@@ -389,7 +389,8 @@ async function interactive(resumeId?: string, folder?: string) {
   if (!resumeId && !str(o.model) && process.stdin.isTTY && (await import("./core/firststart.ts")).needsFirstStart()) sample = await firstStart();
   if (resumeId) {
     const lock = await liveLock(resumeId);
-    if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : "This session is open in another terminal. Close it there first.");
+    const { ownerKnown, OPENING_TEXT } = await import("./core/sessions.ts");
+    if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : ownerKnown(lock) ? "This session is open in another terminal. Close it there first." : OPENING_TEXT);
   }
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
   if (!adapters.length && !resumeId && !sample) {
@@ -420,8 +421,10 @@ async function sharedApp(ref: string): Promise<string | undefined> {
   const lock = await liveLock(ref);
   if (!lock) return undefined;
   if (lock.app) return lock.app;
+  const { OPENING_TEXT, ownerKnown, signalOwner } = await import("./core/sessions.ts");
+  if (!ownerKnown(lock)) fail(OPENING_TEXT);
   if (process.platform === "win32") fail("This session is open in another window. Close it there first.");
-  process.kill(lock.pid, "SIGUSR2");
+  if (!signalOwner(lock, "SIGUSR2")) fail(OPENING_TEXT);
   for (let i = 0; i < 50; i++) {
     await new Promise((r) => setTimeout(r, 100));
     const now = await liveLock(ref);
