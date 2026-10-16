@@ -33,7 +33,7 @@ const KEYS: Record<string, { code: string; vk: number }> = {
 
 export async function openChrome(extraArgs: string[] = []): Promise<Page> {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-chrome-"));
-  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "--hide-scrollbars", ...extraArgs, "about:blank"], { stdio: "ignore" });
+  const proc: ChildProcess = spawn(CHROME!, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "--hide-scrollbars", ...extraArgs, "about:blank"], { stdio: "ignore", detached: process.platform !== "win32" });
   let port = "";
   for (let i = 0; i < 600 && !port; i++) {
     await wait(100);
@@ -97,8 +97,12 @@ export async function openChrome(extraArgs: string[] = []): Promise<Page> {
     async close() {
       ws.close();
       const exited = new Promise<void>((done) => proc.once("exit", () => done()));
-      proc.kill();
-      if (proc.exitCode === null && proc.signalCode === null) await exited;
+      try {
+        if (proc.pid && process.platform !== "win32") process.kill(-proc.pid, "SIGKILL");
+        else proc.kill();
+      } catch {}
+      if (proc.exitCode === null && proc.signalCode === null) await Promise.race([exited, wait(5000)]);
+      await wait(200);
       try {
         rmSync(dir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 });
       } catch (e) {

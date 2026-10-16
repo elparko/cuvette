@@ -227,7 +227,11 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
   }, 60000);
   afterAll(async () => {
     await page?.close();
-    proc?.kill();
+    if (proc && proc.exitCode === null) {
+      const gone = new Promise((done) => proc.once("exit", done));
+      proc.kill();
+      await Promise.race([gone, new Promise((done) => setTimeout(done, 10000))]);
+    }
   });
 
   const overflow = () =>

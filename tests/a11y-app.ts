@@ -148,7 +148,11 @@ export function useApp() {
   afterAll(async () => {
     if (!CHROME) return;
     await page?.close();
-    proc?.kill();
+    if (proc && proc.exitCode === null) {
+      const gone = new Promise((done) => proc.once("exit", done));
+      proc.kill();
+      await Promise.race([gone, wait(10000)]);
+    }
     await wait(500);
     for (const d of dirs) rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });

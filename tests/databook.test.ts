@@ -1,7 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const fakeChrome = vi.hoisted(() => ({ path: undefined as string | undefined }));
+vi.mock("../src/core/trail.ts", async (original) => {
+  const real = await original<typeof import("../src/core/trail.ts")>();
+  return { ...real, findChrome: () => fakeChrome.path ?? real.findChrome() };
+});
 import { buildDatabook, localePaper, openRecord, pdfPages, resolveTarget, writeDatabook } from "../src/core/databook.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { find } from "../src/core/settings.ts";
@@ -221,6 +227,32 @@ describe("databook", () => {
     expect(localePaper({ LANG: "en_US.UTF-8" })).toBe("letter");
     expect(localePaper({ LANG: "de_DE.UTF-8" })).toBe("a4");
   });
+
+  it.skipIf(process.platform === "win32")("a PDF export does not fail if the browser leaves a process that still writes in the temporary folder", async () => {
+    const script = join(mkdtempSync(join(tmpdir(), "cuvette-fake-chrome-")), "chrome.sh");
+    writeFileSync(script, [
+      "#!/bin/sh",
+      'for a in "$@"; do case "$a" in --user-data-dir=*) ud="${a#*=}";; --print-to-pdf=*) pdf="${a#*=}";; esac; done',
+      'mkdir -p "$ud"',
+      "printf '%%PDF-1.4\\n' > \"$pdf\"",
+      `perl -MPOSIX -e 'POSIX::setsid(); my $end = time + 2; my $i = 0; while (time < $end) { $i++; open(F, ">", "$ARGV[0]/f$i"); close F; } open(F, ">", $ARGV[1]); close F;' "$ud" "$(dirname "$pdf")/writer-done" &`,
+      "sleep 0.5",
+      'echo "123 bytes written to file $pdf" >&2',
+      "sleep 5",
+      "",
+    ].join("\n"));
+    chmodSync(script, 0o755);
+    fakeChrome.path = script;
+    try {
+      const r = session();
+      const w = await writeDatabook({ target: r.dir, cwd: "/", formats: ["pdf"], author: "A", paper: "a4" });
+      expect(w.pdf && existsSync(w.pdf)).toBe(true);
+      expect(existsSync(join(dirname(w.pdf!), "writer-done"))).toBe(true);
+      expect(readdirSync(tmpdir()).filter((n) => n.startsWith("cuvette-databook-"))).toEqual([]);
+    } finally {
+      fakeChrome.path = undefined;
+    }
+  }, 30000);
 
   it.skipIf(!findChrome())("writes a PDF with more than one page", async () => {
     const r = session();
