@@ -195,7 +195,7 @@ export function adapterTrust(root: string): TrustInfo {
   const homeBase = join(cuvetteHome(), "adapters");
   const homeAdapter = inside(homeBase, root) || (() => {
     const r = relative(realOf(homeBase), resolve(realOf(dirname(root)), basename(root)));
-    return !!r && !r.startsWith("..") && !r.startsWith(sep);
+    return !!r && !isAbsolute(r) && r !== ".." && !r.startsWith(`..${sep}`);
   })();
   info.codeConfirmed = !((entry || homeAdapter) && level === "unlisted" && codeFiles.length) || index.confirmed[realOf(root)] === digest;
   return info;

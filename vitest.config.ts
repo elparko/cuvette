@@ -6,7 +6,7 @@ export default defineConfig({
     globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup.ts"],
     pool: "forks",
-    maxWorkers: 4,
+    ...(process.env.GITHUB_ACTIONS ? {} : { maxWorkers: 4 }),
     testTimeout: 120000,
     hookTimeout: 60000,
     teardownTimeout: 30000,
