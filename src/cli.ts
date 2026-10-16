@@ -454,13 +454,14 @@ async function app(folder?: string) {
     }
   }
   const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [], trustFolder }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
-  console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
-  if (!o["no-open"]) openWithOs(a.url);
-  await new Promise<void>((done) => {
+  const stopSignal = new Promise<void>((done) => {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
     process.once("SIGHUP", done);
   });
+  console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
+  if (!o["no-open"]) openWithOs(a.url);
+  await stopSignal;
   const slow = setTimeout(() => console.log("Stopping. Press Ctrl+C again to quit now."), 1000);
   await stopApp(() => a.close());
   clearTimeout(slow);

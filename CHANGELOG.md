@@ -67,6 +67,7 @@ Release 0.1.1 includes all changes since 12 October.
 - `OLLAMA_HOST` can be a bare host, a host with a port, or a bare IPv6 address. Cuvette adds `http://` and the port 11434 if they are missing. It treats `0.0.0.0` as a local address. The model query has a time limit.
 - After Ctrl+C, the command line waits up to 20 seconds for the app to close. The app waits up to 6 seconds for an install to stop. So Ctrl+C during an install still closes the session.
 - The app prints "Stopping. Press Ctrl+C again to quit now." if the close takes more than one second. A second Ctrl+C or a second stop signal quits at once.
+- `cuvette app` installs its stop handlers before it prints the address. A stop signal that comes right after the address no longer ends the process with no clean close.
 
 ### Data and statistics
 
