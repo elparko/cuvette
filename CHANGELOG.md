@@ -23,7 +23,7 @@ Release 0.1.1 includes all changes since 12 October.
 
 - Cuvette stores each row of the session list in its own file in the folder `sessions-index`. Two windows that save at the same time no longer lose a row.
 - Cuvette still reads the old file `sessions-index.json`. It does not write to it.
-- Two Cuvette processes can no longer both open one session. A process writes the session lock to a temporary file and links it into place. If the file system cannot link, it writes the lock in one step. A lock file that is empty and younger than two seconds counts as held.
+- Two Cuvette processes can no longer both open one session. A process writes the session lock to a temporary file and links it into place. If the drive cannot link, the process writes the lock file directly, and an empty lock file that is less than 2 seconds old counts as held. Then Cuvette shows "This session is opening in another window. Try again in a moment." and does not signal any process.
 - The Remove command writes a removal row for a session in the old sessions folder. It keeps the files.
 - Cuvette moves a row file that has bad JSON (JavaScript Object Notation) or a wrong identifier (ID) aside. A read error does not move it.
 
