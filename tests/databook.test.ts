@@ -227,6 +227,7 @@ describe("databook", () => {
     addFigure(r);
     const w = await writeDatabook({ target: r.dir, cwd: "/", formats: ["pdf"], author: "A. Scientist", paper: "a4" });
     expect(existsSync(w.html)).toBe(true);
+    expect(w.notes).toEqual([]);
     expect(w.pdf && existsSync(w.pdf)).toBe(true);
     expect(w.pages).toBeGreaterThan(1);
     expect(pdfPages(w.pdf!)).toBe(w.pages);
