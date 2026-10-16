@@ -70,8 +70,6 @@ export function makeSanitizer(run?: { dir?: string }): (s: string) => string {
   const host = hostname();
   rules.push(
     [dataRoot(), "{data}"],
-    // Old run records name the data folder on the drive of the author.
-    ["/Volumes/T7/guided-analysis/data", "{data}"],
     [/\/Volumes\/[^/\s"'`]+\/guided-analysis\/tools\/bench-runs/g, "{runs}"],
     [/\/Volumes\/[^/\s"'`]+(\/guided-analysis)?/g, "{other volume}"],
     [join(h, ".cuvette"), "{cuvette home}"],
@@ -86,6 +84,7 @@ export function makeSanitizer(run?: { dir?: string }): (s: string) => string {
     [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, "{email}"],
     [/\b(localhost|127\.0\.0\.1)(:\d+)?/g, "{local server}"],
   );
+  if (process.env.CUVETTE_OLD_DATA_ROOT) rules.unshift([process.env.CUVETTE_OLD_DATA_ROOT, "{data}"]);
   if (host) for (const v of new Set([host, host.replace(/\.local$/, "")])) if (v.length > 3) rules.push([new RegExp(reEsc(v), "gi"), "{host}"]);
   return (s: string) => {
     let out = s;

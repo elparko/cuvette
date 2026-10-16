@@ -11,7 +11,7 @@ Date: 2026-10-07. Program: SMILE MSI 2.0.0, Python 3.12, mcp 2.2.0.
 2. **The wrapper, over MCP.** The script starts `wrapper.py` as a stdio MCP server and calls the same tools
    with the same arguments (the arguments after the fill).
 
-Run it with: `/Users/parker/Code/SMILE-MSI/.venv/bin/python catalog/smile-msi/parity.py`
+Run it with: `<SMILE-MSI checkout>/.venv/bin/python catalog/smile-msi/parity.py`
 
 The session uses the demo slide. A script adds two regions: `rim` (514 pixels) and `core` (417 pixels).
 The setup is the built-in profile with no change.

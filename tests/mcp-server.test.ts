@@ -165,7 +165,8 @@ test("stdout carries only protocol lines", async () => {
   send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "count", arguments: { input: "/x" } } });
   send({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "blur", arguments: { input: "/x", sigma: 2 } } });
   const deadline = Date.now() + 20000;
-  while (!/"id":4/.test(out) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+  const answered = () => [1, 2, 3, 4].every((id) => out.split("\n").some((l) => l.trimEnd().endsWith(`"id":${id}}`)));
+  while (!answered() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
   const exited = new Promise<number | null>((ok) => child.on("exit", ok));
   child.stdin.end();
   const code = await Promise.race([exited, new Promise<string>((ok) => setTimeout(() => ok("running"), 5000))]);
