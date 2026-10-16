@@ -82,7 +82,7 @@ jobs:
         with:
           path: ~/.cache/cuvette/node-v${{ steps.node-version.outputs.version }}-small
           key: cuvette-node-${{ steps.node-version.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: npm ci
       - run: npm run desktop:build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
