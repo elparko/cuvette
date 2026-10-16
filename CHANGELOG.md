@@ -105,6 +105,17 @@ Release 0.1.1 includes all changes since 12 October.
 - `--fetch-data` downloads without the question. A run without a terminal downloads nothing without it. If you decline, the tests that need the data do not run. This is not an error in the adapter.
 - Cuvette checks the SHA-256 sum of each download and refuses a file that does not match.
 
+### Home folder
+
+- The Python environments and the R library now follow `CUVETTE_HOME`. `cuvette doctor` and `cuvette adapter check` no longer look in `~/.cuvette` if `CUVETTE_HOME` points to another folder.
+- An adapter path that starts with `~/.cuvette` points into `CUVETTE_HOME`.
+
+### Known issues
+
+- `run_script` has no sandbox on Windows.
+- The Linux sandbox cannot block a new file in the project root by pattern.
+- The permission table does not list these wrappers: `nice`, `time`, `timeout`, `doas`, `setsid`, `stdbuf` and `find -exec`.
+
 ## 14 October 2026
 
 ### Slash command fixes
