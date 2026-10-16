@@ -8,6 +8,7 @@ import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
 import { collectOutputs, parseToolText, readFields, buildOutput, runProcess, type CallDir } from "../src/adapters/kinds/common.ts";
 import { convertResult } from "../src/adapters/mcp.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-fuzz-adapter-"));
 const started: AdapterRuntime[] = [];
@@ -136,7 +137,7 @@ describe("fuzz: adapter output readers", () => {
     for (let n = 0; n < 5000; n++) writeFileSync(join(many, `f${n}.txt`), "");
     const t = performance.now();
     expect(collectOutputs({ dir: many, outputs: {} }, def()).length).toBe(5000);
-    expect(performance.now() - t).toBeLessThan(5000);
+    withinMs(performance.now() - t, 5000);
   });
 });
 
@@ -229,7 +230,7 @@ describe("fuzz: Python worker replies", () => {
     const out = await tool.execute({}, { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal } as unknown as ToolContext);
     expect(out.ok).toBe(true);
     expect(out.metrics).toMatchObject({ size: 3, ndim: 1 });
-    expect(performance.now() - t).toBeLessThan(15000);
+    withinMs(performance.now() - t, 15000);
   }, 30000);
 
   test("a worker with damaged output never hangs or crashes the harness", async () => {

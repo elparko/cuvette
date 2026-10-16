@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import type { Args, ToolContext } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import { runArgv } from "./cli.ts";
-import { commandLine, defTool, expand, inflight, makeRuntime, renderArgv, scopeFor, scalar, type CallDir, type KindContext } from "./common.ts";
+import { commandLine, defTool, envAllowed, expand, inflight, makeRuntime, renderArgv, scopeFor, scalar, type CallDir, type KindContext } from "./common.ts";
 
 export function startScript(c: KindContext): AdapterRuntime {
   const live = inflight();
@@ -13,7 +13,7 @@ export function startScript(c: KindContext): AdapterRuntime {
       const interpreter = conn.interpreter.flatMap((a) => renderArgv([a], scopeFor(c, def, args, call)));
       if (!interpreter.length) return Promise.resolve({ ok: false, error: "connection.interpreter is empty" });
       if (!def.script) return Promise.resolve({ ok: false, error: "the tool has no script" });
-      const script = resolve(c.adapter.root, expand(def.script, c.ph));
+      const script = resolve(c.adapter.root, expand(def.script, c.ph, envAllowed(c.adapter.manifest)));
       const params = join(call.dir, ".params.json");
       writeFileSync(params, JSON.stringify(args));
       const argv = [...interpreter, script, params];

@@ -3,6 +3,8 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { confirmCode } from "../src/adapters/source.ts";
+import { withinMs } from "./timing.ts";
 
 const CUVETTE = join(__dirname, "..", "bin/cuvette.js");
 const REFEREE_MS = 1500;
@@ -31,6 +33,14 @@ function script(name: string, value: unknown): string {
 function setup(name: string, steps: unknown[], reply: string, referee: Record<string, unknown> = { complete: reply, completeDelayMs: REFEREE_MS }) {
   const home = mkdtempSync(join(root, "home-"));
   cpSync(join(__dirname, "fixtures", "drive"), join(home, "adapters", "drivefix"), { recursive: true });
+  const before = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    confirmCode(join(home, "adapters", "drivefix"));
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
+  }
   return { home, model: script(`${name}-model`, steps), referee: script(`${name}-referee`, { steps: [], ...referee }) };
 }
 
@@ -93,7 +103,7 @@ test("headless json has answerReadyMs below turnMs by about the referee time, an
   expect(out.stop).toBe("answer");
   expect(out.answer).toBe(ANSWER);
   expect(out.turnMs - out.answerReadyMs).toBeGreaterThanOrEqual(1000);
-  expect(out.turnMs - out.answerReadyMs).toBeLessThan(REFEREE_MS * 10);
+  withinMs(out.turnMs - out.answerReadyMs, REFEREE_MS * 10);
   expect(out.findings.map((f: { message: string; source: string }) => `${f.source}: ${f.message}`)).toContain("referee: The sample is small.");
 });
 

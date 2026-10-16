@@ -1,0 +1,7 @@
+{
+ "data/calcium_correlation.csv": {"sha256":"46cc9b574af79f6baaf0a236746d87130d97173461e0606219675d603d11e53a","bytes":340},
+ "data/calcium_glucose.csv": {"sha256":"c2837b0650744eee6422db4724012dbf4484d1f0d539173825ff9b13d819b874","bytes":387},
+ "data/hdl_chd.csv": {"sha256":"68899954b41e28d202716b06043c588fdf4e7b4e2e41b8d60bd5e9db14c16fe7","bytes":1041},
+ "data/ldl_chd.csv": {"sha256":"7073c729f8929f31b69ca7d0037b0647e4381d6b45c314bd4cc0c46ae46bcc10","bytes":1049},
+ "data/make_fixtures.R": {"sha256":"e079bb67c83336d32491c239c4d49d9dc5b6d3e287b270a81db8237b7dcd72d4","bytes":965}
+}

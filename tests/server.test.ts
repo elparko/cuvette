@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { FakeSession } from "../src/ui/fake-session.ts";
-import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
+import { ntfyNotifier } from "../src/server/notify.ts";
 import { startWindow, tokenOk } from "../src/server/window.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -37,6 +37,17 @@ async function runToQuestion(s: FakeSession) {
 }
 
 describe("window server", () => {
+  test("a request for always allow on a tool in the no-always set is a single allow", async () => {
+    const { s, base, token } = await open();
+    const calls: unknown[][] = [];
+    s.respondPermission = (...a: unknown[]) => void calls.push(a);
+    for (const [rid, tool] of [["r1", "run_command"], ["r2", "run_script"]]) s.bus.emit({ type: "permission", rid, tool, args: {}, touches: "files" });
+    const post = (rid: string) => fetch(`${base}/api/permission?t=${token}`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ rid, ok: true, always: true }) });
+    expect((await post("r1")).status).toBe(200);
+    expect((await post("r2")).status).toBe(200);
+    expect(calls).toEqual([["r1", true, "", false], ["r2", true, "", true]]);
+  });
+
   test("a call that Cuvette blocked does not show as a failed call with the text for the model", async () => {
     const { s, base, token } = await open();
     s.record.append("tool_call", { callId: "a", tool: "read_file", args: { path: "/home/.cuvette/settings.json" } });
@@ -128,7 +139,7 @@ describe("window server", () => {
 });
 
 describe("ntfy notifier", () => {
-  test("posts the question title and the window URL", async () => {
+  test("posts the question title and text only", async () => {
     const got: { body: string; title?: string; click?: string }[] = [];
     const srv = createServer((req, res) => {
       let body = "";
@@ -142,15 +153,9 @@ describe("ntfy notifier", () => {
     closers.push(() => srv.close());
     const topic = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/my-topic`;
     const q = { qid: "q1", title: "Which cutoff?", text: "Pick one." } as never;
-    setWindowUrl(undefined);
     await ntfyNotifier(topic)(q);
     expect(got[0]!.body).toBe("Which cutoff?\nPick one.");
     expect(got[0]!.click).toBeUndefined();
-    setWindowUrl("http://127.0.0.1:9/?t=abc");
-    await ntfyNotifier(topic)(q);
-    expect(got[1]!.body).toContain("http://127.0.0.1:9/?t=abc");
-    expect(got[1]!.click).toBe("http://127.0.0.1:9/?t=abc");
-    setWindowUrl(undefined);
   });
 
   test("does not throw when the topic is unreachable", async () => {

@@ -6,7 +6,7 @@ import { locate } from "../locate.ts";
 import type { AdapterModule, LoadedAdapter, ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import {
-  cap, childEnv, samePath, defTool, expand, fileKind, fmtNumber, inflight, lookup, makeRuntime, makeSummary, numberOrString,
+  cap, childEnv, samePath, defTool, envAllowed, expand, fileKind, fmtNumber, inflight, lookup, makeRuntime, makeSummary, numberOrString,
   integrityError, placeholders, processFailure, runProcess, scalar, tablePreview, type CallDir, type Dirs, type KindContext,
 } from "./common.ts";
 
@@ -125,7 +125,7 @@ async function runMacroTool(c: KindContext, def: ToolDef, args: Args, call: Call
   const shown = renderMacro(def.macro.replace(/\{include:([^}]+)\}/g, (_m, f: string) => `// (the helper file ${f} from the adapter folder goes here)`), scope);
   const manual = mod.manualRoute?.(def.name, args) ?? shown;
   const fidelity = (mod as { fidelity?: (t: string, a: Args) => Fidelity | undefined }).fidelity?.(def.name, args);
-  const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: macroFile, call_dir: call.dir }));
+  const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: macroFile, call_dir: call.dir }, envAllowed(c.adapter.manifest)));
   const env = childEnv(c);
   const guarded = await guardCommand(argv, c.dirs, { cwd: call.dir, env, adapterRoot: c.adapter.root });
   const r = await runProcess(guarded.argv, { cwd: call.dir, env, signal, timeoutMs: conn.call_timeout_s * 1000 });
@@ -170,7 +170,7 @@ async function programVersion(c: KindContext, found: string): Promise<string> {
   const conn = c.adapter.manifest.connection;
   const file = join(c.adapter.root, `version${conn.macro_ext}`);
   if (!c.programPath || !existsSync(file)) return "";
-  const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: file }));
+  const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: file }, envAllowed(c.adapter.manifest)));
   const r = await runProcess(argv, { timeoutMs: 30_000 });
   return /version=(\S+)/.exec(r.stdout)?.[1] ?? "";
 }

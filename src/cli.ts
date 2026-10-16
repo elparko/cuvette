@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { cuvetteHome } from "./adapters/manifest.ts";
+import { writeFileAtomic } from "./core/atomic.ts";
 import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import { plainText } from "./core/plain.ts";
 import type { Mode } from "./core/types.ts";
@@ -17,6 +19,33 @@ if (!process.env.CUVETTE_HOME) {
   const moved = moveOldHome();
   if (moved) console.error(moved);
 }
+
+let stopAll = async (): Promise<unknown> => {
+  const { Session } = await import("./core/session.ts");
+  return Promise.all([...Session.open].map((x) => x.close().catch(() => {})));
+};
+let crashing = false;
+const crash = (e: unknown) => {
+  if (crashing) return;
+  crashing = true;
+  const err = e instanceof Error ? e : new Error(String(e));
+  let file = "";
+  try {
+    mkdirSync(cuvetteHome(), { recursive: true });
+    file = join(cuvetteHome(), `crash-${new Date().toISOString().replace(/[:.]/g, "-")}.log`);
+    writeFileAtomic(file, `${err.stack ?? `${err.name}: ${err.message}`}\n`, 0o600);
+  } catch {
+    file = "";
+  }
+  console.error(`Cuvette stopped because of an error: ${err.name}: ${err.message}${file ? `. Details: ${file}` : ""}`);
+  setTimeout(() => process.exit(70), 5000);
+  stopAll().then(
+    () => process.exit(70),
+    () => process.exit(70),
+  );
+};
+process.on("uncaughtException", crash);
+process.on("unhandledRejection", crash);
 
 const HELP = `cuvette - a guided analysis agent for science programs
 
@@ -63,8 +92,10 @@ Usage
   cuvette adapter audit <folder|name> [--model claude:<id>]
                                      ask Claude to review the files; asks first because it costs tokens
   cuvette adapter allow-code <name>  allow the code of an installed Unlisted adapter to run
-  cuvette adapter check <name|dir> [--static] [--run-tests] [--gui]
+  cuvette adapter check <name|dir> [--static] [--run-tests] [--gui] [--fetch-data]
                                      --static checks the files only. It imports no code and starts no program.
+                                     --fetch-data downloads the missing test data of this adapter only, without a question.
+                                     Without it, an interactive run asks first and a run without a terminal downloads nothing.
                                      --gui also runs the tests marked gui: true (they open a window)
   cuvette adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
                                      drive test: one plain request for each tool, run by the
@@ -220,6 +251,7 @@ const { values: o, positionals: pos } = parseArgs({
     clean: { type: "boolean" },
     cite: { type: "boolean" },
     "no-self-test": { type: "boolean" },
+    "fetch-data": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
@@ -456,6 +488,7 @@ async function app(folder?: string) {
   const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [], trustFolder }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
   console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
   if (!o["no-open"]) openWithOs(a.url);
+  stopAll = () => stopApp(() => a.close());
   await new Promise<void>((done) => {
     process.once("SIGINT", done);
     process.once("SIGTERM", done);
@@ -517,7 +550,18 @@ async function main() {
         return;
       }
       if (a1 === "check") {
-        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui, static: !!o.static });
+        const fetchData = async (notice: string[]) => {
+          console.log(notice.join("\n"));
+          if (o["fetch-data"]) return true;
+          if (!process.stdin.isTTY) {
+            console.log(`Nothing was downloaded. To download this data, run the check again with --fetch-data.`);
+            return false;
+          }
+          if (/^y(es)?$/i.test((await ask(`Download this data for ${a2} only? [y/N] `)).trim())) return true;
+          console.log("Nothing was downloaded. The tests that need this data did not run. This is not an error in the adapter.");
+          return false;
+        };
+        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui, static: !!o.static, fetchData });
         for (const e of r.errors) console.log(`error: ${e}`);
         for (const w of r.warnings) console.log(`warning: ${w}`);
         for (const t of r.tests ?? []) console.log(t.skipped ? `skip ${t.id}: ${t.skipped}` : `${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);

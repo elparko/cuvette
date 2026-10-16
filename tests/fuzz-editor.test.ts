@@ -2,6 +2,7 @@ import stringWidth from "string-width";
 import { describe, expect, test } from "vitest";
 import { INPUT_KEYS, cleanPaste, emptyEd, layout, press, rowOf, snap, type Ed, type InputKeys, type Stroke } from "../src/tui/editor.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const PIECES = ["a", "b", " ", "é", "é", "日", "本", "😀", "👩‍🔬", "🇩🇪", "👍🏽", "\ud83d", "\ude00", "ạ̈", "µg", "\t", "\r\n", "\n", "\x1b[31m", "​", "\\"];
 const KEYS: Stroke[] = [
@@ -122,7 +123,7 @@ describe("fuzz: editor", () => {
     let st = press(emptyEd(), { key: "text", text: big }, "mac", 100).st;
     const rows = layout(st.text, 100);
     const r = rowOf(rows, st.cur);
-    expect(performance.now() - t0).toBeLessThan(1000);
+    withinMs(performance.now() - t0, 1000);
     expect(st.text).toBe(big);
     expect(st.cur).toBe(big.length);
     expect(r).toBe(rows.length - 1);

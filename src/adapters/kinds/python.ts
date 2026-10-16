@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
-import { expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
+import { envAllowed, expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 import { blindArgv, blindPolicy } from "../blind.ts";
 import { fingerprint, guardCommand, logFingerprint } from "../../tools/run_script.ts";
@@ -78,7 +78,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let preloading: Promise<unknown> | undefined;
 
   const interpreter = (): string[] => {
-    const given = conn.interpreter.map((a) => expand(a, c.ph));
+    const given = conn.interpreter.map((a) => expand(a, c.ph, envAllowed(c.adapter.manifest)));
     return given.length ? given : [process.platform === "win32" ? "python" : "python3"];
   };
 

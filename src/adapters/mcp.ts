@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { addOldEnv } from "../core/old-names.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import type { LoadedAdapter } from "./manifest.ts";
-import { cap, decorate, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, type KindContext } from "./kinds/common.ts";
+import { cap, decorate, envAllowed, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, withoutSecrets, type KindContext } from "./kinds/common.ts";
 import type { AdapterRuntime } from "./runtime.ts";
 import { blindArgv } from "./blind.ts";
 
@@ -23,25 +23,45 @@ interface McpResult {
   isError?: boolean;
 }
 
+const RESULT_CAP = 16 * 1024 * 1024;
+
 const IMAGE_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/gif": ".gif", "image/webp": ".webp" };
 
 export function convertResult(res: McpResult, tool: string, args: Args, adapter: LoadedAdapter | undefined, workDir: string): ToolOutput {
   const content = res.content ?? [];
-  const text = content.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n");
+  let text = content.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n");
+  const notes: string[] = [];
+  if (text.length > RESULT_CAP) {
+    text = text.slice(0, RESULT_CAP);
+    notes.push("[The tool result is cut at 16 MB.]");
+  }
   const images: string[] = [];
+  let imageBytes = 0;
   const files: OutputFile[] = [];
   for (const part of content) {
     if (part.type !== "image" || !part.data) continue;
+    const size = Math.floor(part.data.length * 0.75);
+    if (imageBytes + size > RESULT_CAP) {
+      notes.push("[The images in the tool result are more than 16 MB. Cuvette did not save this image.]");
+      continue;
+    }
+    imageBytes += size;
     const ext = IMAGE_EXT[(part.mimeType ?? "image/png").toLowerCase()] ?? ".png";
     const path = uniqueFile(workDir, `${safeName(tool)}-image`, ext);
     writeFileSync(path, Buffer.from(part.data, "base64"));
     images.push(path);
     files.push(outputFile(path));
   }
+  let structured = res.structuredContent;
+  if (structured !== undefined && JSON.stringify(structured).length > RESULT_CAP) {
+    structured = undefined;
+    notes.push("[The structured content of the tool result is more than 16 MB. Cuvette did not use it.]");
+  }
   if (res.isError) {
+    if (notes.length) text = `${text}\n${notes.join("\n")}`.trim();
     return { ok: false, error: text || "the tool reported an error", text, images: images.length ? images : undefined, outputs: files.length ? files : undefined };
   }
-  let data: unknown = res.structuredContent;
+  let data: unknown = structured;
   if (data === undefined && /^\s*[[{]/.test(text)) {
     try {
       data = JSON.parse(text);
@@ -52,7 +72,7 @@ export function convertResult(res: McpResult, tool: string, args: Args, adapter:
   for (const o of f.outputs ?? []) if (!outputs.has(o.path)) outputs.set(o.path, o);
   const entry = adapter?.mapEntry(tool, args);
   const out: ToolOutput = { ok: f.ok !== false };
-  out.text = cap(text || (data !== undefined ? JSON.stringify(data) : ""), 20000);
+  out.text = [cap(text || (data !== undefined ? JSON.stringify(data) : ""), 20000), ...notes].join("\n").trim();
   if (data !== undefined) out.data = data;
   if (f.error) out.error = f.error;
   else if (!out.ok) out.error = f.summary ?? "the tool reported a failure";
@@ -98,11 +118,11 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       const headers = Object.fromEntries(Object.entries(conn.headers).map(([k, v]) => [k, expand(v, c.ph)]));
       t = new StreamableHTTPClientTransport(new URL(expand(conn.url, c.ph)), { requestInit: { headers } });
     } else {
-      const argv = blindArgv(conn.command.map((a) => expand(a, c.ph)));
+      const ok = envAllowed(c.adapter.manifest);
+      const argv = blindArgv(conn.command.map((a) => expand(a, c.ph, ok)));
       if (!argv.length) throw new Error("connection.command is empty");
-      const env: Record<string, string> = {};
-      for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-      for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph);
+      const env = withoutSecrets(process.env);
+      for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph, ok);
       Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
       addOldEnv(env);
       log(Buffer.alloc(0));
@@ -157,7 +177,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       const page = await cl.listTools(cursor ? { cursor } : undefined);
       for (const t of page.tools) {
         const o = overrides.get(t.name);
-        const tool = decorate(c, { read_only: t.annotations?.readOnlyHint === true || o?.read_only === true, approval: o?.approval === true }, {
+        const tool = decorate(c, { read_only: o?.read_only === true, approval: o?.approval === true }, {
           name: t.name,
           title: t.title ?? t.annotations?.title ?? (o?.title || undefined),
           description: t.description ?? o?.description ?? "",

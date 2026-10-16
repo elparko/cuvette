@@ -152,3 +152,10 @@ test("cuvette key status says that an ant auth login is signed in", () => {
     rmSync(cfg, { recursive: true, force: true });
   }
 }, 60_000);
+
+test.skipIf(process.platform === "win32")("the first key save creates the home folder with mode 0700", () => {
+  const home = join(process.env.CUVETTE_HOME!, "new-home");
+  process.env.CUVETTE_HOME = home;
+  saveClaudeKey(KEY);
+  expect(statSync(home).mode & 0o777).toBe(0o700);
+});

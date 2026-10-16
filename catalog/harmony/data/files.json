@@ -1,0 +1,8 @@
+{
+ "data/jurkat_small.h5ad": {"sha256":"f977fb737ccc425856a3915953188d4213f0e370e48fb09ebbe50ccb1af152eb","bytes":320028},
+ "data/lisi_reference.h5ad": {"sha256":"eaa5cfe90f560583c72d2bb8ae5d59bd992987172ddffdd2b85e697ed1cafd75","bytes":72504},
+ "data/make_test_data.py": {"sha256":"a8aed442ade8c37896f8efaa1a6b04b07b1b439465d27491d3f7fd8f9fac506a","bytes":2037},
+ "data/mix_small.h5ad": {"sha256":"11378e22046c7237dccb4bbff924a11cda1b2263628723c66a921de9591ba294","bytes":315828},
+ "data/pbmc3500_pcs.h5ad": {"sha256":"7c5e2a0839b3025483d8597e42b8c82d2a75162ce46a924f6bbc261167cfac12","bytes":988992},
+ "data/t293_small.h5ad": {"sha256":"443ceff793ec68fc5ce9e82c289c6691f2943c86688377373145334bccf3e31e","bytes":307388}
+}

@@ -1,0 +1,6 @@
+{
+ "data/bbbc039-mini/images/crop1.tif": {"sha256":"936c80e00d7c124a87e6b53e3711fc55e665605e73ddddf8e9e48d6976760b4d","bytes":75903},
+ "data/bbbc039-mini/images/crop2.tif": {"sha256":"45ca87caa0c66414f14841b3f702b07286415b166e1593b91fa3ce9b081c0e19","bytes":50831},
+ "data/bbbc039-mini/masks/crop1.png": {"sha256":"1ebde500033271b058f0bf457423a36effd2ad5aa80d1e440e55249713f8288e","bytes":3494},
+ "data/bbbc039-mini/masks/crop2.png": {"sha256":"58dd07e72921e97dc321beb1f8af2ad061cda81486784f96b027f04427cfaf4a","bytes":1216}
+}

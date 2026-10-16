@@ -70,6 +70,7 @@ Decisions:
 - Give each decision `choices` or an explicit `kind`. [decision-type]
 - Give a default, or let the scientist own the decision so that the harness asks. [decision-default]
 - Write a plain help text of one or two sentences. [decision-help]
+- In a child process adapter, {env:NAME} must name a safe variable, such as HOME, or a name in connection.pass_env. A secret name never resolves. [env-name]
 - Write descriptions, decision help, STANDARDS.md and skills in ASD-STE100 Simplified Technical English. Instructions have 20 words or fewer, descriptions 25 or fewer. Use the active voice and "must" for a requirement. [text-style]
 - Link each decision to a tool argument. A decision with no link changes nothing.
 - Write sensitivity `compare` entries as result paths: `metrics.n_peaks`. [sensitivity-compare]
@@ -98,7 +99,7 @@ Data and tests:
 - If you calculate an expected value with a different program or language, save the script and its output in `checks/` in the adapter folder. Name both files in the test description.
 - Add a test with bad input that expects `ok: false` and a `contains` on the error. [kat-failure-path]
 - Use public or synthetic data. List each file in `data/SOURCES.md`: `| File | Source | License |`. [kat-data-license]
-- Do not commit a file whose license does not allow redistribution. Write `data/fetch.sh`: it downloads the file, checks its SHA-256 sum and stops on a mismatch. Set `fetch: data/fetch.sh` on each test that reads the file, and add the file to `.gitignore`. The test downloads the file when it is missing, and it skips if the computer has no network. [kat-data-license]
+- Do not commit a file whose license does not allow redistribution. Write `data/fetch.sh`: it downloads the file, checks its SHA-256 sum and stops on a mismatch. Set `fetch: data/fetch.sh` on each test that reads the file, and add the file to `.gitignore`. The check asks before it runs the script. The test skips if you decline or the computer has no network. [kat-data-license]
 - A test runs headless, or it has `gui: true`. Default test runs skip `gui: true` tests; `--gui` runs them. A macro or screen adapter states `gui` on each test. [kat-gui]
 - Take expected numbers from a real program run or a publication, never from your own tool.
 

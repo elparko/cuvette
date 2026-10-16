@@ -27,7 +27,11 @@ import { ELIDE_AT, ELIDE_BATCH, SUMMARIZE_AT, elideOld, estimateTokens, headText
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, Masker, phiOn, scanContent, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { estimateText, modelName } from "./estimate.ts";
-import { loadSettings, thinkingShown, xlsxOn, type Settings } from "./config.ts";
+import { MAX_TOKENS } from "../providers/claude.ts";
+import { MAX_OUTPUT_TOKENS } from "../providers/ollama.ts";
+import { ROOT } from "../root.ts";
+import { NO_ALWAYS } from "./no-always.ts";
+import { MAX_CALLS_PER_REPLY, PARALLEL_CALL_LIMIT, loadSettings, thinkingShown, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
 import { ADAPTER_DECISION, decisionHook, DecisionRecord, REPORTING_DECISION, TEST_DECISIONS } from "./decisions.ts";
@@ -380,11 +384,15 @@ export class Session {
     return this.provider.info;
   }
 
+  static open = new Set<Session>();
+
   static async create(opts: SessionOptions, record?: AnalysisRecord): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
     try {
-      return await Session.build(opts, cwd, record);
+      const made = await Session.build(opts, cwd, record);
+      Session.open.add(made);
+      return made;
     } catch (e) {
       if (opts.trustFolder) endTrustOnce(cwd);
       throw e;
@@ -408,7 +416,7 @@ export class Session {
       const held = claimLock(s.dir);
       if (held) {
         if (!opts.place) discardPlace(place);
-        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : !ownerKnown(held) ? OPENING_TEXT : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
+        throw new Error(held.fresh ? "Another process is opening this session. Try again in a few seconds." : held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : !ownerKnown(held) ? OPENING_TEXT : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
       }
       s.overrides = overrides;
       s.onceTrusted = !!opts.trustFolder;
@@ -617,7 +625,7 @@ export class Session {
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
     if (this.pick) extra.push(...this.adapterTools());
-    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.runTool(t, a, id, sig), guard: (m, all) => this.phiForHelper(m, all), folders: () => this.foldersText() }));
+    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.runTool(t, a, id, sig), guard: (m, all) => this.phiForHelper(m, all), folders: () => this.foldersText(), usage: (u) => this.record.append("usage", { ...u, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info), helper: true }) }));
     if (this.pilotOn()) extra.push(...this.pilotTools());
     if (this.planFirst || this.interactive) extra.push(this.clarifyTool());
     extra.push(this.inspectTool());
@@ -633,7 +641,7 @@ export class Session {
     );
     this.hooks.onError = (message) => this.record.append("notice", { text: message, warn: true });
 
-    this.system = this.buildSystem();
+    this.rebuildSystem();
     if (resumed) {
       const used = this.record.live(["method"]).filter((e) => e.data.action === "started").at(-1);
       if (used) {
@@ -678,6 +686,7 @@ export class Session {
         modelSpec: this.settings.model,
         provider: this.provider.info.provider,
         referee: this.settings.referee,
+        ...this.reproData(),
         mode: this.mode,
         cwd: this.cwd,
         guidance: this.settings.guidance,
@@ -737,7 +746,7 @@ export class Session {
     this.record.moveTo(next.recordDir, { workDir: next.outDir, exportDir: next.outDir });
     Object.assign(this.dirs(), { workDir: next.outDir, sessionDir: next.recordDir });
     for (const t of await this.fileTools()) if (this.tools.has(t.name) && this.tools.get(t.name)!.source === t.source) this.tools.set(t.name, t);
-    this.system = this.buildSystem();
+    this.rebuildSystem();
     this.record.append("notice", { text: `This session saves its results in ${next.outDir}.` });
   }
 
@@ -800,6 +809,28 @@ export class Session {
 
   folderListMs = 2000;
 
+  private reproData() {
+    const limit = this.provider.info.provider === "claude" ? MAX_TOKENS : this.provider.info.provider === "ollama" ? MAX_OUTPUT_TOKENS : undefined;
+    return {
+      cuvetteVersion: cuvetteVersion(),
+      maxTokens: limit,
+      effort: (this.provider as { effort?: string }).effort ?? this.settings.effort,
+      systemSha256: createHash("sha256").update(this.system).digest("hex"),
+    };
+  }
+
+  private noteSystemChange() {
+    const hash = createHash("sha256").update(this.system).digest("hex");
+    const known = this.record.entries(["session", "setting"]).filter((e) => e.kind === "session" || e.data.name === "system_prompt").at(-1);
+    const was = known?.kind === "session" ? known.data.systemSha256 : known?.data.new;
+    if (known && was !== hash) this.record.append("setting", { name: "system_prompt", old: was ?? null, new: hash, scope: "session", reason: was ? "The system prompt text changed." : "The record had no hash of the system prompt before." });
+  }
+
+  private rebuildSystem() {
+    this.system = this.buildSystem();
+    this.noteSystemChange();
+  }
+
   private buildSystem(): string {
     return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) }, textStyle: this.settings.text_style });
   }
@@ -848,7 +879,7 @@ export class Session {
       if (shown && shown.programVersion !== f.version) {
         shown.programVersion = f.version;
         // After the first model request, a new system prompt makes the API write the prompt cache again.
-        if (!this.systemSent) this.system = this.buildSystem();
+        if (!this.systemSent) this.rebuildSystem();
       }
       if (before && before !== f.version && before !== rt.adapter.manifest.program.version && !f.timedOut) this.record.append("notice", { text: `The version command of the adapter ${name} gives the program version ${f.version}. The start of this session used the saved version ${before}. The steps record ${f.version}.` });
       this.envTargets.set(name, envTarget({ kind: rt.adapter.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: f.path, program: rt.adapter.manifest.program.name, programVersion: f.version }));
@@ -1121,7 +1152,7 @@ export class Session {
       this.active.add("find_tools");
       this.chooseActiveTools(String(this.lastRequest()?.data.text ?? ""));
     } else names.forEach((n) => this.active.add(n));
-    this.system = this.buildSystem();
+    this.rebuildSystem();
     const info = this.adapterInfo.at(-1)!;
     const envHash = await this.envHashFor(a.name);
     this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, trust: info.trust, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
@@ -1433,13 +1464,25 @@ export class Session {
         const runTogether = async () => {
           const list = together;
           together = [];
-          const parts = await Promise.all(list.map((i) => this.runCall(calls[i]!, signal)));
+          const parts: Part[] = [];
+          let next = 0;
+          const lane = async () => {
+            while (next < list.length) {
+              const k = next++;
+              parts[k] = await this.runCall(calls[list[k]!]!, signal);
+            }
+          };
+          await Promise.all(Array.from({ length: Math.min(PARALLEL_CALL_LIMIT, list.length) }, lane));
           list.forEach((i, k) => (results[i] = parts[k]!));
           list.forEach(record);
         };
         for (const [i, call] of calls.entries()) {
           const sig = `${call.name}:${JSON.stringify(call.args)}`;
           sigs[i] = sig;
+          if (i >= MAX_CALLS_PER_REPLY) {
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: not run: more than ${MAX_CALLS_PER_REPLY} tool calls in one reply. Call the tool again in the next reply.`, isError: true };
+            continue;
+          }
           const parallel = this.parallelSafe(call) && sig !== lastSig;
           if (!parallel && together.length) await runTogether();
           if (signal.aborted || this.stopTurn || this.endTurn) {
@@ -1509,11 +1552,14 @@ export class Session {
       this.endTurn = undefined;
       this.cutReply = false;
       this.saveResults(turnStart);
-      this.busy = false;
-      this.bus.emit({ type: "status", state: "idle" });
-      await this.writeReport();
-      if (!stopHooked) await this.hooks.event("Stop", { session: this.id }).catch(() => {});
-      this.titling = this.retitle(turnStart);
+      try {
+        await this.writeReport();
+        if (!stopHooked) await this.hooks.event("Stop", { session: this.id }).catch(() => {});
+        this.titling = this.retitle(turnStart);
+      } finally {
+        this.busy = false;
+        this.bus.emit({ type: "status", state: "idle" });
+      }
     }
   }
 
@@ -2032,6 +2078,7 @@ export class Session {
     const before = { settings: this.settings, provider: this.provider, referee: this.refereeProvider, system: this.system, active: new Set(this.active), phiFrom: this.phiFrom };
     const restore = () => {
       Object.assign(this, { settings: before.settings, provider: before.provider, refereeProvider: before.referee, system: before.system, active: before.active, phiFrom: before.phiFrom });
+      this.noteSystemChange();
     };
     try {
       await this.applySetting("model", spec);
@@ -2055,7 +2102,7 @@ export class Session {
 
   // The last token count holds only if it came from the current model and the history did not change since.
   contextTokens(): number {
-    const last = this.record.entries(["usage", "compaction", "rewind"]).at(-1);
+    const last = this.record.entries(["usage", "compaction", "rewind"]).filter((e) => !e.data.helper).at(-1);
     if (last?.kind === "usage" && last.data.model === this.provider.info.model) return promptTokens(last.data);
     return estimateTokens(this.history, this.system, this.activeSchemas());
   }
@@ -3050,8 +3097,9 @@ export class Session {
     }
     this.permissionWaits.delete(rid);
     this.waiting.delete(rid);
-    if (res.ok && res.always && !search) this.sessionAllow.add(tool.name);
-    this.record.append("permission", { rid, tool: tool.name, decision: res.cancelled ? "cancelled" : res.ok ? "allowed" : "denied", by: res.cancelled ? "harness" : "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
+    const always = res.always && !search && !NO_ALWAYS.has(tool.name);
+    if (res.ok && always) this.sessionAllow.add(tool.name);
+    this.record.append("permission", { rid, tool: tool.name, decision: res.cancelled ? "cancelled" : res.ok ? "allowed" : "denied", by: res.cancelled ? "harness" : "scientist", note: res.note, always, sha256, ...(search ? { search: search.root } : {}) });
     if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: activity(tool.name, args, tool.source === "adapter" ? tool.title : undefined), since: Date.now() });
     return res;
   }
@@ -3224,7 +3272,7 @@ export class Session {
       this.permissionMode = "bypass";
     }
     this.index = undefined;
-    this.system = this.buildSystem();
+    this.rebuildSystem();
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
     const start = folderTrusted(this.cwd) ? (project.hooks as Settings["hooks"] | undefined)?.SessionStart : undefined;
     if (start?.length) {
@@ -3331,7 +3379,7 @@ export class Session {
       this.chooseActiveTools();
     }
     if (name === "export_xlsx" || name === "figure_formats") this.dirs();
-    if (["model", "export_xlsx", "figure_formats", "text_style"].includes(name)) this.system = this.buildSystem();
+    if (["model", "export_xlsx", "figure_formats", "text_style"].includes(name)) this.rebuildSystem();
   }
 
   setMode(mode: Mode): void {
@@ -4861,6 +4909,7 @@ export class Session {
   }
 
   async close(): Promise<void> {
+    Session.open.delete(this);
     if (this.timer) clearInterval(this.timer);
     if (this.onceTrusted) {
       endTrustOnce(this.cwd);
@@ -4984,6 +5033,14 @@ function getArg(args: Args, path: string): unknown {
 }
 
 const MAX_STOP_BLOCKS = 8;
+
+const cuvetteVersion = (): string => {
+  try {
+    return String(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version);
+  } catch {
+    return "unknown";
+  }
+};
 const ASK_MAX_QUESTION = 2000;
 const ASK_MAX_OPTIONS = 12;
 const ASK_MAX_OPTION = 200;

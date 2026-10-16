@@ -1,0 +1,5 @@
+{
+ "data/bovine_lfq.tsv": {"sha256":"ee5f5de7d3ffca8b9848252fd5e2db6e6b0d0070636eb905e5dbd6b07110573c","bytes":1735603},
+ "data/make_fixture.R": {"sha256":"66c14c37812fc93dcdb0a77c0cdfd02a9f9f5ee5a4da67a35d4d68f716ba018d","bytes":1076},
+ "data/pxd000279_lfq.tsv": {"sha256":"d7e2769df368c11a8b80cb59583f1649dd81bf4e8d35796f11e2236b1830c354","bytes":1074141}
+}

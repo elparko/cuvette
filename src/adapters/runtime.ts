@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import type { Tool } from "../core/types.ts";
 import type { LoadedAdapter } from "./manifest.ts";
 import { locate, quickLocate, saveVersion, START_VERSION_TIMEOUT_MS, type Located } from "./locate.ts";
-import { expand, placeholders, type Dirs, type KindContext } from "./kinds/common.ts";
+import { envAllowed, expand, placeholders, type Dirs, type KindContext } from "./kinds/common.ts";
 import { startCli } from "./kinds/cli.ts";
 import { startFiles } from "./kinds/files.ts";
 import { startHttp } from "./kinds/http.ts";
@@ -51,7 +51,7 @@ export async function startAdapter(adapter: LoadedAdapter, dirs: { workDir: stri
     rt.startPath = found.path;
     rt.checked = c.ready.then(async () => {
       const f = await checked;
-      Object.assign(rt, { programPath: f.path, programVersion: f.version, interpreter: m.connection.interpreter.map((a) => expand(a, c.ph)) });
+      Object.assign(rt, { programPath: f.path, programVersion: f.version, interpreter: m.connection.interpreter.map((a) => expand(a, c.ph, envAllowed(m))) });
       return f;
     });
     return rt;

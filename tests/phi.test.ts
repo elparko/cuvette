@@ -11,6 +11,7 @@ import { runTui } from "../src/tui/app.tsx";
 import { makeHarness, sleep, until } from "../src/tui/testing.ts";
 import { cardFromEvent, closesCard, phiView, type Card } from "../src/ui/cards.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
+import { withinMs } from "./timing.ts";
 
 beforeEach(() => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-phi-"));
@@ -471,7 +472,7 @@ test("a binary or very large tool result does not stop the MCP mask", async () =
   const big = `${CLINIC_CSV}${"x,1\n".repeat(500_000)}`;
   const t0 = Date.now();
   const out = session.phiForClient(big, "read_file");
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
   expect(out).not.toContain("John Doe");
   await session.close();
 });
@@ -597,7 +598,7 @@ test("a long line with many ZIP codes and no date is scanned in linear time", ()
   const line = "ZIP 70112 ".repeat(30000);
   const t0 = Date.now();
   expect(scanText(line, "f")).toEqual([]);
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
 });
 
 test("the Masker masks 20000 values, and two calls give the same text", () => {
@@ -614,7 +615,7 @@ test("groupHits of 50000 hits in one group is fast", () => {
   const hits = Array.from({ length: 50000 }, (_, i) => ({ kind: "name" as const, value: `N${i}`, where: "t", line: i + 1 }));
   const t0 = Date.now();
   const g = groupHits(hits);
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
   expect(g).toHaveLength(1);
 });
 
@@ -642,4 +643,27 @@ test("localUrl treats 0.0.0.0 as local", () => {
 test("localUrl treats the IPv6 any address as local", () => {
   expect(localUrl("http://[::]:11434")).toBe(true);
   expect(localUrl("http://[::1]:11434")).toBe(true);
+});
+
+test("localUrl needs a full address, not a host name that starts with digits", () => {
+  expect(localUrl("https://10.evil.example.com/v1")).toBe(false);
+  expect(localUrl("https://192.168.evil.com/v1")).toBe(false);
+  expect(localUrl("https://172.16.example.com/v1")).toBe(false);
+  expect(localUrl("http://10.0.0.5:8000/v1")).toBe(true);
+  expect(localUrl("http://192.168.1.1/v1")).toBe(true);
+  expect(localUrl("http://172.20.1.1/v1")).toBe(true);
+  expect(localUrl("http://127.0.0.2/v1")).toBe(true);
+  expect(localUrl("http://10.0.0.300/v1")).toBe(false);
+});
+
+test("a blank row in a table does not stop the scan of a name column", () => {
+  const csv = "patient_name,visit\nJane Doe,1\n\nJohn Smith,2\n";
+  const names = scanContent(csv, "v.csv").filter((h) => h.kind === "name").map((h) => h.value);
+  expect(names).toEqual(["Jane Doe", "John Smith"]);
+});
+
+test("two blank lines inside a table do not hide the names after them", () => {
+  const csv = "patient_name,visit\nJane Doe,1\n\n\nJohn Smith,2\nAnn Lee,3\n";
+  const names = scanContent(csv, "v.csv").filter((h) => h.kind === "name").map((h) => h.value);
+  expect(names).toEqual(["Jane Doe", "John Smith", "Ann Lee"]);
 });

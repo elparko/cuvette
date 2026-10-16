@@ -1,11 +1,14 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type { Tool, ToolContext } from "../src/core/types.ts";
+import { pathToFileURL } from "node:url";
 import { loadAdapter, Manifest } from "../src/adapters/manifest.ts";
 import { locate } from "../src/adapters/locate.ts";
+import { convertResult } from "../src/adapters/mcp.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
+import { withinMs } from "./timing.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-runtime-"));
 const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
@@ -88,7 +91,7 @@ test("cancel stops a call that obeys cancel and keeps the process", async () => 
   const r = await p;
   expect(r.ok).toBe(false);
   expect(r.error).toMatch(/cancelled/);
-  expect(Date.now() - t0).toBeLessThan(4000);
+  withinMs(Date.now() - t0, 4000);
   expect(rt.running).toBe(true);
   expect((await run("echo", { text: "again" })).ok).toBe(true);
 });
@@ -106,7 +109,7 @@ test("cancel kills a process that does not answer, and the next call restarts it
   await new Promise((r) => setTimeout(r, 500));
   const t0 = Date.now();
   await rt.cancel();
-  expect(Date.now() - t0).toBeLessThan(6000);
+  withinMs(Date.now() - t0, 6000);
   expect((await p).ok).toBe(false);
   expect(rt.running).toBe(false);
   expect((await run("echo", { text: "back" })).text).toBe("echo: back");
@@ -198,7 +201,7 @@ test("quick start: a Python adapter starts before its version command ends, and 
     const dirs = { workDir: mkdtempSync(join(tmpdir(), "w-")), sessionDir: mkdtempSync(join(tmpdir(), "s-")) };
     const t0 = Date.now();
     const rt = await startAdapter(a, dirs, { quick: true });
-    expect(Date.now() - t0).toBeLessThan(2000);
+    withinMs(Date.now() - t0, 2000);
     expect(rt.programVersion).toBe("from the manifest");
     const f = await rt.checked;
     expect(f).toMatchObject({ version: "9.9", identified: true });
@@ -268,7 +271,7 @@ test("quick start: a stop while the version command runs ends the call at once, 
     setTimeout(() => stop.abort(), 100);
     const t0 = Date.now();
     const out = await nap.execute({ seconds: 5 }, { ...ctx(stop.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t0).toBeLessThan(4000);
+    withinMs(Date.now() - t0, 4000);
     expect(out.ok).toBe(false);
     await rt.checked;
     const next = await nap.execute({ seconds: 0 }, { ...ctx(), workDir: d.workDir, sessionDir: d.sessionDir });
@@ -278,7 +281,7 @@ test("quick start: a stop while the version command runs ends the call at once, 
     setTimeout(() => queued.abort(), 100);
     const t1 = Date.now();
     const second = await nap.execute({ seconds: 0 }, { ...ctx(queued.signal), workDir: d.workDir, sessionDir: d.sessionDir });
-    expect(Date.now() - t1).toBeLessThan(5000);
+    withinMs(Date.now() - t1, 5000);
     expect(second.ok).toBe(false);
     expect((await first).ok).toBe(true);
     await rt.close();
@@ -351,12 +354,13 @@ test("warm: the worker starts and imports the adapter modules before the first c
   const { rt, call } = await quickStart(dir);
   const t0 = Date.now();
   rt.warm!(true);
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
+  expect(existsSync(join(dir, "imported"))).toBe(false);
   await until(() => existsSync(join(dir, "imported")));
   await new Promise((r) => setTimeout(r, 3500));
   const t1 = Date.now();
   const out = await call();
-  expect(Date.now() - t1).toBeLessThan(1500);
+  withinMs(Date.now() - t1, 1500);
   expect(out.ok).toBe(true);
   expect((out.data as { pid: number }).pid).toBe(Number(readFileSync(join(dir, "imported"), "utf8")));
   await rt.close();
@@ -384,7 +388,7 @@ test("warm: a close while the worker imports the modules stops the worker", asyn
   const pid = Number(readFileSync(join(dir, "imported"), "utf8"));
   const t0 = Date.now();
   await rt.close();
-  expect(Date.now() - t0).toBeLessThan(1000);
+  withinMs(Date.now() - t0, 1000);
   await until(() => !alive(pid), 3000);
 }, 20000);
 
@@ -411,7 +415,7 @@ test("warm: a call that Esc stops while the worker imports the modules returns a
   const out = await p;
   expect(out.ok).toBe(false);
   expect(out.error).toMatch(/interrupted/);
-  expect(Date.now() - t0).toBeLessThan(1500);
+  withinMs(Date.now() - t0, 1500);
   await rt.close();
 }, 20000);
 
@@ -455,7 +459,7 @@ test("warm: an import of the adapter modules that does not end stops at the star
   const out = await call();
   expect(out.ok).toBe(false);
   expect(out.error).toMatch(/did not end within 2 s/);
-  expect(Date.now() - t0).toBeLessThan(4000);
+  withinMs(Date.now() - t0, 4000);
   await until(() => !alive(pid));
   await rt.close();
 }, 20000);
@@ -480,3 +484,103 @@ test("a call after a call that timed out starts a new worker", async () => {
     process.env.CUVETTE_HOME = home;
   }
 }, 20000);
+
+
+const SDK = pathToFileURL(join(process.cwd(), "node_modules/@modelcontextprotocol/sdk/dist/esm/server")).href;
+const hintServer = `
+const { McpServer } = await import(${JSON.stringify(SDK + "/mcp.js")});
+const { StdioServerTransport } = await import(${JSON.stringify(SDK + "/stdio.js")});
+const s = new McpServer({ name: "hint", version: "1.0.0" });
+s.registerTool("peek", { description: "Show two variables.", annotations: { readOnlyHint: true } }, async () => ({ content: [{ type: "text", text: JSON.stringify({ secret: process.env.CUVETTE_TEST_API_KEY ?? null, plain: process.env.CUVETTE_TEST_PLAIN ?? null }) }] }));
+await s.connect(new StdioServerTransport());
+`;
+
+function hintAdapter(extra: string): string {
+  const dir = mkdtempSync(join(root, "hint-"));
+  writeFileSync(join(dir, "server.mjs"), hintServer);
+  writeFileSync(join(dir, "adapter.yaml"), `adapter: { name: hint-mcp }\nprogram: { name: hint }\nconnection:\n  kind: mcp\n  command: ["{node}", "{adapter_dir}/server.mjs"]\n${extra}`);
+  return dir;
+}
+
+test("mcp: the server process gets no secret variables and a tool hint from the server does not make a tool read-only", async () => {
+  process.env.CUVETTE_TEST_API_KEY = "s3cret";
+  process.env.CUVETTE_TEST_PLAIN = "visible";
+  const own = { workDir: join(root, "hint-work"), sessionDir: join(root, "hint-session") };
+  const r = await startAdapter(loadAdapter(hintAdapter("")), own);
+  try {
+    const peek = (await r.tools()).find((t) => t.name === "peek")!;
+    expect(peek.readOnly).toBeUndefined();
+    const out = await peek.execute({}, ctx());
+    expect(out.data).toEqual({ secret: null, plain: "visible" });
+  } finally {
+    await r.close();
+    delete process.env.CUVETTE_TEST_API_KEY;
+    delete process.env.CUVETTE_TEST_PLAIN;
+  }
+}, 30000);
+
+test("mcp: env expansion for a stdio server resolves a safe name and a pass_env name, and not an unlisted or secret name", async () => {
+  process.env.CUVETTE_TEST_PLAIN = "visible";
+  process.env.CUVETTE_TEST_API_KEY = "s3cret";
+  const fields = (extra: string) =>
+    hintAdapter(`${extra}  env: { CUVETTE_TEST_PLAIN: "{env:CUVETTE_TEST_PLAIN}", CUVETTE_TEST_API_KEY: "{env:CUVETTE_TEST_API_KEY}" }\n`);
+  const peek = async (dir: string, name: string) => {
+    const r = await startAdapter(loadAdapter(dir), { workDir: join(root, `${name}-work`), sessionDir: join(root, `${name}-session`) });
+    try {
+      return (await (await r.tools()).find((t) => t.name === "peek")!.execute({}, ctx())).data;
+    } finally {
+      await r.close();
+    }
+  };
+  try {
+    expect(await peek(fields(""), "envmcp1")).toEqual({ secret: "", plain: "" });
+    expect(await peek(fields("  pass_env: [CUVETTE_TEST_PLAIN, CUVETTE_TEST_API_KEY]\n"), "envmcp2")).toEqual({ secret: "", plain: "visible" });
+  } finally {
+    delete process.env.CUVETTE_TEST_PLAIN;
+    delete process.env.CUVETTE_TEST_API_KEY;
+  }
+}, 30000);
+
+test("mcp: the manifest can mark a tool read-only", async () => {
+  const dir = hintAdapter("tools:\n  - name: peek\n    description: Show two variables.\n    read_only: true\n");
+  const own = { workDir: join(root, "hint2-work"), sessionDir: join(root, "hint2-session") };
+  const r = await startAdapter(loadAdapter(dir), own);
+  try {
+    expect((await r.tools()).find((t) => t.name === "peek")!.readOnly).toBe(true);
+  } finally {
+    await r.close();
+  }
+}, 30000);
+
+test("mcp: a result of more than 16 MB is cut and the final text keeps the note", () => {
+  const big = "a".repeat(23 * 1024 * 1024);
+  const work = mkdtempSync(join(root, "cap-"));
+  const r = convertResult({ content: [{ type: "text", text: big }, { type: "image", data: big, mimeType: "image/png" }] }, "t", {}, undefined, work);
+  expect(r.ok).toBe(true);
+  expect(r.images).toBeUndefined();
+  expect(r.text!.length).toBeLessThan(21000);
+  expect(r.text).toContain("[The tool result is cut at 16 MB.]");
+  expect(r.text).toContain("Cuvette did not save this image");
+  const e = convertResult({ isError: true, content: [{ type: "text", text: big }, { type: "image", data: big, mimeType: "image/png" }] }, "t", {}, undefined, work);
+  expect(e.text!.length).toBeLessThan(big.length);
+  expect(e.text).toContain("cut at 16 MB");
+  expect(e.text).toContain("Cuvette did not save this image");
+  expect(readdirSync(work)).toEqual([]);
+});
+
+test("mcp: the images together are capped at 16 MB and structured content of more than 16 MB is dropped", () => {
+  const work = mkdtempSync(join(root, "cap-"));
+  const half = "a".repeat(14 * 1024 * 1024);
+  const r = convertResult({ content: [{ type: "text", text: "ok" }, { type: "image", data: half }, { type: "image", data: half }] }, "t", {}, undefined, work);
+  expect(r.images).toHaveLength(1);
+  expect(r.text).toContain("Cuvette did not save this image");
+  const s = convertResult({ content: [{ type: "text", text: "small" }], structuredContent: { v: "a".repeat(17 * 1024 * 1024) } }, "t", {}, undefined, work);
+  expect(s.data).toBeUndefined();
+  expect(s.text).toContain("structured content");
+});
+
+test("catalog MCP adapters mark their read tools read-only in the manifest", () => {
+  const readOnly = (dir: string) => loadAdapter(dir).manifest.tools.filter((t) => t.read_only).map((t) => t.name).sort();
+  expect(readOnly("catalog/onboarding")).toEqual(["fetch_url", "list_files", "probe_program", "python_api", "read_file", "read_help"]);
+  expect(readOnly("catalog/smile-msi")).toEqual(["analysis_catalog", "history", "list_slides", "run_result", "scripting_guide", "slide_state", "state"]);
+});

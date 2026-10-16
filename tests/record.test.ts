@@ -6,6 +6,7 @@ import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { extractNumbers } from "../src/core/claims.ts";
 import type { NodeIn } from "../src/core/types.ts";
+import { withinMs } from "./timing.ts";
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), "cuvette-rec-"));
@@ -231,7 +232,7 @@ test("a log with 100,000 entries loads, rebuilds the history and finds numbers i
   const r = new AnalysisRecord(dir, "s1");
   expect(r.messages().length).toBeGreaterThan(0);
   expect(r.numbers().length).toBeGreaterThan(1000);
-  expect(Date.now() - t0).toBeLessThan(15_000);
+  withinMs(Date.now() - t0, 15_000);
 }, 30_000);
 
 function scriptNode(files: Record<string, string | Buffer>) {
@@ -267,7 +268,7 @@ test("numbers from script output files: a huge file gives none and many files st
   const { r, dir } = scriptNode(files);
   const t = Date.now();
   const nums = r.numbers();
-  expect(Date.now() - t).toBeLessThan(3000);
+  withinMs(Date.now() - t, 3000);
   expect(nums.length).toBe(2000);
   expect(nums.some((n) => n.path.endsWith("huge.csv"))).toBe(false);
   rmSync(dir, { recursive: true, force: true });
@@ -277,7 +278,7 @@ test("a long table in a file is read in linear time", () => {
   const rows = Array.from({ length: 20_000 }, (_, i) => `| ${i} | ${i % 7} | ${(i * 0.37).toFixed(3)} |`).join("\n");
   const t = Date.now();
   expect(extractNumbers(rows).length).toBeGreaterThan(40_000);
-  expect(Date.now() - t).toBeLessThan(2000);
+  withinMs(Date.now() - t, 2000);
 });
 
 test("messages() matches a copy of the history after every entry, also after a reload from disk", () => {
@@ -313,4 +314,53 @@ test("messages() matches a copy of the history after every entry, also after a r
       for (let k = 0; k <= snaps.length - 1; k += 7) expect(texts(rec.messages(k))).toEqual(snaps[k]);
     }
   }
+});
+
+test("a torn reference file moves aside, gives no blob and is reported once", () => {
+  const dir = tmp();
+  const work = join(dir, "out");
+  const r = new AnalysisRecord(join(dir, "rec"), "s1", { workDir: work, exportDir: work, project: dir });
+  const big = join(dir, "big.bin");
+  writeFileSync(big, Buffer.alloc(COPY_LIMIT_BYTES + 1, 3));
+  const sha = r.putBlob(big);
+  const ref = join(dir, "rec", "blobs", `${sha}.ref.json`);
+  writeFileSync(ref, '{"path": "/x", "si');
+  const told: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((t: string) => (told.push(String(t)), true)) as typeof process.stderr.write;
+  try {
+    expect(r.blobRef(sha)).toBeUndefined();
+    expect(r.blobPath(sha)).toBeUndefined();
+  } finally {
+    process.stderr.write = write;
+  }
+  expect(told.filter((t) => t.includes("damaged"))).toHaveLength(1);
+  expect(existsSync(ref)).toBe(false);
+  const aside = readdirSync(join(dir, "rec", "blobs")).filter((f) => f.startsWith(`${sha}.ref.json.damaged-`));
+  expect(aside).toHaveLength(1);
+  expect(r.putBlob(big)).toBe(sha);
+  expect(r.blobPath(sha)).toBe(big);
+});
+
+test("a temporary file and a moved-aside reference file are not blobs", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  const sha = "a".repeat(64);
+  writeFileSync(join(dir, "rec", "blobs", `${sha}.ref.json.damaged-2026-01-01`), "x");
+  writeFileSync(join(dir, "rec", "blobs", ".tmp-123-" + sha), "x");
+  expect(r.blobPath(sha)).toBeUndefined();
+  expect(r.blobPath("a".repeat(10))).toBeUndefined();
+  const real = r.putBlob(Buffer.from("abc"), ".txt");
+  expect(readdirSync(join(dir, "rec", "blobs")).filter((f) => f.startsWith(real))).toEqual([real + ".txt"]);
+  expect(readdirSync(join(dir, "rec", "blobs")).some((f) => f.startsWith(".tmp-") && f !== ".tmp-123-" + sha)).toBe(false);
+});
+
+test.skipIf(process.platform === "win32")("the record folder and blob folder are private, and so is the log", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(join(dir, "rec"), "s1");
+  r.append("note" as any, { text: "x" });
+  const mode = (p: string) => statSync(p).mode & 0o777;
+  expect(mode(join(dir, "rec"))).toBe(0o700);
+  expect(mode(join(dir, "rec", "blobs"))).toBe(0o700);
+  expect(mode(join(dir, "rec", "log.jsonl"))).toBe(0o600);
 });

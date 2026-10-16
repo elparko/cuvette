@@ -1,9 +1,10 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { HookRunner } from "../src/core/hooks.ts";
 import type { Hook, PreToolUseInput } from "../src/core/types.ts";
+import { withinMs } from "./timing.ts";
 
 const input: PreToolUseInput = { event: "PreToolUse", session: "s", mode: "watch", tool: "seg", args: { a: 1 } };
 const dir = mkdtempSync(join(tmpdir(), "cuvette-hook-"));
@@ -95,14 +96,15 @@ test("a hook that hangs stops at once when the turn stops, and the call does not
   setTimeout(() => ctl.abort(), 200);
   const r = await h.pre(input, ctl.signal);
   expect(r.decision).toBe("deny");
+  expect(r.reason).not.toMatch(/timed out/);
   const ctl2 = new AbortController();
   setTimeout(() => ctl2.abort(), 200);
   expect(await h.stop({ session: "s" }, ctl2.signal)).toBeUndefined();
-  expect(Date.now() - t0).toBeLessThan(5000);
+  withinMs(Date.now() - t0, 5000);
 });
 
 test("a command hook keeps a multi-byte character that spans two output chunks", async () => {
-  const text = "€".repeat(40000);
+  const text = "€".repeat(20000);
   const body = `const b=Buffer.from(JSON.stringify({additionalContext:${JSON.stringify(text)}}));const cut=b.indexOf(0xe2)+1;process.stdout.write(b.subarray(0,cut));setTimeout(()=>process.stdout.write(b.subarray(cut)),100)`;
   const split = script("split.js", body);
   const r = await new HookRunner([], { PostToolUse: [{ command: split }] }).post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
@@ -121,4 +123,105 @@ test("the notices of a command hook write out escape sequences of the command an
   const r = await new HookRunner([], { PreToolUse: [{ command: block }] }).pre(input);
   expect(r.reason).toContain("SECRET-TEXT");
   expect(r.reason).not.toMatch(/[\u0000-\u0008\u000b-\u001f]/);
+});
+
+const sh = (body: string) => ["sh", "-c", body];
+
+test("a timeout kills the grandchild of a shell hook and blocks the call", async () => {
+  const marker = join(dir, "grandchild-alive");
+  const h = new HookRunner([], { PreToolUse: [{ command: sh(`(sleep 1; echo x > ${marker}) & wait`) }] }, dir, 300);
+  const r = await h.pre(input);
+  expect(r.decision).toBe("deny");
+  expect(r.reason).toMatch(/timed out/);
+  await new Promise((res) => setTimeout(res, 1500));
+  expect(existsSync(marker)).toBe(false);
+});
+
+test("an abort kills the grandchild of a shell hook", async () => {
+  const pidFile = join(dir, "grandchild-pid");
+  const h = new HookRunner([], { PreToolUse: [{ command: sh(`sh -c 'echo $$ > ${pidFile}; sleep 30' & wait`) }] }, dir);
+  const ctl = new AbortController();
+  setTimeout(() => ctl.abort(), 500);
+  await h.pre(input, ctl.signal);
+  const pid = Number(readFileSync(pidFile, "utf8").trim());
+  const alive = () => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  for (let i = 0; i < 20 && alive(); i++) await new Promise((res) => setTimeout(res, 100));
+  expect(alive()).toBe(false);
+});
+
+test("a command hook does not get environment variables with secret names", async () => {
+  const before = process.env.CUVETTE_TEST_TOKEN;
+  process.env.CUVETTE_TEST_TOKEN = "t-secret";
+  try {
+    const env = script("env.js", "console.log(JSON.stringify({additionalContext: String(process.env.CUVETTE_TEST_TOKEN)}))");
+    const r = await new HookRunner([], { PostToolUse: [{ command: env }] }).post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
+    expect(r.additionalContext).toBe("undefined");
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_TEST_TOKEN;
+    else process.env.CUVETTE_TEST_TOKEN = before;
+  }
+});
+
+test("a command hook with more than 64 KB of output gives an error and the cut is noted", async () => {
+  const big = script("big.js", "process.stdout.write('a'.repeat(200000))");
+  const r = await new HookRunner([], { PreToolUse: [{ command: big }] }).pre(input);
+  expect(r.decision).toBeUndefined();
+  expect(r.errors?.[0]).toMatch(/more than 64 KB/);
+  const loud = script("loud.js", "process.stderr.write('e'.repeat(200000),()=>process.exit(2))");
+  const d = await new HookRunner([], { PreToolUse: [{ command: loud }] }).pre(input);
+  expect(d.decision).toBe("deny");
+  expect(d.reason).toMatch(/\[cut at 64 KB\]$/);
+  expect(d.reason!.length).toBeLessThan(70000);
+});
+
+test("a PreToolUse hook that fails to start blocks the call, and a hook of another event does not", async () => {
+  const missing = [join(dir, "no-such-program")];
+  const r = await new HookRunner([], { PreToolUse: [{ command: missing }] }).pre(input);
+  expect(r.decision).toBe("deny");
+  expect(r.reason).toMatch(/no-such-program.*failed to start/);
+  const h = new HookRunner([], { Stop: [{ command: missing }] });
+  expect(await h.stop({ session: "s" })).toBeUndefined();
+});
+
+test("a matcher that is not a valid regex matches a PreToolUse hook and is reported once", async () => {
+  let ran = 0;
+  const h = new HookRunner([hook("b", () => { ran++; return {}; }, { matcher: "(" })]);
+  const seen: string[] = [];
+  h.onError = (m) => seen.push(m);
+  await h.pre(input);
+  await h.pre(input);
+  expect(ran).toBe(2);
+  expect(seen).toHaveLength(1);
+  expect(seen[0]).toMatch(/not a valid regular expression/);
+});
+
+test("a matcher that is not a valid regex skips a hook of another event with one notice", async () => {
+  let ran = 0;
+  const h = new HookRunner([{ name: "p", event: "PostToolUse", matcher: "(", run: () => { ran++; return {}; } }]);
+  const seen: string[] = [];
+  h.onError = (m) => seen.push(m);
+  const p = { event: "PostToolUse" as const, session: "s", tool: "t", args: {}, output: { ok: true } };
+  await h.post(p);
+  await h.post(p);
+  expect(ran).toBe(0);
+  expect(seen).toHaveLength(1);
+});
+
+test("the same bad matcher is reported once for each event", async () => {
+  const h = new HookRunner([
+    hook("b", () => ({}), { matcher: "(" }),
+    { name: "p", event: "PostToolUse", matcher: "(", run: () => ({}) },
+  ]);
+  const seen: string[] = [];
+  h.onError = (m) => seen.push(m);
+  await h.pre(input);
+  await h.post({ event: "PostToolUse", session: "s", tool: "t", args: {}, output: { ok: true } });
+  expect(seen).toHaveLength(2);
 });

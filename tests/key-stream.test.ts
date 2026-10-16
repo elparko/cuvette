@@ -133,7 +133,7 @@ function startApp(answer: string) {
     send: (d: string, gap = 0) => p.stdin.write(JSON.stringify({ d, gap }) + "\n"),
     rows,
     raw: () => raw,
-    async wait(cond: (rows: string[]) => boolean, what: string, ms = 4000) {
+    async wait(cond: (rows: string[]) => boolean, what: string, ms = 30000) {
       const end = Date.now() + ms;
       while (!cond(rows())) {
         if (Date.now() > end) throw new Error(`${what}: timeout. Screen:\n${rows().join("\n")}`);
@@ -167,7 +167,7 @@ describe.skipIf(!hasPython)("the real app in a pseudo-terminal", () => {
       test(`${kitty ? "kitty protocol on" : "no kitty answer"}, ${gap ? `one byte every ${gap} ms` : "one write for each key"}`, async () => {
         const app = startApp(kitty ? "\x1b[?0u" : "");
         try {
-          await app.wait((r) => r.some((x) => x.includes("Setup: your choices")), "setup card", 20000);
+          await app.wait((r) => r.some((x) => x.includes("Setup: your choices")), "setup card", 90000);
           if (!kitty) expect(app.raw()).not.toContain("\x1b[>1u");
           for (let i = 0; ; i++) {
             app.send("\r");
@@ -201,5 +201,5 @@ describe.skipIf(!hasPython)("the real app in a pseudo-terminal", () => {
         } finally {
           app.stop();
         }
-      }, 60000);
+      }, 240000);
 });

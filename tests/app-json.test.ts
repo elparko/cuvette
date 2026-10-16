@@ -117,8 +117,8 @@ test("the server sends the built assets without the token, and only from the ass
     const r = await fetch(`${base}/assets/${name}`);
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toContain("javascript");
-    expect((await fetch(`${base}/assets/..%2F..%2Fpackage.json`)).status).toBe(401);
-    expect((await fetch(`${base}/assets/nothing.js`)).status).toBe(401);
+    expect((await fetch(`${base}/assets/..%2F..%2Fpackage.json`)).status).toBe(404);
+    expect((await fetch(`${base}/assets/nothing.js`)).status).toBe(404);
   } finally {
     (await import("node:fs")).rmSync(made ? dir : join(dir, name), { recursive: true, force: true });
   }

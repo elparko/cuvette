@@ -1,0 +1,6 @@
+{
+ "data/demo_counts.txt": {"sha256":"9a4b6322272d3f1eb3cc3c0ca0e89c68b7f9f61260992ace131494eef9efddcb","bytes":39411},
+ "data/demo_counts_excel_dates.txt": {"sha256":"d82fcd2712069273dc949f7c7d2e9715594d942ae7115b50727be31fdd501a86","bytes":1517},
+ "data/designmat.txt": {"sha256":"5e30d53f469ec182049fd360678b7041e801bba8912d6f8966ac9acf74abbf63","bytes":99},
+ "data/leukemia_subset.csv": {"sha256":"bfc588bd69c7e774f8f724d20abd247f811a1b190a82cfd7036ac0937900b4c6","bytes":418453}
+}

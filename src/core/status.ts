@@ -3,7 +3,7 @@ import { createReadStream, existsSync, realpathSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import { adapterDirs, findAdapter } from "../adapters/manifest.ts";
 import { locate } from "../adapters/locate.ts";
-import { expand, placeholders } from "../adapters/kinds/common.ts";
+import { envAllowed, expand, placeholders } from "../adapters/kinds/common.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import { captureEnv, envTarget, packageChanges, type EnvLock } from "./envlock.ts";
 import { stepNumbers } from "./housekeeping.ts";
@@ -215,7 +215,7 @@ export async function currentFromDisk(record: AnalysisRecord, cwd: string, given
       const ph = placeholders(a, { workDir: record.workDir, sessionDir: record.dir }, found.path);
       let interpreter: string[] = [];
       try {
-        interpreter = a.manifest.connection.interpreter.map((x) => expand(x, ph));
+        interpreter = a.manifest.connection.interpreter.map((x) => expand(x, ph, envAllowed(a.manifest)));
       } catch {}
       const macro = a.manifest.connection.kind === "macro";
       const programVersion = macro ? undefined : found.version || undefined;

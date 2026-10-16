@@ -3,13 +3,14 @@ import { createHash } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, CutReplyError, ProviderError } from "../core/types.ts";
 import { antLogin, claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
+import { noticeOnce } from "../core/atomic.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { RETRIES, noRetry, retryAfterMs, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
-const MAX_TOKENS = 64000;
+export const MAX_TOKENS = 64000;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const NO_CREDENTIALS = "No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.";
 const NO_CREDENTIALS_HEADLESS = "No valid Claude credentials. Run cuvette key, or set ANTHROPIC_API_KEY.";
@@ -103,7 +104,7 @@ export class ClaudeProvider implements Provider {
   private headless = false;
   private apiKey?: string;
   private made?: { client: any; version: number; login: boolean };
-  private effort: string;
+  effort: string;
   private display: "summarized" | "omitted";
   private fallbacks = true;
   private sleep?: Sleep;
@@ -211,7 +212,7 @@ export class ClaudeProvider implements Provider {
         return await stream.finalMessage();
       } catch (e) {
         const started = stream.currentMessage?.usage;
-        if (started && !this.fixedClient) recordSpend(this.model, usageOf(started, this.mark?.ttl === "1h"));
+        if (started && !this.fixedClient) this.spend(usageOf(started, this.mark?.ttl === "1h"));
         if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError) && /^(stream|request) ended without/.test(e.message)) throw Object.assign(new Error(e.message), { partial: true });
         throw e;
       }
@@ -230,9 +231,17 @@ export class ClaudeProvider implements Provider {
       throw mapError(e, this.model, this.headless);
     }
     const out = this.fromNative(msg);
-    if (!this.fixedClient) recordSpend(this.model, out.usage);
+    if (!this.fixedClient) this.spend(out.usage);
     if (msg.stop_reason === "model_context_window_exceeded") throw new ProviderError("The reply stopped because the context window of the model is full.", false, true);
     return out;
+  }
+
+  private spend(u: Usage): void {
+    try {
+      recordSpend(this.model, u);
+    } catch (e) {
+      noticeOnce(`Cuvette could not write the spend record: ${(e as Error).message}`);
+    }
   }
 
   private fromNative(msg: any): StepResult {
@@ -279,7 +288,7 @@ export class ClaudeProvider implements Provider {
       if (over) throw new ProviderError(over);
       const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
-      if (!this.fixedClient) recordSpend(this.model, usageOf(u, false));
+      if (!this.fixedClient) this.spend(usageOf(u, false));
       if (opts?.failIfCut && msg.stop_reason === "max_tokens") throw new CutReplyError("The reply hit the output limit and was cut short.", (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n"));
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {

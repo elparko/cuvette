@@ -1,0 +1,6 @@
+{
+ "data/make_synthetic_ica_raw.py": {"sha256":"c78f6921fc5c62da9d2182000b51ed1b68804a4d1532ee951a3bacf07d5e4063","bytes":914},
+ "data/make_synthetic_raw.py": {"sha256":"9cef42b2c29c13b2d6a50e7699575b153ea111f2620854c0eea5dcb106804b10","bytes":990},
+ "data/synthetic_ica_raw.fif": {"sha256":"86041a84a9403523b24c3596dcd2497ddcc0cb487992895dbe04268d50c655f1","bytes":482124},
+ "data/synthetic_raw.fif": {"sha256":"50c78f9d6cde2ff4f0a51180e3fcb0954226e34f6c1d96cc177004504b2fad97","bytes":386204}
+}

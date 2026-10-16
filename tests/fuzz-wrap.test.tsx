@@ -7,6 +7,7 @@ import { tableLines } from "../src/tui/markdown.tsx";
 import { InstructionCard, PhiCard } from "../src/tui/cards.tsx";
 import { makeHarness, plain, sleep } from "../src/tui/testing.ts";
 import { Rng, runs } from "./fuzz-rng.ts";
+import { withinMs } from "./timing.ts";
 
 const PIECES = ["word", "a", "µg/mL", "naïve", "日本語のテキスト", "全角", "🧪", "👩‍🔬", "🇩🇪", "é", "ạ̈", "\t", "  ", " ", "x".repeat(60), "https://example.org/a/very/long/path/that/never/breaks", "\x1b[31mred\x1b[0m", "\x1b[1mbold\x1b[22m", "한국어", "Ünïcödé", "→", "—", "​", "‮RTL‬"];
 
@@ -68,7 +69,7 @@ describe("fuzz: terminal wrap", () => {
     const start = performance.now();
     hangLines(t, 40);
     hangWrap(t, 40);
-    expect(performance.now() - start).toBeLessThan(process.env.CI && process.platform === "win32" ? 5000 : 1500);
+    withinMs(performance.now() - start, process.env.CI && process.platform === "win32" ? 5000 : 1500);
   });
 });
 

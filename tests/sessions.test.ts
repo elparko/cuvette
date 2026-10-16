@@ -10,7 +10,7 @@ vi.mock("node:fs", async (original) => {
   return { ...real, linkSync: (a: string, b: string) => { if (linkFails.code) throw Object.assign(new Error(linkFails.code), { code: linkFails.code }); return real.linkSync(a, b); }, renameSync: (a: string, b: string) => { if (linkFails.rename) throw Object.assign(new Error("EBUSY"), { code: "EBUSY" }); return real.renameSync(a, b); } };
 });
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
-import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, openLock, OPENING_TEXT, ownerKnown, sessionLine, signalOwner } from "../src/core/sessions.ts";
+import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, logLimits, openLock, OPENING_TEXT, ownerKnown, scanLog, sessionLine, signalOwner } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
@@ -264,6 +264,74 @@ test("claimLock takes a free or dead lock, and refuses a live lock of another pr
   expect(lockAlive({ pid: process.pid, procStart: Date.now() - 86_400_000 * 400 })).toBe(false);
 });
 
+test("claimLock does not take an empty lock file that is new, and takes one that is old", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-empty-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  expect(claimLock(dir)).toMatchObject({ pid: 0, fresh: true });
+  expect(readFileSync(lock, "utf8")).toBe("");
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(lock, old, old);
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid });
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("claimLock writes the lock in place and shows one notice if the file system has no hard links", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-nolink-"));
+  const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    linkFails.code = "ENOTSUP";
+    expect(claimLock(dir)).toBeUndefined();
+    expect(JSON.parse(readFileSync(join(dir, "open.json"), "utf8"))).toMatchObject({ pid: process.pid });
+    rmSync(join(dir, "open.json"));
+    expect(claimLock(dir)).toBeUndefined();
+    const notices = write.mock.calls.filter((c) => String(c[0]).includes("no hard links"));
+    expect(notices).toHaveLength(1);
+    expect(String(notices[0][0])).toContain("The session lock is weaker here.");
+    expect(readdirSync(dir)).toEqual(["open.json"]);
+  } finally {
+    linkFails.code = undefined;
+    write.mockRestore();
+  }
+});
+
+test("claimLock throws on an error that is not about hard links", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-eacces-"));
+  try {
+    linkFails.code = "EACCES";
+    expect(() => claimLock(dir)).toThrow();
+    expect(existsSync(join(dir, "open.json"))).toBe(false);
+    expect(readdirSync(dir)).toEqual([]);
+  } finally {
+    linkFails.code = undefined;
+  }
+});
+
+test("claimLock waits for a live takeover guard and removes a stale one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-guard-"));
+  const lock = join(dir, "open.json");
+  const guard = join(dir, "open.json.take");
+  const old = new Date(Date.now() - 60_000);
+  writeFileSync(lock, JSON.stringify({ pid: 2 ** 22 + 7 }));
+  writeFileSync(guard, "");
+  expect(claimLock(dir)).toMatchObject({ fresh: true });
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(2 ** 22 + 7);
+  utimesSync(guard, old, old);
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("claimLock does not treat a lock file with a future modified time as new", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-future-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  const future = new Date(Date.now() + 3_600_000);
+  utimesSync(lock, future, future);
+  expect(claimLock(dir)).toBeUndefined();
+});
+
 test("of many processes that claim one lock at the same time, exactly one gets it", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-race-"));
   const code = `import { claimLock } from ${JSON.stringify(join(__dirname, "../src/core/sessions.ts"))}; const at = Number(process.env.AT); while (Date.now() < at) {} const held = claimLock(${JSON.stringify(dir)}); console.log(held ? "lost" : "won"); process.stdin.resume();`;
@@ -333,6 +401,19 @@ test("cleanSessions removes only an old session with start entries, no lock and 
     expect([folders.young, folders.live, folders.asked, folders.method, folders.files].every(existsSync)).toBe(true);
     expect(readIndex()).toHaveLength(5);
     expect(existsSync(join(folders.files, ".record", "open.json"))).toBe(false);
+  } finally {
+    if (prev === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = prev;
+  }
+});
+
+test("cleanSessions skips a stale row whose record folder is missing", () => {
+  const prev = process.env.CUVETTE_HOME;
+  try {
+    const { folders } = staleHome();
+    rmSync(join(folders.never, ".record"), { recursive: true, force: true });
+    expect(() => cleanSessions()).not.toThrow();
+    expect(existsSync(folders.never)).toBe(true);
   } finally {
     if (prev === undefined) delete process.env.CUVETTE_HOME;
     else process.env.CUVETTE_HOME = prev;
@@ -495,4 +576,28 @@ test("lockAlive never sends a signal to process 0 or a negative process", () => 
 
 test("the opening text says to try again", () => {
   expect(OPENING_TEXT).toBe("This session is opening in another window. Try again in a moment.");
+});
+
+test("a log over the read limit is read at both ends, and the status says that the log is too large", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-big-"));
+  const dir = join(h, "sessions", "20261009-100000-dddd");
+  mkdirSync(dir, { recursive: true });
+  const filler = Array.from({ length: 40 }, (_, i) => JSON.stringify({ id: i + 3, kind: "note", data: { text: "x".repeat(60) } }));
+  const lines = [{ id: 1, kind: "session", data: { cwd: "/lab/big", adapters: [], model: "m" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l));
+  writeFileSync(join(dir, "log.jsonl"), [...lines, ...filler, JSON.stringify({ id: 99, kind: "assistant", data: { text: "Done.", final: true } })].join("\n") + "\n");
+  const before = { ...logLimits };
+  try {
+    logLimits.read = 1000;
+    logLimits.edge = 400;
+    expect(scanLog(join(dir, "log.jsonl"))).toMatchObject({ partial: true, status: "log too large to read", first: { data: { cwd: "/lab/big" } }, ask: { data: { text: "Count the cells" } } });
+    const list = listSessions(h);
+    expect(list.map((x) => x.id)).toEqual(["20261009-100000-dddd"]);
+    expect(list[0]).toMatchObject({ cwd: "/lab/big", ask: "Count the cells", status: "log too large to read" });
+    logLimits.read = before.read;
+    const whole = scanLog(join(dir, "log.jsonl"));
+    expect(whole.status).toBe("answered");
+    expect(whole.partial).toBeUndefined();
+  } finally {
+    Object.assign(logLimits, before);
+  }
 });

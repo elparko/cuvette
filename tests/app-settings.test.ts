@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
@@ -284,4 +284,15 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] [data-sx-cancel]').click()`);
     expect(existsSync(join(proj, ".cuvette", "settings.json"))).toBe(true);
   });
+});
+
+test("a saved setting replaces the settings file in one step", async () => {
+  const c = await serve();
+  const file = settingsPath("user", cwd);
+  await c.post("api/setting", { name: "pilot", value: "off", scope: "user" });
+  linkSync(file, `${file}.copy`);
+  const before = readFileSync(file, "utf8");
+  await c.post("api/setting", { name: "effort", value: "max", scope: "user" });
+  expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ pilot: "off", effort: "max" });
 });

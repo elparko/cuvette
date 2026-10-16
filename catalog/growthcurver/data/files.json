@@ -1,0 +1,7 @@
+{
+ "data/bactgrowth_D_0_1.csv": {"sha256":"89954a36b4b6ece16a661f04eeba460c5c84c246d2c1a47d3fc8a03e15f3950f","bytes":283},
+ "data/growthdata.csv": {"sha256":"23ec8235bcd2cb18a3c65596319a64613c5c289988604da929d0fe302cc7e4a0","bytes":255865},
+ "data/make_fixtures.R": {"sha256":"64b01dae4e61fd5ec38b0896d4cad0ae82b6d295928b5a89dc0274225d8937b8","bytes":850},
+ "data/strr_design.csv": {"sha256":"2d6e4ec9751370033a41049c25fdc46ad26f58f85184e429c800ee6893833fcb","bytes":1509},
+ "data/strr_od.csv": {"sha256":"5f9d34de8585a961460b42ae4a397fd98ca46c5ec3defef6055042fe0f201a60","bytes":637343}
+}

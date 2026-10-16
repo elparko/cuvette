@@ -8,6 +8,7 @@ import { Session } from "../src/core/session.ts";
 import type { Mode, Tool } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { trustFolder } from "../src/core/trust.ts";
+import { withinMs } from "./timing.ts";
 
 const tool = (o: Partial<Tool>): Tool => ({ name: "t", description: "", inputSchema: {}, source: "adapter", execute: async () => ({ ok: true }), ...o });
 
@@ -78,7 +79,7 @@ test("a deny rule tests the command after an unknown wrapper option, but not a w
   const many = ["env", "-i", "echo", ...Array.from({ length: 2000 }, (_, i) => `word${i}`)];
   const t0 = performance.now();
   for (let i = 0; i < 50; i++) expect(p.check(rc, { argv: many })).toBe("ask");
-  expect(performance.now() - t0).toBeLessThan(2000);
+  withinMs(performance.now() - t0, 2000);
 });
 
 test("env -S takes a command string, and a deny rule tests that string", () => {
@@ -98,7 +99,7 @@ test("a deny rule catches env with the text of -S in the same word, and a comman
   const many = ["env", ...Array.from({ length: 3000 }, () => "-i"), "echo", "hi"];
   const t0 = performance.now();
   for (let i = 0; i < 50; i++) expect(p.check(rc, { argv: many })).toBe("ask");
-  expect(performance.now() - t0).toBeLessThan(2000);
+  withinMs(performance.now() - t0, 2000);
 });
 
 test("a deny rule does not catch a shell command, a renamed copy or a script, and an allow rule does not look through a wrapper", () => {

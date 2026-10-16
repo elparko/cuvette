@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { copyFileSync, existsSync, linkSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, linkSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { branchPlace, inProject, placeAt, type Place } from "./places.ts";
-import { AnalysisRecord } from "./record.ts";
+import { AnalysisRecord, isTempOrDamaged } from "./record.ts";
+import { logLimits } from "./sessions.ts";
 import { changeCell, currentNodes, num, numbersOf } from "./status.ts";
 
 export interface BranchSource {
@@ -33,6 +34,7 @@ export function openRecord(place: Place): AnalysisRecord {
 export function branchSession(s: BranchSource, name: string, upTo?: number): { place: Place; upTo: number } {
   const clean = name.trim();
   if (!clean) throw new Error("Give the branch a name: /branch <name>.");
+  if (statSync(s.record.logPath).size > logLimits.read) throw new Error("The record is too large to branch. Start a new session.");
   const cut = upTo ?? s.record.entries().at(-1)?.id ?? 0;
   const id = branchId();
   const child = branchPlace(s.place, clean, id);
@@ -47,9 +49,10 @@ export function branchSession(s: BranchSource, name: string, upTo?: number): { p
         return false;
       }
     });
-  writeFileSync(join(child.recordDir, "log.jsonl"), lines.length ? lines.join("\n") + "\n" : "");
+  writeFileSync(join(child.recordDir, "log.jsonl"), lines.length ? lines.join("\n") + "\n" : "", { mode: 0o600 });
   const rec = openRecord(child);
   for (const f of existsSync(s.record.blobDir) ? readdirSync(s.record.blobDir) : []) {
+    if (isTempOrDamaged(f)) continue;
     const from = join(s.record.blobDir, f);
     const to = join(rec.blobDir, f);
     if (existsSync(to)) continue;

@@ -1,0 +1,9 @@
+{
+ "data/make_pix_table.py": {"sha256":"4110b47c66a3df7c8f056b2c7019dbebe9b7cbf9b534d5caa9f083892842d2c0","bytes":609},
+ "data/make_synthetic.py": {"sha256":"7bec267b55c3c7c1c9c90607bae689219bbae816af81f51ecd564edc81f395b5","bytes":1507},
+ "data/pix_h_score_table.csv": {"sha256":"aecb8a4edc6c21b6d6fa57bba12a65eef047d0eaee60c58171241049d258e617","bytes":8141},
+ "data/shrout_fleiss_1979.csv": {"sha256":"2cb615af1e61423539eaa933a17759daed55aee404139d5321eba5b0f85a5ae4","bytes":96},
+ "data/skimage_immunohistochemistry.png": {"sha256":"b5b65f45c56ac526aef7880ee1edb74da72803dd1fdc7ed0c4609f1486fb5014","bytes":464377},
+ "data/synthetic_cells.csv": {"sha256":"09a4193244e9e52c1e887988f54eda8213d48f1528d208e373fd39032f1d26dd","bytes":6403},
+ "data/synthetic_ihc.png": {"sha256":"408628b937952be5ee0c55d3ce927aba06a7e393662ca5776068e497f54c905b","bytes":2049}
+}

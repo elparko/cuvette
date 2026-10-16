@@ -257,3 +257,18 @@ test("a token count near 100 thousand shows no tenth", () => {
   expect(kTokens(99_999)).toBe("100k");
   expect(kTokens(1000)).toBe("1.0k");
 });
+
+test("the default ledger file lives in the Cuvette home folder", () => {
+  const oldFile = process.env.CUVETTE_SPEND_FILE;
+  const oldHome = process.env.CUVETTE_HOME;
+  delete process.env.CUVETTE_SPEND_FILE;
+  process.env.CUVETTE_HOME = join(tmpdir(), "cuvette-spend-home");
+  try {
+    expect(spendFile()).toBe(join(tmpdir(), "cuvette-spend-home", "spend.jsonl"));
+  } finally {
+    if (oldFile === undefined) delete process.env.CUVETTE_SPEND_FILE;
+    else process.env.CUVETTE_SPEND_FILE = oldFile;
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
+  }
+});

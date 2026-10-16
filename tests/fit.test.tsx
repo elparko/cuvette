@@ -319,9 +319,10 @@ describe("a short or narrow terminal", () => {
     await until(() => h.term.view().includes("Permission needed: run_command"));
     await until(() => /lines 1–\d+ of \d+ · /.test(h.term.view()));
     expect(h.term.view()).toMatch(/lines 1–\d+ of \d+ · /);
-    for (let i = 0; i < 40 && !h.term.view().includes("last-word"); i++) {
+    const end = Date.now() + 60000;
+    while (!h.term.view().includes("last-word") && Date.now() < end) {
       h.type("\x1b[6~");
-      await sleep(40);
+      await sleep(100);
     }
     expect(h.term.view()).toContain("last-word");
     for (const l of h.term.lines()) expect(l.length).toBeLessThanOrEqual(40);

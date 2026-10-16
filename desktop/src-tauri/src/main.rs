@@ -27,6 +27,7 @@ struct Core {
     port: Mutex<Option<u16>>,
     ready: Mutex<bool>,
     pending: Mutex<Option<String>>,
+    stopped: Mutex<Option<String>>,
     zoom: Mutex<f64>,
 }
 
@@ -54,8 +55,16 @@ fn decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+fn from_core(window: &WebviewWindow) -> Result<(), String> {
+    match window.url() {
+        Ok(url) if is_core(window.app_handle(), &url) => Ok(()),
+        _ => Err("The Cuvette core is not running.".into()),
+    }
+}
+
 #[tauri::command]
 async fn choose_folder(window: WebviewWindow, start: Option<String>) -> Option<String> {
+    from_core(&window).ok()?;
     let mut d = window.dialog().file().set_parent(&window).set_title("Choose the folder with your data");
     if let Some(s) = start.filter(|s| Path::new(s).is_dir()) {
         d = d.set_directory(s);
@@ -65,17 +74,20 @@ async fn choose_folder(window: WebviewWindow, start: Option<String>) -> Option<S
 }
 
 #[tauri::command]
-fn reveal(app: AppHandle, path: String) -> Result<(), String> {
+fn reveal(app: AppHandle, window: WebviewWindow, path: String) -> Result<(), String> {
+    from_core(&window)?;
     app.opener().reveal_item_in_dir(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+fn notify(app: AppHandle, window: WebviewWindow, title: String, body: String) -> Result<(), String> {
+    from_core(&window)?;
     app.notification().builder().title(title).body(body).show().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn save_file(window: WebviewWindow, request: Request<'_>) -> Result<Option<String>, String> {
+    from_core(&window)?;
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err("The file data is missing.".into());
     };
@@ -118,11 +130,17 @@ fn start_core(app: &AppHandle, folder: Option<&str>) -> std::io::Result<Child> {
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(File::create(log)?).spawn()
 }
 
+fn open_outside(app: &AppHandle, url: &Url) {
+    if matches!(url.scheme(), "http" | "https" | "mailto") {
+        let _ = app.opener().open_url(url.as_str(), None::<&str>);
+    }
+}
+
 fn stop_core(app: &AppHandle) {
     let Some(mut child) = app.state::<Core>().child.lock().unwrap().take() else { return };
     drop(child.stdin.take());
     let t = Instant::now();
-    while t.elapsed() < Duration::from_secs(3) {
+    while t.elapsed() < Duration::from_secs(10) {
         if let Ok(Some(_)) = child.try_wait() {
             return;
         }
@@ -387,15 +405,22 @@ fn window(app: &AppHandle, hidden: bool) -> tauri::Result<WebviewWindow> {
             if url.scheme() == "tauri" || matches!(url.scheme(), "about" | "blob" | "data") || is_core(&nav, url) {
                 return true;
             }
-            let _ = nav.opener().open_url(url.as_str(), None::<&str>);
+            open_outside(&nav, url);
             false
         })
         .on_new_window(move |url, _| {
-            let _ = popup.opener().open_url(url.as_str(), None::<&str>);
+            open_outside(&popup, &url);
             NewWindowResponse::Deny
         })
         .on_page_load(move |_, p| {
-            if p.event() != PageLoadEvent::Finished || !is_core(&load, p.url()) {
+            if p.event() != PageLoadEvent::Finished {
+                return;
+            }
+            if !is_core(&load, p.url()) {
+                let stopped = load.state::<Core>().stopped.lock().unwrap().take();
+                if let (Some(text), "tauri") = (stopped, p.url().scheme()) {
+                    show_error(&load, &text);
+                }
                 return;
             }
             let core = load.state::<Core>();
@@ -453,12 +478,32 @@ fn main() {
             std::thread::spawn(move || {
                 let mut lines = BufReader::new(stdout).lines();
                 let started = lines.next().and_then(Result::ok).and_then(|l| serde_json::from_str::<Started>(&l).ok());
+                let ok = started.is_some();
                 let h = handle.clone();
                 let _ = handle.run_on_main_thread(move || match started {
                     Some(s) => serve(&h, s),
                     None => show_error(&h, "The Cuvette core stopped before it was ready."),
                 });
                 for _ in lines {}
+                if !ok {
+                    return;
+                }
+                let h = handle.clone();
+                let _ = handle.run_on_main_thread(move || {
+                    let core = h.state::<Core>();
+                    if core.child.lock().unwrap().is_none() {
+                        return;
+                    }
+                    if let Some(c) = core.child.lock().unwrap().as_mut() {
+                        let _ = c.try_wait();
+                    }
+                    *core.port.lock().unwrap() = None;
+                    *core.ready.lock().unwrap() = false;
+                    *core.stopped.lock().unwrap() = Some("The Cuvette core stopped. Close the window and start Cuvette again.".into());
+                    if let (Some(w), Ok(url)) = (h.get_webview_window("main"), Url::parse("tauri://localhost")) {
+                        let _ = w.navigate(url);
+                    }
+                });
             });
             Ok(())
         })

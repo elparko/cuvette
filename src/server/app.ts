@@ -9,7 +9,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
-import { isCredentialsFile, noClaudeCredentials } from "../core/credentials.ts";
+import { isSecretFile, noClaudeCredentials } from "../core/credentials.ts";
 import { KEY_ANT_LOGIN } from "../ui/cards.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
@@ -18,6 +18,7 @@ import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock, ownerKnown, OPENING_TEXT } from "../core/sessions.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { findPlace, removeIndexRow, renameIndexRow } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
@@ -277,6 +278,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       try {
         await detach();
         const s = await makeSession({ folder: o.folder, resume: o.resume, model: opts.model, adapter: o.adapter });
+        if (closing) return void (await s.close().catch(() => {}));
         attach(s, true);
         if (o.first) s.send(o.first).catch(() => {});
       } catch (e) {
@@ -293,9 +295,9 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   };
   const ctx = (): Ctx => ({ token, session: current?.session as SessionLike, settings: settingCtx(), busy: current?.view.busy });
 
-  const allowedFile = (p: string) => {
+  const allowedFile = (p: string, only?: (string | undefined)[]) => {
     const s = current?.session as (SessionLike & { outputDir?: string }) | undefined;
-    if (!s) return false;
+    if (!s && !only) return false;
     const real = (x: string) => {
       try {
         return realpathSync(x);
@@ -303,7 +305,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         return resolve(x);
       }
     };
-    return !isCredentialsFile(p) && [s.dir, s.workDir, s.outputDir, s.cwd].filter(Boolean).some((root) => inside(root!, p) && inside(real(root!), real(p)));
+    return !isSecretFile(p) && (only ?? [s!.dir, s!.workDir, s!.outputDir, s!.cwd]).filter(Boolean).some((root) => inside(root!, p) && inside(real(root!), real(p)));
   };
 
   const outDir = () => {
@@ -407,8 +409,9 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return send(res, 200, { ...programsJson(await listPrograms({ ...progHooks(), quick }), { checking: quick }), jobs: running });
     }
     if (get && p === "/api/thumb") {
-      const f = listSessions().find((s) => s.id === url.searchParams.get("id"))?.figure;
-      if (!f || !existsSync(f)) return send(res, 404, { error: "no figure" });
+      const info = listSessions().find((s) => s.id === url.searchParams.get("id"));
+      const f = info?.figure;
+      if (!f || !allowedFile(f, [info!.folder, info!.cwd, join(cuvetteHome(), "sessions", info!.id)]) || !existsSync(f)) return send(res, 404, { error: "no figure" });
       return pipeFile(res, f, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=300" });
     }
     if (get && p === "/api/settings") return send(res, 200, settingsHtml(ctx()), "text/html; charset=utf-8");
@@ -642,12 +645,21 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return send(res, 400, { error: "bad request" });
     }
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
-    if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
+    if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
+      try {
+        if (!sendAsset(res, url.pathname)) send(res, 404, { error: "not found" });
+      } catch {
+        if (!res.headersSent) send(res, 500, { error: "The server could not read the file." });
+        else res.destroy();
+      }
+      return;
+    }
     if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return req.method === "GET" && url.pathname === "/" ? send(res, 401, WRONG_LINK, "text/html; charset=utf-8") : send(res, 401, { error: "missing or wrong token" });
     try {
       await route(req, res, url);
     } catch (e) {
-      if (!res.headersSent) send(res, e instanceof HttpError ? e.status : 400, { error: (e as Error).message }, undefined, e instanceof HttpError && e.status === 413 ? { connection: "close" } : {});
+      if (!(e instanceof HttpError)) process.stderr.write(`${(e as Error)?.stack ?? e}\n`);
+      if (!res.headersSent) send(res, e instanceof HttpError ? e.status : 500, { error: e instanceof HttpError ? e.message : "The server could not handle the request." }, undefined, e instanceof HttpError && e.status === 413 ? { connection: "close" } : {});
       else res.destroy();
     }
   });
@@ -679,6 +691,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const open = [...jobs.values()].filter((j) => !j.done);
       for (const j of open) j.abort.abort();
       if (open.length) await Promise.race([Promise.all(open.map((j) => j.ended?.catch(() => {}))), new Promise((r) => setTimeout(r, JOB_STOP_WAIT_MS).unref())]);
+      await opening?.catch(() => {});
       await detach();
       for (const c of idle) c.end();
       server.close();

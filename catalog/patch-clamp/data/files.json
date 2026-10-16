@@ -1,0 +1,10 @@
+{
+ "data/jahncke_cells_events.csv": {"sha256":"fb6e70686b56d2232fa7f7044ba4471ae9302d4d95815aeca514058cb25c2722","bytes":2641},
+ "data/make_synthetic.py": {"sha256":"0cd48871ee0181d7f2da3ca903035a69a7358ede3a7ed1299d926a0b98c02ab5","bytes":1593},
+ "data/pyabf/171116sh_0018.abf": {"sha256":"9042a1162d18a47fbbe83ea1c0817142d3ae21f6f6060195ff18d35358f6e8c7","bytes":2047488},
+ "data/pyabf/17o05024_vc_steps.abf": {"sha256":"4375eb736efe3eb58b141f2e43c715fb109f7fad76398ebf4d9fc90affe07a9f","bytes":987648},
+ "data/synthetic_activation.csv": {"sha256":"dd25e5dd253c790200735fb9a6f7f375d33c8714b4d2607a640ccb2e24633e06","bytes":177},
+ "data/synthetic_events.csv": {"sha256":"73ee22a3e9d016270c863488c28274cd3bb09190286d1affbab39d930c97c399","bytes":1120621},
+ "data/synthetic_events_truth.csv": {"sha256":"6fd37b37e744915ee96e32943640015a6fd404cc30a54bc5727a744655ba9f43","bytes":358},
+ "data/synthetic_inactivation.csv": {"sha256":"de74ff10a8e4ce541b414187564fae2a23ee77b89818dd51f8046f16de2865a8","bytes":172}
+}

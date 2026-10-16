@@ -3,15 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { saveAccess } from "../src/adapters/access.ts";
+import { accessFile, saveAccess } from "../src/adapters/access.ts";
 import { applyInstall, prepareAdd } from "../src/adapters/install.ts";
 import { CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
+import { confirmCode } from "../src/adapters/source.ts";
 import { isRecordName } from "../src/core/places.ts";
 import { Session, cleanText } from "../src/core/session.ts";
 import { genericTools } from "../src/tools/generic.ts";
 import type { Message, StepResult, ToolOutput } from "../src/core/types.ts";
 import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
 import { checkText } from "../src/core/ste.ts";
+import { withinMs } from "./timing.ts";
 
 type Bad = FakeStep & { stopReason?: StepResult["stopReason"]; parseError?: string; note?: string };
 
@@ -436,7 +438,7 @@ test("a result of 100 MB is cut to the limit and the harness stays fast", async 
   expect(text.length).toBeLessThan(21000);
   expect(text).toMatch(/\[The harness cut \d+ characters\. Write long output to a file and read it in parts\.\]$/);
   expect(String(results(s)[0]!.text).length).toBe(4000);
-  expect(Date.now() - t0).toBeLessThan(30000);
+  withinMs(Date.now() - t0, 30000);
 });
 
 test("one line of 5 MB is cut too", async () => {
@@ -610,6 +612,7 @@ test.skipIf(windows)("a link in the project folder that leads into the Cuvette h
 test("a skill of an adapter in the Cuvette home folder is read through load_skill", async () => {
   const root = join(home, "adapters", "astropy");
   cpSync(join(CATALOG_DIR, "astropy"), root, { recursive: true });
+  confirmCode(root);
   const adapter = loadAdapter(root);
   const skill = adapter.skills()[0]!;
   const provider = new ScriptedProvider([call("load_skill", { name: skill.name }), call("read_file", { path: join(home, "adapters", "other-adapter", "x.md") }), { text: "ok" }]);
@@ -746,9 +749,9 @@ test.skipIf(windows)("a script that starts many processes, also in new sessions,
     "open(os.environ['WORK_DIR'] + '/pids.txt', 'w').write(' '.join(str(p.pid) for p in same + apart))",
     "time.sleep(120)",
   ].join("\n");
-  const { provider, session: s } = await start([script(code), { text: "ok" }]);
+  const { provider, session: s } = await start([script(code, 8), { text: "ok" }]);
   await s.send("go");
-  expect(texts(provider)[0]).toContain("the script timed out after 1 s");
+  expect(texts(provider)[0]).toContain("the script timed out after 8 s");
   const pids = readFileSync(join(s.workDir, "pids.txt"), "utf8").split(" ").map(Number);
   expect(pids).toHaveLength(10);
   try {
@@ -1169,4 +1172,14 @@ test("the refusal text writes out a control code and a line break in a path", as
   const hidden = /[\u0000-\u001f\u007f-\u009f\u2028\u202a-\u202e]/;
   for (const text of [pathRefusalReason("private", "/a/\u001b[2J\u202e/b\nc"), pathRefusalReason("link", "/a/\u0007/b"), writeRefusalReason("/a/\u2028b", false)]) expect(text).not.toMatch(hidden);
   expect(pathRefusalReason("private", "/a/\u202e/b\nc")).toContain(String.raw`"/a/\\u202e/b\nc"`);
+});
+
+test("saveAccess replaces the settings file in one step", () => {
+  const file = accessFile();
+  saveAccess("openbabel", { off: true });
+  linkSync(file, `${file}.copy`);
+  const before = readFileSync(file, "utf8");
+  saveAccess("openbabel", { off: false });
+  expect(readFileSync(`${file}.copy`, "utf8")).toBe(before);
+  expect(readFileSync(file, "utf8")).not.toBe(before);
 });

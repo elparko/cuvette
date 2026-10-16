@@ -51,6 +51,7 @@ const Connection = z.strictObject({
   transport: z.enum(["stdio", "http"]).default("stdio"),
   command: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).default({}),
+  pass_env: z.array(z.string()).default([]),
   cwd: z.string().default(""),
   url: z.string().default(""),
   interpreter: z.array(z.string()).default([]),
@@ -62,7 +63,7 @@ const Connection = z.strictObject({
   state_tool: z.string().default(""),
   history_tool: z.string().default(""),
   startup_timeout_s: z.number().default(60),
-  call_timeout_s: z.number().default(600),
+  call_timeout_s: z.number().positive("call_timeout_s must be more than 0 and at most 86400 seconds.").max(86400, "call_timeout_s must be more than 0 and at most 86400 seconds.").default(600),
 });
 
 const DecisionLink = z.strictObject({ tool: z.string(), arg: z.string() });

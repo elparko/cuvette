@@ -1,0 +1,7 @@
+{
+ "data/imc_cells.h5ad": {"sha256":"590de7800f8aeb8461e4b2223072619f891f13d1374f0a2bdf24650410400469","bytes":1404276},
+ "data/make_test_data.py": {"sha256":"46983185d5d688f5368e19d0c88e9029592d0619d7fe012083e5b7c4a733e18f","bytes":2203},
+ "data/visium_hne_100hvg.h5ad": {"sha256":"6f7438b4a96b8ad2790f1881e6fbe1c872d5ee6a5cfc530632ef329aae47954b","bytes":394250},
+ "data/visium_tiny.h5": {"sha256":"36b4c40db27bb346ca16ea85a3ce2b7d9a040e2b521a7e05b10e889bc4b24ae1","bytes":423464},
+ "data/visium_tiny_positions.txt": {"sha256":"12ab372600fc7a98109357ff96a30e2a9e6ee2c603f3b54e76f51fdd2bb1763f","bytes":7665}
+}

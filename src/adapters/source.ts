@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { ensureHome, moveAside, noticeOnce, writeFileAtomic } from "../core/atomic.ts";
 import { CATALOG_DIR, cuvetteHome, loadAdapter, type Manifest } from "./manifest.ts";
 import { trustedRegistry } from "./registry.ts";
 
@@ -48,20 +49,29 @@ export const indexFile = () => join(cuvetteHome(), "installed-adapters.json");
 export const userAdapterDir = (name: string) => join(cuvetteHome(), "adapters", name);
 
 function readIndex(): IndexFile {
-  if (!existsSync(indexFile())) return { adapters: {}, confirmed: {} };
+  let text: string;
   try {
-    const j = JSON.parse(readFileSync(indexFile(), "utf8"));
+    text = readFileSync(indexFile(), "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") noticeOnce(`Cuvette cannot read the file ${indexFile()}: ${(e as Error).message} The installed adapters list is empty.`);
+    return { adapters: {}, confirmed: {} };
+  }
+  try {
+    const j = JSON.parse(text);
     const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
     const adapters = Object.fromEntries(Object.entries(obj(j?.adapters)).filter(([, e]) => e && typeof e === "object" && typeof (e as { name?: unknown }).name === "string"));
     return { ...obj(j), adapters, confirmed: obj(j?.confirmed) } as IndexFile;
   } catch {
+    try {
+      noticeOnce(`The file ${indexFile()} is damaged. Cuvette moved it to ${moveAside(indexFile())}. The installed adapters list is empty until you install the adapters again.`);
+    } catch {}
     return { adapters: {}, confirmed: {} };
   }
 }
 
 function writeIndex(i: IndexFile): void {
-  mkdirSync(dirname(indexFile()), { recursive: true });
-  writeFileSync(indexFile(), JSON.stringify({ version: 1, ...i }, null, 2) + "\n");
+  ensureHome();
+  writeFileAtomic(indexFile(), JSON.stringify({ version: 1, ...i }, null, 2) + "\n");
 }
 
 export const readInstalled = () => readIndex().adapters;
@@ -182,7 +192,12 @@ export function adapterTrust(root: string): TrustInfo {
   const level: TrustLevel = entry?.checked && trustedRegistry(entry.registry) && !changed ? "checked" : "unlisted";
   const info = make(level, { entry, changed, codeFiles });
   if (changed) info.detail = `${TRUST_DETAIL.unlisted} The files changed after the install.`;
-  info.codeConfirmed = !(entry && level === "unlisted" && codeFiles.length) || index.confirmed[realOf(root)] === digest;
+  const homeBase = join(cuvetteHome(), "adapters");
+  const homeAdapter = inside(homeBase, root) || (() => {
+    const r = relative(realOf(homeBase), resolve(realOf(dirname(root)), basename(root)));
+    return !!r && !r.startsWith("..") && !r.startsWith(sep);
+  })();
+  info.codeConfirmed = !((entry || homeAdapter) && level === "unlisted" && codeFiles.length) || index.confirmed[realOf(root)] === digest;
   return info;
 }
 

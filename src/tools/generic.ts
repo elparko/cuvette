@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { cap, commandLine, integrityError, integrityReason, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
-import { isCredentialsFile } from "../core/credentials.ts";
+import { isCredentialsFile, isSecretFile } from "../core/credentials.ts";
 import { writeRefusalReason } from "../core/refusals.ts";
 import { guardCommand, settingsScope } from "./run_script.ts";
 
@@ -163,6 +163,7 @@ export function genericTools(dirs: Dirs): Tool[] {
         const path = here(String(a.path));
         if (!existsSync(path) || !statSync(path).isFile()) return { ok: false, error: `${path} is not a file` };
         if (isCredentialsFile(path)) return { ok: false, error: `${path} holds the saved API keys. The agent cannot read it.` };
+        if (isSecretFile(path) || isSecretFile(realpathSync(path))) return { ok: false, error: `${path} can hold a password or a key. The agent cannot read it.` };
         const size = statSync(path).size;
         const fd = openSync(path, "r");
         const buf = Buffer.alloc(Math.min(size, Number(a.max_bytes)));
@@ -228,12 +229,10 @@ export function genericTools(dirs: Dirs): Tool[] {
       name: "screenshot",
       title: "Take a screenshot",
       description: "Save a PNG of the whole screen.",
-      readOnly: true,
+      permission: "ask",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async run(_a, ctx) {
-        const env: Record<string, string> = {};
-        for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-        const out = await takeScreenshot(dirs, env, ctx.signal);
+        const out = await takeScreenshot(dirs, withoutSecrets(), ctx.signal);
         return { ...out, fidelity: "none" };
       },
     }),

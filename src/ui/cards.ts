@@ -2,6 +2,7 @@ import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse,
 import type { PhiAction } from "../core/phi.ts";
 import { noClaudeCredentials, ENV_KEY_WARNING, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
+import { NO_ALWAYS } from "../core/no-always.ts";
 import { codeOf, plainOf } from "./items.ts";
 import { commandText, visibleText } from "../core/plain.ts";
 import { cutText } from "../core/places.ts";
@@ -126,8 +127,11 @@ export function applyRewind(session: SessionLike, n: number): { ok: boolean; tex
 
 const ARG_LIMIT = 1000;
 
+export { NO_ALWAYS };
+export const ALWAYS_SCOPE = "Always allow: this session only.";
+
 export function permissionView(card: Extract<Card, { t: "permission" }>) {
-  const always = card.tool !== "eln_push" && !card.search;
+  const always = !NO_ALWAYS.has(card.tool) && !card.search;
   const { purpose, does } = plainOf(card.args);
   const argv = Array.isArray(card.args.argv) ? card.args.argv : undefined;
   const given = card.code ?? (argv ? undefined : codeOf(card.args));
@@ -145,7 +149,7 @@ export function permissionView(card: Extract<Card, { t: "permission" }>) {
     args,
     code,
     always,
-    touches: card.search ? card.touches : `This will touch: ${card.touches}`,
+    touches: card.search ? card.touches : `This will touch: ${card.touches}${always ? ` ${ALWAYS_SCOPE}` : ""}`,
   };
 }
 
@@ -153,7 +157,7 @@ export type PermissionChoice = { ok: true; always?: boolean } | { ok: false; not
 
 export function respondPermission(session: SessionLike, card: Extract<Card, { t: "permission" }>, c: PermissionChoice): void {
   if ("stop" in c) return session.interrupt();
-  if (c.ok) session.respondPermission(card.rid, true, ...((c.always ? ["", true] : []) as [string?, boolean?]));
+  if (c.ok) session.respondPermission(card.rid, true, ...((c.always && !NO_ALWAYS.has(card.tool) ? ["", true] : []) as [string?, boolean?]));
   else session.respondPermission(card.rid, false, c.note);
 }
 

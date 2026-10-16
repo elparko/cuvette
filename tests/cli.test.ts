@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { confirmCode } from "../src/adapters/source.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 const CUVETTE = join(__dirname, "..", "bin/cuvette.js");
@@ -14,6 +15,14 @@ let data = "";
 function home(settings?: Record<string, unknown>): string {
   const h = mkdtempSync(join(root, "home-"));
   cpSync(join(__dirname, "fixtures", "drive"), join(h, "adapters", "drivefix"), { recursive: true });
+  const before = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    confirmCode(join(h, "adapters", "drivefix"));
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
+  }
   if (settings) writeFileSync(join(h, "settings.json"), JSON.stringify(settings));
   return h;
 }
@@ -307,6 +316,35 @@ test.skipIf(process.platform === "win32")("cuvette app stops on SIGHUP and exits
     child.kill("SIGKILL");
   }
 }, 60_000);
+
+for (const how of ["throw", "reject"])
+  test.skipIf(process.platform === "win32")(`cuvette app prints one line, stops, and exits with code 70 after an uncaught ${how}`, async () => {
+    const h = ptyHome();
+    const boom = join(root, `boom-${how}.mjs`);
+    writeFileSync(boom, `process.on("SIGUSR2", () => setImmediate(() => { ${how === "throw" ? 'throw new Error("boom")' : 'Promise.reject(new Error("boom"))'}; }));\n`);
+    const child = spawn(process.execPath, ["--import", boom, CUVETTE, "app", "--no-open"], { cwd: join(h, "proj"), env: cleanEnv(h, { ANTHROPIC_API_KEY: "sk-ant-test" }), stdio: ["ignore", "pipe", "pipe"] });
+    try {
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (err += d));
+      const exit = new Promise<number | null>((done) => child.on("exit", (c) => done(c)));
+      for (let i = 0; i < 300 && !out.includes("Cuvette app:"); i++) await new Promise((r) => setTimeout(r, 100));
+      expect(out).toContain("Cuvette app:");
+      child.kill("SIGUSR2");
+      expect(await exit).toBe(70);
+      const lines = err.trim().split("\n");
+      expect(lines).toHaveLength(1);
+      const file = /^Cuvette stopped because of an error: Error: boom\. Details: (.+crash-.+\.log)$/.exec(lines[0]!)?.[1];
+      expect(lines[0]).toMatch(/Details: /);
+      expect(file).toBeTruthy();
+      expect(file!.startsWith(h)).toBe(true);
+      expect(readFileSync(file!, "utf8")).toContain("Error: boom\n    at");
+      expect(statSync(file!).mode & 0o777).toBe(0o600);
+    } finally {
+      child.kill("SIGKILL");
+    }
+  }, 60_000);
 
 describe.skipIf(!hasPython)("first start and the terminal app in a pseudo-terminal", () => {
   let ollama: Server;

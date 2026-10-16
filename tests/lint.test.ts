@@ -96,6 +96,26 @@ describe("lint: the base adapter passes", () => {
   });
 });
 
+describe("lint: environment names", () => {
+  test("env-name: a name that is not safe and not in pass_env is a warning", async () => {
+    const withEnv = (extra: string) => make((y) => y.replace("  kind: cli\n", `  kind: cli\n${extra}`));
+    expect(await findings(withEnv('  env: { A: "{env:HOME}" }\n'), "env-name")).toEqual([]);
+    expect(await findings(withEnv('  pass_env: [MY_VAR]\n  env: { A: "{env:MY_VAR}" }\n'), "env-name")).toEqual([]);
+    const f = await findings(withEnv('  env: { A: "{env:MY_VAR}", B: "{env:MY_TOKEN}" }\n'), "env-name");
+    expect(f.map((x) => x.where).sort()).toEqual(["{env:MY_TOKEN}", "{env:MY_VAR}"]);
+    expect(f.every((x) => x.severity === "warning")).toBe(true);
+    expect((await findings(withEnv('  pass_env: [MY_TOKEN]\n  env: { A: "{env:MY_TOKEN}" }\n'), "env-name")).length).toBe(1);
+  });
+
+  test("env-name: the command and env of an mcp stdio adapter follow the same rule, and http headers are skipped", async () => {
+    const mcp = (extra: string, transport = "stdio") => make((y) => y.replace("  kind: cli\n", `  kind: mcp\n  transport: ${transport}\n  command: ["node", "{env:MY_CMD}"]\n${extra}`));
+    const f = await findings(mcp('  env: { A: "{env:MY_VAR}", B: "{env:HOME}" }\n'), "env-name");
+    expect(f.map((x) => x.where).sort()).toEqual(["{env:MY_CMD}", "{env:MY_VAR}"]);
+    expect(await findings(mcp('  pass_env: [MY_CMD, MY_VAR]\n  env: { A: "{env:MY_VAR}" }\n'), "env-name")).toEqual([]);
+    expect(await findings(mcp('  url: "http://x"\n  headers: { Authorization: "Bearer {env:MY_TOKEN}" }\n', "http"), "env-name")).toEqual([]);
+  });
+});
+
 describe("lint: citations", () => {
   test("program-citation: no citation, or one without a doi or url, is an error; a url is enough", async () => {
     const none = await findings(make((y) => y.replace(/  citation:\n(    .*\n)+/, "")), "program-citation");

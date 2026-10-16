@@ -17,6 +17,7 @@ my-adapter/
   adapter.ts          optional. Checks, hooks, extra tools, manual routes.
   data/               small test datasets and reference outputs.
   data/SOURCES.md     required if the tests read data. Source and license of each file.
+  data/files.json     the SHA-256 sum and the size of each committed data file. See "Test data".
   evidence/           optional. Notes, macro recorder output, demonstrations.
   server.ts           optional. Code for an MCP server or a worker that the adapter starts.
 ```
@@ -160,6 +161,7 @@ can also use `{adapter_dir}`. On macOS, a path must match the file name with the
 | `transport` | `stdio` or `http` | `stdio` | For `mcp`. How to reach the server. |
 | `command` | list of text | `[]` | For `mcp` and `macro`. The command that starts the server or the program. |
 | `env` | text to text | `{}` | Environment variables for the child process. Values can use placeholders. |
+| `pass_env` | list of text | `[]` | Names of environment variables that `{env:NAME}` can read in `cli`, `python`, `script`, `macro`, `files` and `screen` adapters, and in `command` and `env` of `mcp` over `stdio`. |
 | `cwd` | text | `""` | Working folder of the child process. If empty, each call gets its own folder. |
 | `url` | text | `""` | For `mcp` over `http`. Address of the server. |
 | `interpreter` | list of text | `[]` | For `python` and `script`. The command that runs the code, such as `["Rscript"]`. |
@@ -183,10 +185,16 @@ Placeholders work in `command`, `env`, `cwd`, `interpreter` and in tool template
 | `{work_dir}` | The work folder of the session. |
 | `{session_dir}` | The folder of the session. |
 | `{program_path}` | The program path from `locate`. |
-| `{env:NAME}` | The value of an environment variable. |
+| `{env:NAME}` | The value of an environment variable. See the rule below. |
 
 The child process gets `CUVETTE_WORK_DIR`, `CUVETTE_SESSION_DIR`, `CUVETTE_ADAPTER_DIR` and `CUVETTE_PROGRAM_PATH`.
-Do not put a secret in `adapter.yaml`. Use `{env:NAME}`.
+The `{env:NAME}` rule applies to `cli`, `python`, `script`, `macro`, `files` and `screen` adapters. It also applies to `command` and `env` of an `mcp` adapter over `stdio`:
+
+- A name in the safe set always resolves. The safe set is `HOME`, `USER`, `PATH`, `TMPDIR`, `LANG`, `LC_ALL`, `SHELL`, `DISPLAY`, `JAVA_HOME`, `R_HOME`, `CONDA_PREFIX` and each `XDG_*` name. On Windows it also has `USERPROFILE`, `APPDATA`, `LOCALAPPDATA` and `TEMP`.
+- Any other name must be in `pass_env`. If it is not, `{env:NAME}` gives an empty text.
+- A name that looks like a secret never resolves in these kinds, also if it is in `pass_env`. A name looks like a secret if it has `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD` or `CREDENTIAL` in it. It also looks like a secret if it ends in `_PASS` or is `DATABASE_URL`.
+
+Do not put a secret in `adapter.yaml`. A secret in `{env:NAME}` works only in `http` headers and `mcp` headers.
 
 ### `tools`
 
@@ -662,6 +670,7 @@ English. It gives a warning, not an error.
 | A skill has no `name` or `description`. | error |
 | A test uses a tool, a data file or a saved name that does not exist. | error |
 | A known-answer test fails (with `--run-tests`). | error |
+| A known-answer test needs data that is not installed, and you decline the download. | none; the test does not run |
 | There is no `STANDARDS.md`. | warning |
 | There are no tests. | warning |
 | A `close` entry has no `difference`. | warning |
@@ -681,3 +690,32 @@ the answer reached the known value. Each confusion names its record entry. The d
 The pull request workflow `.github/workflows/adapter-check.yml` runs `cuvette adapter check` on each changed adapter folder. The checklist rules run inside that
 command, so the workflow needs no new step. The ImageJ job in `.github/workflows/test.yml` passes
 `--gui`.
+
+## Test data
+
+The npm package does not contain `data/` of the catalog adapters. It keeps `data/SOURCES.md`,
+`data/files.json`, the `fetch*.sh` scripts and the files that the self-tests read. The self-tests
+run without a question, so their files must stay in the package. `package.json` lists them.
+
+`data/files.json` maps each committed data file to its SHA-256 sum and its size in bytes.
+Run `node scripts/data-index.mjs` to write it again after you change a data file. A test in
+`tests/testdata.test.ts` fails if the file is out of date.
+
+`cuvette adapter check <name> --run-tests` finds the test data that the computer does not have.
+It shows the adapter name, the file names, the source from `data/SOURCES.md` and the
+size if `data/files.json` lists every file. Then it asks `[y/N]`.
+
+1. If you answer `y`, or you use `--fetch-data`, Cuvette fetches the data of this adapter only.
+2. A test with `fetch:` runs its fetch script. The script checks the SHA-256 sum.
+3. A file in `data/files.json` comes from
+   `https://raw.githubusercontent.com/elparko/cuvette/v<version>/catalog/<name>/`.
+   Cuvette refuses a file with a wrong sum or size and saves nothing.
+   Cuvette saves the fetched data in the package folder. If that folder is not writable, it saves the data under `<cuvette home>/testdata/<name>/`.
+4. The tests that need the data do not run in three cases:
+   - You answer `n`.
+   - A run without a terminal has no `--fetch-data`.
+   - The computer has no network.
+5. For a test that does not run, the check prints `skip <test>: <reason>` and a warning.
+   The exit code is 0, as for any test that does not run.
+
+The adapter list, `/programs` and the Sessions page never read a data file.

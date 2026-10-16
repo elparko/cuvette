@@ -10,7 +10,7 @@ import { parseArgs } from "./openai.ts";
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
-const MAX_OUTPUT_TOKENS = 8192;
+export const MAX_OUTPUT_TOKENS = 8192;
 const FULL_PROMPT = 0.9;
 
 function ollamaError(text: string, status?: number): ProviderError {

@@ -1,0 +1,7 @@
+{
+ "data/make_fixtures.R": {"sha256":"70db30a723f673d9fedb136fbcb3332e8025b22ce7053c7c3f3095b8fcf7a962","bytes":1148},
+ "data/sacurine.csv": {"sha256":"77497cb05b6339139bea66bc1111f08763af1b6aca66e516dd7dfa6589fe0a43","bytes":243990},
+ "data/sacurine_linear.csv": {"sha256":"66d393be3409e89554fb75a3ee459ea5e395661be0c1e7bd79b4c6c02396a036","bytes":343498},
+ "data/tiny_table.csv": {"sha256":"55e953c18a748aa45065f1963642e6e1e119807331121c4580292e373f041d06","bytes":188},
+ "data/tiny_three_groups.csv": {"sha256":"dc450e484c903d5a0f8aa1a1e31cb87d73e0d78b6c5681ed35ec602e72d6143c","bytes":170}
+}

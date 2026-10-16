@@ -27,6 +27,24 @@ test("tool list and flags", () => {
   expect(tools.write_file.permission).toBeUndefined();
 });
 
+test("read_file refuses files that hold secrets, also through a link", async () => {
+  const dir = join(root, "secrets");
+  mkdirSync(dir, { recursive: true });
+  for (const name of [".env", ".netrc", "id_rsa", "server.pem"]) {
+    writeFileSync(join(dir, name), "SECRET=1");
+    expect(await tools.read_file.execute({ path: join(dir, name) }, ctx())).toMatchObject({ ok: false, error: expect.stringMatching(/cannot read it/) });
+  }
+  symlinkSync(join(dir, ".env"), join(dir, "notes.txt"));
+  expect((await tools.read_file.execute({ path: join(dir, "notes.txt") }, ctx())).ok).toBe(false);
+  writeFileSync(join(dir, "plain.txt"), "hello");
+  expect(await tools.read_file.execute({ path: join(dir, "plain.txt") }, ctx())).toMatchObject({ ok: true, text: "hello" });
+});
+
+test("screenshot asks before it runs", async () => {
+  expect(tools.screenshot.readOnly).toBeFalsy();
+  expect(tools.screenshot.permission).toBe("ask");
+});
+
 test("run_command runs without a shell and reports failures", async () => {
   const r = await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: [process.execPath, "-e", "console.log(process.argv[1]); console.error('warn')", "a;b $(x)"] }, ctx());
   expect(r).toMatchObject({ ok: true, fidelity: "none" });

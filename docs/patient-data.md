@@ -13,10 +13,15 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
   4. Stop. Nothing goes to the model. A later turn sends a short text in place of the content.
 - Your choice applies to the rest of the session. The record logs each decision as a `phi` entry, with masked values only.
 - A local model (Ollama, or an OpenAI-style server on this computer) gets no card. The record logs a notice.
+- A model URL counts as "this computer" if the host is `localhost`, `127.x`, `[::1]` or a `.local` name. A literal LAN IPv4 address also counts: `10.x`, `192.168.x` or `172.16.x` to `172.31.x`. A host name such as `10.example.com` does not count.
+- `read_file` refuses a secret file, such as `.env`, `.netrc` or a key file.
+- The `screenshot` tool asks you before it runs.
+- If a reply has more than 16 tool calls, the harness runs the first 16.
 - A headless run has no one to answer the card. It masks the values and logs the decision.
 - The harness masks a result that goes to an MCP client.
 - A helper agent of the `task` tool follows your choice. If you have not chosen, the harness stops the helper. A local model gets no check.
 - After "Mask", the harness does not send the record to a cloud referee or to the title model, because the record holds the values.
+- If you set a notify URL, the text of each question goes to that server. A notify URL must use https, or http on 127.0.0.1 or localhost.
 - The `search_literature` tool sends only its query to api.sciencemadereadable.com. It sends no data file. It refuses a query that has a likely patient identifier. It asks you before each search, also in bypass mode.
 
 ## Settings

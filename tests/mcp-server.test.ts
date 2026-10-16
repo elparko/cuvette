@@ -6,6 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { confirmCode } from "../src/adapters/source.ts";
 
 const root = resolve(__dirname, "..");
 const cuvette = join(root, "bin/cuvette.js");
@@ -69,6 +70,14 @@ test("lists adapter tools with their schemas and the cuvette tools", async () =>
 test("with no adapter, the client lists the adapters, use_adapter loads the agent's choice with no card, and the tool list grows", async () => {
   mkdirSync(join(home, "adapters"), { recursive: true });
   symlinkSync(lab, join(home, "adapters", "lab"));
+  const before = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    confirmCode(join(home, "adapters", "lab"));
+  } finally {
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
+  }
   const c = await connect();
   const changed: number[] = [];
   c.setNotificationHandler(ToolListChangedNotificationSchema, async () => void changed.push(1));

@@ -292,6 +292,20 @@ describe("cards", () => {
     }
   });
 
+  test("a permission card for a tool that never allows always ignores a and sends a plain allow on y", async () => {
+    const { h, s } = start();
+    const calls: unknown[][] = [];
+    s.respondPermission = (...a: unknown[]) => void calls.push(a);
+    await sleep(100);
+    s.bus.emit({ type: "permission", rid: "rx", tool: "run_command", args: {}, touches: "a command" } as never);
+    await until(() => h.all().includes("Permission needed: run_command"));
+    await type(h, "a");
+    expect(calls).toEqual([]);
+    await type(h, "y");
+    await until(() => calls.length === 1);
+    expect(calls).toEqual([["rx", true]]);
+  });
+
   test("a question card with no options ignores Enter and text that follow typing", async () => {
     process.env.CUVETTE_CARD_GUARD_MS = "400";
     try {

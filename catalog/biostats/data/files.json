@@ -1,0 +1,14 @@
+{
+ "data/approval_pairs.csv": {"sha256":"65799bff25e603a9a62003ec45de1bb2b3c78d198af1dd836d903f274eee3e99","bytes":43047},
+ "data/birthwt.csv": {"sha256":"50102db24a1fc05d351f83b341d71fa6b5847493bbb1a709811f9910a38f62ca","bytes":4955},
+ "data/hollander_depression.csv": {"sha256":"91312f2c38e06a457a3acff341f8fbd6a5b7cef3bea35aa11402b50183ea54ca","bytes":306},
+ "data/hollander_permeability.csv": {"sha256":"9ebbf032429f29ac71959d98d66a950528637b1c4d1c03d0438f2d819576ba51","bytes":295},
+ "data/infert.csv": {"sha256":"9438c10c5cad05bdb686c655b8c46148ed7746e7959b9125c60b3b2acb9582a4","bytes":6715},
+ "data/plantgrowth.csv": {"sha256":"d1738e182d566ed045ce9a492671fc8f793ea33f42aaaa5b499b18e9438ee7fc","bytes":400},
+ "data/rossi.csv": {"sha256":"0214400170e07f3015a285edca2014cac0dae8aac125fcbaad642490e05f892c","bytes":8693},
+ "data/rounding_times.csv": {"sha256":"e7abb32b89fe99fc86820a17ccc4894a2aa534f005a151c78c20fa3016c52cad","bytes":1304},
+ "data/sleep.csv": {"sha256":"5563ff4da6cf477df91551d9455f905dd0090cd82948fca985eda8a5440e548f","bytes":238},
+ "data/sleepstudy.csv": {"sha256":"20922ddc87d538bf2344f73d49000eeb2d7e14934b6191a3e071fefc329942c4","bytes":3316},
+ "data/veteran.csv": {"sha256":"313250dbd6c2684d536a5f5923a354bba7a1162c63503876b3d8538f1d5df5ab","bytes":3914},
+ "data/warpbreaks.csv": {"sha256":"9317a8e3f68324caf0dfdf8a98d178255c25c66c019211d2ba67feba043638dc","bytes":620}
+}

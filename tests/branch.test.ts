@@ -1,8 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
+import { logLimits } from "../src/core/sessions.ts";
+import { branchSession } from "../src/core/branch.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { commands, type CommandCtx } from "../src/ui/commands.ts";
@@ -89,4 +91,32 @@ test("/branch at <n> copies up to a rewind point, and /compare shows the key num
   expect(out[0]).toMatch(/\d+ of \d+ rows differ\.$/);
   await commands.find((c) => c.name === "compare")!.run(["nothing"], printCtx(s, out));
   expect(out.at(-1)).toBe("ERROR No branch named nothing. Type /branches to see the list.");
+});
+
+test("/branch does not copy temporary or moved-aside blob files, and the branch log is private", async () => {
+  const s = await counted("Otsu");
+  const sha = "b".repeat(64);
+  writeFileSync(join(s.record.blobDir, `.tmp-1-${sha}`), "x");
+  writeFileSync(join(s.record.blobDir, `${sha}.ref.json.damaged-2026`), "x");
+  writeFileSync(join(s.record.blobDir, `${sha}.ref.json`), "{}");
+  const r = s.branch("copy check");
+  const child = readdirSync(join(r.folder, ".record", "blobs"));
+  expect(child).toContain(`${sha}.ref.json`);
+  expect(child.filter((f) => f.startsWith(".tmp-") || f.includes(".damaged-"))).toEqual([]);
+  if (process.platform !== "win32") expect(statSync(join(r.folder, ".record", "log.jsonl")).mode & 0o777).toBe(0o600);
+});
+
+test("a record over the size limit is refused before any branch folder or index row exists", async () => {
+  const s = await counted("Otsu");
+  const rows = readdirSync(dirname(s.place.outDir));
+  const index = existsSync(join(process.env.CUVETTE_HOME!, "index.jsonl")) ? readFileSync(join(process.env.CUVETTE_HOME!, "index.jsonl"), "utf8") : "";
+  const before = logLimits.read;
+  logLimits.read = 10;
+  try {
+    expect(() => branchSession(s, "too big")).toThrow(/too large to branch/);
+  } finally {
+    logLimits.read = before;
+  }
+  expect(readdirSync(dirname(s.place.outDir))).toEqual(rows);
+  expect(existsSync(join(process.env.CUVETTE_HOME!, "index.jsonl")) ? readFileSync(join(process.env.CUVETTE_HOME!, "index.jsonl"), "utf8") : "").toBe(index);
 });

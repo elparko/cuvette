@@ -1,0 +1,9 @@
+{
+ "data/amr_test_clsi2019.csv": {"sha256":"bcf51b10e3b91206ecbbf8a9c63d6e9fbf65bb8bc6e50e2e1ceb5b883bcf4f00","bytes":214},
+ "data/amr_test_clsi2024.csv": {"sha256":"a15ac85070395d9d929c94d9d55d90024e134a381164175cabc090c07f98fa28","bytes":452},
+ "data/amr_test_eucast2020.csv": {"sha256":"09591766e2a55d9cd32e5d1e101d03470b6a1e69379bbbc223c1797dd2f779c3","bytes":275},
+ "data/amr_test_eucast2022_amc.csv": {"sha256":"3b508a745f01f9e0154e10fcc85ac1e8fd0fa32f83e8db6071bd919b5494fc04","bytes":552},
+ "data/amr_test_eucast2023.csv": {"sha256":"3162a7583529014925c0d74c2501a78eb3cca0555c0d450bc3179ca4c386ac3f","bytes":140},
+ "data/amr_test_mic_hand.csv": {"sha256":"623e2f114bc13fc7a4e7519bc86f2384f4ec4007f944d0bd8d22f1aed6a7f3bf","bytes":495},
+ "data/make_fixtures.R": {"sha256":"e6b2fed9a19a713095cf80aceaeca7004cd0c8039cd69bed5be16c3e15b9d64a","bytes":877}
+}

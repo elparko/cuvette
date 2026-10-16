@@ -1464,6 +1464,7 @@ tools:
       command: { type: string, description: 'Exact menu command name, such as "Median...".' }
       options: { type: string, default: "", description: "Dialog fields, such as radius=2." }
     required: [input, command]
+    approval: true
     outputs:
       image: { kind: file, ext: .tif, description: The image after the command. }
       preview: { kind: image, ext: .png, description: PNG preview. }
@@ -1471,6 +1472,8 @@ tools:
     macro: |
       {include:lib.ijm}
       openImage("{input}");
+      cmdName = toLowerCase("{command}");
+      if (cmdName == "run..." || cmdName == "install..." || cmdName == "compile and run..." || cmdName == "macro...") fail("The command {command} runs code. Use run_macro for code.");
       List.setCommands;
       if (List.get("{command}") == "") fail("Unknown menu command: {command}. Use list_commands to find the exact name.");
       run("{command}", "{options}");

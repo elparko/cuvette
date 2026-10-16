@@ -379,3 +379,18 @@ describe.skipIf(!live)("live teach review", () => {
     }
   }, 180000);
 });
+
+describe("run_command", () => {
+  const def = adapter.manifest.tools.find((t) => t.name === "run_command")!;
+
+  test("needs approval", () => {
+    expect(def.approval).toBe(true);
+  });
+
+  test("refuses the commands that run code", () => {
+    const macro = macroFor("run_command", { input: "/x/a.tif", command: "Compile and Run..." });
+    for (const name of ["run...", "install...", "compile and run...", "macro..."]) expect(macro).toContain(`cmdName == "${name}"`);
+    expect(macro.indexOf("runs code")).toBeLessThan(macro.indexOf("List.setCommands"));
+    expect(macro.indexOf("runs code")).toBeLessThan(macro.indexOf('run("Compile and Run..."'));
+  });
+});

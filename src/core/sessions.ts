@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, linkSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { cutText, discardPlace, readIndex, readRowMarks, type IndexRow } from "./places.ts";
 
-export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started";
+export type SessionStatus = "answered" | "waiting for you" | "running" | "in progress" | "not started" | "log too large to read";
 
 export interface SessionInfo {
   id: string;
@@ -29,10 +29,13 @@ export interface OpenLock {
   app?: string;
   started?: string;
   procStart?: number;
+  fresh?: boolean;
 }
 
 const LOCK = "open.json";
 const START_SLACK_MS = 5000;
+const LOCK_GRACE_MS = 5000;
+const CLOCK_SKEW_MS = 1000;
 
 export function processStart(pid: number): number | undefined {
   if (process.platform === "win32") {
@@ -79,8 +82,6 @@ function readLock(path: string): OpenLock | undefined {
   }
 }
 
-const LOCK_GRACE_MS = 2000;
-
 export const OPENING_TEXT = "This session is opening in another window. Try again in a moment.";
 
 export const ownerKnown = (lock: OpenLock | undefined): lock is OpenLock => !!lock && Number.isInteger(lock.pid) && lock.pid > 0;
@@ -91,9 +92,10 @@ export function signalOwner(lock: OpenLock, signal: NodeJS.Signals, kill: (pid: 
   return true;
 }
 
-function unfinished(path: string): boolean {
+function freshFile(path: string): boolean {
   try {
-    return Date.now() - statSync(path).mtimeMs < LOCK_GRACE_MS;
+    const age = Date.now() - statSync(path).mtimeMs;
+    return age >= -CLOCK_SKEW_MS && age < LOCK_GRACE_MS;
   } catch {
     return false;
   }
@@ -102,62 +104,88 @@ function unfinished(path: string): boolean {
 export function openLock(recordDir: string, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const path = join(recordDir, LOCK);
   const lock = readLock(path);
-  if (!lock && unfinished(path)) return { pid: 0 };
+  if (!lock && freshFile(path)) return { pid: 0, fresh: true };
   return lockAlive(lock, startOf) ? lock : undefined;
 }
 
+const NO_LINK_CODES = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
+let warnedNoLinks = false;
+
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 export function claimLock(recordDir: string, extra: Record<string, unknown> = {}, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
   const path = join(recordDir, LOCK);
+  const guard = `${path}.take`;
   const body = () => JSON.stringify({ pid: process.pid, procStart: ownStart(), started: new Date().toISOString(), ...extra });
-  const fresh = () => {
-    const tmp = `${path}.new.${process.pid}.${randomBytes(4).toString("hex")}`;
+  const writeInPlace = () => {
+    const fd = openSync(path, "wx", 0o600);
     try {
-      writeFileSync(tmp, body(), { mode: 0o600 });
-      linkSync(tmp, path);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "EEXIST") throw e;
-      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
+      writeSync(fd, body());
+      fsyncSync(fd);
     } finally {
-      rmSync(tmp, { force: true });
+      closeSync(fd);
     }
-    return true;
   };
-  for (let i = 0; i < 5; i++) {
+  const publish = () => {
+    const temp = `${path}.new.${process.pid}.${randomBytes(4).toString("hex")}`;
     try {
-      if (fresh()) return undefined;
+      writeFileSync(temp, body(), { flag: "wx", mode: 0o600 });
+      linkSync(temp, path);
+      return true;
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
+      const code = (e as NodeJS.ErrnoException).code ?? "";
+      if (code === "EEXIST") return false;
+      if (!NO_LINK_CODES.has(code)) throw e;
+      if (!warnedNoLinks) {
+        warnedNoLinks = true;
+        process.stderr.write("This file system has no hard links. The session lock is weaker here.\n");
+      }
+      try {
+        writeInPlace();
+        return true;
+      } catch (e2) {
+        if ((e2 as NodeJS.ErrnoException).code === "EEXIST") return false;
+        throw e2;
+      }
+    } finally {
+      rmSync(temp, { force: true });
     }
-    const held = readLock(path);
-    if (!held && unfinished(path)) return { pid: 0 };
-    if (held && lockAlive(held, startOf)) {
-      if (held.pid === process.pid) return undefined;
-      return held;
-    }
-    const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
+  };
+  const takeGuard = () => {
     try {
-      renameSync(path, aside);
-    } catch {
+      closeSync(openSync(guard, "wx", 0o600));
+      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    }
+    if (!freshFile(guard)) rmSync(guard, { force: true });
+    return false;
+  };
+  const opening: OpenLock = { pid: 0, fresh: true };
+  for (let i = 0; i < 5; i++) {
+    if (publish()) return undefined;
+    const held = readLock(path);
+    if (held && lockAlive(held, startOf)) return held.pid === process.pid ? undefined : held;
+    if (!held && freshFile(path)) return opening;
+    if (!takeGuard()) {
+      pause(100);
       continue;
     }
-    const moved = readLock(aside);
-    if (!moved && unfinished(aside)) {
+    try {
+      const again = readLock(path);
+      if (again && lockAlive(again, startOf)) return again.pid === process.pid ? undefined : again;
+      if (!again && freshFile(path)) return opening;
+      const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
       try {
-        linkSync(aside, path);
+        renameSync(path, aside);
+        rmSync(aside, { force: true });
       } catch {}
-      rmSync(aside, { force: true });
-      return { pid: 0 };
+      if (publish()) return undefined;
+    } finally {
+      rmSync(guard, { force: true });
     }
-    if (moved && lockAlive(moved, startOf) && moved.pid !== process.pid) {
-      try {
-        linkSync(aside, path);
-      } catch {}
-      rmSync(aside, { force: true });
-      return moved;
-    }
-    rmSync(aside, { force: true });
   }
-  return readLock(path) ?? { pid: 0 };
+  return opening;
 }
 
 const alive = (dir: string) => !!openLock(dir);
@@ -172,14 +200,31 @@ interface Parsed {
   waiting: boolean;
   lastFinal: boolean;
   worked: boolean;
+  partial?: boolean;
 }
 
-const parsed = new Map<string, { mtime: number; size: number; ino: number; p: Parsed }>();
+export const logLimits = { read: 256 * 1024 * 1024, edge: 1024 * 1024 };
+
+function readLog(log: string, size: number): string {
+  if (size <= logLimits.read) return readFileSync(log, "utf8");
+  const fd = openSync(log, "r");
+  try {
+    const part = (at: number) => {
+      const buf = Buffer.alloc(logLimits.edge);
+      return buf.subarray(0, readSync(fd, buf, 0, logLimits.edge, at)).toString("utf8");
+    };
+    return `${part(0)}\n${part(size - logLimits.edge)}`;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+const parsed = new Map<string, { mtime: number; size: number; ino: number; limit: number; p: Parsed }>();
 
 function parseLog(log: string): Parsed {
   const st = statSync(log);
   const hit = parsed.get(log);
-  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino) return hit.p;
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size && hit.ino === st.ino && hit.limit === logLimits.read) return hit.p;
   let first: any;
   let owner: string | undefined;
   let ask: any;
@@ -190,7 +235,7 @@ function parseLog(log: string): Parsed {
   let planOpen = false;
   let lastFinal = false;
   let worked = false;
-  for (const l of readFileSync(log, "utf8").replace(/^\uFEFF/, "").split("\n")) {
+  for (const l of readLog(log, st.size).replace(/^\uFEFF/, "").split("\n")) {
     if (!l) continue;
     let e: any;
     try {
@@ -214,17 +259,17 @@ function parseLog(log: string): Parsed {
     else if (e.kind === "plan_approved" || e.kind === "pilot_approved") planOpen = false;
     else if (figures.length < 20 && e.kind === "node" && !d.sensitivityOf) figures.push(...((d.outputs ?? []) as { path: string; kind?: string }[]).map((o) => o.path).filter((p) => IMAGE.test(p)));
   }
-  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal, worked };
-  parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, p });
+  const p = { first, owner: owner ?? first?.session, ask, title, figures, answered, waiting: asked.size > 0 || planOpen, lastFinal, worked, ...(st.size > logLimits.read ? { partial: true } : {}) };
+  parsed.set(log, { mtime: st.mtimeMs, size: st.size, ino: st.ino, limit: logLimits.read, p });
   return p;
 }
 
-export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string; worked: boolean } {
-  const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked } = parseLog(log);
+export function scanLog(log: string): { first: any; ask: any; title?: { title: string; description: string }; status: SessionStatus; figure?: string; owner?: string; worked: boolean; partial?: boolean } {
+  const { first, owner, ask, title, figures, answered, waiting, lastFinal, worked, partial } = parseLog(log);
   const figure = figures.find((f) => existsSync(f));
   const live = alive(dirname(log));
-  const status: SessionStatus = waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask || worked ? "in progress" : "not started";
-  return { first, ask, title, status, figure, owner, worked };
+  const status: SessionStatus = partial ? "log too large to read" : waiting && !lastFinal ? "waiting for you" : live && !lastFinal ? "running" : answered ? "answered" : ask || worked ? "in progress" : "not started";
+  return { first, ask, title, status, figure, owner, worked, ...(partial ? { partial } : {}) };
 }
 
 function firstFigure(folder: string | undefined): string | undefined {
@@ -277,7 +322,12 @@ export function cleanSessions(): string[] {
   for (const r of readIndex()) {
     if (!staleEmpty(r)) continue;
     const record = join(r.folder, ".record");
-    if (claimLock(record)) continue;
+    try {
+      if (claimLock(record)) continue;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw e;
+    }
     if (startEntriesOnly(join(record, "log.jsonl"))) discardPlace({ id: r.id, outDir: r.folder, recordDir: record, project: r.project, title: "", created: r.date, legacy: false, fallback: false });
     if (existsSync(r.folder)) rmSync(join(record, LOCK), { force: true });
     else removed.push(`${r.id}  ${r.folder}`);

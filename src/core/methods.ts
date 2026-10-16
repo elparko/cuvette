@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { ensureHome, writeFileAtomic } from "./atomic.ts";
 import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -139,8 +140,9 @@ export function saveMethod(m: Method, project?: string): string {
   const p = pathOf(m.name, dir);
   const before = project ? trustStatus(project).state : undefined;
   try {
+    if (!project) ensureHome();
     mkdirSync(dir, { recursive: true });
-    writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+    writeFileAtomic(p, JSON.stringify(m, null, 2) + "\n");
   } catch (e) {
     if (["EACCES", "EPERM", "EROFS"].includes((e as NodeJS.ErrnoException).code ?? "")) throw new Error(`Cannot write the method file ${p}. Check that the folder is not read-only.`);
     throw e;
@@ -212,7 +214,7 @@ export function exportMethod(name: string, to: string): string {
   const m = loadMethod(name);
   const { path: _p, hash: _h, ...plain } = m;
   const dest = to.endsWith(".json") ? to : join(to, `${m.name}.cuvette-method.json`);
-  writeFileSync(dest, JSON.stringify(plain, null, 2) + "\n");
+  writeFileAtomic(dest, JSON.stringify(plain, null, 2) + "\n");
   return dest;
 }
 
