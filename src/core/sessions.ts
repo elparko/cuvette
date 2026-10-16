@@ -302,7 +302,12 @@ export function cleanSessions(): string[] {
   for (const r of readIndex()) {
     if (!staleEmpty(r)) continue;
     const record = join(r.folder, ".record");
-    if (claimLock(record)) continue;
+    try {
+      if (claimLock(record)) continue;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw e;
+    }
     if (startEntriesOnly(join(record, "log.jsonl"))) discardPlace({ id: r.id, outDir: r.folder, recordDir: record, project: r.project, title: "", created: r.date, legacy: false, fallback: false });
     if (existsSync(r.folder)) rmSync(join(record, LOCK), { force: true });
     else removed.push(`${r.id}  ${r.folder}`);

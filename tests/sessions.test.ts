@@ -412,6 +412,19 @@ test("cleanSessions removes only an old session with start entries, no lock and 
   }
 });
 
+test("cleanSessions skips a stale row whose record folder is missing", () => {
+  const prev = process.env.CUVETTE_HOME;
+  try {
+    const { folders } = staleHome();
+    rmSync(join(folders.never, ".record"), { recursive: true, force: true });
+    expect(() => cleanSessions()).not.toThrow();
+    expect(existsSync(folders.never)).toBe(true);
+  } finally {
+    if (prev === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = prev;
+  }
+});
+
 test("cuvette sessions --clean prints what it removes", () => {
   const prev = process.env.CUVETTE_HOME;
   try {
