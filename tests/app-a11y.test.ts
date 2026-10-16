@@ -68,9 +68,23 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     expect(await until(page, `[...document.querySelectorAll('nav[aria-label="Pages"] button')].some((x) => x.offsetParent && (x.getAttribute("aria-label") || x.textContent) === ${JSON.stringify(name)} && x.getAttribute("aria-current") === "page")`)).toBe(true);
     await frames();
   };
+  const layoutSettled = () =>
+    page.eval<boolean>(`(async () => {
+      const shape = () => [...document.querySelectorAll("[data-prog]")].map((e) => Math.round(e.getBoundingClientRect().top + scrollY) + ":" + Math.round(e.getBoundingClientRect().height)).join(",") + "|" + document.documentElement.scrollHeight;
+      let last = shape();
+      let same = 0;
+      for (let i = 0; i < 100 && same < 5; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        const now = shape();
+        same = now === last ? same + 1 : 0;
+        last = now;
+      }
+      return same >= 5;
+    })()`);
   const programsPage = async () => {
     await goPage("Programs");
     expect(await until(page, `document.querySelector("[data-prog]") && !document.querySelector("main .animate-spin")`)).toBe(true);
+    expect(await layoutSettled()).toBe(true);
     await frames();
   };
   const sendStream = (m: object) => page.eval(`window.__sources.at(-1).onmessage(new MessageEvent("message", { data: ${JSON.stringify(JSON.stringify(m))} }))`);
@@ -98,7 +112,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app in headless Chrome", 
     for (const [i, s] of r.seq.entries()) {
       if (s.ratio < 3) out.push(`${label}: weak focus ring ${s.ratio.toFixed(2)} on ${s.sel} [${s.ring}]`);
       const p = r.seq[i - 1];
-      if (order && p && p.region === s.region && s.top < p.top - 6 && s.left <= p.left + 6) out.push(`${label}: Tab goes up from ${p.sel} to ${s.sel}`);
+      if (order && p && p.region === s.region && s.top < p.top - 6 && s.left <= p.left + 6) out.push(`${label}: Tab goes up from ${p.sel} (top ${Math.round(p.top)}, left ${Math.round(p.left)}) to ${s.sel} (top ${Math.round(s.top)}, left ${Math.round(s.left)})`);
     }
     for (const m of r.missed) out.push(`${label}: Tab does not reach ${m}`);
     return out;
