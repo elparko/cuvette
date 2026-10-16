@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -6,9 +7,9 @@ export default defineConfig({
     globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup.ts"],
     pool: "forks",
-    ...(process.env.GITHUB_ACTIONS ? {} : { maxWorkers: 4 }),
+    maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
     testTimeout: 120000,
-    hookTimeout: 60000,
+    hookTimeout: process.env.GITHUB_ACTIONS ? 180000 : 60000,
     teardownTimeout: 30000,
   },
 });

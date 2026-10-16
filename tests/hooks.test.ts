@@ -137,7 +137,7 @@ test("a timeout kills the grandchild of a shell hook and blocks the call", async
   expect(existsSync(marker)).toBe(false);
 });
 
-test("an abort kills the grandchild of a shell hook", async () => {
+test.skipIf(process.platform === "win32")("an abort kills the grandchild of a shell hook", async () => {
   const pidFile = join(dir, "grandchild-pid");
   const h = new HookRunner([], { PreToolUse: [{ command: sh(`sh -c 'echo $$ > ${pidFile}; sleep 30' & wait`) }] }, dir);
   const ctl = new AbortController();

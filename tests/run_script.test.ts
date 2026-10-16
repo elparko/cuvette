@@ -28,7 +28,7 @@ function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = asy
   return { tool, run, dirs };
 }
 
-test("the sandbox denies the read of open.json in every record folder, for Seatbelt and bubblewrap", () => {
+test.skipIf(process.platform === "win32")("the sandbox denies the read of open.json in every record folder, for Seatbelt and bubblewrap", () => {
   const work = join(root, "open-work");
   const session = join(root, "open-session");
   mkdirSync(work, { recursive: true });

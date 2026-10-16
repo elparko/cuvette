@@ -13,6 +13,7 @@ describe.skipIf(!CHROME)("accessibility of the browser app: the display settings
   test("with reduced motion the animations and the smooth scroll stop", async () => {
     await openSession();
     await setView(1280, "light");
+    await page.media([{ name: "prefers-color-scheme", value: "light" }, { name: "prefers-reduced-motion", value: "no-preference" }]);
     const insert = `document.querySelector('[role="log"]').insertAdjacentHTML("beforeend", '<span id="mo" class="pulse-dot"></span><span class="caret working"></span><div class="runbar"></div><svg class="animate-spin" width="10" height="10"></svg>')`;
     const remove = `document.querySelectorAll("#mo, .pulse-dot, .caret, .runbar, svg.animate-spin").forEach((e) => e.remove())`;
     await page.eval(insert);

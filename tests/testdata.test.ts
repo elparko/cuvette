@@ -108,7 +108,7 @@ describe("a check of an adapter whose test data is not installed", () => {
     expect(existsSync(join(dir, "data", "fetch-ran"))).toBe(false);
   });
 
-  test("an accepted question fetches the data of this adapter only", async () => {
+  test.skipIf(process.platform === "win32")("an accepted question fetches the data of this adapter only", async () => {
     const dir = fixture();
     const other = fixture();
     const urls = stubFetch();
@@ -258,7 +258,7 @@ describe("the download request", () => {
 });
 
 describe("no network", () => {
-  test("a download that cannot reach the network is reported as not run", async () => {
+  test.skipIf(process.platform === "win32")("a download that cannot reach the network is reported as not run", async () => {
     const dir = fixture();
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("fetch failed");
@@ -332,7 +332,7 @@ describe("the catalog data folders", () => {
   });
 
   test("the package has the self-test data, the sources, the fetch scripts and the index, and no other test data", () => {
-    const r = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: join(__dirname, ".."), encoding: "utf8", timeout: 280_000, maxBuffer: 1 << 26 });
+    const r = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { shell: process.platform === "win32", cwd: join(__dirname, ".."), encoding: "utf8", timeout: 280_000, maxBuffer: 1 << 26 });
     const pack = JSON.parse(r.stdout)[0] as { files: { path: string; size: number }[]; unpackedSize: number };
     const inPack = new Set(pack.files.map((f) => f.path));
     const dataFiles = [...inPack].filter((p) => /^catalog\/[^/]+\/data\//.test(p));

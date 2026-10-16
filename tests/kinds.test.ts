@@ -179,7 +179,7 @@ test("{env:NAME} resolves a safe name without pass_env, a listed name with pass_
 test("the cli working folder and the python interpreter use the same {env:NAME} rule", async () => {
   const dir = mkdtempSync(join(root, "cwd-"));
   process.env.CUVETTE_TEST_CWD = dir;
-  process.env.CUVETTE_TEST_PY = spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
+  process.env.CUVETTE_TEST_PY = process.platform === "win32" ? "python" : spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
   try {
     const cli = (pass: string) => adapter(`${head("cli", `  ${pass}cwd: "{env:CUVETTE_TEST_CWD}"\n`)}tools:
   - { name: where, description: d, command: ["{node}", "-e", "console.log(process.cwd())"], parse: text }

@@ -1,6 +1,6 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, normalize, resolve } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import type { Message } from "../src/core/types.ts";
@@ -29,7 +29,7 @@ function model(pick: (c: DriveCase) => { name: string; args: Record<string, unkn
     });
 }
 
-const args = (c: DriveCase) => JSON.parse(JSON.stringify(c.target.args).replaceAll("{adapter_dir}", DIR.replaceAll("\\", "\\\\")));
+const args = (c: DriveCase) => Object.fromEntries(Object.entries(JSON.parse(JSON.stringify(c.target.args).replaceAll("{adapter_dir}", DIR.replaceAll("\\", "\\\\")))).map(([k, v]) => [k, typeof v === "string" ? normalize(v) : v])) as Record<string, any>;
 
 describe("drive test", () => {
   test("one case for each tool, from its known-answer test", () => {
@@ -43,7 +43,7 @@ describe("drive test", () => {
     const c = driveCases(a)[0];
     const text = buildRequest(a, c.steps, c.target, new Map([["mean_of", "Compute the mean of one column of a CSV file."]]));
     expect(text).toContain("Compute the mean of one column of a CSV file.");
-    expect(text).toContain(`${DIR}/data/a.csv`);
+    expect(text).toContain(join(DIR, "data", "a.csv"));
     expect(text).toContain("column: x");
     expect(text).not.toContain("mean_of");
   });

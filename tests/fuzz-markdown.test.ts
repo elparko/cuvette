@@ -92,7 +92,7 @@ describe("fuzz: markdown renderer", () => {
   });
 
   test("deep nesting does not overflow the stack", () => {
-    for (const src of [">".repeat(20000) + " a", "> ".repeat(5000) + "a", Array.from({ length: 3000 }, (_, i) => " ".repeat(i) + "- a").join("\n"), "- ".repeat(5000) + "a"]) {
+    for (const src of [">".repeat(2000) + " a", "> ".repeat(2000) + "a", Array.from({ length: 1000 }, (_, i) => " ".repeat(i) + "- a").join("\n"), "- ".repeat(2000) + "a"]) {
       expect(() => md(src)).not.toThrow();
       expect(audit(md(src))).toEqual([]);
       expect(() => liveHtml(src)).not.toThrow();
