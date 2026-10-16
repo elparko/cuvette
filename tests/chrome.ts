@@ -99,7 +99,11 @@ export async function openChrome(extraArgs: string[] = []): Promise<Page> {
       const exited = new Promise<void>((done) => proc.once("exit", () => done()));
       proc.kill();
       if (proc.exitCode === null && proc.signalCode === null) await exited;
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 });
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOTEMPTY") throw e;
+      }
     },
   };
 }

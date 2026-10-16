@@ -18,5 +18,5 @@ function newestSource(dir: string): number {
 export function ensureUiBuild() {
   const index = join(UI_DIST, "index.html");
   if (existsSync(index) && statSync(index).mtimeMs >= newestSource(SOURCE)) return;
-  execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+  execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore", shell: process.platform === "win32" });
 }
