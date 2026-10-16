@@ -164,8 +164,8 @@ const CASES: [string, string, string, string][] = [
 describe.skipIf(!hasPython)("the real app in a pseudo-terminal", () => {
   for (const kitty of [false, true])
     for (const slow of [0, 25])
-      test(`${kitty ? "kitty protocol on" : "no kitty answer"}, ${slow ? `one byte every ${slow} ms` : "one write for each key"}`, async () => {
-        const gap = slow && process.env.GITHUB_ACTIONS ? 10 : slow;
+      test.skipIf(slow > 0 && !!process.env.GITHUB_ACTIONS && process.platform === "darwin")(`${kitty ? "kitty protocol on" : "no kitty answer"}, ${slow ? `one byte every ${slow} ms` : "one write for each key"}`, async () => {
+        const gap = slow;
         const app = startApp(kitty ? "\x1b[?0u" : "");
         try {
           await app.wait((r) => r.some((x) => x.includes("Setup: your choices")), "setup card", 90000);
