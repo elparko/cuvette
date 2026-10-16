@@ -40,7 +40,11 @@ describe.skipIf(!CHROME)("a double click in the app", () => {
   }, 90000);
   afterAll(async () => {
     await page?.close();
-    proc?.kill();
+    if (proc && proc.exitCode === null) {
+      const gone = new Promise((done) => proc.once("exit", done));
+      proc.kill();
+      await Promise.race([gone, new Promise((done) => setTimeout(done, 10000))]);
+    }
   });
 
   const token = () => new URL(url).searchParams.get("t");

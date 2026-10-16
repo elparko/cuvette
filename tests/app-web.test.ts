@@ -51,7 +51,11 @@ describe.skipIf(!CHROME)("the new app page in headless Chrome", () => {
   }, 90000);
   afterAll(async () => {
     await page?.close();
-    proc?.kill();
+    if (proc && proc.exitCode === null) {
+      const gone = new Promise((done) => proc.once("exit", done));
+      proc.kill();
+      await Promise.race([gone, new Promise((done) => setTimeout(done, 10000))]);
+    }
   });
 
   const sections = () => page.eval<string[]>(`[...document.querySelectorAll('nav[aria-label="Setting sections"] button')].map((b) => b.textContent)`);
