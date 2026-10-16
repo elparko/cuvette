@@ -2,7 +2,19 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+
+const linkFault = vi.hoisted(() => ({ code: undefined as string | undefined }));
+vi.mock("node:fs", async (orig) => {
+  const real = await orig<typeof import("node:fs")>();
+  return {
+    ...real,
+    linkSync: (a: string, b: string) => {
+      if (linkFault.code) throw Object.assign(new Error(linkFault.code), { code: linkFault.code });
+      real.linkSync(a, b);
+    },
+  };
+});
 import { readIndex, removeIndexRow, renameIndexRow, saveIndexRow } from "../src/core/places.ts";
 import { ageText, claimLock, cleanSessions, clip, clipStart, defaultSession, listSessions, lockAlive, logLimits, openLock, scanLog, sessionLine } from "../src/core/sessions.ts";
 import { TSX_CLI } from "../src/adapters/kinds/common.ts";
@@ -261,13 +273,68 @@ test("claimLock does not take an empty lock file that is new, and takes one that
   const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-empty-"));
   const lock = join(dir, "open.json");
   writeFileSync(lock, "");
-  expect(claimLock(dir)).toMatchObject({ pid: 0 });
+  expect(claimLock(dir)).toMatchObject({ pid: 0, fresh: true });
   expect(readFileSync(lock, "utf8")).toBe("");
   const old = new Date(Date.now() - 60_000);
   utimesSync(lock, old, old);
   expect(claimLock(dir)).toBeUndefined();
   expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid });
   expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("claimLock writes the lock in place and shows one notice if the file system has no hard links", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-nolink-"));
+  const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    linkFault.code = "ENOTSUP";
+    expect(claimLock(dir)).toBeUndefined();
+    expect(JSON.parse(readFileSync(join(dir, "open.json"), "utf8"))).toMatchObject({ pid: process.pid });
+    rmSync(join(dir, "open.json"));
+    expect(claimLock(dir)).toBeUndefined();
+    const notices = write.mock.calls.filter((c) => String(c[0]).includes("no hard links"));
+    expect(notices).toHaveLength(1);
+    expect(String(notices[0][0])).toContain("The session lock is weaker here.");
+    expect(readdirSync(dir)).toEqual(["open.json"]);
+  } finally {
+    linkFault.code = undefined;
+    write.mockRestore();
+  }
+});
+
+test("claimLock throws on an error that is not about hard links", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-eacces-"));
+  try {
+    linkFault.code = "EACCES";
+    expect(() => claimLock(dir)).toThrow();
+    expect(existsSync(join(dir, "open.json"))).toBe(false);
+    expect(readdirSync(dir)).toEqual([]);
+  } finally {
+    linkFault.code = undefined;
+  }
+});
+
+test("claimLock waits for a live takeover guard and removes a stale one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-guard-"));
+  const lock = join(dir, "open.json");
+  const guard = join(dir, "open.json.take");
+  const old = new Date(Date.now() - 60_000);
+  writeFileSync(lock, JSON.stringify({ pid: 2 ** 22 + 7 }));
+  writeFileSync(guard, "");
+  expect(claimLock(dir)).toMatchObject({ fresh: true });
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(2 ** 22 + 7);
+  utimesSync(guard, old, old);
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);
+  expect(readdirSync(dir)).toEqual(["open.json"]);
+});
+
+test("claimLock does not treat a lock file with a future modified time as new", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-future-"));
+  const lock = join(dir, "open.json");
+  writeFileSync(lock, "");
+  const future = new Date(Date.now() + 3_600_000);
+  utimesSync(lock, future, future);
+  expect(claimLock(dir)).toBeUndefined();
 });
 
 test("of many processes that claim one lock at the same time, exactly one gets it", async () => {
