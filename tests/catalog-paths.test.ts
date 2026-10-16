@@ -16,3 +16,9 @@ test("the catalog names no private drive under /Volumes/", () => {
   const hits = files.filter((p) => readFileSync(p, "utf8").includes("/Volumes/")).map((p) => relative(CATALOG_DIR, p));
   expect(hits).toEqual([]);
 });
+
+test("the catalog and the source name no private folder of the author", () => {
+  const files = [...walk(CATALOG_DIR), ...walk(join(CATALOG_DIR, "../src"))].filter((p) => /\.(ya?ml|sh|R|py|mjs|js|ts|tsx|md|txt)$/.test(p));
+  const hits = files.filter((p) => /\/Users\/parker|\/Volumes\/T\d\b/.test(readFileSync(p, "utf8"))).map((p) => relative(CATALOG_DIR, p));
+  expect(hits).toEqual([]);
+});

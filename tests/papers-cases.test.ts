@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { answerDraftIds, buildCases, caseGaps, listedHashes, loadCase, makeSanitizer, sourceText } from "../src/bench/papers-cases.ts";
 import { computedFault, type ItemScore } from "../src/bench/papers-score.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -48,6 +48,7 @@ test("sourceText names the tool of a computed value and never calls it published
 });
 
 test.skipIf(process.platform === "win32")("the sanitizer removes local paths, keys, addresses and host names", () => {
+  vi.stubEnv("CUVETTE_OLD_DATA_ROOT", "/Volumes/T7/guided-analysis/data");
   const san = makeSanitizer({ dir: "/Volumes/T7/guided-analysis/tools/bench-runs/d/claude/p/run1/home/sessions/s1" });
   const text = [
     "/Volumes/T7/guided-analysis/data/p/a.csv",
@@ -68,6 +69,7 @@ test.skipIf(process.platform === "win32")("the sanitizer removes local paths, ke
   expect(out).toContain("{home}/notes.txt");
   expect(out).toContain("biostats@0.1.0");
   for (const bad of ["/Users/", "/Volumes/", "sk-ant", "@example.org", "localhost"]) expect(out).not.toContain(bad);
+  vi.unstubAllEnvs();
 });
 
 test("listedHashes reads checksum lines from fetch scripts and SHA256SUMS files", () => {
