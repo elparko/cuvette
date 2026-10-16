@@ -305,6 +305,15 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("the index
   }
 });
 
+async function newFolders(root: string): Promise<string[]> {
+  let left = readdirSync(root).filter((n) => n.startsWith(".new-"));
+  for (let i = 0; i < 60 && left.length; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    left = readdirSync(root).filter((n) => n.startsWith(".new-"));
+  }
+  return left;
+}
+
 async function interruptDuringStart(extra: string) {
   const cwd = project();
   const held: import("node:http").ServerResponse[] = [];
@@ -322,7 +331,7 @@ async function interruptDuringStart(extra: string) {
   const code2 = await exit;
   server.closeAllConnections();
   await new Promise((r) => server.close(r));
-  return { code: code2, left: readdirSync(root).filter((n) => n.startsWith(".new-")) };
+  return { code: code2, left: await newFolders(root) };
 }
 
 test.skipIf(process.platform === "win32")("Ctrl+C with another SIGINT handler lets that handler end the process", async () => {
@@ -349,7 +358,7 @@ test.skipIf(process.platform === "win32")("Ctrl+C while a session starts removes
   expect(await exit).toBe(130);
   server.closeAllConnections();
   await new Promise((r) => server.close(r));
-  expect(readdirSync(root).filter((n) => n.startsWith(".new-"))).toEqual([]);
+  expect(await newFolders(root)).toEqual([]);
   expect(readIndex()).toEqual([]);
 }, 60_000);
 

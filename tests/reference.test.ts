@@ -1,7 +1,17 @@
 import { mkdirSync, mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+
+const reads = vi.hoisted(() => ({ dirs: [] as string[], files: [] as string[] }));
+vi.mock("node:fs", async (original) => {
+  const real = await original<typeof import("node:fs")>();
+  return {
+    ...real,
+    readdirSync: (p: never, ...rest: never[]) => (reads.dirs.push(String(p)), (real.readdirSync as (...a: unknown[]) => unknown)(p, ...rest)),
+    readFileSync: (p: never, ...rest: never[]) => (reads.files.push(String(p)), (real.readFileSync as (...a: unknown[]) => unknown)(p, ...rest)),
+  };
+});
 import { decodePng } from "../src/bench/png.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { zip } from "../src/eln/zip.ts";
@@ -115,13 +125,17 @@ test("a second search reads the folders again only after they change, so a paren
   writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,count\nwell_a,3\n");
   const old = new Date(Date.now() - 60_000);
   for (const d of [root, proj, join(proj, "sub"), join(proj, "sub", "old_counts.csv")]) utimesSync(d, old, old);
-  const t0 = performance.now();
+  reads.dirs.length = 0;
+  reads.files.length = 0;
   expect(findReferences([proj, root], ["counts"]).map((c) => c.path)).toEqual([join(proj, "sub", "old_counts.csv")]);
-  const first = performance.now() - t0;
-  const t1 = performance.now();
+  expect([...new Set(reads.dirs)].sort()).toEqual([root, proj, join(proj, "sub")].sort());
+  expect(reads.files.filter((f) => f.endsWith("old_counts.csv")).length).toBeGreaterThan(0);
+  expect(Date.now() - statSync(root).mtimeMs, "the old time of the parent folder").toBeGreaterThan(30_000);
+  reads.dirs.length = 0;
+  reads.files.length = 0;
   findReferences([proj, root], ["counts"]);
-  const second = performance.now() - t1;
-  expect(second).toBeLessThan(Math.max(100, first));
+  expect(reads.dirs, "folders read by the second search").toEqual([]);
+  expect(reads.files, "files read by the second search").toEqual([]);
   writeFileSync(join(root, "counts_summary.csv"), "sample,count\nwell_a,3\n");
   writeFileSync(join(proj, "sub", "old_counts.csv"), "sample,area,count\nwell_a,3,4\n");
   const again = findReferences([proj, root], ["counts", "area"]);
