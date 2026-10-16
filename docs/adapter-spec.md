@@ -710,6 +710,7 @@ size if `data/files.json` lists every file. Then it asks `[y/N]`.
 3. A file in `data/files.json` comes from
    `https://raw.githubusercontent.com/elparko/cuvette/v<version>/catalog/<name>/`.
    Cuvette refuses a file with a wrong sum or size and saves nothing.
+   Cuvette saves the fetched data in the package folder. If that folder is not writable, it saves the data under `<cuvette home>/testdata/<name>/`.
 4. The tests that need the data do not run in three cases:
    - You answer `n`.
    - A run without a terminal has no `--fetch-data`.
