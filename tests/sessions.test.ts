@@ -532,7 +532,7 @@ test("a claim leaves no temporary file after a success or after an error", () =>
   const missing = join(dir, "no", "such");
   linkFails.code = "EPERM";
   try {
-    expect(claimLock(missing)).toBeUndefined();
+    expect(() => claimLock(missing)).toThrow(/ENOENT/);
   } finally {
     linkFails.code = undefined;
   }

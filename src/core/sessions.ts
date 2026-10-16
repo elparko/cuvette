@@ -108,7 +108,7 @@ export function openLock(recordDir: string, startOf?: (pid: number) => number | 
   return lockAlive(lock, startOf) ? lock : undefined;
 }
 
-const NO_LINK_CODES = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
+const NO_LINK_CODES = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS", "EXDEV"]);
 let warnedNoLinks = false;
 
 const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);

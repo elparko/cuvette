@@ -416,7 +416,7 @@ export class Session {
       const held = claimLock(s.dir);
       if (held) {
         if (!opts.place) discardPlace(place);
-        throw new Error(held.fresh ? "Another process is opening this session. Try again in a few seconds." : held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : !ownerKnown(held) ? OPENING_TEXT : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
+        throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : !ownerKnown(held) ? OPENING_TEXT : `This session is open in another window (process ${held.pid}). Close it there first${process.platform === "win32" ? `. If no other window is open, delete this file and try again: ${join(s.dir, "open.json")}` : ""}`);
       }
       s.overrides = overrides;
       s.onceTrusted = !!opts.trustFolder;
