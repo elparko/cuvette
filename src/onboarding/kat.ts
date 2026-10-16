@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { KnownAnswerTest, LoadedAdapter } from "../adapters/manifest.ts";
-import { dataGaps, present, provideData, runFetchScript } from "../adapters/testdata.ts";
+import { dataFile, dataGaps, present, provideData, runFetchScript } from "../adapters/testdata.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 
 export interface TestOutcome {
@@ -53,11 +53,15 @@ function lookup(ref: string, saved: Record<string, ToolOutput>, adapterDir: stri
   return value;
 }
 
+export function fillAdapterDir(text: string, root: string): string {
+  return text.replace(/\{adapter_dir\}\/(data\/[^"{}*?\s]+)/g, (_, rel: string) => dataFile(root, rel)).replaceAll("{adapter_dir}", root);
+}
+
 export function substitute(value: unknown, saved: Record<string, ToolOutput>, adapterDir: string): unknown {
   if (typeof value === "string") {
     const whole = WHOLE.exec(value);
     if (whole) return lookup(whole[1], saved, adapterDir);
-    return value.replace(ANY, (_, ref: string) => String(lookup(ref, saved, adapterDir)));
+    return fillAdapterDir(value, adapterDir).replace(ANY, (_, ref: string) => String(lookup(ref, saved, adapterDir)));
   }
   if (Array.isArray(value)) return value.map((v) => substitute(v, saved, adapterDir));
   if (value && typeof value === "object") {

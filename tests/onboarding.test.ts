@@ -1,10 +1,11 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter } from "../src/adapters/manifest.ts";
+import { homeDataDir } from "../src/adapters/testdata.ts";
 import { approveAdapter, checkAdapter, installHint, missingDependencies, missingDependency, pythonSignature, scriptReads } from "../src/onboarding/checker.ts";
-import { runTests, substitute } from "../src/onboarding/kat.ts";
+import { fillAdapterDir, runTests, substitute } from "../src/onboarding/kat.ts";
 import { onboardCommand } from "../src/onboarding/agent.ts";
 import type { Tool, ToolOutput } from "../src/core/types.ts";
 
@@ -282,6 +283,23 @@ describe("known-answer runner", () => {
     a.module = async () => ({ tools: await tool.tools() });
     const out = await runTests(a, { tools: async () => [] });
     expect(out[0].failures).toEqual([]);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a data path resolves to the home folder if the package folder is read-only and lacks the file", () => {
+    const dir = join(tmp, "readonly-pkg");
+    mkdirSync(join(dir, "data"), { recursive: true });
+    mkdirSync(join(homeDataDir(dir), "data"), { recursive: true });
+    writeFileSync(join(homeDataDir(dir), "data", "a.csv"), "x\n1\n");
+    chmodSync(join(dir, "data"), 0o500);
+    try {
+      const home = join(homeDataDir(dir), "data", "a.csv");
+      expect(substitute({ x: "{adapter_dir}/data/a.csv" }, {}, dir)).toEqual({ x: home });
+      expect(fillAdapterDir("open {adapter_dir}/data/a.csv now", dir)).toBe(`open ${home} now`);
+      expect(substitute("{adapter_dir}", {}, dir)).toBe(dir);
+      expect(substitute("{adapter_dir}/data/none.csv", {}, dir)).toBe(join(dir, "data", "none.csv"));
+    } finally {
+      chmodSync(join(dir, "data"), 0o700);
+    }
   });
 
   test("substitute reports a missing saved name", () => {

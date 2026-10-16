@@ -48,6 +48,8 @@ jobs:
         with:
           name: disk-image
           path: desktop-image
+      - name: Check the test data index
+        run: node scripts/check-data-index.mjs
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:

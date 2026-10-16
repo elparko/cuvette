@@ -1,12 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { adapterDirs, CATALOG_DIR, loadAdapter } from "../src/adapters/manifest.ts";
-import { dataGaps, dataNotice, provideData } from "../src/adapters/testdata.ts";
+import { dataFile, dataGaps, dataNotice, homeDataDir, provideData } from "../src/adapters/testdata.ts";
 import { listPrograms } from "../src/core/programs.ts";
 import { checkAdapter } from "../src/onboarding/checker.ts";
 
@@ -173,6 +173,87 @@ describe("a corrupt download", () => {
     const r = await checkAdapter(dir, { runTests: true, fetchData: async () => true });
     expect(r.errors.join("\n")).toContain("checksum mismatch: made.txt");
     expect(existsSync(join(dir, "data", "made.txt"))).toBe(false);
+  });
+});
+
+describe("where the download is saved", () => {
+  const gapOf = (dir: string) => {
+    const a = loadAdapter(dir);
+    return { a, gap: dataGaps(a, a.manifest.tests.filter((t) => t.id === "indexed"))[0] };
+  };
+
+  test("a writable package folder gets the file", async () => {
+    const dir = fixture();
+    stubFetch();
+    const { a, gap } = gapOf(dir);
+    expect(await provideData(a, gap)).toEqual({});
+    expect(readFileSync(join(dir, "data", "a.csv"), "utf8")).toBe(A_CSV);
+    expect(existsSync(homeDataDir(dir))).toBe(false);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a read-only package folder sends the file to the home folder", async () => {
+    const dir = fixture();
+    stubFetch();
+    const { a, gap } = gapOf(dir);
+    chmodSync(join(dir, "data"), 0o500);
+    try {
+      expect(await provideData(a, gap)).toEqual({});
+    } finally {
+      chmodSync(join(dir, "data"), 0o700);
+    }
+    expect(existsSync(join(dir, "data", "a.csv"))).toBe(false);
+    expect(readFileSync(join(homeDataDir(dir), "data", "a.csv"), "utf8")).toBe(A_CSV);
+    expect(dataFile(dir, "data/a.csv")).toBe(join(homeDataDir(dir), "data", "a.csv"));
+    expect(dataGaps(a, a.manifest.tests.filter((t) => t.id === "indexed"))).toEqual([]);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("if both folders fail, the message names the home folder", async () => {
+    const dir = fixture();
+    stubFetch();
+    const { a, gap } = gapOf(dir);
+    mkdirSync(join(homeDataDir(dir), ".."), { recursive: true });
+    chmodSync(join(dir, "data"), 0o500);
+    chmodSync(join(homeDataDir(dir), ".."), 0o500);
+    try {
+      const got = await provideData(a, gap);
+      expect(got.error).toContain(homeDataDir(dir));
+    } finally {
+      chmodSync(join(dir, "data"), 0o700);
+      chmodSync(join(homeDataDir(dir), ".."), 0o700);
+    }
+  });
+});
+
+describe("the download request", () => {
+  test("a 404 for the version tag is a skip with a plain message", async () => {
+    const dir = fixture();
+    vi.stubGlobal("fetch", async () => new Response("Not Found", { status: 404 }));
+    const a = loadAdapter(dir);
+    const [gap] = dataGaps(a, a.manifest.tests.filter((t) => t.id === "indexed"));
+    const version = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version;
+    expect(await provideData(a, gap)).toEqual({ skip: `The data files for version ${version} are not published yet.` });
+  });
+
+  test("a body larger than the indexed size plus 1 KB is stopped", async () => {
+    const dir = fixture();
+    vi.stubGlobal("fetch", async () => new Response("x".repeat(A_CSV.length + 2048)));
+    const a = loadAdapter(dir);
+    const [gap] = dataGaps(a, a.manifest.tests.filter((t) => t.id === "indexed"));
+    const got = await provideData(a, gap);
+    expect(got.error).toContain("larger than the size in data/files.json");
+    expect(existsSync(join(dir, "data", "a.csv"))).toBe(false);
+  });
+
+  test("it prints one line for each file", async () => {
+    const dir = fixture();
+    stubFetch();
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const a = loadAdapter(dir);
+    const [gap] = dataGaps(a, a.manifest.tests.filter((t) => t.id === "indexed"));
+    await provideData(a, gap);
+    const lines = write.mock.calls.map((c) => String(c[0]));
+    write.mockRestore();
+    expect(lines).toEqual([`Downloading data/a.csv (${A_CSV.length} bytes)...\n`]);
   });
 });
 

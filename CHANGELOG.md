@@ -7,7 +7,7 @@ The project is in early development. Version numbers start at the first public r
 
 ### Smaller package
 
-- The npm package no longer contains the test data of the adapters. It is about 2.5 MB packed, from 18.5 MB.
+- The npm package no longer contains the test data of the adapters. It is 3.9 MB packed and 12.8 MB unpacked, from 18.5 MB packed.
 - The package keeps `data/SOURCES.md`, `data/files.json`, the `fetch*.sh` scripts and the data files of the self-tests.
 - `cuvette adapter check <name> --run-tests` shows the files, the source and the size of the missing test data. Then it asks before it downloads the data of that adapter only.
 - `--fetch-data` downloads without the question. A run without a terminal downloads nothing without it. If you decline, the tests that need the data do not run. This is not an error in the adapter.
