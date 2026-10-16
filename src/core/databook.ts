@@ -980,6 +980,7 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs: number, doneWh
     const child = spawn(cmd, args, { cwd, stdio: ["ignore", "ignore", "pipe"], detached: process.platform !== "win32" });
     let err = "";
     let finished = false;
+    let closed = false;
     const stop = (ok: boolean) => {
       if (finished) return;
       finished = true;
@@ -988,7 +989,12 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs: number, doneWh
         if (child.pid && process.platform !== "win32") process.kill(-child.pid, "SIGKILL");
         else child.kill("SIGKILL");
       } catch {}
-      done({ ok, err });
+      if (closed) return done({ ok, err });
+      const wait = setTimeout(() => done({ ok, err }), 3000);
+      child.once("close", () => {
+        clearTimeout(wait);
+        done({ ok, err });
+      });
     };
     child.stderr.on("data", (d) => {
       err += String(d);
@@ -998,6 +1004,9 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs: number, doneWh
     child.on("error", (e) => {
       err += e.message;
       stop(false);
+    });
+    child.on("close", () => {
+      closed = true;
     });
     child.on("exit", (code) => stop(code === 0));
   });
@@ -1019,7 +1028,9 @@ export async function printPdf(html: string, pdf: string): Promise<string | unde
     }
     return "No PDF: Chrome did not write the file.";
   } finally {
-    rmSync(tmp, { recursive: true, force: true });
+    try {
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {}
   }
 }
 
