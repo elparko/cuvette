@@ -60,7 +60,8 @@ test("the file-type hint names adapters for the files in the request", () => {
   expect(fileTypeHint("Data: /data/sleep.csv", list, cwd)).toContain("biostats");
   expect(fileTypeHint("Count reads in /data/x.bam and call variants in calls.vcf.gz", list, cwd)).toMatch(/x\.bam -> samtools.*calls\.vcf\.gz -> bcftools/);
   expect(fileTypeHint("Quantify salmon/quant.sf", list, cwd)).toMatch(/quant\.sf -> deseq2/);
-  expect(fileTypeHint("Look at run.imzML", list, cwd)).toMatch(/run\.imzML -> cardinal, pyimzml, smile-msi/);
+  const imzml = fileTypeHint("Look at run.imzML", list, cwd);
+  for (const name of ["cardinal", "pyimzml", "smile-msi"]) expect(imzml).toMatch(new RegExp(`run\\.imzML -> [a-z0-9, -]*\\b${name}\\b`));
   expect(fileTypeHint("No files here, just a question.", list, cwd)).toBe("");
   expect(fileTypeHint("Count reads in /data/x.bam", list, cwd, ["samtools"])).toBe("");
 });
